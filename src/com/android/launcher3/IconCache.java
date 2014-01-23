@@ -39,6 +39,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -68,6 +69,7 @@ public class IconCache {
     private static final String TAG = "Launcher.IconCache";
 
     private static final int INITIAL_ICON_CACHE_CAPACITY = 50;
+    private IconPackHelper mIconPackHelper;
 
     // Empty class name is used for storing package default entry.
     private static final String EMPTY_CLASS_NAME = ".";
@@ -140,6 +142,9 @@ public class IconCache {
         // Always prefer RGB_565 config for low res. If the bitmap has transparency, it will
         // automatically be loaded as ALPHA_8888.
         mLowResOptions.inPreferredConfig = Bitmap.Config.RGB_565;
+
+        mIconPackHelper = new IconPackHelper(context);
+        loadIconPack();
     }
 
     private Drawable getFullResDefaultActivityIcon() {
@@ -172,6 +177,26 @@ public class IconCache {
         return getFullResDefaultActivityIcon();
     }
 
+    public Drawable getFullResIcon(ApplicationInfo info) {
+        Resources resources;
+        try {
+            resources = mPackageManager.getResourcesForApplication(info);
+        } catch (PackageManager.NameNotFoundException e) {
+            resources = null;
+        }
+        if (resources != null) {
+            int iconId = 0;
+            if (mIconPackHelper != null && mIconPackHelper.isIconPackLoaded()) {
+                iconId = mIconPackHelper.getResourceIdForActivityIcon(info);
+                if (iconId != 0) {
+                    return getFullResIcon(mIconPackHelper.getIconPackResources(), iconId);
+                }
+            }
+        }
+
+        return getFullResDefaultActivityIcon();
+    }
+
     public Drawable getFullResIcon(ActivityInfo info) {
         Resources resources;
         try {
@@ -193,6 +218,26 @@ public class IconCache {
     private Bitmap makeDefaultIcon(UserHandleCompat user) {
         Drawable unbadged = getFullResDefaultActivityIcon();
         return Utilities.createBadgedIconBitmap(unbadged, user, mContext, -1);
+    }
+
+    private void loadIconPack() {
+        mIconPackHelper.unloadIconPack();
+        String iconPack = PreferenceManager.getDefaultSharedPreferences(mContext)
+                    .getString(Utilities.KEY_ICON_PACK, "");
+        if (!TextUtils.isEmpty(iconPack) && !mIconPackHelper.loadIconPack(iconPack)) {
+            PreferenceManager.getDefaultSharedPreferences(mContext).edit()
+                    .putString(Utilities.KEY_ICON_PACK, "").commit();
+        }
+    }
+
+    /**
+     * Empty out the cache.
+     */
+    public void flush() {
+        synchronized (mCache) {
+            mCache.clear();
+        }
+        loadIconPack();
     }
 
     /**
@@ -266,6 +311,7 @@ public class IconCache {
             updateDBIcons(user, apps, UserHandleCompat.myUserHandle().equals(user)
                     ? ignorePackagesForMainUser : Collections.<String>emptySet());
         }
+        loadIconPack();
     }
 
     /**
@@ -674,7 +720,16 @@ public class IconCache {
                     Bitmap lowResIcon =  generateLowResIcon(icon, mPackageBgColor);
                     entry.title = appInfo.loadLabel(mPackageManager);
                     entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, user);
-                    entry.icon = useLowResIcon ? lowResIcon : icon;
+                    Drawable iconDrawable = getFullResIcon(appInfo);
+                    if (mIconPackHelper.isIconPackLoaded() && (mIconPackHelper
+                            .getResourceIdForActivityIcon(appInfo) == 0)) {
+                        entry.icon = Utilities.createIconBitmap(
+                                iconDrawable, mContext, mIconPackHelper.getIconBack(),
+                                mIconPackHelper.getIconMask(), mIconPackHelper.getIconUpon(),
+                                mIconPackHelper.getIconScale());
+                    } else {
+                        entry.icon = useLowResIcon ? lowResIcon : icon;
+                    }
                     entry.isLowResIcon = useLowResIcon;
 
                     // Add the icon in the DB here, since these do not get written during

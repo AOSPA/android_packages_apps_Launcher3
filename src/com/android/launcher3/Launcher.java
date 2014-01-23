@@ -172,6 +172,8 @@ public class Launcher extends Activity
 
     private static final int REQUEST_PERMISSION_CALL_PHONE = 13;
 
+    protected static final int REQUEST_PICK_ICON = 15;
+
     private static final float BOUNCE_ANIMATION_TENSION = 1.3f;
 
     /**
