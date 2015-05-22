@@ -48,6 +48,7 @@ public class LauncherAppState {
     private static LauncherAppState INSTANCE;
 
     private static boolean mHaveCustomWorkspace;
+    private static boolean mCustomizeBrowserIcon;
 
     private InvariantDeviceProfile mInvariantDeviceProfile;
 
@@ -87,6 +88,8 @@ public class LauncherAppState {
         }
         mHaveCustomWorkspace = sContext.getResources().getBoolean(
                 R.bool.config_launcher_customWorkspace);
+        mCustomizeBrowserIcon = sContext.getResources().getBoolean(
+                R.bool.config_regional_customize_default_browser_icon);
 
         mInvariantDeviceProfile = new InvariantDeviceProfile(sContext);
         mIconCache = new IconCache(sContext, mInvariantDeviceProfile);
@@ -162,6 +165,10 @@ public class LauncherAppState {
 
     public static boolean isCustomWorkspace() {
         return mHaveCustomWorkspace;
+    }
+
+    public static boolean isCustomizeBrowserIcon() {
+        return mCustomizeBrowserIcon;
     }
 
     static void setLauncherProvider(LauncherProvider provider) {

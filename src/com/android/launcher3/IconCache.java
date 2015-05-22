@@ -75,6 +75,8 @@ public class IconCache {
 
     private static final int LOW_RES_SCALE_FACTOR = 5;
 
+    private final String CHROME_PACKAGE_NAME = "com.android.chrome";
+
     @Thunk static final Object ICON_UPDATE_TOKEN = new Object();
 
     @Thunk static class CacheEntry {
@@ -455,6 +457,34 @@ public class IconCache {
         }
     }
 
+    private Bitmap getCustomizedIcon() {
+        Resources res = mContext.getResources();
+        Bitmap bitmap = BitmapFactory.decodeResource(res, R.drawable.customize_browser_icon);
+        return bitmap;
+    }
+
+    private void setCustomizedIconAndTitle(LauncherActivityInfoCompat info, CacheEntry entry) {
+        if (info != null) {
+            setCustomizedIconAndTitle(info.getComponentName().toString().trim(), entry);
+        }
+    }
+
+    private void setCustomizedIconAndTitle(String packagename, CacheEntry entry) {
+        boolean iscustomizechrome = false;
+        if (packagename != null) {
+            iscustomizechrome = packagename.contains(CHROME_PACKAGE_NAME);
+        }
+        if (iscustomizechrome) {
+            entry.icon = getCustomizedIcon();
+            entry.title = getCustomizedTitle();
+        }
+    }
+
+    private String getCustomizedTitle() {
+        return mContext.getResources().getString(
+                R.string.config_regional_customize_default_browser_title);
+    }
+
     /**
      * Returns a high res icon for the given intent and user
      */
@@ -569,6 +599,9 @@ public class IconCache {
                 entry.title = info.getLabel();
                 entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, user);
             }
+        }
+        if(LauncherAppState.isCustomizeBrowserIcon()) {
+            setCustomizedIconAndTitle(info, entry);
         }
         return entry;
     }
@@ -701,6 +734,9 @@ public class IconCache {
                 } else {
                     entry.contentDescription = mUserManager.getBadgedLabelForUser(
                             entry.title, cacheKey.user);
+                }
+                if(LauncherAppState.isCustomizeBrowserIcon()) {
+                    setCustomizedIconAndTitle(cacheKey.componentName.flattenToString(), entry);
                 }
                 return true;
             }
