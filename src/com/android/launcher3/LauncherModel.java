@@ -170,6 +170,11 @@ public class LauncherModel extends BroadcastReceiver
 
     // </ only access in worker thread >
 
+    public static final String ACTION_UNREAD_CHANGED =
+            "com.android.launcher.action.UNREAD_CHANGED";
+    private static final String EXTRA_COMPONENT_NAME = "component_name";
+    private static final String EXTRA_UNREAD_NUMBER = "unread_number";
+
     @Thunk IconCache mIconCache;
 
     @Thunk final LauncherAppsCompat mLauncherApps;
@@ -207,6 +212,95 @@ public class LauncherModel extends BroadcastReceiver
         public void onPageBoundSynchronously(int page);
         public void dumpLogsToLocalData();
     }
+
+    private HashMap<ComponentName, UnreadInfo> mUnreadChangedMap =
+            new HashMap<ComponentName, LauncherModel.UnreadInfo>();
+
+    private class UnreadInfo {
+        ComponentName mComponentName;
+        int mUnreadNum;
+
+        public UnreadInfo(ComponentName componentName, int unreadNum) {
+            mComponentName = componentName;
+            mUnreadNum = unreadNum;
+        }
+    }
+
+    private class UnreadNumberChangeTask implements Runnable {
+        public void run() {
+            ArrayList<UnreadInfo> unreadInfos = new ArrayList<LauncherModel.UnreadInfo>();
+            synchronized (mUnreadChangedMap) {
+                unreadInfos.addAll(mUnreadChangedMap.values());
+                mUnreadChangedMap.clear();
+            }
+
+            final Callbacks callbacks = getCallback();
+            if (callbacks == null) {
+                Log.w(TAG, "Nobody to tell about the new app.  Launcher is probably loading.");
+                return;
+            }
+
+            final ArrayList<AppInfo> unreadChangeFinal = new ArrayList<AppInfo>();
+            for (UnreadInfo uInfo : unreadInfos) {
+                AppInfo info = mBgAllAppsList.unreadNumbersChanged(mApp.getContext(),
+                        uInfo.mComponentName, uInfo.mUnreadNum);
+                if (info != null) {
+                    unreadChangeFinal.add(info);
+                }
+            }
+
+            // update the mainmenu icon
+            if (unreadChangeFinal.isEmpty()) return;
+            mHandler.post(new Runnable() {
+                public void run() {
+                    Callbacks cb = getCallback();
+                    if (cb != null && callbacks == cb) {
+                        cb.bindAppsUpdated(unreadChangeFinal);
+                    }
+                }
+            });
+
+            // update the workspace shortcuts icon
+            final UserHandleCompat user = UserHandleCompat.myUserHandle();
+            final ArrayList<ShortcutInfo> updatedShortcuts = new ArrayList<>();
+            synchronized (sBgLock) {
+                for (ItemInfo info : sBgItemsIdMap) {
+                    if (info instanceof ShortcutInfo && user.equals(info.user)
+                            && info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION) {
+                        ShortcutInfo si = (ShortcutInfo) info;
+                        ComponentName cn = si.getTargetComponent();
+                        if (cn != null && unreadContains(unreadChangeFinal, cn)) {
+                            si.updateIcon(mIconCache);
+                            updatedShortcuts.add(si);
+                        }
+                    }
+                }
+            }
+
+            if (!updatedShortcuts.isEmpty()) {
+                mHandler.post(new Runnable() {
+
+                    public void run() {
+                        Callbacks cb = getCallback();
+                        if (cb != null && callbacks == cb) {
+                            cb.bindShortcutsChanged(updatedShortcuts,
+                                    new ArrayList<ShortcutInfo>(), user);
+                        }
+                    }
+                });
+            }
+        }
+        private boolean unreadContains(ArrayList<AppInfo> unreadList, ComponentName cn) {
+            for (AppInfo info : unreadList) {
+                if (info.componentName.equals(cn)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private UnreadNumberChangeTask mUnreadUpdateTask = new UnreadNumberChangeTask();
 
     public interface ItemInfoFilter {
         public boolean filterItem(ItemInfo parent, ItemInfo info, ComponentName cn);
@@ -1285,6 +1379,16 @@ public class LauncherModel extends BroadcastReceiver
                         PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE,
                         new String[0], user));
             }
+        } else if (ACTION_UNREAD_CHANGED.equals(action)) {
+            ComponentName componentName = intent.getParcelableExtra(EXTRA_COMPONENT_NAME);
+            int unreadNum = intent.getIntExtra(EXTRA_UNREAD_NUMBER, 0);
+
+            if (componentName == null) return;
+            synchronized (mUnreadChangedMap) {
+                mUnreadChangedMap.put(componentName, new UnreadInfo(componentName, unreadNum));
+            }
+            sWorker.removeCallbacks(mUnreadUpdateTask);
+            sWorker.post(mUnreadUpdateTask);
         }
     }
 

@@ -109,6 +109,12 @@ public class LauncherAppState {
 
         sContext.registerReceiver(
                 new WallpaperChangedReceiver(), new IntentFilter(Intent.ACTION_WALLPAPER_CHANGED));
+
+        filter = new IntentFilter();
+        if (Utilities.isUnreadCountEnabled(sContext)) {
+            filter.addAction(LauncherModel.ACTION_UNREAD_CHANGED);
+            sContext.registerReceiver(mModel, filter);
+        }
     }
 
     /**
