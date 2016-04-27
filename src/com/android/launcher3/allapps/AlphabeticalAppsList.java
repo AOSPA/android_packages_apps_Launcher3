@@ -24,8 +24,12 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.compat.AlphabeticIndexCompat;
 import com.android.launcher3.compat.UserHandleCompat;
 import com.android.launcher3.model.AppNameComparator;
+import com.android.launcher3.R;
 import com.android.launcher3.util.ComponentKey;
-
+import com.android.launcher3.xml.ComponentInfo;
+import com.android.launcher3.xml.ComponentParserImpl;
+import java.io.InputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -336,6 +340,38 @@ public class AlphabeticalAppsList {
         }
         onAppsUpdated();
     }
+    public void lockPreloadingApps() {
+        List<ComponentInfo> custom_app_list = null;
+        try {
+            InputStream is = mLauncher.getAssets().open("custom_main_menu.xml");
+            ComponentParserImpl pbp = new ComponentParserImpl();
+            custom_app_list = pbp.parse(is);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (custom_app_list != null && !custom_app_list.isEmpty()) {
+            for (int i = 0; i < custom_app_list.size(); i++) {
+                for (int j = 0; j < mApps.size(); j++) {
+                    AppInfo info = mApps.get(j);
+                    ComponentInfo cinfo = custom_app_list.get(i);
+                    if (null != info && null != cinfo && null != info.componentName &&
+                            info.componentName.getPackageName().
+                            equals(cinfo.getComponentPackage()) &&
+                            info.componentName.getClassName().
+                            equals(cinfo.getComponentClass())) {
+                        int row = cinfo.getRow() + 1;
+                        int column = cinfo.getColumn() + 1;
+                        int lockpos = mNumAppsPerRow * (row - 1) + column;
+                        if (column <= mNumAppsPerRow && lockpos <= mApps.size()) {
+                            Collections.swap(mApps, lockpos - 1, j);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Updates internals when the set of apps are updated.
@@ -345,7 +381,10 @@ public class AlphabeticalAppsList {
         mApps.clear();
         mApps.addAll(mComponentToAppMap.values());
         Collections.sort(mApps, mAppNameComparator.getAppInfoComparator());
-
+        if (mLauncher.getResources().getBoolean(
+                R.bool.config_launcher_customWorkspace)){
+            lockPreloadingApps();
+        }
         // As a special case for some languages (currently only Simplified Chinese), we may need to
         // coalesce sections
         Locale curLocale = mLauncher.getResources().getConfiguration().locale;
