@@ -46,11 +46,13 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
@@ -69,7 +71,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
+import android.os.RemoteException;
 import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -141,6 +145,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.qti.launcherunreadservice.IGetUnreadNumber;
 /**
  * Default launcher application.
  */
@@ -221,6 +229,11 @@ public class Launcher extends Activity
 
     private boolean restoreFromHideMode = false;
     private List<HideAppInfo> mHideApps = new ArrayList<HideAppInfo>();
+
+    private static final String LAUNCHER_UNREAD_SERVICE_PACKAGENAME =
+            "com.qti.launcherunreadservice";
+    private static final String LAUNCHER_UNREAD_SERVICE_CLASSNAME =
+            "com.qti.launcherunreadservice.LauncherUnreadService";
 
     static final String INTRO_SCREEN_DISMISSED = "launcher.intro_screen_dismissed";
     static final String FIRST_RUN_ACTIVITY_DISPLAYED = "launcher.first_run_activity_displayed";
@@ -425,6 +438,27 @@ public class Launcher extends Activity
         }
     }
 
+    private Map mUnreadAppMap = new HashMap<ComponentName, Integer>();
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            IGetUnreadNumber iGetUnreadNumber = IGetUnreadNumber.Stub.asInterface(service);
+
+            try {
+                if(iGetUnreadNumber != null){
+                    mUnreadAppMap = iGetUnreadNumber.GetUnreadNumber();
+                }
+            } catch (RemoteException ex) {
+            }
+
+            mIconCache.setUnreadMap(mUnreadAppMap);
+            unbindService(mConnection);
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+        }
+    };
+
     private Runnable mUpdateOrientationRunnable = new Runnable() {
         public void run() {
             setOrientation();
@@ -547,11 +581,22 @@ public class Launcher extends Activity
             showFirstRunActivity();
             showFirstRunClings();
         }
+
         if (LauncherAppState.isShowWFCNotification()) {
             mTelephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
             mSignalStrengthListener = new SignalStrengthListener();
             mTelephonyManager.listen(mSignalStrengthListener,
                     PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+        }
+
+        if(mIconCache.getAppIconReload()) {
+            Intent intent = new Intent();
+            ComponentName componentName = new ComponentName(LAUNCHER_UNREAD_SERVICE_PACKAGENAME,
+                    LAUNCHER_UNREAD_SERVICE_CLASSNAME);
+            intent.setComponent(componentName);
+            final Intent eintent = new Intent(Utilities.
+                    createExplicitFromImplicitIntent(this, intent));
+            bindService(eintent, mConnection, Context.BIND_AUTO_CREATE);
         }
     }
 
