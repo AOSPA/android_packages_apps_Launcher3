@@ -202,7 +202,7 @@ public abstract class ButtonDropTarget extends TextView
     }
 
     @Override
-    public final boolean acceptDrop(DragObject dragObject) {
+    public boolean acceptDrop(DragObject dragObject) {
         return supportsDrop(dragObject.dragSource, dragObject.dragInfo);
     }
 

@@ -4998,6 +4998,10 @@ public class Launcher extends Activity
         return sCustomAppWidgets;
     }
 
+    public void updateTitleDb(ShortcutInfo info, String title) {
+        mModel.updateShortcutTitle(this, info, title);
+    }
+
     public void dumpLogsToLocalData() {
         if (DEBUG_DUMP_LOG) {
             new AsyncTask<Void, Void, Void>() {

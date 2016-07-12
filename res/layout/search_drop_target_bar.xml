@@ -40,6 +40,16 @@
         </FrameLayout>
 
         <FrameLayout
+             style="@style/DropTargetButtonContainer"
+             android:layout_weight="1">
+                <!-- Delete target -->
+                <com.android.launcher3.RenameDropTarget
+                    android:id="@+id/rename_target_text"
+                    style="@style/DropTargetButton"
+                    android:text="@string/rename_target_label" />
+        </FrameLayout>
+
+        <FrameLayout
             style="@style/DropTargetButtonContainer"
             android:layout_weight="1" >
 

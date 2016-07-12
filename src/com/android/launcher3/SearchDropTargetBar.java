@@ -76,6 +76,7 @@ public class SearchDropTargetBar extends FrameLayout implements DragController.D
     // Drop targets
     private ButtonDropTarget mInfoDropTarget;
     private ButtonDropTarget mDeleteDropTarget;
+    private ButtonDropTarget mRenameDropTarget;
     private ButtonDropTarget mUninstallDropTarget;
 
     public SearchDropTargetBar(Context context, AttributeSet attrs) {
@@ -92,15 +93,18 @@ public class SearchDropTargetBar extends FrameLayout implements DragController.D
 
         dragController.addDragListener(mInfoDropTarget);
         dragController.addDragListener(mDeleteDropTarget);
+        dragController.addDragListener(mRenameDropTarget);
         dragController.addDragListener(mUninstallDropTarget);
 
         dragController.addDropTarget(mInfoDropTarget);
         dragController.addDropTarget(mDeleteDropTarget);
+        dragController.addDropTarget(mRenameDropTarget);
         dragController.addDropTarget(mUninstallDropTarget);
 
         mInfoDropTarget.setLauncher(launcher);
         mDeleteDropTarget.setLauncher(launcher);
         mUninstallDropTarget.setLauncher(launcher);
+        mRenameDropTarget.setLauncher(launcher);
     }
 
     @Override
@@ -111,12 +115,16 @@ public class SearchDropTargetBar extends FrameLayout implements DragController.D
         mDropTargetBar = findViewById(R.id.drag_target_bar);
         mInfoDropTarget = (ButtonDropTarget) mDropTargetBar.findViewById(R.id.info_target_text);
         mDeleteDropTarget = (ButtonDropTarget) mDropTargetBar.findViewById(R.id.delete_target_text);
+        mRenameDropTarget = (ButtonDropTarget) mDropTargetBar.findViewById(R.id.rename_target_text);
         mUninstallDropTarget = (ButtonDropTarget) mDropTargetBar.findViewById(R.id.uninstall_target_text);
 
         mInfoDropTarget.setSearchDropTargetBar(this);
         mDeleteDropTarget.setSearchDropTargetBar(this);
+        mRenameDropTarget.setSearchDropTargetBar(this);
         mUninstallDropTarget.setSearchDropTargetBar(this);
-
+        if(!LauncherAppState.isCustomizeShortcutRname()) {
+            mRenameDropTarget.setVisibility(View.GONE);
+        }
         // Create the various fade animations
         mDropTargetBar.setAlpha(0f);
         AlphaUpdateListener.updateVisibility(mDropTargetBar, mAccessibilityEnabled);
@@ -252,6 +260,9 @@ public class SearchDropTargetBar extends FrameLayout implements DragController.D
             mQSB.setVisibility(enable ? View.GONE : View.VISIBLE);
         }
         mInfoDropTarget.enableAccessibleDrag(enable);
+        if(LauncherAppState.isCustomizeShortcutRname()) {
+            mRenameDropTarget.enableAccessibleDrag(enable);
+        }
         mDeleteDropTarget.enableAccessibleDrag(enable);
         mUninstallDropTarget.enableAccessibleDrag(enable);
     }

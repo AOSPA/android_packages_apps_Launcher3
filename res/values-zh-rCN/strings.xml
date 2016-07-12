@@ -103,6 +103,12 @@
     <string name="action_increase_height" msgid="459390020612501122">"增加高度"</string>
     <string name="action_decrease_width" msgid="1374549771083094654">"减小宽度"</string>
     <string name="action_decrease_height" msgid="282377193880900022">"减小高度"</string>
+    <!-- Label for the rename drop target. [CHAR_LIMIT==30] -->
+    <string name="rename_target_label">重命名</string>
+    <string name="rename_desc_label">修改应用名称:</string>
+    <string name="cancel_action">取消</string>
+    <string name="rename_action">确认</string>
+    <string name="delete_zone_label_workspace">删除</string>
     <string name="widget_resized" msgid="9130327887929620">"小部件尺寸已调整为：宽度 <xliff:g id="NUMBER_0">%1$s</xliff:g>，高度 <xliff:g id="NUMBER_1">%2$s</xliff:g>"</string>
 
     <!-- All app menu -->

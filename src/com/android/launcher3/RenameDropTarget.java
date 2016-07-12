@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 The Android Open Source Project
+ * Copyright (C) 2016 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,59 +16,79 @@
 
 package com.android.launcher3;
 
+import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.res.ColorStateList;
-import android.content.res.Configuration;
-import android.content.res.Resources;
-import android.graphics.drawable.TransitionDrawable;
+import android.content.DialogInterface;
+import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.view.View;
-import android.view.ViewGroup;
+import android.util.Log;
+import android.widget.EditText;
 
 import com.android.launcher3.compat.UserHandleCompat;
 
-public class InfoDropTarget extends ButtonDropTarget {
+public class RenameDropTarget extends ButtonDropTarget {
 
-    private ColorStateList mOriginalTextColor;
-    private TransitionDrawable mDrawable;
+    private static String TAG = "RenameDropTarget";
+    private static boolean DBG = false;
+    private Context mCtx;
 
-    public InfoDropTarget(Context context, AttributeSet attrs) {
+    public RenameDropTarget(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
+        mCtx = context;
     }
 
-    public InfoDropTarget(Context context, AttributeSet attrs, int defStyle) {
+    public RenameDropTarget(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+        mCtx = context;
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-
-        mOriginalTextColor = getTextColors();
-
         // Get the hover color
-        Resources r = getResources();
-        mHoverColor = r.getColor(R.color.info_target_hover_tint);
-        mDrawable = (TransitionDrawable) getCurrentDrawable();
+        mHoverColor = getResources().getColor(R.color.info_target_hover_tint);
+        setDrawable(R.drawable.ic_info_launcher);
+    }
 
-        if (mDrawable == null) {
-            // TODO: investigate why this is ever happening. Presently only on one known device.
-            mDrawable = (TransitionDrawable) r.getDrawable(R.drawable.info_target_selector);
-            setCompoundDrawablesRelativeWithIntrinsicBounds(mDrawable, null, null, null);
+    public static void startDetailsActivityForInfo(Object info, Launcher launcher) {
+        ComponentName componentName = null;
+        if (info instanceof AppInfo) {
+            componentName = ((AppInfo) info).componentName;
+        } else if (info instanceof ShortcutInfo) {
+            componentName = ((ShortcutInfo) info).intent.getComponent();
+        } else if (info instanceof PendingAddItemInfo) {
+            componentName = ((PendingAddItemInfo) info).componentName;
+        }
+        final UserHandleCompat user;
+        if (info instanceof ItemInfo) {
+            user = ((ItemInfo) info).user;
+        } else {
+            user = UserHandleCompat.myUserHandle();
         }
 
-        if (null != mDrawable) {
-            mDrawable.setCrossFadeEnabled(true);
+        if (componentName != null) {
+            launcher.startApplicationDetailsActivity(componentName, user);
         }
+    }
 
-        // Remove the text in the Phone UI in landscape
-        int orientation = getResources().getConfiguration().orientation;
-        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            if (!LauncherAppState.getInstance().isScreenLarge()) {
-                setText("");
-            }
-        }
+    @Override
+    protected boolean supportsDrop(DragSource source, Object info) {
+        boolean isactive = isVisible(info);
+        return isactive;
+    }
+
+    private boolean isVisible(Object info){
+        return (info instanceof ShortcutInfo);
+    }
+
+    public static boolean supportsDrop(Context context, Object info) {
+        return info instanceof AppInfo || info instanceof PendingAddItemInfo;
+    }
+
+    @Override
+    void completeDrop(DragObject d) {
+        startDetailsActivityForInfo(d.dragInfo, mLauncher);
     }
 
     @Override
@@ -77,63 +97,41 @@ public class InfoDropTarget extends ButtonDropTarget {
         // in onDrop, because it allows us to reject the drop (by returning false)
         // so that the object being dragged isn't removed from the drag source.
         ComponentName componentName = null;
-        if (d.dragInfo instanceof AppInfo) {
-            componentName = ((AppInfo) d.dragInfo).componentName;
-        } else if (d.dragInfo instanceof ShortcutInfo) {
+        if (d.dragInfo instanceof ShortcutInfo) {
+            final ShortcutInfo  curShortcutInfo = (ShortcutInfo) d.dragInfo;
             componentName = ((ShortcutInfo) d.dragInfo).intent.getComponent();
-        } else if (d.dragInfo instanceof PendingAddItemInfo) {
-            componentName = ((PendingAddItemInfo) d.dragInfo).componentName;
+            String text = curShortcutInfo.title.toString();
+            final EditText ed = new EditText(mCtx);
+            ed.setSingleLine(true);
+            ed.setText(text);
+            ed.setSelection(text.length());
+            new AlertDialog.Builder(mCtx)
+                .setTitle(R.string.rename_desc_label)
+                .setIcon(android.R.drawable.ic_dialog_info)
+                .setView(ed)
+                .setPositiveButton(R.string.rename_action,
+                    new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            curShortcutInfo.intent.putExtra("isShortcutInfoRename", true);
+                            mLauncher.updateTitleDb(curShortcutInfo,
+                               ed.getText().toString());
+                            mLauncher.getModel().forceReload();
+                        }
+                    }
+                )
+                .setNegativeButton(R.string.cancel_action,
+                    new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            mLauncher.getModel().forceReload();
+                        }
+                    }
+                )
+                .show();
         }
-        final UserHandleCompat user;
-        if (d.dragInfo instanceof ItemInfo) {
-            user = ((ItemInfo) d.dragInfo).user;
-        } else {
-            user = UserHandleCompat.myUserHandle();
-        }
-
-        if (componentName != null) {
-            mLauncher.startApplicationDetailsActivity(componentName, user);
-        }
-
         // There is no post-drop animation, so clean up the DragView now
         d.deferDragViewCleanupPostAnimation = false;
         return false;
-    }
-
-    @Override
-    public void onDragStart(DragSource source, Object info, int dragAction) {
-        boolean isVisible = true;
-
-        // Hide this button unless we are dragging something from AllApps
-        if (!source.supportsAppInfoDropTarget()) {
-            isVisible = false;
-        }
-
-        mActive = isVisible;
-        mDrawable.resetTransition();
-        setTextColor(mOriginalTextColor);
-        ((ViewGroup) getParent()).setVisibility(isVisible ? View.VISIBLE : View.GONE);
-    }
-
-    @Override
-    public void onDragEnd() {
-        super.onDragEnd();
-        mActive = false;
-    }
-
-    public void onDragEnter(DragObject d) {
-        super.onDragEnter(d);
-
-        mDrawable.startTransition(mTransitionDuration);
-        setTextColor(mHoverColor);
-    }
-
-    public void onDragExit(DragObject d) {
-        super.onDragExit(d);
-
-        if (!d.dragComplete) {
-            mDrawable.resetTransition();
-            setTextColor(mOriginalTextColor);
-        }
     }
 }

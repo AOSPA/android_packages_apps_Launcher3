@@ -33,6 +33,10 @@ public class UninstallDropTarget extends ButtonDropTarget {
 
     @Override
     protected boolean supportsDrop(DragSource source, Object info) {
+        boolean  isVisiable = (info instanceof ShortcutInfo);
+        if (isVisiable) {
+           return false;
+        }
         return supportsDrop(getContext(), info);
     }
 

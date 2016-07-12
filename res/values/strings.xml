@@ -266,6 +266,13 @@
     <!-- Accessibility action to decrease height of a widget. [CHAR_LIMIT=30] -->
     <string name="action_decrease_height">Decrease height</string>
 
+    <!-- Label for the rename drop target. [CHAR_LIMIT=30] -->
+    <string name="rename_target_label">Rename</string>
+    <string name="rename_desc_label">Change Shortcut title to:</string>
+    <string name="cancel_action">Cancel</string>
+    <string name="rename_action">OK</string>
+    <string name="delete_zone_label_workspace">DEl</string>
+
     <!-- Accessibility confirmation for widget resize. -->
     <string name="widget_resized">Widget resized to width <xliff:g id="number" example="2">%1$s</xliff:g> height <xliff:g id="number" example="1">%2$s</xliff:g></string>
 

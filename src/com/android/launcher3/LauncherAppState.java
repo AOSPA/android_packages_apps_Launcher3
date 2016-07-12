@@ -49,6 +49,7 @@ public class LauncherAppState {
 
     private static boolean mHaveCustomWorkspace;
     private static boolean mCustomizeBrowserIcon;
+    private static boolean mCustomizeShortcutRename;
 
     private InvariantDeviceProfile mInvariantDeviceProfile;
 
@@ -90,6 +91,8 @@ public class LauncherAppState {
                 R.bool.config_launcher_customWorkspace);
         mCustomizeBrowserIcon = sContext.getResources().getBoolean(
                 R.bool.config_regional_customize_default_browser_icon);
+        mCustomizeShortcutRename = sContext.getResources().getBoolean(
+                R.bool.config_regional_customize_rename);
 
         mInvariantDeviceProfile = new InvariantDeviceProfile(sContext);
         mIconCache = new IconCache(sContext, mInvariantDeviceProfile);
@@ -171,6 +174,9 @@ public class LauncherAppState {
         return mCustomizeBrowserIcon;
     }
 
+    public static boolean isCustomizeShortcutRname() {
+        return mCustomizeShortcutRename;
+    }
     static void setLauncherProvider(LauncherProvider provider) {
         sLauncherProvider = new WeakReference<LauncherProvider>(provider);
     }

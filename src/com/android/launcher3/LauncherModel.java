@@ -3028,6 +3028,19 @@ public class LauncherModel extends BroadcastReceiver
                     ComponentName cn = si.getTargetComponent();
                     if (cn != null && updatedPackages.contains(cn.getPackageName())) {
                         si.updateIcon(mIconCache);
+                        if(LauncherAppState.isCustomizeShortcutRname()) {
+                            boolean isShortcutInfoRename = false;
+                            if (si.intent != null) {
+                                isShortcutInfoRename = si.intent
+                                        .getBooleanExtra("isShortcutInfoRename", false);
+                            }
+                            if (isShortcutInfoRename) {
+                                String  rename = getshortcutReame(si.id);
+                                if (rename != null) {
+                                    si.title = rename;
+                                }
+                            }
+                        }
                         updatedShortcuts.add(si);
                     }
                 }
@@ -3060,6 +3073,21 @@ public class LauncherModel extends BroadcastReceiver
                 }
             });
         }
+    }
+
+    private String getshortcutReame(long id) {
+        final Uri contentUri = LauncherSettings.Favorites.CONTENT_URI;
+        final Cursor c = mApp.getContext().getContentResolver().query(contentUri,
+                new String[]{LauncherSettings.Favorites.TITLE},"_id" + "=?",
+                new String[]{id+""}, null);
+        if (c != null) {
+           final int titleIndex = c.getColumnIndexOrThrow
+                   (LauncherSettings.Favorites.TITLE);
+           c.moveToFirst();
+           return c.getString(titleIndex);
+        }
+
+        return null;
     }
 
     void enqueuePackageUpdated(PackageUpdatedTask task) {
@@ -3608,6 +3636,16 @@ public class LauncherModel extends BroadcastReceiver
             info.title =  Utilities.trim(c.getString(titleIndex));
         }
 
+        if(LauncherAppState.isCustomizeShortcutRname()) {
+            boolean isShortcutInfoRename = false;
+            if (intent != null) {
+                 isShortcutInfoRename = intent.getBooleanExtra("isShortcutInfoRename", false);
+            }
+            if (c != null && isShortcutInfoRename) {
+                info.title =  c.getString(titleIndex);
+            }
+        }
+
         // fall back to the class name of the activity
         if (info.title == null) {
             info.title = componentName.getClassName();
@@ -3756,6 +3794,11 @@ public class LauncherModel extends BroadcastReceiver
     static boolean isValidProvider(AppWidgetProviderInfo provider) {
         return (provider != null) && (provider.provider != null)
                 && (provider.provider.getPackageName() != null);
+    }
+
+    public void updateShortcutTitle(Context context, ShortcutInfo info, String title) {
+       info.title = title;
+       updateItemInDatabase(context, info);
     }
 
     public void dumpState() {
