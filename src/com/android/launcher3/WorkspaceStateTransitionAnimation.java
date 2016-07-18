@@ -283,6 +283,8 @@ public class WorkspaceStateTransitionAnimation {
         float finalOverviewPanelAlpha = states.stateIsOverview ? 1f : 0f;
         float finalWorkspaceTranslationY = states.stateIsOverview || states.stateIsOverviewHidden ?
                 mWorkspace.getOverviewModeTranslationY() : 0;
+        float finalPageIndicatorTranslationY = 2*finalWorkspaceTranslationY;
+        float finalPageIndicatorAlpha = 1;
 
         final int childCount = mWorkspace.getChildCount();
         final int customPageCount = mWorkspace.numCustomPages();
@@ -291,8 +293,6 @@ public class WorkspaceStateTransitionAnimation {
 
         if (states.oldStateIsOverview) {
             mWorkspace.disableFreeScroll();
-        } else if (states.stateIsOverview) {
-            mWorkspace.enableFreeScroll();
         }
 
         if (!states.stateIsNormal) {
@@ -389,7 +389,8 @@ public class WorkspaceStateTransitionAnimation {
             Animator pageIndicatorAlpha;
             if (pageIndicator != null) {
                 pageIndicatorAlpha = new LauncherViewPropertyAnimator(pageIndicator)
-                        .alpha(finalHotseatAndPageIndicatorAlpha).withLayer();
+                        .alpha(finalPageIndicatorAlpha).withLayer()
+                        .translationY(finalPageIndicatorTranslationY);
                 pageIndicatorAlpha.addListener(new AlphaUpdateListener(pageIndicator,
                         accessibilityEnabled));
             } else {

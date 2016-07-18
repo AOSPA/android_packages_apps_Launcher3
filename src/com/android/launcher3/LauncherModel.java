@@ -2425,6 +2425,8 @@ public class LauncherModel extends BroadcastReceiver
                             null, sWorker);
                 }
 
+                /* Due to the add/remove home screen feature, there allowed to be empty screen,
+                 * no need to delete the empty screen.
                 // Remove any empty screens
                 ArrayList<Long> unusedScreens = new ArrayList<Long>(sBgWorkspaceScreens);
                 for (ItemInfo item: sBgItemsIdMap) {
@@ -2440,6 +2442,7 @@ public class LauncherModel extends BroadcastReceiver
                     sBgWorkspaceScreens.removeAll(unusedScreens);
                     updateWorkspaceScreenOrder(context, sBgWorkspaceScreens);
                 }
+                */
 
                 if (DEBUG_LOADERS) {
                     Log.d(TAG, "loaded workspace in " + (SystemClock.uptimeMillis()-t) + "ms");

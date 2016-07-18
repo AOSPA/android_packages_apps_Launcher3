@@ -349,6 +349,9 @@ public class Launcher extends Activity
     // the press state and keep this reference to reset the press state when we return to launcher.
     private BubbleTextView mWaitingForResume;
 
+    private Context mContext;
+    private ArrayList<Long> mEmptyScreenList;
+
     protected static HashMap<String, CustomAppWidget> sCustomAppWidgets =
             new HashMap<String, CustomAppWidget>();
 
@@ -448,6 +451,9 @@ public class Launcher extends Activity
         // this also ensures that any synchronous binding below doesn't re-trigger another
         // LauncherModel load.
         mPaused = false;
+
+        mContext = this;
+        mEmptyScreenList = new ArrayList<Long>();
 
         if (PROFILE_STARTUP) {
             android.os.Debug.startMethodTracing(
@@ -3267,7 +3273,11 @@ public class Launcher extends Activity
                 mWorkspace.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
                         HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
                 if (mWorkspace.isInOverviewMode()) {
-                    mWorkspace.startReordering(v);
+                    long screenId = mWorkspace.getIdForScreen((CellLayout)v);
+
+                    if (screenId != mWorkspace.EXTRA_EMPTY_SCREEN_ID) {
+                        mWorkspace.startReordering(v);
+                    }
                 } else {
                     showOverviewMode(true);
                 }
@@ -3385,8 +3395,22 @@ public class Launcher extends Activity
      * @return whether or not the Launcher state changed.
      */
     boolean showWorkspace(int snapToPage, boolean animated, Runnable onCompleteRunnable) {
+        mWorkspace.removeAddScreen();
+
         boolean changed = mState != State.WORKSPACE ||
                 mWorkspace.getState() != Workspace.State.NORMAL;
+        int childCount = mWorkspace.getChildCount();
+
+        for (int i = 0; i < childCount; i++) {
+            CellLayout cl = (CellLayout) mWorkspace.getChildAt(i);
+            long screenId = mWorkspace.getIdForScreen(cl);
+
+            if(mEmptyScreenList.indexOf(screenId) != -1){
+                removeDeleteScreenLayout(cl);
+            }
+        }
+        mEmptyScreenList.clear();
+
         if (changed) {
             mWorkspace.setVisibility(View.VISIBLE);
             mStateTransitionAnimation.startAnimationToWorkspace(mState, mWorkspace.getState(),
@@ -3420,6 +3444,83 @@ public class Launcher extends Activity
         showOverviewMode(animated, false);
     }
 
+    public void deleteScreenLayout(CellLayout cell) {
+        if (null == cell) { return; }
+
+        final CellLayout emptyscreen = cell;
+        LayoutInflater inflater = LayoutInflater.from(this);
+        final View contentview = (View)inflater.inflate(
+                R.layout.delete_screen_button, cell, false);
+
+        View deletecontainer = (View)contentview.findViewById(R.id.delete_container);
+        TextView deleteScreenButton = (TextView)contentview.findViewById(R.id.delete_btn);
+        Drawable d = getResources().getDrawable(R.drawable.screen_close);
+
+        deleteScreenButton.setBackgroundDrawable(d);
+        final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(3, 0, 1, 1);
+        emptyscreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, true);
+
+        deletecontainer.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View arg0) {
+                mWorkspace.deleteScreenLayoutTransitions(emptyscreen);
+                long screenId = mWorkspace.getIdForScreen(emptyscreen);
+                ArrayList<Long> workspaceScreens = mWorkspace.getScreenOrder();
+
+                workspaceScreens.remove(screenId);
+                mWorkspace.removeView(emptyscreen);
+                getModel().updateWorkspaceScreenOrder(mContext, workspaceScreens);
+                mEmptyScreenList.remove(screenId);
+                removeDeleteScreenLayout(emptyscreen);
+            }
+        });
+    }
+
+    public void removeDeleteScreenLayout(CellLayout cell) {
+        if (null == cell) { return; }
+
+        View view = cell.getChildAt(3, 0);
+        cell.removeView(view);
+    }
+
+    public void AddScreenLayout() {
+        if (null == mWorkspace
+                || (null != mWorkspace && mWorkspace.getChildCount() - 1 < 0)) {
+            return;
+        }
+
+        final CellLayout addScreen = (CellLayout) mWorkspace.
+                getChildAt(mWorkspace.getChildCount() - 1);
+        LayoutInflater inflater = LayoutInflater.from(this);
+        final View contentview = (View)inflater.inflate(
+                R.layout.add_screen_button, addScreen, false);
+
+        View add_container = (View) contentview.findViewById(R.id.add_btn_container);
+        TextView addScreenButton = (TextView) contentview.findViewById(R.id.add_btn);
+        Drawable d = getResources().getDrawable(R.drawable.screen_add);
+        addScreenButton.setBackgroundDrawable(d);
+
+        final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(1, 1, 2, 2);
+        addScreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, true);
+
+        add_container.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View arg0) {
+                mWorkspace.commitExtraEmptyScreen();
+                mWorkspace.saveWorkspaceScreenToDb((CellLayout) mWorkspace.
+                        getChildAt(mWorkspace.getChildCount() - 1));
+                mWorkspace.addExtraEmptyScreen();
+
+                int finalIndex = mWorkspace.getChildCount() - 1;
+                CellLayout addscreen = (CellLayout) mWorkspace.getChildAt(finalIndex);
+                CellLayout emptyscreen = (CellLayout) mWorkspace.getChildAt(finalIndex - 1);
+
+                emptyscreen.removeAllViews();
+                addscreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, true);
+                showOverviewMode(true);
+            }
+        });
+    }
     /**
      * Shows the overview button, and if {@param requestButtonFocus} is set, will force the focus
      * onto one of the overview panel buttons.
@@ -3437,12 +3538,33 @@ public class Launcher extends Activity
                 }
             };
         }
+
+        mWorkspace.addExtraEmptyScreen();
+        AddScreenLayout();
         mWorkspace.setVisibility(View.VISIBLE);
+
+        int childCount = mWorkspace.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            CellLayout cl = (CellLayout) mWorkspace.getChildAt(i);
+            long screenId = mWorkspace.getIdForScreen(cl);
+
+            if (null != cl && null != cl.getShortcutsAndWidgets()
+                    && cl.getShortcutsAndWidgets().getChildCount() == 0) {
+
+                deleteScreenLayout(cl);
+                mEmptyScreenList.add(screenId);
+            }
+        }
+
         mStateTransitionAnimation.startAnimationToWorkspace(mState, mWorkspace.getState(),
                 Workspace.State.OVERVIEW,
                 WorkspaceStateTransitionAnimation.SCROLL_TO_CURRENT_PAGE, animated,
                 postAnimRunnable);
         mState = State.WORKSPACE;
+    }
+
+    public ArrayList<Long> getEmptyScreenList(){
+        return mEmptyScreenList;
     }
 
     /**

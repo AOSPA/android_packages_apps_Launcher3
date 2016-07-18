@@ -321,6 +321,17 @@ public class CellLayout extends ViewGroup implements BubbleTextShadowHandler {
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         if (mUseTouchHelper ||
                 (mInterceptTouchListener != null && mInterceptTouchListener.onTouch(this, ev))) {
+
+            ArrayList<Long> workspaceScreens = mLauncher.mWorkspace.getScreenOrder();
+            ArrayList<Long> emptyScreens = mLauncher.getEmptyScreenList();
+
+            long finalScreenId = workspaceScreens.get(workspaceScreens.size() - 1);
+            long screenId = mLauncher.mWorkspace.getIdForScreen(this);
+
+            if (screenId == finalScreenId || emptyScreens.indexOf(screenId) != -1) {
+                return false;
+            }
+
             return true;
         }
         return false;

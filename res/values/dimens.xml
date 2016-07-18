@@ -170,4 +170,9 @@
     <dimen name="infomation_count_textsize">11dp</dimen>
     <dimen name="infomation_count_padding">4dp</dimen>
     <dimen name="infomation_count_circle_radius">7dp</dimen>
+
+    <!-- edit mode add,delte screen -->
+    <dimen name="add_screen_width">34dp</dimen>
+    <dimen name="delete_screen_width">14dp</dimen>
+
 </resources>
