@@ -16,6 +16,8 @@
 package com.android.launcher3.allapps;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import com.android.launcher3.AppInfo;
@@ -23,6 +25,8 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.compat.AlphabeticIndexCompat;
 import com.android.launcher3.compat.UserHandleCompat;
+import com.android.launcher3.ItemInfo;
+import com.android.launcher3.model.AbstractUserComparator;
 import com.android.launcher3.model.AppNameComparator;
 import com.android.launcher3.R;
 import com.android.launcher3.util.ComponentKey;
@@ -30,8 +34,10 @@ import com.android.launcher3.xml.ComponentInfo;
 import com.android.launcher3.xml.ComponentParserImpl;
 import java.io.InputStream;
 import java.io.IOException;
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -49,6 +55,10 @@ public class AlphabeticalAppsList {
 
     private static final int FAST_SCROLL_FRACTION_DISTRIBUTE_BY_ROWS_FRACTION = 0;
     private static final int FAST_SCROLL_FRACTION_DISTRIBUTE_BY_NUM_SECTIONS = 1;
+
+    private static final int ALL_APP_ALPHABETICAL_MODE = 1;
+    private static final int ALL_APP_INSTALLATION_TIME_MODE = 2;
+    private static String ALL_APP_SORT_MODE_KEY="all_app_sort_mode";
 
     private final int mFastScrollDistributionMode = FAST_SCROLL_FRACTION_DISTRIBUTE_BY_NUM_SECTIONS;
 
@@ -197,11 +207,17 @@ public class AlphabeticalAppsList {
     private int mNumAppsPerRow;
     private int mNumPredictedAppsPerRow;
     private int mNumAppRowsInAdapter;
+    private int  mAllAppListSortMode;
+    private SharedPreferences mAllAppListPreferences;
 
     public AlphabeticalAppsList(Context context) {
         mLauncher = (Launcher) context;
         mIndexer = new AlphabeticIndexCompat(context);
         mAppNameComparator = new AppNameComparator(context);
+        mAllAppListPreferences = mLauncher.getSharedPreferences(ALL_APP_SORT_MODE_KEY,
+                Context.MODE_PRIVATE);
+        mAllAppListSortMode = mAllAppListPreferences.getInt(ALL_APP_SORT_MODE_KEY,
+                ALL_APP_ALPHABETICAL_MODE);
     }
 
     /**
@@ -373,6 +389,77 @@ public class AlphabeticalAppsList {
         }
     }
 
+    public void saveAllAppSortPreferences(){
+        Editor editor = mAllAppListPreferences.edit();
+        editor.putInt(ALL_APP_SORT_MODE_KEY, new Integer(mAllAppListSortMode));
+        editor.commit();
+    }
+
+    public void sortLetterApp(List<AppInfo> apps) {
+        mAllAppListSortMode = ALL_APP_ALPHABETICAL_MODE;
+        saveAllAppSortPreferences();
+        Collections.sort(apps, mAppNameComparator.getAppInfoComparator());
+        updateAdapterItems();
+    }
+
+    public void sortInstallTimeApp(List<AppInfo> apps) {
+        mAllAppListSortMode = ALL_APP_INSTALLATION_TIME_MODE;
+        saveAllAppSortPreferences();
+        Collections.sort(apps, new AbstractUserComparator<ItemInfo>(mLauncher) {
+            public int compare(ItemInfo obj1, ItemInfo obj2) {
+                AppInfo a = (AppInfo) obj1;
+                AppInfo b = (AppInfo) obj2;
+
+                long firstInstallTime1 = a.getfirstInstallTime();
+                long firstInstallTime2 = b.getfirstInstallTime();
+
+                if (firstInstallTime1 > firstInstallTime2) {
+                    return 1;
+                } else if (firstInstallTime1 < firstInstallTime2) {
+                    return -1;
+                } else {
+                    int result = compareTitles(a, b);
+                    if (result == 0) {
+                        return super.compare(a, b);
+                    }
+                    return result;
+                }
+            }
+        });
+        updateAdapterItems();
+    }
+
+    int compareTitles(AppInfo a, AppInfo b) {
+        // Ensure that we de-prioritize any titles that don't start with a linguistic letter or
+        // digit
+        String titleA = a.title.toString();
+        String titleB = b.title.toString();
+        boolean aStartsWithLetter = (titleA.length() > 0) &&
+                Character.isLetterOrDigit(titleA.codePointAt(0));
+        boolean bStartsWithLetter = (titleB.length() > 0) &&
+                Character.isLetterOrDigit(titleB.codePointAt(0));
+        if (aStartsWithLetter && !bStartsWithLetter) {
+            return -1;
+        } else if (!aStartsWithLetter && bStartsWithLetter) {
+            return 1;
+        }
+
+        // Order by the title in the current locale
+        int result = Collator.getInstance().compare(titleA, titleB);
+        if (result == 0) {
+            AppInfo aAppInfo = (AppInfo) a;
+            AppInfo bAppInfo = (AppInfo) b;
+            // If two apps have the same title, then order by the component name
+            result = aAppInfo.componentName.compareTo(bAppInfo.componentName);
+            if (result == 0) {
+                // If the two apps are the same component, then prioritize by the order
+                // that
+                // the app user was created (prioritizing the main user's apps)
+                return result;
+            }
+        }
+        return result;
+    }
     /**
      * Updates internals when the set of apps are updated.
      */
@@ -380,11 +467,6 @@ public class AlphabeticalAppsList {
         // Sort the list of apps
         mApps.clear();
         mApps.addAll(mComponentToAppMap.values());
-        Collections.sort(mApps, mAppNameComparator.getAppInfoComparator());
-        if (mLauncher.getResources().getBoolean(
-                R.bool.config_launcher_customWorkspace)){
-            lockPreloadingApps();
-        }
         // As a special case for some languages (currently only Simplified Chinese), we may need to
         // coalesce sections
         Locale curLocale = mLauncher.getResources().getConfiguration().locale;
@@ -422,7 +504,14 @@ public class AlphabeticalAppsList {
                 getAndUpdateCachedSectionName(info.title);
             }
         }
-
+        if (mAllAppListSortMode == ALL_APP_ALPHABETICAL_MODE) {
+            Collections.sort(mApps, mAppNameComparator.getAppInfoComparator());
+        } else if (mAllAppListSortMode == ALL_APP_INSTALLATION_TIME_MODE) {
+            sortInstallTimeApp(mApps);
+        }
+        if (LauncherAppState.isCustomWorkspace()) {
+            lockPreloadingApps();
+        }
         // Recompose the set of adapter items from the current set of apps
         updateAdapterItems();
     }

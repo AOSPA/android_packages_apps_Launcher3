@@ -20,16 +20,22 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.support.v7.widget.RecyclerView;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.text.method.TextKeyListener;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewConfiguration;
+import android.widget.ImageView;
+import android.widget.PopupWindow;
+import android.widget.TextView;
 
 import com.android.launcher3.AppInfo;
 import com.android.launcher3.BaseContainerView;
@@ -146,6 +152,21 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
     private View mSearchContainer;
     private ExtendedEditText mSearchInput;
+
+    private View mHideAppContainerView;
+    private View mAllAppMemuView;
+
+    // menu item
+    private TextView mLetterTView;
+    private TextView mInstallTView;
+    private TextView mHideTView;
+
+    // hide app
+    private ImageView mBackSearchButtonView;
+    private ImageView mHideAppsButtonView;
+
+    private PopupWindow mPopupWindow;
+
     private HeaderElevationController mElevationController;
 
     private SpannableStringBuilder mSearchQueryBuilder = null;
@@ -276,6 +297,14 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
         mSearchContainer = findViewById(R.id.search_container);
         mSearchInput = (ExtendedEditText) findViewById(R.id.search_box_input);
+        mAllAppMemuView = findViewById(R.id.all_app_menu);
+        mAllAppMemuView.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showPopupWindow(mSearchContainer);
+            }
+        });
+
         mElevationController = Utilities.ATLEAST_LOLLIPOP
                 ? new HeaderElevationController.ControllerVL(mSearchContainer)
                 : new HeaderElevationController.ControllerV16(mSearchContainer);
@@ -606,5 +635,59 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
         mSearchQueryBuilder.clear();
         mSearchQueryBuilder.clearSpans();
         Selection.setSelection(mSearchQueryBuilder, 0);
+    }
+
+    private void showPopupWindow(View parent) {
+        LayoutInflater layoutInflater = (LayoutInflater)mLauncher.getSystemService(
+                Context.LAYOUT_INFLATER_SERVICE);
+        View contentView = layoutInflater.inflate(R.layout.menu_item, null);
+
+        mLetterTView = (TextView) contentView.findViewById(R.id.letter_tv);
+        mInstallTView = (TextView) contentView.findViewById(R.id.install_tv);
+        mHideTView = (TextView) contentView.findViewById(R.id.hide_tv);
+
+        mLetterTView.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                mApps.sortLetterApp(mApps.getApps());
+                mPopupWindow.dismiss();
+
+            }
+        });
+
+        mInstallTView.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                mApps.sortInstallTimeApp(mApps.getApps());
+                mPopupWindow.dismiss();
+
+            }
+        });
+
+        mHideTView.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                mPopupWindow.dismiss();
+            }
+        });
+
+        mPopupWindow = new PopupWindow(contentView, LayoutParams.WRAP_CONTENT,
+                LayoutParams.WRAP_CONTENT, true);
+        mPopupWindow.setFocusable(true);
+        mPopupWindow.setOutsideTouchable(true);
+        mPopupWindow.setBackgroundDrawable(new BitmapDrawable());
+        mPopupWindow.setAnimationStyle(R.style.PopupAnimation);
+
+        int[] location = new int[2];
+        parent.getLocationOnScreen(location);
+
+        int pwidth = parent.getWidth();
+        int cw = mPopupWindow.getWidth();
+
+        mPopupWindow.showAtLocation(parent, Gravity.TOP | Gravity.RIGHT, location[0],
+                location[1]);
     }
 }

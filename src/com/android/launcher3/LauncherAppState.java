@@ -47,6 +47,8 @@ public class LauncherAppState {
 
     private static LauncherAppState INSTANCE;
 
+    private static boolean mHaveCustomWorkspace;
+
     private InvariantDeviceProfile mInvariantDeviceProfile;
 
     private LauncherAccessibilityDelegate mAccessibilityDelegate;
@@ -83,6 +85,8 @@ public class LauncherAppState {
         if (TestingUtils.MEMORY_DUMP_ENABLED) {
             TestingUtils.startTrackingMemory(sContext);
         }
+        mHaveCustomWorkspace = sContext.getResources().getBoolean(
+                R.bool.config_launcher_customWorkspace);
 
         mInvariantDeviceProfile = new InvariantDeviceProfile(sContext);
         mIconCache = new IconCache(sContext, mInvariantDeviceProfile);
@@ -154,6 +158,10 @@ public class LauncherAppState {
 
     public LauncherModel getModel() {
         return mModel;
+    }
+
+    public static boolean isCustomWorkspace() {
+        return mHaveCustomWorkspace;
     }
 
     static void setLauncherProvider(LauncherProvider provider) {

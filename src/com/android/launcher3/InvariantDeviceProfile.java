@@ -175,8 +175,7 @@ public class InvariantDeviceProfile {
         // width, height, #rows, #columns, #folder rows, #folder columns,
         // iconSize, iconTextSize, #hotseat, #hotseatIconSize, defaultLayoutId.
         int fourByFourDefaultLayout = R.xml.default_workspace_4x4;
-        if (mContext.getResources().getBoolean(
-                R.bool.config_launcher_customWorkspace)){
+        if (LauncherAppState.isCustomWorkspace()){
             fourByFourDefaultLayout = R.xml.custom_workspace_4x4;
 
         }

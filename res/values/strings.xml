@@ -269,4 +269,10 @@
     <!-- Accessibility confirmation for widget resize. -->
     <string name="widget_resized">Widget resized to width <xliff:g id="number" example="2">%1$s</xliff:g> height <xliff:g id="number" example="1">%2$s</xliff:g></string>
 
+    <!--All app menu -->
+    <string name="letter_order">Alphabetical order</string>
+    <string name="install_order">Installation order</string>
+    <string name="hide_app">Hide app</string>
+    <!--hide app -->
+    <string name="hide_app_hint">Select app to hide</string>
 </resources>
