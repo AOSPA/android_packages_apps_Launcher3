@@ -52,6 +52,7 @@ import com.android.launcher3.compat.PackageInstallerCompat;
 import com.android.launcher3.compat.PackageInstallerCompat.PackageInstallInfo;
 import com.android.launcher3.compat.UserHandleCompat;
 import com.android.launcher3.compat.UserManagerCompat;
+import com.android.launcher3.hideapp.HideAppInfo;
 import com.android.launcher3.model.GridSizeMigrationTask;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.util.ComponentKey;
@@ -1209,6 +1210,19 @@ public class LauncherModel extends BroadcastReceiver
         runOnWorkerThread(r);
     }
 
+    public ArrayList<ItemInfo> getWorkspaceItems() {
+        return sBgWorkspaceItems;
+    }
+
+    public ArrayList<LauncherAppWidgetInfo> getAppWidgets() {
+        return sBgAppWidgets;
+    }
+
+    public ArrayList<AppInfo> getAllAppsList() {
+        ArrayList<AppInfo> list = (ArrayList<AppInfo>) mBgAllAppsList.data.clone();
+        return list;
+    }
+
     /**
      * Update the order of the workspace screens in the database. The array list contains
      * a list of screen ids in the order that they should appear.
@@ -1392,7 +1406,7 @@ public class LauncherModel extends BroadcastReceiver
         }
     }
 
-    void forceReload() {
+    public void forceReload() {
         resetLoadedState(true, true);
 
         // Do this here because if the launcher activity is running it will be restarted.

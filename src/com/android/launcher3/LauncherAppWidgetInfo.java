@@ -128,6 +128,9 @@ public class LauncherAppWidgetInfo extends ItemInfo {
         }
     }
 
+    public ComponentName getProviderName() {
+        return providerName;
+    }
 
     @Override
     public String toString() {

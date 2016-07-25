@@ -27,11 +27,16 @@ import com.android.launcher3.compat.AlphabeticIndexCompat;
 import com.android.launcher3.compat.UserHandleCompat;
 import com.android.launcher3.ItemInfo;
 import com.android.launcher3.model.AbstractUserComparator;
+import com.android.launcher3.hideapp.HideAppInfo;
+import com.android.launcher3.hideapp.HideAppService;
 import com.android.launcher3.model.AppNameComparator;
 import com.android.launcher3.R;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.xml.ComponentInfo;
 import com.android.launcher3.xml.ComponentParserImpl;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
 import java.text.Collator;
@@ -209,6 +214,9 @@ public class AlphabeticalAppsList {
     private int mNumAppRowsInAdapter;
     private int  mAllAppListSortMode;
     private SharedPreferences mAllAppListPreferences;
+    private boolean isHideAppsMode = false;
+    private List<HideAppInfo> mHideApps = new ArrayList<HideAppInfo>() ;
+    private List<AppInfo> mRemoveApps = new ArrayList<>();
 
     public AlphabeticalAppsList(Context context) {
         mLauncher = (Launcher) context;
@@ -238,6 +246,9 @@ public class AlphabeticalAppsList {
     public void setAdapter(RecyclerView.Adapter adapter) {
         mAdapter = adapter;
     }
+    public RecyclerView.Adapter getAdapter() {
+        return mAdapter;
+    }
 
     /**
      * Returns all the apps.
@@ -266,6 +277,64 @@ public class AlphabeticalAppsList {
     public List<AdapterItem> getAdapterItems() {
         return mAdapterItems;
     }
+
+    public List<AppInfo> getRemoveApps(){
+        return mRemoveApps;
+    }
+
+    public boolean isHideApp(AppInfo item){
+        for(HideAppInfo info : mHideApps){
+            if(item.componentName.getPackageName().equals(info.getComponentPackage()) &&
+               item.componentName.getClassName().equals(info.getComponentClass())){
+                    return true;
+                }
+            }
+        return false;
+    }
+
+    public void removeHideapp(){
+        List<AppInfo> removepack = new ArrayList<>();
+        for(AppInfo item : mApps){
+            for(HideAppInfo info : mHideApps){
+                if(item.componentName.getPackageName().equals(info.getComponentPackage()) &&
+                item.componentName.getClassName().equals(info.getComponentClass())){
+                    removepack.add(item);
+                }
+            }
+        }
+        if(mHideApps.size() == 0){
+            mRemoveApps.clear();
+        }
+        if(removepack.size() > 0){
+            mRemoveApps.clear();
+            mRemoveApps.addAll(removepack);
+            removeApps(mRemoveApps);
+        }
+    }
+
+    public List<HideAppInfo>  readHideAppList() throws Exception{
+        File xmlFile = new File(mLauncher.getFilesDir(), "hide.xml");
+        FileInputStream inputStream = new FileInputStream(xmlFile);
+        List<HideAppInfo> hideapps = new ArrayList<HideAppInfo>() ;
+        try {
+            hideapps = HideAppService.read(inputStream);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        mHideApps.clear();
+        mHideApps.addAll(hideapps);
+        return hideapps;
+    }
+    public void saveHideAppList() throws Exception{
+        File xmlFile = new File(mLauncher.getFilesDir(), "hide.xml");
+        FileOutputStream outStream = new FileOutputStream(xmlFile);
+        HideAppService.save(mHideApps, outStream);
+    }
+
+    public void showHideapp(){
+        addApps(mRemoveApps);
+    }
+
 
     /**
      * Returns the number of rows of applications (not including predictions)
@@ -335,6 +404,15 @@ public class AlphabeticalAppsList {
      */
     public void addApps(List<AppInfo> apps) {
         updateApps(apps);
+        if(!isHideAppsMode){
+            try {
+                readHideAppList();
+                removeHideapp();
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -399,7 +477,9 @@ public class AlphabeticalAppsList {
         mAllAppListSortMode = ALL_APP_ALPHABETICAL_MODE;
         saveAllAppSortPreferences();
         Collections.sort(apps, mAppNameComparator.getAppInfoComparator());
-        updateAdapterItems();
+        if(!isHideAppsMode){
+            updateAdapterItems();
+        }
     }
 
     public void sortInstallTimeApp(List<AppInfo> apps) {
@@ -426,7 +506,9 @@ public class AlphabeticalAppsList {
                 }
             }
         });
-        updateAdapterItems();
+        if(!isHideAppsMode){
+            updateAdapterItems();
+        }
     }
 
     int compareTitles(AppInfo a, AppInfo b) {
@@ -460,6 +542,20 @@ public class AlphabeticalAppsList {
         }
         return result;
     }
+
+    public void  setHideAppsMode(boolean mode){
+        isHideAppsMode = mode;
+        mAdapter.notifyDataSetChanged();
+    }
+
+    public boolean  getHideAppsMode(){
+        return isHideAppsMode;
+    }
+    public List<HideAppInfo>  getHideApps(){
+        return mHideApps;
+    }
+
+
     /**
      * Updates internals when the set of apps are updated.
      */
@@ -512,6 +608,23 @@ public class AlphabeticalAppsList {
         if (LauncherAppState.isCustomWorkspace()) {
             lockPreloadingApps();
         }
+        if(isHideAppsMode){
+            List<AppInfo> noHideApps = new ArrayList<>();
+            for (AppInfo info : mApps) {
+                if(!isHideApp(info)){
+                    noHideApps.add(info);
+                }
+            }
+            if(mAllAppListSortMode == ALL_APP_ALPHABETICAL_MODE){
+                sortLetterApp(mRemoveApps);
+            } else if(mAllAppListSortMode == ALL_APP_INSTALLATION_TIME_MODE){
+                sortInstallTimeApp(mRemoveApps);
+            }
+            mApps.clear();
+            mApps.addAll(mRemoveApps);
+            mApps.addAll(noHideApps);
+        }
+
         // Recompose the set of adapter items from the current set of apps
         updateAdapterItems();
     }

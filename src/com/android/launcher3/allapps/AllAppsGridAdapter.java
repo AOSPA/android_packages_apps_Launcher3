@@ -39,10 +39,13 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.ViewGroup.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
+import android.widget.ImageView;
 import android.widget.TextView;
 import com.android.launcher3.AppInfo;
 import com.android.launcher3.BubbleTextView;
+import com.android.launcher3.hideapp.HideAppInfo;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
@@ -72,6 +75,9 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
     public static final int SEARCH_MARKET_DIVIDER_VIEW_TYPE = 4;
     // The message to continue to a market search when there are no filtered results
     public static final int SEARCH_MARKET_VIEW_TYPE = 5;
+
+    public static HashMap<Integer, Integer> mHideMap = new HashMap<>();
+    public static HashMap<Integer, Integer> mHideFrontBg = new HashMap<>();
 
     public interface BindViewCallback {
         public void onBindView(ViewHolder holder);
@@ -516,15 +522,15 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
             case SECTION_BREAK_VIEW_TYPE:
                 return new ViewHolder(new View(parent.getContext()));
             case ICON_VIEW_TYPE: {
-                BubbleTextView icon = (BubbleTextView) mLayoutInflater.inflate(
-                        R.layout.all_apps_icon, parent, false);
+                View contentView = mLayoutInflater.inflate(R.layout.all_apps_icon, parent, false);
+                BubbleTextView icon = (BubbleTextView) contentView.findViewById(R.id.icon);
                 icon.setOnTouchListener(mTouchListener);
                 icon.setOnClickListener(mIconClickListener);
                 icon.setOnLongClickListener(mIconLongClickListener);
                 icon.setLongPressTimeout(ViewConfiguration.get(parent.getContext())
                         .getLongPressTimeout());
                 icon.setFocusable(true);
-                return new ViewHolder(icon);
+                return new ViewHolder(contentView);
             }
             case PREDICTION_ICON_VIEW_TYPE: {
                 BubbleTextView icon = (BubbleTextView) mLayoutInflater.inflate(
@@ -563,10 +569,26 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
         switch (holder.getItemViewType()) {
             case ICON_VIEW_TYPE: {
                 AppInfo info = mApps.getAdapterItems().get(position).appInfo;
-                BubbleTextView icon = (BubbleTextView) holder.mContent;
+                BubbleTextView icon = (BubbleTextView)  holder.mContent.findViewById(R.id.icon);
+                View hide_front = (View) holder.mContent.findViewById(R.id.hide_front_btn);
+                if (!mHideMap.containsKey(position)) {
+                    mHideMap.put(position, View.INVISIBLE);
+                }
+                if (mApps.isHideApp(info) && mApps.getHideAppsMode()) {
+                    mHideMap.put(position, View.VISIBLE);
+                } else {
+                    mHideMap.put(position, View.INVISIBLE);
+                }
+
+                ViewGroup.LayoutParams params = hide_front.getLayoutParams();
+                params.width = info.iconBitmap.getWidth();
+                params.height = info.iconBitmap.getHeight();
+                hide_front.setLayoutParams(params);
+                hide_front.setVisibility(mHideMap.get(position));
                 icon.applyFromApplicationInfo(info);
                 icon.setAccessibilityDelegate(
                         LauncherAppState.getInstance().getAccessibilityDelegate());
+                icon.setPosition(position);
                 break;
             }
             case PREDICTION_ICON_VIEW_TYPE: {

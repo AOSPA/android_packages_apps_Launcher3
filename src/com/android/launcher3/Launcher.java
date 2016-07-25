@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
  * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,12 +98,14 @@ import android.widget.Toast;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.PagedView.PageSwitchListener;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
 import com.android.launcher3.allapps.DefaultAppSearchController;
 import com.android.launcher3.compat.AppWidgetManagerCompat;
 import com.android.launcher3.compat.LauncherActivityInfoCompat;
 import com.android.launcher3.compat.LauncherAppsCompat;
 import com.android.launcher3.compat.UserHandleCompat;
 import com.android.launcher3.compat.UserManagerCompat;
+import com.android.launcher3.hideapp.HideAppInfo;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.LongArrayMap;
@@ -2488,6 +2490,11 @@ public class Launcher extends Activity
         }
 
         if (isAppsViewVisible()) {
+            if (mAppsView.getHideAppsMode()) {
+                mAppsView.exitHideMode();
+                mAppsView.getApps().removeHideapp();
+                return;
+            }
             showWorkspace(true);
         } else if (isWidgetsViewVisible())  {
             showOverviewMode(true);
@@ -2560,7 +2567,35 @@ public class Launcher extends Activity
         } else if (v == mAllAppsButton) {
             onClickAllAppsButton(v);
         } else if (tag instanceof AppInfo) {
-            startAppShortcutOrInfoActivity(v);
+            if (mAppsView.getHideAppsMode()) {
+                int pos = ((BubbleTextView) v).getPosition();
+                if (AllAppsGridAdapter.mHideMap.get(pos) == View.VISIBLE) {
+                    AllAppsGridAdapter.mHideMap.put(pos, View.INVISIBLE);
+                } else {
+                    AllAppsGridAdapter.mHideMap.put(pos, View.VISIBLE);
+                }
+                AppInfo info = (AppInfo) tag;
+                HideAppInfo hideinfo = new HideAppInfo();
+                hideinfo.setComponentPackage(info.componentName.getPackageName());
+                hideinfo.setComponentClass(info.componentName.getClassName());
+                List<HideAppInfo> hidelist = mAppsView.getApps().getHideApps();
+
+                boolean isExit = false;
+                for (HideAppInfo hinfo : hidelist) {
+                    if (hideinfo.getComponentPackage().equals(hinfo.getComponentPackage())
+                            && hideinfo.getComponentClass().equals(hinfo.getComponentClass())) {
+                        isExit = true;
+                        hidelist.remove(hinfo);
+                        break;
+                    }
+                }
+                if (isExit == false) {
+                    hidelist.add(hideinfo);
+                }
+                mAppsView.getAdapter().notifyDataSetChanged();
+            } else {
+                startAppShortcutOrInfoActivity(v);
+            }
         } else if (tag instanceof LauncherAppWidgetInfo) {
             if (v instanceof PendingAppWidgetHostView) {
                 onClickPendingWidget((PendingAppWidgetHostView) v);

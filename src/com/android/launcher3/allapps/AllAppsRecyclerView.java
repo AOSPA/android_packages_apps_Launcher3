@@ -171,6 +171,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView
             sourceData.putString(Stats.SOURCE_EXTRA_SUB_CONTAINER,
                     Stats.SUB_CONTAINER_ALL_APPS_SEARCH);
         } else {
+            /* fix CastException FrameLayout cannot be cast to RecyclerView exception
             if (v instanceof BubbleTextView) {
                 BubbleTextView icon = (BubbleTextView) v;
                 int position = getChildPosition(icon);
@@ -183,7 +184,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView
                         return;
                     }
                 }
-            }
+            } */
             sourceData.putString(Stats.SOURCE_EXTRA_SUB_CONTAINER,
                     Stats.SUB_CONTAINER_ALL_APPS_A_Z);
         }

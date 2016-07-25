@@ -16,11 +16,14 @@
 package com.android.launcher3.allapps;
 
 import android.annotation.SuppressLint;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.support.v7.widget.RecyclerView;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
@@ -33,6 +36,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewConfiguration;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.PopupWindow;
 import android.widget.TextView;
@@ -47,8 +51,11 @@ import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget;
 import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Folder;
+import com.android.launcher3.hideapp.HideAppInfo;
 import com.android.launcher3.ItemInfo;
 import com.android.launcher3.Launcher;
+import com.android.launcher3.LauncherAppWidgetInfo;
+import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherTransitionable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -153,7 +160,6 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
     private View mSearchContainer;
     private ExtendedEditText mSearchInput;
 
-    private View mHideAppContainerView;
     private View mAllAppMemuView;
 
     // menu item
@@ -164,6 +170,9 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
     // hide app
     private ImageView mBackSearchButtonView;
     private ImageView mHideAppsButtonView;
+    private TextView mHideHintText;
+
+    private Drawable mBackground;
 
     private PopupWindow mPopupWindow;
 
@@ -213,6 +222,10 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
         mApps.setPredictedApps(apps);
     }
 
+    public AlphabeticalAppsList getApps() {
+        return mApps;
+    }
+
     /**
      * Sets the current set of apps.
      */
@@ -239,6 +252,18 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
      */
     public void removeApps(List<AppInfo> apps) {
         mApps.removeApps(apps);
+    }
+
+    public boolean getHideAppsMode() {
+        return mApps.getHideAppsMode();
+    }
+
+    public boolean isHideApp(AppInfo item) {
+        return mApps.isHideApp(item);
+    }
+
+    public RecyclerView.Adapter getAdapter() {
+        return mApps.getAdapter();
     }
 
     /**
@@ -296,6 +321,8 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
         });
 
         mSearchContainer = findViewById(R.id.search_container);
+        mBackground = mSearchContainer.getBackground();
+
         mSearchInput = (ExtendedEditText) findViewById(R.id.search_box_input);
         mAllAppMemuView = findViewById(R.id.all_app_menu);
         mAllAppMemuView.setOnClickListener(new OnClickListener() {
@@ -329,8 +356,10 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
         final int heightMeasureSpec = MeasureSpec.makeMeasureSpec(
                 getResources().getDisplayMetrics().heightPixels, MeasureSpec.AT_MOST);
 
-        BubbleTextView icon = (BubbleTextView) layoutInflater.inflate(
+        FrameLayout iconHolder = (FrameLayout) layoutInflater.inflate(
                 R.layout.all_apps_icon, this, false);
+        BubbleTextView icon = (BubbleTextView) iconHolder.findViewById(R.id.icon);
+
         icon.applyDummyInfo();
         icon.measure(widthMeasureSpec, heightMeasureSpec);
         BubbleTextView predIcon = (BubbleTextView) layoutInflater.inflate(
@@ -341,6 +370,83 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
                 icon.getMeasuredHeight());
 
         updateBackgroundAndPaddings();
+
+        mBackSearchButtonView = (ImageView)findViewById(R.id.dismiss_search_button);
+        mHideAppsButtonView = (ImageView)findViewById(R.id.select_hide_button);
+        mHideHintText = (TextView)findViewById(R.id.hide_hint_text);
+
+        mBackSearchButtonView.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                exitHideMode();
+
+                try {
+                    mApps.readHideAppList();
+                } catch (Exception e) {
+                }
+                mApps.removeHideapp();
+            }
+        });
+
+        mHideAppsButtonView.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                if (null == mLauncher || (null != mLauncher && null == mLauncher.getModel())) {
+                    return;
+                }
+
+                mApps.setHideAppsMode(false);
+                List<HideAppInfo> hidelist = mApps.getHideApps();
+                ArrayList<ItemInfo> workspaceitems = mLauncher.getModel().getWorkspaceItems();
+
+                for (ItemInfo item : workspaceitems) {
+                    String packageName = item.getIntent().getPackage();
+                    ComponentName cn = item.getIntent().getComponent();
+                    for (HideAppInfo info : hidelist) {
+                        if (null != cn && cn.getPackageName().equals(info.getComponentPackage())
+                                && cn.getClassName().equals(info.getComponentClass())) {
+                            LauncherModel.deleteItemFromDatabase(mLauncher, item);
+                        }
+                        if (null == cn && packageName.equals(info.getComponentPackage())) {
+                            LauncherModel.deleteItemFromDatabase(mLauncher, item);
+                        }
+                    }
+                }
+
+                ArrayList<LauncherAppWidgetInfo> widgetInfos = mLauncher.getModel().getAppWidgets();
+
+                for (LauncherAppWidgetInfo widgetinfo : widgetInfos) {
+                    ComponentName cn = widgetinfo.getProviderName();
+                    for (HideAppInfo info : hidelist) {
+                        if (cn.getPackageName().equals(info.getComponentPackage())) {
+                            LauncherModel.deleteItemFromDatabase(mLauncher, widgetinfo);
+                        }
+
+                    }
+                }
+
+                try {
+                    mApps.saveHideAppList();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                exitHideMode();
+                hidelist.clear();
+                mLauncher.getModel().forceReload();
+                mLauncher.showWorkspace(true);
+            }
+        });
+    }
+
+    public void exitHideMode(){
+        updateTopSearchBarArea(false);
+        mSearchContainer.setBackground(mBackground);
+
+        mApps.setHideAppsMode(false);
+        AllAppsGridAdapter.mHideMap.clear();
     }
 
     @Override
@@ -473,10 +579,13 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
         // Return if global dragging is not enabled
         if (!mLauncher.isDraggingEnabled()) return false;
 
-        // Start the drag
-        mLauncher.getWorkspace().beginDragShared(v, mIconLastTouchPos, this, false);
-        // Enter spring loaded mode
-        mLauncher.enterSpringLoadedDragMode();
+        Object tag = v.getTag();
+        if (!mApps.getHideAppsMode()) {
+            // Start the drag
+            mLauncher.getWorkspace().beginDragShared(v, mIconLastTouchPos, this, false);
+            // Enter spring loaded mode
+            mLauncher.enterSpringLoadedDragMode();
+        }
 
         return false;
     }
@@ -671,6 +780,12 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             @Override
             public void onClick(View arg0) {
                 mPopupWindow.dismiss();
+                mSearchContainer.setBackgroundColor(Color.GRAY);
+                // enter hide mode
+                updateTopSearchBarArea(true);
+
+                mApps.setHideAppsMode(true);
+                mApps.showHideapp();
             }
         });
 
@@ -689,5 +804,23 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
         mPopupWindow.showAtLocation(parent, Gravity.TOP | Gravity.RIGHT, location[0],
                 location[1]);
+    }
+
+    private void updateTopSearchBarArea(boolean enterHideMode) {
+        if (enterHideMode) {
+            mSearchInput.setVisibility(View.GONE);
+            mAllAppMemuView.setVisibility(View.GONE);
+
+            mBackSearchButtonView.setVisibility(View.VISIBLE);
+            mHideAppsButtonView.setVisibility(View.VISIBLE);
+            mHideHintText.setVisibility(View.VISIBLE);
+        } else {
+            mBackSearchButtonView.setVisibility(View.GONE);
+            mHideAppsButtonView.setVisibility(View.GONE);
+            mHideHintText.setVisibility(View.GONE);
+
+            mSearchInput.setVisibility(View.VISIBLE);
+            mAllAppMemuView.setVisibility(View.VISIBLE);
+        }
     }
 }

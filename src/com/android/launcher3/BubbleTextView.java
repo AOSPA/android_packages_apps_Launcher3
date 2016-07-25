@@ -165,6 +165,16 @@ public class BubbleTextView extends TextView
         }
     }
 
+    int postion;
+
+    public void setPosition(int pos) {
+        postion = pos;
+    }
+
+    public int getPosition() {
+        return postion;
+    }
+
     public void applyFromApplicationInfo(AppInfo info) {
         FastBitmapDrawable iconDrawable = mLauncher.createIconDrawable(info.iconBitmap);
         if (info.isDisabled()) {

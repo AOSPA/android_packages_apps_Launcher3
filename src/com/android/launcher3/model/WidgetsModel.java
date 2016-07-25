@@ -11,6 +11,8 @@ import android.os.TransactionTooLargeException;
 import android.util.Log;
 
 import com.android.launcher3.AppFilter;
+import com.android.launcher3.hideapp.HideAppInfo;
+import com.android.launcher3.hideapp.HideAppService;
 import com.android.launcher3.IconCache;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.ItemInfo;
@@ -22,6 +24,9 @@ import com.android.launcher3.compat.AppWidgetManagerCompat;
 import com.android.launcher3.compat.UserHandleCompat;
 import com.android.launcher3.config.ProviderConfig;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,6 +49,7 @@ public class WidgetsModel {
     /* Map of widgets and shortcuts that are tracked per package. */
     private final HashMap<PackageItemInfo, ArrayList<Object>> mWidgetsList;
 
+    private ArrayList<PackageItemInfo> mRemovePackages = new ArrayList<>();
     private final AppWidgetManagerCompat mAppWidgetMgr;
     private final WidgetsAndShortcutNameComparator mWidgetAndShortcutNameComparator;
     private final Comparator<ItemInfo> mAppNameComparator;
@@ -52,6 +58,7 @@ public class WidgetsModel {
     private final AlphabeticIndexCompat mIndexer;
 
     private ArrayList<Object> mRawList;
+    private Context mContext;
 
     public WidgetsModel(Context context,  IconCache iconCache, AppFilter appFilter) {
         mAppWidgetMgr = AppWidgetManagerCompat.getInstance(context);
@@ -64,6 +71,7 @@ public class WidgetsModel {
         mWidgetsList = new HashMap<>();
 
         mRawList = new ArrayList<>();
+        mContext= context;
     }
 
     @SuppressWarnings("unchecked")
@@ -102,6 +110,18 @@ public class WidgetsModel {
 
     public boolean isEmpty() {
         return mRawList.isEmpty();
+    }
+
+    public List<HideAppInfo> readHideAppList() throws Exception {
+        File xmlFile = new File(mContext.getFilesDir(), "hide.xml");
+        FileInputStream inputStream = new FileInputStream(xmlFile);
+        List<HideAppInfo> hideapps = new ArrayList<HideAppInfo>();
+        try {
+            hideapps = HideAppService.read(inputStream);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return hideapps;
     }
 
     public WidgetsModel updateAndClone(Context context) {
@@ -148,6 +168,7 @@ public class WidgetsModel {
         mWidgetsList.clear();
         mPackageItemInfos.clear();
         mWidgetAndShortcutNameComparator.reset();
+        mRemovePackages.clear();
 
         InvariantDeviceProfile idp = LauncherAppState.getInstance().getInvariantDeviceProfile();
 
@@ -210,6 +231,24 @@ public class WidgetsModel {
                 tmpPackageItemInfos.put(packageName,  pInfo);
                 mPackageItemInfos.add(pInfo);
             }
+        }
+        List<HideAppInfo> removepacks = new ArrayList<>();
+        try {
+            removepacks = readHideAppList();
+        } catch (Exception e) {
+        }
+
+        for (PackageItemInfo item : mPackageItemInfos) {
+            for (HideAppInfo info : removepacks) {
+                if (null != info && item != null
+                        && info.getComponentPackage().equals(item.packageName)) {
+                    mRemovePackages.add(item);
+                }
+            }
+        }
+
+        for (PackageItemInfo item : mRemovePackages) {
+            mPackageItemInfos.remove(item);
         }
 
         // sort.

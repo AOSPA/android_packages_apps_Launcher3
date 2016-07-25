@@ -95,6 +95,41 @@
                 android:contentDescription="@string/all_apps_button_label"
                 android:src="@drawable/apps_menu"/>
 
+            <ImageView
+                android:id="@+id/dismiss_search_button"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="16dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginRight="16dp"
+                android:contentDescription="@string/all_apps_button_label"
+                android:src="@drawable/back_search"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/hide_hint_text"
+                android:layout_width="240dp"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent"
+                android:gravity="fill_horizontal|center_vertical"
+                android:hint="@string/hide_app_hint"
+                android:scrollHorizontally="true"
+                android:textColor="#ffffff"
+                android:textColorHint="#ffffff"
+                android:layout_marginLeft="16dp"
+                android:textSize="20sp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/select_hide_button"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="16dp"
+                android:contentDescription="@string/all_apps_button_label"
+                android:src="@drawable/hide_confirm"
+                android:visibility="gone" />
         </LinearLayout>
 
     </com.android.launcher3.allapps.AllAppsRecyclerViewContainerView>
