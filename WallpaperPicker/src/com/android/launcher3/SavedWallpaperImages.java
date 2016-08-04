@@ -20,6 +20,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -105,46 +106,57 @@ public class SavedWallpaperImages extends BaseAdapter implements ListAdapter {
     public void loadThumbnailsAndImageIdList() {
         mImages = new ArrayList<SavedWallpaperTile>();
         SQLiteDatabase db = mDb.getReadableDatabase();
-        Cursor result = db.query(ImageDb.TABLE_NAME,
-                new String[] { ImageDb.COLUMN_ID,
-                    ImageDb.COLUMN_IMAGE_THUMBNAIL_FILENAME,
-                    ImageDb.COLUMN_IMAGE_FILENAME,
-                    ImageDb.COLUMN_EXTRAS}, // cols to return
-                null, // select query
-                null, // args to select query
-                null,
-                null,
-                ImageDb.COLUMN_ID + " DESC",
-                null);
+        Cursor result = null;
+        try {
+            result = db.query(ImageDb.TABLE_NAME,
+                    new String[] { ImageDb.COLUMN_ID,
+                            ImageDb.COLUMN_IMAGE_THUMBNAIL_FILENAME,
+                            ImageDb.COLUMN_IMAGE_FILENAME,
+                            ImageDb.COLUMN_EXTRAS}, // cols to return
+                    null, // select query
+                    null, // args to select query
+                    null,
+                    null,
+                    ImageDb.COLUMN_ID + " DESC",
+                    null);
 
-        while (result.moveToNext()) {
-            String filename = result.getString(1);
-            File file = new File(mContext.getFilesDir(), filename);
+            while (result.moveToNext()) {
+                String filename = result.getString(1);
+                File file = new File(mContext.getFilesDir(), filename);
 
-            Bitmap thumb = BitmapFactory.decodeFile(file.getAbsolutePath());
-            if (thumb != null) {
+                Bitmap thumb = BitmapFactory.decodeFile(file.getAbsolutePath());
+                if (thumb != null) {
 
-                Float[] extras = null;
-                String extraStr = result.getString(3);
-                if (extraStr != null) {
-                    String[] parts = extraStr.split(",");
-                    extras = new Float[parts.length];
-                    for (int i = 0; i < parts.length; i++) {
-                        try {
-                            extras[i] = Float.parseFloat(parts[i]);
-                        } catch (Exception e) {
-                            extras = null;
-                            break;
+                    Float[] extras = null;
+                    String extraStr = result.getString(3);
+                    if (extraStr != null) {
+                        String[] parts = extraStr.split(",");
+                        extras = new Float[parts.length];
+                        for (int i = 0; i < parts.length; i++) {
+                            try {
+                                extras[i] = Float.parseFloat(parts[i]);
+                            } catch (Exception e) {
+                                extras = null;
+                                break;
+                            }
                         }
                     }
-                }
 
-                mImages.add(new SavedWallpaperTile(result.getInt(0),
-                        new File(mContext.getFilesDir(), result.getString(2)),
-                        new BitmapDrawable(thumb), extras));
+                    mImages.add(new SavedWallpaperTile(result.getInt(0),
+                            new File(mContext.getFilesDir(), result.getString(2)),
+                            new BitmapDrawable(thumb), extras));
+                }
+            }
+
+            result.close();
+        } catch (SQLiteException e) {
+            e.printStackTrace();
+        } finally {
+            if (result != null) {
+                result.close();
             }
         }
-        result.close();
+
     }
 
     public int getCount() {
