@@ -297,10 +297,13 @@ public class FocusHelper {
                 workspace.snapToPage(pageIndex - 1);
                 // If the page we are going to is fullscreen, have it take the focus from hotseat.
                 CellLayout prevPage = (CellLayout) workspace.getPageAt(pageIndex - 1);
-                boolean isPrevPageFullscreen = ((CellLayout.LayoutParams) prevPage
-                        .getShortcutsAndWidgets().getChildAt(0).getLayoutParams()).isFullscreen;
-                if (isPrevPageFullscreen) {
-                    workspace.getPageAt(pageIndex - 1).requestFocus();
+                View tempV= prevPage.getShortcutsAndWidgets().getChildAt(0);
+                if (tempV != null) {
+                    boolean isPrevPageFullscreen =
+                            ((CellLayout.LayoutParams) tempV.getLayoutParams()).isFullscreen;
+                    if (isPrevPageFullscreen) {
+                        workspace.getPageAt(pageIndex - 1).requestFocus();
+                    }
                 }
                 break;
             case FocusLogic.NEXT_PAGE_LEFT_COLUMN:
