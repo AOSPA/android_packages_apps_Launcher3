@@ -23,6 +23,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.RelativeLayout;
 
 public class ShortcutAndWidgetContainer extends ViewGroup {
     static final String TAG = "CellLayoutChildren";
@@ -149,6 +150,8 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
 
             if (child instanceof LauncherAppWidgetHostView) {
                 // Widgets have their own padding, so skip
+            } else if(child instanceof RelativeLayout){
+                //deleteScreenButton and addScreenButton on overview have their own padding, skip.
             } else {
                 // Otherwise, center the icon
                 int cHeight = getCellContentHeight();
