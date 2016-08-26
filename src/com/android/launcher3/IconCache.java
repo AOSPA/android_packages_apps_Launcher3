@@ -75,7 +75,7 @@ public class IconCache {
 
     private static final int LOW_RES_SCALE_FACTOR = 5;
 
-    private final String CHROME_PACKAGE_NAME = "com.android.chrome";
+    private final String BROWSER_PACKAGE_NAME = "com.android.browser";
 
     @Thunk static final Object ICON_UPDATE_TOKEN = new Object();
 
@@ -472,7 +472,7 @@ public class IconCache {
     private void setCustomizedIconAndTitle(String packagename, CacheEntry entry) {
         boolean iscustomizechrome = false;
         if (packagename != null) {
-            iscustomizechrome = packagename.contains(CHROME_PACKAGE_NAME);
+            iscustomizechrome = packagename.contains(BROWSER_PACKAGE_NAME);
         }
         if (iscustomizechrome) {
             entry.icon = getCustomizedIcon();
