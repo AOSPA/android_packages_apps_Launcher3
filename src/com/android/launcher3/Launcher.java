@@ -2490,8 +2490,9 @@ public class Launcher extends Activity
         }
 
         if (isAppsViewVisible()) {
-            if (mAppsView.getHideAppsMode()) {
+            if (null != mAppsView && mAppsView.getHideAppsMode()) {
                 mAppsView.exitHideMode();
+                mAppsView.readHideAppFunction();
                 mAppsView.getApps().removeHideapp();
                 return;
             }

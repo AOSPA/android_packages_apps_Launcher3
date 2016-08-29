@@ -381,10 +381,7 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             public void onClick(View arg0) {
                 exitHideMode();
 
-                try {
-                    mApps.readHideAppList();
-                } catch (Exception e) {
-                }
+                readHideAppFunction();
                 mApps.removeHideapp();
             }
         });
@@ -449,6 +446,13 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
         mApps.setHideAppsMode(false);
         AllAppsGridAdapter.mHideMap.clear();
+    }
+
+    public void readHideAppFunction() {
+        try {
+            mApps.readHideAppList();
+        } catch (Exception e) {
+        }
     }
 
     @Override
