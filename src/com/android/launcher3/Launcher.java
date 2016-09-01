@@ -3492,7 +3492,8 @@ public class Launcher extends Activity
         Drawable d = getResources().getDrawable(R.drawable.screen_close);
 
         deleteScreenButton.setBackgroundDrawable(d);
-        final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(3, 0, 1, 1);
+        final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(
+                mDeviceProfile.inv.numColumns - 1, 0, 1, 1);
         emptyscreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, true);
 
         deletecontainer.setOnClickListener(new View.OnClickListener() {
@@ -3514,7 +3515,7 @@ public class Launcher extends Activity
     public void removeDeleteScreenLayout(CellLayout cell) {
         if (null == cell) { return; }
 
-        View view = cell.getChildAt(3, 0);
+        View view = cell.getChildAt(mDeviceProfile.inv.numColumns - 1, 0);
         cell.removeView(view);
     }
 
@@ -3535,7 +3536,8 @@ public class Launcher extends Activity
         Drawable d = getResources().getDrawable(R.drawable.screen_add);
         addScreenButton.setBackgroundDrawable(d);
 
-        final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(1, 1, 2, 2);
+        final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(
+                1, 1, mDeviceProfile.inv.numColumns - 2, mDeviceProfile.inv.numRows - 2);
         addScreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, true);
 
         add_container.setOnClickListener(new View.OnClickListener() {
