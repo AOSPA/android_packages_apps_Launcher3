@@ -58,13 +58,12 @@
             android:layout_marginTop="@dimen/all_apps_search_bar_height"
             android:descendantFocusability="afterDescendants" />
 
-        <LinearLayout
+        <RelativeLayout
             android:id="@+id/search_container"
             android:layout_width="match_parent"
             android:saveEnabled="false"
             android:layout_height="@dimen/all_apps_search_bar_height"
             android:layout_gravity="start|top"
-            android:orientation="horizontal"
             android:background="@drawable/all_apps_search_bg" >
 
             <com.android.launcher3.ExtendedEditText
@@ -90,7 +89,9 @@
                 android:id="@+id/all_app_menu"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:gravity="right|center_vertical"
+                android:gravity="center_vertical|right"
+                android:layout_alignParentRight="true"
+                android:layout_marginRight="9dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/all_apps_button_label"
                 android:src="@drawable/apps_menu"/>
@@ -119,6 +120,7 @@
                 android:textColorHint="#ffffff"
                 android:layout_marginLeft="16dp"
                 android:textSize="20sp"
+                android:layout_toRightOf="@+id/dismiss_search_button"
                 android:visibility="gone" />
 
             <ImageView
@@ -126,11 +128,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_gravity="center_vertical"
-                android:layout_marginEnd="16dp"
+                android:layout_alignParentRight="true"
+                android:layout_marginRight="15dp"
                 android:contentDescription="@string/all_apps_button_label"
                 android:src="@drawable/hide_confirm"
                 android:visibility="gone" />
-        </LinearLayout>
+        </RelativeLayout>
 
     </com.android.launcher3.allapps.AllAppsRecyclerViewContainerView>
 </com.android.launcher3.allapps.AllAppsContainerView>
