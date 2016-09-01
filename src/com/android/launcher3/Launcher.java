@@ -4100,6 +4100,7 @@ public class Launcher extends Activity
 
             workspace.addInScreenFromBind(view, item.container, item.screenId, item.cellX,
                     item.cellY, 1, 1);
+            getWorkspace().setHideAppToWorkspace(false);
             if (animateIcons) {
                 // Animate all the applications up now
                 view.setAlpha(0f);

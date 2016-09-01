@@ -436,6 +436,7 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
                 exitHideMode();
                 hidelist.clear();
+                mLauncher.getWorkspace().setHideAppToWorkspace(true);
                 mLauncher.getModel().forceReload();
                 mLauncher.showWorkspace(true);
             }
