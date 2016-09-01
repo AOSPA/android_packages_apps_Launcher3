@@ -409,7 +409,8 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
                                 && cn.getClassName().equals(info.getComponentClass())) {
                             LauncherModel.deleteItemFromDatabase(mLauncher, item);
                         }
-                        if (null == cn && packageName.equals(info.getComponentPackage())) {
+                        if (null == cn && packageName != null
+                                && packageName.equals(info.getComponentPackage())) {
                             LauncherModel.deleteItemFromDatabase(mLauncher, item);
                         }
                     }
