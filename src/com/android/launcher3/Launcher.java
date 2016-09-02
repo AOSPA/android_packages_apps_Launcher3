@@ -30,6 +30,9 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.SearchManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
@@ -58,6 +61,8 @@ import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -68,6 +73,12 @@ import android.os.Message;
 import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.UserHandle;
+import android.provider.Settings;
+import android.telephony.CellInfo;
+import android.telephony.PhoneNumberUtils;
+import android.telephony.PhoneStateListener;
+import android.telephony.SignalStrength;
+import android.telephony.TelephonyManager;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -241,6 +252,12 @@ public class Launcher extends Activity
     private static int NEW_APPS_ANIMATION_INACTIVE_TIMEOUT_SECONDS = 5;
     @Thunk static int NEW_APPS_ANIMATION_DELAY = 500;
 
+    private static final int NOTIFICATION_WIFI_CALL_ID = 1;
+    private static final int PERMISSION_REQUEST_CODE_LOCATION = 2;
+    private static final String WIFI_CALL_TURNON = "wifi_call_turnon";
+    private static final int WIFI_CALL_TURN_OFF = 0;
+    private static final int SIGNAL_STRENGTH_POOR = 1;
+
     private final BroadcastReceiver mCloseSystemDialogsReceiver
             = new CloseSystemDialogsIntentReceiver();
 
@@ -358,6 +375,10 @@ public class Launcher extends Activity
     // launcher. Since there is no callback for when the activity has finished launching, enable
     // the press state and keep this reference to reset the press state when we return to launcher.
     private BubbleTextView mWaitingForResume;
+
+    private TelephonyManager mTelephonyManager;
+    private SignalStrengthListener mSignalStrengthListener;
+    private boolean mIsNotificationPopNeeded = false;
 
     private Context mContext;
     private ArrayList<Long> mEmptyScreenList;
@@ -525,6 +546,12 @@ public class Launcher extends Activity
         } else {
             showFirstRunActivity();
             showFirstRunClings();
+        }
+        if (LauncherAppState.isShowWFCNotification()) {
+            mTelephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+            mSignalStrengthListener = new SignalStrengthListener();
+            mTelephonyManager.listen(mSignalStrengthListener,
+                    PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
         }
     }
 
@@ -882,6 +909,11 @@ public class Launcher extends Activity
                 Toast.makeText(this, getString(R.string.msg_no_phone_permission,
                         getString(R.string.app_name)), Toast.LENGTH_SHORT).show();
             }
+        } else if(requestCode == PERMISSION_REQUEST_CODE_LOCATION){
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                notifyWFCOnlyIfPermissionGranted();
+            }
         }
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onRequestPermissionsResult(requestCode, permissions,
@@ -1097,7 +1129,10 @@ public class Launcher extends Activity
         idleScreenIntent.putExtra("SCREEN_IDLE",true);
         Log.d(TAG,"Broadcasting Home Idle Screen Intent ...");
         sendBroadcast(idleScreenIntent);
-
+        if(LauncherAppState.isShowWFCNotification()) {
+            mIsNotificationPopNeeded = true;
+            notifyWFCOnlyIfPermissionGranted();
+        }
     }
 
     @Override
@@ -2067,6 +2102,9 @@ public class Launcher extends Activity
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onDestroy();
+        }
+        if (LauncherAppState.isShowWFCNotification() && (null != mTelephonyManager)) {
+            mTelephonyManager.listen(mSignalStrengthListener, PhoneStateListener.LISTEN_NONE);
         }
     }
 
@@ -4960,6 +4998,98 @@ public class Launcher extends Activity
         icon.setBounds(0, 0, mDeviceProfile.iconSizePx, mDeviceProfile.iconSizePx);
         return icon;
     }
+
+    private boolean isShowWifiCallNotification() {
+        boolean wifiAvailableNotConnected = false;
+        boolean wifiCallTurnOn = Settings.Global.getInt(getContentResolver(),
+                WIFI_CALL_TURNON, WIFI_CALL_TURN_OFF) == 1 ? true :false;
+
+        ConnectivityManager conManager = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo wifiNetworkInfo = conManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        if (wifiNetworkInfo.isAvailable() && !wifiNetworkInfo.isConnected()) {
+            wifiAvailableNotConnected = true;
+        }
+
+        return wifiCallTurnOn && wifiAvailableNotConnected && !isCellularNetworkAvailable();
+    }
+
+    private boolean isCellularNetworkAvailable() {
+        TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+        List<CellInfo> cellInfoList = tm.getAllCellInfo();
+
+        if (cellInfoList != null) {
+            for (CellInfo cellinfo : cellInfoList) {
+                if (cellinfo.isRegistered()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void popConnectWifiCallNotification() {
+        if ((mState == State.WORKSPACE) && mIsNotificationPopNeeded
+                && isShowWifiCallNotification()) {
+            if(LOGD) {
+                Log.d(TAG, "popConnectWifiCallNotification:" + "send wfc notification");
+            }
+            final NotificationManager notiManager =
+                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+            Intent intent = new Intent();
+            intent.setAction(android.provider.Settings.ACTION_WIFI_SETTINGS);
+            PendingIntent pendingIntent =
+                    PendingIntent.getActivity(
+                            this, NOTIFICATION_WIFI_CALL_ID,
+                            intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+            Notification.Builder builder = new Notification.Builder(this);
+            builder.setOngoing(false);
+            builder.setWhen(0);
+            builder.setContentIntent(pendingIntent);
+            builder.setAutoCancel(true);
+            builder.setSmallIcon(R.drawable.wifi_calling_on_notification);
+            builder.setContentTitle(
+                    getResources().getString(R.string.alert_user_connect_to_wifi_for_call_title));
+            builder.setContentText(
+                    getResources().getString(R.string.alert_user_connect_to_wifi_for_call_text));
+            notiManager.notify(NOTIFICATION_WIFI_CALL_ID, builder.build());
+
+            mHandler.postDelayed(new Thread() {
+                @Override
+                public void run() {
+                    notiManager.cancel(NOTIFICATION_WIFI_CALL_ID);
+                }
+            }, 5000);
+            mIsNotificationPopNeeded = false;
+        }
+    }
+
+    private void notifyWFCOnlyIfPermissionGranted() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                    PERMISSION_REQUEST_CODE_LOCATION);
+        } else {
+            popConnectWifiCallNotification();
+        }
+    }
+
+    private class SignalStrengthListener extends PhoneStateListener {
+
+        @Override
+        public void onSignalStrengthsChanged(SignalStrength signalStrength) {
+            super.onSignalStrengthsChanged(signalStrength);
+            int level = signalStrength.getLevel();
+            if (level <= SIGNAL_STRENGTH_POOR) {
+                notifyWFCOnlyIfPermissionGranted();
+                if(LOGD) {
+                    Log.d(TAG, "onSignalStrengthsChanged: level=" + level+", pup notification");
+                }
+            }
+        }
+    };
 
     /**
      * Prints out out state for debugging.
