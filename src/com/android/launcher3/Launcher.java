@@ -3494,7 +3494,7 @@ public class Launcher extends Activity
         deleteScreenButton.setBackgroundDrawable(d);
         final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(
                 mDeviceProfile.inv.numColumns - 1, 0, 1, 1);
-        emptyscreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, true);
+        emptyscreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, false);
 
         deletecontainer.setOnClickListener(new View.OnClickListener() {
             @Override
