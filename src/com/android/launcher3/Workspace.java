@@ -204,6 +204,8 @@ public class Workspace extends PagedView
     private State mState = State.NORMAL;
     private boolean mIsSwitchingState = false;
 
+    private boolean mIsHideAppToWorkspace = false;
+
     boolean mAnimatingViewIntoPlace = false;
     boolean mIsDragOccuring = false;
     boolean mChildrenLayersEnabled = true;
@@ -733,7 +735,7 @@ public class Workspace extends PagedView
 
         // If the final screen is empty, convert it to the extra empty screen
         if (finalScreen.getShortcutsAndWidgets().getChildCount() == 0 &&
-                !finalScreen.isDropPending()) {
+                 !finalScreen.isDropPending() && getChildCount() > 1) {
             mWorkspaceScreens.remove(finalScreenId);
             mScreenOrder.remove(finalScreenId);
 
@@ -1078,6 +1080,10 @@ public class Workspace extends PagedView
 
     public boolean isSwitchingState() {
         return mIsSwitchingState;
+    }
+
+    public void setHideAppToWorkspace(boolean isHideAppToWorkspace) {
+        this.mIsHideAppToWorkspace = isHideAppToWorkspace;
     }
 
     /** This differs from isSwitchingState in that we take into account how far the transition
@@ -1687,7 +1693,7 @@ public class Workspace extends PagedView
     private void updatePageAlphaValues(int screenCenter) {
         if (mWorkspaceFadeInAdjacentScreens &&
                 !workspaceInModalState() &&
-                !mIsSwitchingState) {
+                (!mIsSwitchingState || mIsHideAppToWorkspace)) {
             for (int i = numCustomPages(); i < getChildCount(); i++) {
                 CellLayout child = (CellLayout) getChildAt(i);
                 if (child != null) {
