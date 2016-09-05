@@ -120,6 +120,7 @@ import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -186,6 +187,8 @@ public class Launcher extends Activity
     private static final String RUNTIME_STATE_CURRENT_SCREEN = "launcher.current_screen";
     // Type: int
     private static final String RUNTIME_STATE = "launcher.state";
+    // Type: boolean
+    private static final String RUNTIME_STATE_HIDE_APP_MODE="launcher.hide_app";
     // Type: int
     private static final String RUNTIME_STATE_PENDING_ADD_CONTAINER = "launcher.add_container";
     // Type: int
@@ -202,6 +205,11 @@ public class Launcher extends Activity
     private static final String RUNTIME_STATE_PENDING_ADD_WIDGET_INFO = "launcher.add_widget_info";
     // Type: parcelable
     private static final String RUNTIME_STATE_PENDING_ADD_WIDGET_ID = "launcher.add_widget_id";
+    // Type: parcelable
+    private static final String RUNTIME_STATE_HIDE_APPS_INFO = "launcher.hide_apps_info";
+
+    private boolean restoreFromHideMode = false;
+    private List<HideAppInfo> mHideApps = new ArrayList<HideAppInfo>();
 
     static final String INTRO_SCREEN_DISMISSED = "launcher.intro_screen_dismissed";
     static final String FIRST_RUN_ACTIVITY_DISPLAYED = "launcher.first_run_activity_displayed";
@@ -1317,6 +1325,12 @@ public class Launcher extends Activity
             mOnResumeState = state;
         }
 
+        restoreFromHideMode = savedState.getBoolean(RUNTIME_STATE_HIDE_APP_MODE, false);
+        if (restoreFromHideMode) {
+            mHideApps = (List<HideAppInfo>) savedState.
+                    getSerializable(RUNTIME_STATE_HIDE_APPS_INFO);
+        }
+
         int currentScreen = savedState.getInt(RUNTIME_STATE_CURRENT_SCREEN,
                 PagedView.INVALID_RESTORE_PAGE);
         if (currentScreen != PagedView.INVALID_RESTORE_PAGE) {
@@ -1965,6 +1979,7 @@ public class Launcher extends Activity
         // know as it's not null)
         if (isWorkspaceLoading() && mSavedState != null) {
             outState.putAll(mSavedState);
+            saveAllAppInstanceState(outState);
             return;
         }
 
@@ -1975,6 +1990,9 @@ public class Launcher extends Activity
         super.onSaveInstanceState(outState);
 
         outState.putInt(RUNTIME_STATE, mState.ordinal());
+
+        saveAllAppInstanceState(outState);
+
         // We close any open folder since it will not be re-opened, and we need to make sure
         // this state is reflected.
         closeFolder(false);
@@ -1996,6 +2014,14 @@ public class Launcher extends Activity
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onSaveInstanceState(outState);
+        }
+    }
+
+    private void saveAllAppInstanceState(Bundle outState) {
+        outState.putBoolean(RUNTIME_STATE_HIDE_APP_MODE, mAppsView.getHideAppsMode());
+        if (mAppsView.getHideAppsMode()) {
+            outState.putSerializable(RUNTIME_STATE_HIDE_APPS_INFO,
+                    (Serializable) mAppsView.getApps().getHideApps());
         }
     }
 
@@ -4465,6 +4491,14 @@ public class Launcher extends Activity
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.bindAllApplications(apps);
         }
+        if (restoreFromHideMode) {
+            mAppsView.enterHideAppsMode();
+            mAppsView.getApps().setHideApps(mHideApps);
+            if (mOnResumeState == State.APPS) {
+                mAppsView.getAdapter().notifyDataSetChanged();
+            }
+        }
+        restoreFromHideMode = false;
     }
 
     /**

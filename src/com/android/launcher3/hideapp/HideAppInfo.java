@@ -29,7 +29,9 @@
 
 package com.android.launcher3.hideapp;
 
-public class HideAppInfo {
+import java.io.Serializable;
+
+public class HideAppInfo implements Serializable{
     private String componentPackage;
     private String componentClass;
 
