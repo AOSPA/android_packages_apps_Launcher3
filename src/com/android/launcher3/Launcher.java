@@ -982,7 +982,7 @@ public class Launcher extends Activity
 
         // Restore the previous launcher state
         if (mOnResumeState == State.WORKSPACE) {
-            showWorkspace(false);
+            showWorkspace(true);
         } else if (mOnResumeState == State.APPS) {
             mWorkspace.setVisibility(View.INVISIBLE);
             boolean launchedFromApp = (mWaitingForResume != null);
@@ -3495,7 +3495,7 @@ public class Launcher extends Activity
         deleteScreenButton.setBackgroundDrawable(d);
         final CellLayout.LayoutParams lp = new CellLayout.LayoutParams(
                 mDeviceProfile.inv.numColumns - 1, 0, 1, 1);
-        emptyscreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, true);
+        emptyscreen.addViewToCellLayout(contentview, -1, contentview.getId(), lp, false);
 
         deletecontainer.setOnClickListener(new View.OnClickListener() {
             @Override
