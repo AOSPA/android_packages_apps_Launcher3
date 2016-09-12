@@ -29,32 +29,21 @@
  -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent" >
-
-    <TextView
-        android:id="@+id/blank"
-        android:layout_width="45dp"
-        android:layout_height="45dp"
-        android:layout_alignParentTop="true"
-        android:gravity="right|top" />
+    android:layout_height="match_parent"
+    android:gravity="top|right">
 
     <RelativeLayout
         android:id="@+id/delete_container"
         android:layout_width="44dp"
         android:layout_height="44dp"
-        android:layout_alignTop="@id/blank"
-        android:layout_toRightOf="@id/blank"
-        android:background="@drawable/add_delete_screen_bg" >
-
+        android:background="@drawable/add_delete_screen_bg">
         <TextView
             android:id="@+id/delete_btn"
             style="@style/Icon"
             android:layout_width="14dp"
             android:layout_height="14dp"
-            android:layout_alignParentRight="true"
-            android:layout_alignParentTop="true"
-            android:layout_marginRight="10dp"
-            android:focusable="true" />
+            android:layout_centerInParent="true"
+            android:focusable="true"/>
     </RelativeLayout>
 
 </RelativeLayout>
