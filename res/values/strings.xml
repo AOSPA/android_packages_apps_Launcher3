@@ -283,4 +283,6 @@
     <!--hide app -->
     <string name="hide_app_hint">Select app to hide</string>
     <string name="config_regional_customize_default_browser_title"></string>
+    <string name="alert_user_connect_to_wifi_for_call_title">Connect to Wi-Fi to make calls</string>
+    <string name="alert_user_connect_to_wifi_for_call_text">Tap here to view available networks</string>
 </resources>
