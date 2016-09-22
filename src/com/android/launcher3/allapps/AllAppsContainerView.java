@@ -381,10 +381,7 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             public void onClick(View arg0) {
                 exitHideMode();
 
-                try {
-                    mApps.readHideAppList();
-                } catch (Exception e) {
-                }
+                readHideAppFunction();
                 mApps.removeHideapp();
             }
         });
@@ -449,6 +446,13 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
         mApps.setHideAppsMode(false);
         AllAppsGridAdapter.mHideMap.clear();
+    }
+
+    public void readHideAppFunction() {
+        try {
+            mApps.readHideAppList();
+        } catch (Exception e) {
+        }
     }
 
     @Override
@@ -782,12 +786,7 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             @Override
             public void onClick(View arg0) {
                 mPopupWindow.dismiss();
-                mSearchContainer.setBackgroundColor(Color.GRAY);
-                // enter hide mode
-                updateTopSearchBarArea(true);
-
-                mApps.setHideAppsMode(true);
-                mApps.showHideapp();
+                enterHideAppsMode();
             }
         });
 
@@ -806,6 +805,15 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
         mPopupWindow.showAtLocation(parent, Gravity.TOP | Gravity.RIGHT, location[0],
                 location[1]);
+    }
+
+    public void enterHideAppsMode() {
+        mSearchContainer.setBackgroundColor(Color.GRAY);
+        // enter hide mode
+        updateTopSearchBarArea(true);
+
+        mApps.setHideAppsMode(true);
+        mApps.showHideapp();
     }
 
     private void updateTopSearchBarArea(boolean enterHideMode) {

@@ -96,4 +96,5 @@
     <bool name="config_launcher_customWorkspace">false</bool>
     <bool name="config_regional_customize_default_browser_icon">false</bool>
     <bool name="config_regional_customize_rename">false</bool>
+    <bool name="config_show_wfc_notification">false</bool>
 </resources>

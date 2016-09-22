@@ -555,6 +555,9 @@ public class AlphabeticalAppsList {
         return mHideApps;
     }
 
+    public void setHideApps(List<HideAppInfo> hideApps) {
+        mHideApps = hideApps;
+    }
 
     /**
      * Updates internals when the set of apps are updated.
