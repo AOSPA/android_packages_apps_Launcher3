@@ -807,6 +807,14 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
                 location[1]);
     }
 
+    // when home key is pressed, need to dismiss the popup window if the pop
+    // up is still showing
+    public void dismissPopupWindow() {
+        if (mPopupWindow != null && mPopupWindow.isShowing()) {
+            mPopupWindow.dismiss();
+        }
+    }
+
     public void enterHideAppsMode() {
         mSearchContainer.setBackgroundColor(Color.GRAY);
         // enter hide mode

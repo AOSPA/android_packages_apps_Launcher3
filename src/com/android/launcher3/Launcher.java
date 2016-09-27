@@ -1993,6 +1993,10 @@ public class Launcher extends Activity
             }
         }
 
+        if (null != mAppsView) {
+            mAppsView.dismissPopupWindow();
+        }
+
         if (DEBUG_RESUME_TIME) {
             Log.d(TAG, "Time spent in onNewIntent: " + (System.currentTimeMillis() - startTime));
         }
