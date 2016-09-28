@@ -98,4 +98,11 @@
     <bool name="config_regional_customize_rename">false</bool>
     <bool name="config_show_wfc_notification">false</bool>
     <bool name="config_tether_hotspot_shortcut">false</bool>
+
+    <!-- JIO-Launcher new feature enable -->
+    <bool name="config_jio_new_feature_enabled">false</bool>
+    <bool name="config_searchbar_visible_default">true</bool>
+    <integer name="config_jio_hotseat_icon_size">61</integer>
+    <integer name="config_jio_allapp_icon_size">61</integer>
+    <integer name="config_jio_allapp_icon_text_size">12</integer>
 </resources>

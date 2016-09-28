@@ -150,7 +150,14 @@ public class InvariantDeviceProfile {
         iconSize = interpolatedDeviceProfileOut.iconSize;
         iconBitmapSize = Utilities.pxFromDp(iconSize, dm);
         iconTextSize = interpolatedDeviceProfileOut.iconTextSize;
-        hotseatIconSize = interpolatedDeviceProfileOut.hotseatIconSize;
+
+        if (context.getResources().getBoolean(R.bool.config_jio_new_feature_enabled)) {
+            hotseatIconSize = context.getResources().
+                    getInteger(R.integer.config_jio_hotseat_icon_size);
+        } else {
+            hotseatIconSize = interpolatedDeviceProfileOut.hotseatIconSize;
+        }
+
         fillResIconDpi = getLauncherIconDensity(iconBitmapSize);
 
         // If the partner customization apk contains any grid overrides, apply them
@@ -180,6 +187,9 @@ public class InvariantDeviceProfile {
 
         }
 
+        if (mContext.getResources().getBoolean(R.bool.config_jio_new_feature_enabled)){
+            fourByFourDefaultLayout = R.xml.jio_default_workspace_4x4;
+        }
         predefinedDeviceProfiles.add(new InvariantDeviceProfile("Super Short Stubby",
                 255, 300,     2, 3, 2, 3, 3, 48, 13, 3, 48, R.xml.default_workspace_3x3));
         predefinedDeviceProfiles.add(new InvariantDeviceProfile("Shorter Stubby",
