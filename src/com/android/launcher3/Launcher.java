@@ -2556,6 +2556,7 @@ public class Launcher extends Activity
         if (isAppsViewVisible()) {
             if (null != mAppsView && mAppsView.getHideAppsMode()) {
                 mAppsView.exitHideMode();
+                mAppsView.clearTempHideAppList();
                 mAppsView.readHideAppFunction();
                 mAppsView.getApps().removeHideapp();
                 return;

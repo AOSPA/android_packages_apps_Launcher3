@@ -380,7 +380,7 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             @Override
             public void onClick(View arg0) {
                 exitHideMode();
-
+                clearTempHideAppList();
                 readHideAppFunction();
                 mApps.removeHideapp();
             }
@@ -453,6 +453,10 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             mApps.readHideAppList();
         } catch (Exception e) {
         }
+    }
+
+    public void clearTempHideAppList() {
+        mApps.getHideApps().clear();
     }
 
     @Override
