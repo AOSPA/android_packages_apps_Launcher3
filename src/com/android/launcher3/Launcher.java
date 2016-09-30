@@ -3495,18 +3495,19 @@ public class Launcher extends Activity
      * @return whether or not the Launcher state changed.
      */
     boolean showWorkspace(int snapToPage, boolean animated, Runnable onCompleteRunnable) {
-        mWorkspace.removeAddScreen();
 
         boolean changed = mState != State.WORKSPACE ||
                 mWorkspace.getState() != Workspace.State.NORMAL;
         int childCount = mWorkspace.getChildCount();
 
-        for (int i = 0; i < childCount; i++) {
-            CellLayout cl = (CellLayout) mWorkspace.getChildAt(i);
-            long screenId = mWorkspace.getIdForScreen(cl);
-
-            if(mEmptyScreenList.indexOf(screenId) != -1){
-                removeDeleteScreenLayout(cl);
+        if (changed) {
+            mWorkspace.removeAddScreen();
+            for (int i = 0; i < childCount; i++) {
+                CellLayout cl = (CellLayout) mWorkspace.getChildAt(i);
+                long screenId = mWorkspace.getIdForScreen(cl);
+                if (mEmptyScreenList.indexOf(screenId) != -1) {
+                    removeDeleteScreenLayout(cl);
+                }
             }
         }
         mEmptyScreenList.clear();
