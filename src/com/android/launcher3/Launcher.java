@@ -1993,6 +1993,10 @@ public class Launcher extends Activity
             }
         }
 
+        if (null != mAppsView) {
+            mAppsView.dismissPopupWindow();
+        }
+
         if (DEBUG_RESUME_TIME) {
             Log.d(TAG, "Time spent in onNewIntent: " + (System.currentTimeMillis() - startTime));
         }
@@ -2556,6 +2560,7 @@ public class Launcher extends Activity
         if (isAppsViewVisible()) {
             if (null != mAppsView && mAppsView.getHideAppsMode()) {
                 mAppsView.exitHideMode();
+                mAppsView.clearTempHideAppList();
                 mAppsView.readHideAppFunction();
                 mAppsView.getApps().removeHideapp();
                 return;

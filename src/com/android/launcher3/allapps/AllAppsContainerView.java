@@ -380,7 +380,7 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             @Override
             public void onClick(View arg0) {
                 exitHideMode();
-
+                clearTempHideAppList();
                 readHideAppFunction();
                 mApps.removeHideapp();
             }
@@ -453,6 +453,10 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
             mApps.readHideAppList();
         } catch (Exception e) {
         }
+    }
+
+    public void clearTempHideAppList() {
+        mApps.getHideApps().clear();
     }
 
     @Override
@@ -805,6 +809,14 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
 
         mPopupWindow.showAtLocation(parent, Gravity.TOP | Gravity.RIGHT, location[0],
                 location[1]);
+    }
+
+    // when home key is pressed, need to dismiss the popup window if the pop
+    // up is still showing
+    public void dismissPopupWindow() {
+        if (mPopupWindow != null && mPopupWindow.isShowing()) {
+            mPopupWindow.dismiss();
+        }
     }
 
     public void enterHideAppsMode() {

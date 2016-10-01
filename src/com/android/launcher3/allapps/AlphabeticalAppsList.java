@@ -313,9 +313,13 @@ public class AlphabeticalAppsList {
     }
 
     public List<HideAppInfo>  readHideAppList() throws Exception{
-        File xmlFile = new File(mLauncher.getFilesDir(), "hide.xml");
-        FileInputStream inputStream = new FileInputStream(xmlFile);
         List<HideAppInfo> hideapps = new ArrayList<HideAppInfo>() ;
+
+        File xmlFile = new File(mLauncher.getFilesDir(), "hide.xml");
+        if (xmlFile == null || (xmlFile != null && !xmlFile.exists())) {
+            return hideapps; // hide list is empty, directly return hide list
+        }
+        FileInputStream inputStream = new FileInputStream(xmlFile);
         try {
             hideapps = HideAppService.read(inputStream);
         } catch (Exception e) {
