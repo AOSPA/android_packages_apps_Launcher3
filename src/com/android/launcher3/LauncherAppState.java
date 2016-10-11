@@ -51,6 +51,7 @@ public class LauncherAppState {
     private static boolean mCustomizeBrowserIcon;
     private static boolean mCustomizeShortcutRename;
     private static boolean mIsShowWFCNotification;
+    private static boolean mConfigTetherHotspotShortcut;
 
     private InvariantDeviceProfile mInvariantDeviceProfile;
 
@@ -96,6 +97,8 @@ public class LauncherAppState {
                 R.bool.config_regional_customize_rename);
         mIsShowWFCNotification = sContext.getResources().getBoolean(
                 R.bool.config_show_wfc_notification);
+        mConfigTetherHotspotShortcut = sContext.getResources().getBoolean(
+                R.bool.config_tether_hotspot_shortcut);
 
         mInvariantDeviceProfile = new InvariantDeviceProfile(sContext);
         mIconCache = new IconCache(sContext, mInvariantDeviceProfile);
@@ -184,6 +187,11 @@ public class LauncherAppState {
     public static boolean isCustomizeShortcutRname() {
         return mCustomizeShortcutRename;
     }
+
+    public static boolean isConfigTetherHotspotShortcut() {
+        return mConfigTetherHotspotShortcut;
+    }
+
     static void setLauncherProvider(LauncherProvider provider) {
         sLauncherProvider = new WeakReference<LauncherProvider>(provider);
     }
