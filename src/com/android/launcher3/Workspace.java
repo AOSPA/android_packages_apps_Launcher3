@@ -881,13 +881,13 @@ public class Workspace extends PagedView
 
     public void removeAddScreen(){
         CellLayout cl = mWorkspaceScreens.get(EXTRA_EMPTY_SCREEN_ID);
-        mWorkspaceScreens.remove(EXTRA_EMPTY_SCREEN_ID);
-        mScreenOrder.remove(EXTRA_EMPTY_SCREEN_ID);
-        if(null != cl){
+        if (null != cl) {
+            mWorkspaceScreens.remove(EXTRA_EMPTY_SCREEN_ID);
+            mScreenOrder.remove(EXTRA_EMPTY_SCREEN_ID);
             removeView(cl);
+            // Update the model for the new screen
+            mLauncher.getModel().updateWorkspaceScreenOrder(mLauncher, mScreenOrder);
         }
-        // Update the model for the new screen
-        mLauncher.getModel().updateWorkspaceScreenOrder(mLauncher, mScreenOrder);
     }
 
     public void stripEmptyScreens() {
