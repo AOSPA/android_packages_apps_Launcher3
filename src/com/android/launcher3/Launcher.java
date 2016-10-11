@@ -1067,7 +1067,7 @@ public class Launcher extends Activity
 
         // Restore the previous launcher state
         if (mOnResumeState == State.WORKSPACE) {
-            showWorkspace(true);
+            showWorkspace(false);
         } else if (mOnResumeState == State.APPS) {
             mWorkspace.setVisibility(View.INVISIBLE);
             boolean launchedFromApp = (mWaitingForResume != null);
