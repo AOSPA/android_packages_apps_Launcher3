@@ -71,6 +71,7 @@ import com.android.launcher3.util.IconNormalizer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -908,5 +909,30 @@ public final class Utilities {
         boolean result  = context.getResources().getBoolean(
                 R.bool.config_launcher_show_unread_number);
         return result;
+    }
+
+    public static Intent createExplicitFromImplicitIntent(Context context, Intent implicitIntent) {
+        // Retrieve all services that can match the given intent
+        PackageManager pm = context.getPackageManager();
+        List<ResolveInfo> resolveInfo = pm.queryIntentServices(implicitIntent, 0);
+
+        // Make sure only one match was found
+        if (resolveInfo == null || resolveInfo.size() != 1) {
+            return null;
+        }
+
+        // Get component info and create ComponentName
+        ResolveInfo serviceInfo = resolveInfo.get(0);
+        String packageName = serviceInfo.serviceInfo.packageName;
+        String className = serviceInfo.serviceInfo.name;
+        ComponentName component = new ComponentName(packageName, className);
+
+        // Create a new intent. Use the old one for extras and such reuse
+        Intent explicitIntent = new Intent(implicitIntent);
+
+        // Set the component to be explicit
+        explicitIntent.setComponent(component);
+
+        return explicitIntent;
     }
 }
