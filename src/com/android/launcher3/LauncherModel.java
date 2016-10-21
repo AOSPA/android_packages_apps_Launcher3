@@ -3653,6 +3653,13 @@ public class LauncherModel extends BroadcastReceiver
             info.title = componentName.getClassName();
         }
 
+        if (LauncherAppState.isConfigTetherHotspotShortcut()) {
+            if (IconCache.TETHER_SETTINGS_CLASS_NAME.equals(componentName.getClassName())) {
+               info.title = context.getResources().getString(
+                       R.string.hotspot_app_name);
+            }
+        }
+
         info.itemType = LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
         info.user = user;
         info.contentDescription = mUserManager.getBadgedLabelForUser(info.title, info.user);
