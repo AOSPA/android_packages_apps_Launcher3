@@ -457,6 +457,7 @@ public class WorkspaceStateTransitionAnimation {
             AlphaUpdateListener.updateVisibility(hotseat, accessibilityEnabled);
             if (pageIndicator != null) {
                 pageIndicator.setAlpha(finalHotseatAndPageIndicatorAlpha);
+                pageIndicator.setTranslationY(finalPageIndicatorTranslationY);
                 AlphaUpdateListener.updateVisibility(pageIndicator, accessibilityEnabled);
             }
             mWorkspace.updateCustomContentVisibility();
