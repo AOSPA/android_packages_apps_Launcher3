@@ -555,7 +555,7 @@ public class IconCache {
     private int getUnreadNumber(ComponentName componentName){
         int unreadNumber = -1;
         if(mAppIconReloaded){
-            if(mUnreadMap.containsKey(componentName)) {
+            if(mUnreadMap != null && mUnreadMap.containsKey(componentName)) {
                 unreadNumber = (int) mUnreadMap.get(componentName);
             }
         }
