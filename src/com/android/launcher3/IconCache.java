@@ -69,6 +69,14 @@ public class IconCache {
 
     private static final int INITIAL_ICON_CACHE_CAPACITY = 50;
 
+    private static final String RESOURCE_FILE_PREFIX = "icon_";
+
+    public static final String TETHER_SETTINGS_CLASS_NAME =
+            "com.qualcomm.qti.shortcutspringboard.HotSpotShortcut";
+
+    private final String STK_PACKAGE_NAME = "com.android.stk";
+    private final String CHROME_PACKAGE_NAME = "com.android.chrome";
+
     // Empty class name is used for storing package default entry.
     private static final String EMPTY_CLASS_NAME = ".";
 
@@ -547,7 +555,7 @@ public class IconCache {
     private int getUnreadNumber(ComponentName componentName){
         int unreadNumber = -1;
         if(mAppIconReloaded){
-            if(mUnreadMap.containsKey(componentName)) {
+            if(mUnreadMap != null && mUnreadMap.containsKey(componentName)) {
                 unreadNumber = (int) mUnreadMap.get(componentName);
             }
         }
@@ -630,6 +638,14 @@ public class IconCache {
         }
         if(LauncherAppState.isCustomizeBrowserIcon()) {
             setCustomizedIconAndTitle(info, entry);
+        }
+        if (LauncherAppState.isConfigTetherHotspotShortcut()) {
+            if (TETHER_SETTINGS_CLASS_NAME.equals(componentName.getClassName())) {
+                entry.icon = Utilities.createIconBitmap(mContext.getResources().getDrawable(
+                        R.drawable.ic_launcher_hotspot), mContext);
+                entry.title = mContext.getResources().getString(
+                        R.string.hotspot_app_name);
+            }
         }
         return entry;
     }
