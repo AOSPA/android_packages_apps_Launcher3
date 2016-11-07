@@ -750,6 +750,9 @@ public class LauncherProvider extends ContentProvider {
                         break;
                     }
                 case 21:
+                    if (!addIntegerColumn(db, Favorites.RANK, 0)) {
+                        break;
+                    }
                     // Recreate workspace table with screen id a primary key
                     if (!recreateWorkspaceTable(db)) {
                         break;
