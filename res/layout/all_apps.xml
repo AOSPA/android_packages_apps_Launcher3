@@ -120,7 +120,7 @@
                 android:textColorHint="#ffffff"
                 android:layout_marginLeft="16dp"
                 android:textSize="20sp"
-                android:layout_toRightOf="@+id/dismiss_search_button"
+                android:layout_toEndOf="@+id/dismiss_search_button"
                 android:visibility="gone" />
 
             <ImageView
@@ -128,8 +128,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_gravity="center_vertical"
-                android:layout_alignParentRight="true"
+                android:layout_alignParentEnd="true"
                 android:layout_marginRight="15dp"
+                android:layout_marginLeft="15dp"
                 android:contentDescription="@string/all_apps_button_label"
                 android:src="@drawable/hide_confirm"
                 android:visibility="gone" />
