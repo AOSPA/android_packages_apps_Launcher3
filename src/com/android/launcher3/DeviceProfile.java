@@ -110,6 +110,8 @@ public class DeviceProfile {
     private int normalSearchBarSpaceHeightPx, tallSearchBarSpaceHeightPx;
     private int searchBarSpaceHeightPx; // One of the above.
 
+    public boolean searchBarVisible;
+
     public DeviceProfile(Context context, InvariantDeviceProfile inv,
             Point minSize, Point maxSize,
             int width, int height, boolean isLandscape) {
@@ -124,6 +126,8 @@ public class DeviceProfile {
         isTablet = res.getBoolean(R.bool.is_tablet);
         isLargeTablet = res.getBoolean(R.bool.is_large_tablet);
         isPhone = !isTablet && !isLargeTablet;
+
+        searchBarVisible = res.getBoolean(R.bool.config_searchbar_visible_default);
 
         // Some more constants
         transposeLayoutWithOrientation =
@@ -151,11 +155,19 @@ public class DeviceProfile {
         iconDrawablePaddingOriginalPx =
                 res.getDimensionPixelSize(R.dimen.dynamic_grid_icon_drawable_padding);
 
-        // AllApps uses the original non-scaled icon text size
-        allAppsIconTextSizeSp = inv.iconTextSize;
+        if (res.getBoolean(R.bool.config_jio_new_feature_enabled)){
+            allAppsIconTextSizeSp = res.
+                    getInteger(R.integer.config_jio_allapp_icon_text_size);
 
-        // AllApps uses the original non-scaled icon size
-        allAppsIconSizePx = Utilities.pxFromDp(inv.iconSize, dm);
+            allAppsIconSizePx = Utilities.pxFromDp(res.
+                    getInteger(R.integer.config_jio_allapp_icon_size) ,dm);
+        } else {
+            // AllApps uses the original non-scaled icon text size
+            allAppsIconTextSizeSp = inv.iconTextSize;
+
+            // AllApps uses the original non-scaled icon size
+            allAppsIconSizePx = Utilities.pxFromDp(inv.iconSize, dm);
+        }
 
         // Determine sizes.
         widthPx = width;
@@ -296,16 +308,19 @@ public class DeviceProfile {
     /** Returns the search bar bounds in the current orientation */
     public Rect getSearchBarBounds(boolean isLayoutRtl) {
         Rect bounds = new Rect();
+        int searchBarH = searchBarVisible ? normalSearchBarSpaceHeightPx :
+                searchBarSpaceHeightPx + 2 * edgeMarginPx;
         if (isVerticalBarLayout()) {
             if (isLayoutRtl) {
-                bounds.set(availableWidthPx - normalSearchBarSpaceHeightPx, edgeMarginPx,
+                bounds.set(availableWidthPx - searchBarH, edgeMarginPx,
                         availableWidthPx, availableHeightPx - edgeMarginPx);
             } else {
-                bounds.set(0, edgeMarginPx, normalSearchBarSpaceHeightPx,
+                bounds.set(0, edgeMarginPx, searchBarH,
                         availableHeightPx - edgeMarginPx);
             }
         } else {
-            int boundsBottom = searchBarSpaceHeightPx + getSearchBarTotalVerticalPadding();
+            int boundsBottom = searchBarVisible ? searchBarSpaceHeightPx +
+                    getSearchBarTotalVerticalPadding() : searchBarSpaceHeightPx;
             if (isTablet) {
                 // Pad the left and right of the workspace to ensure consistent spacing
                 // between all icons
@@ -432,13 +447,15 @@ public class DeviceProfile {
     public void setSearchBarHeight(int searchBarHeight) {
         if (searchBarHeight == LauncherCallbacks.SEARCH_BAR_HEIGHT_TALL) {
             hotseatBarHeightPx = shortHotseatBarHeightPx;
-            searchBarSpaceHeightPx = tallSearchBarSpaceHeightPx;
+            searchBarSpaceHeightPx = searchBarVisible ?
+                    tallSearchBarSpaceHeightPx : 3 * edgeMarginPx;
             searchBarBottomPaddingPx = tallSearchBarBottomPaddingPx;
             searchBarTopExtraPaddingPx = isPhone ? tallSearchBarNegativeTopPaddingPx
                     : normalSearchBarTopExtraPaddingPx;
         } else {
             hotseatBarHeightPx = normalHotseatBarHeightPx;
-            searchBarSpaceHeightPx = normalSearchBarSpaceHeightPx;
+            searchBarSpaceHeightPx = searchBarVisible ?
+                    normalSearchBarSpaceHeightPx : 3 * edgeMarginPx;
             searchBarBottomPaddingPx = normalSearchBarBottomPaddingPx;
             searchBarTopExtraPaddingPx = normalSearchBarTopExtraPaddingPx;
         }
