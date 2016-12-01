@@ -448,14 +448,14 @@ public class DeviceProfile {
         if (searchBarHeight == LauncherCallbacks.SEARCH_BAR_HEIGHT_TALL) {
             hotseatBarHeightPx = shortHotseatBarHeightPx;
             searchBarSpaceHeightPx = searchBarVisible ?
-                    tallSearchBarSpaceHeightPx : 3 * edgeMarginPx;
+                    tallSearchBarSpaceHeightPx : 5 * edgeMarginPx;
             searchBarBottomPaddingPx = tallSearchBarBottomPaddingPx;
             searchBarTopExtraPaddingPx = isPhone ? tallSearchBarNegativeTopPaddingPx
                     : normalSearchBarTopExtraPaddingPx;
         } else {
             hotseatBarHeightPx = normalHotseatBarHeightPx;
             searchBarSpaceHeightPx = searchBarVisible ?
-                    normalSearchBarSpaceHeightPx : 3 * edgeMarginPx;
+                    normalSearchBarSpaceHeightPx : 5 * edgeMarginPx;
             searchBarBottomPaddingPx = normalSearchBarBottomPaddingPx;
             searchBarTopExtraPaddingPx = normalSearchBarTopExtraPaddingPx;
         }
