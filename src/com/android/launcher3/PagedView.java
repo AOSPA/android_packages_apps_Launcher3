@@ -1759,6 +1759,9 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
 
         case MotionEvent.ACTION_UP:
             if (mTouchState == TOUCH_STATE_SCROLLING) {
+                if (mCurrentPage < 0 || mCurrentPage >= getChildCount()) {
+                    break;
+                }
                 final int activePointerId = mActivePointerId;
                 final int pointerIndex = ev.findPointerIndex(activePointerId);
                 final float x = ev.getX(pointerIndex);
