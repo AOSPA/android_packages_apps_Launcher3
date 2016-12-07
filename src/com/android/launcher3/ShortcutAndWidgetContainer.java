@@ -18,12 +18,10 @@ package com.android.launcher3;
 
 import android.app.WallpaperManager;
 import android.content.Context;
-import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.RelativeLayout;
 
 public class ShortcutAndWidgetContainer extends ViewGroup {
     static final String TAG = "CellLayoutChildren";
@@ -43,7 +41,6 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
     private int mHeightGap;
 
     private int mCountX;
-    private int mCountY;
 
     private Launcher mLauncher;
 
@@ -51,7 +48,7 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
 
     public ShortcutAndWidgetContainer(Context context) {
         super(context);
-        mLauncher = (Launcher) context;
+        mLauncher = Launcher.getLauncher(context);
         mWallpaperManager = WallpaperManager.getInstance(context);
     }
 
@@ -62,7 +59,6 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
         mWidthGap = widthGap;
         mHeightGap = heightGap;
         mCountX = countX;
-        mCountY = countY;
     }
 
     public View getChildAt(int x, int y) {
@@ -77,24 +73,6 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
             }
         }
         return null;
-    }
-
-    @Override
-    protected void dispatchDraw(Canvas canvas) {
-        @SuppressWarnings("all") // suppress dead code warning
-        final boolean debug = false;
-        if (debug) {
-            // Debug drawing for hit space
-            Paint p = new Paint();
-            p.setColor(0x6600FF00);
-            for (int i = getChildCount() - 1; i >= 0; i--) {
-                final View child = getChildAt(i);
-                final CellLayout.LayoutParams lp = (CellLayout.LayoutParams) child.getLayoutParams();
-
-                canvas.drawRect(lp.x, lp.y, lp.x + lp.width, lp.y + lp.height, p);
-            }
-        }
-        super.dispatchDraw(canvas);
     }
 
     @Override
@@ -150,10 +128,8 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
 
             if (child instanceof LauncherAppWidgetHostView) {
                 // Widgets have their own padding, so skip
-            } else if(child instanceof RelativeLayout){
-                //deleteScreenButton and addScreenButton on overview have their own padding, skip.
             } else {
-                // Otherwise, center the icon
+                // Otherwise, center the icon/folder
                 int cHeight = getCellContentHeight();
                 int cellPaddingY = (int) Math.max(0, ((lp.height - cHeight) / 2f));
                 int cellPaddingX = (int) (grid.edgeMarginPx / 2f);
@@ -239,8 +215,14 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
         }
     }
 
-    @Override
     protected void setChildrenDrawnWithCacheEnabled(boolean enabled) {
         super.setChildrenDrawnWithCacheEnabled(enabled);
+    }
+
+    @Override
+    public void setLayerType(int layerType, Paint paint) {
+        // When clip children is disabled do not use hardware layer,
+        // as hardware layer forces clip children.
+        super.setLayerType(getClipChildren() ? layerType : LAYER_TYPE_NONE, paint);
     }
 }
