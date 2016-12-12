@@ -250,7 +250,7 @@ class AllAppsList {
     }
 
     public AppInfo unreadNumbersChanged(Context context, ComponentName component,
-            int unreadNum) {
+                                        int unreadNum) {
 
         if (component == null) { return null; }
 

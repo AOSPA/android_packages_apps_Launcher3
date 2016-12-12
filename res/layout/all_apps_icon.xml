@@ -13,38 +13,15 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-
-<FrameLayout
+<com.android.launcher3.BubbleTextView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:launcher="http://schemas.android.com/apk/res-auto"
+    style="@style/Icon.AllApps"
+    android:id="@+id/icon"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:layout_gravity="center"
+    android:focusable="true"
+    launcher:iconDisplay="all_apps"
+    launcher:centerVertically="true" />
 
-    <com.android.launcher3.BubbleTextView
-        style="@style/Icon.AllApps"
-        android:id="@+id/icon"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:paddingTop="@dimen/all_apps_icon_top_bottom_padding"
-        android:paddingBottom="@dimen/all_apps_icon_top_bottom_padding"
-        android:focusable="true"
-        android:background="@drawable/focusable_view_bg"
-        launcher:iconDisplay="all_apps" />
-
-    <LinearLayout
-        android:id="@+id/hide_front_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/all_apps_icon_top_bottom_padding"
-        android:layout_gravity="center_horizontal"
-        android:gravity="center"
-        android:background="#99000000"
-        android:visibility="invisible">
-        <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/front_hide"/>
-    </LinearLayout>
-
-</FrameLayout>
