@@ -1213,6 +1213,9 @@ public class WallpaperPickerActivity extends WallpaperCropActivity {
         final String packageName = getResources().getResourcePackageName(R.array.wallpapers);
         try {
             ApplicationInfo info = getContext().getPackageManager().getApplicationInfo(packageName, 0);
+            if (getResources().getBoolean(R.bool.config_jio_new_feature_enabled)) {
+                return new Pair<ApplicationInfo, Integer>(info, R.array.wallpapers_jio);
+            }
             return new Pair<ApplicationInfo, Integer>(info, R.array.wallpapers);
         } catch (PackageManager.NameNotFoundException e) {
             return null;
