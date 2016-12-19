@@ -41,6 +41,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.ActivityInfo;
@@ -56,7 +57,9 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
+import android.os.RemoteException;
 import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -136,6 +139,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+
+import com.qti.launcherunreadservice.IGetUnreadNumber;
 
 /**
  * Default launcher application.
@@ -180,6 +186,11 @@ public class Launcher extends Activity
 
     public static final String ACTION_APPWIDGET_HOST_RESET =
             "com.android.launcher3.intent.ACTION_APPWIDGET_HOST_RESET";
+
+    private static final String LAUNCHER_UNREAD_SERVICE_PACKAGENAME =
+            "com.qti.launcherunreadservice";
+    private static final String LAUNCHER_UNREAD_SERVICE_CLASSNAME =
+            "com.qti.launcherunreadservice.LauncherUnreadService";
 
     // Type: int
     private static final String RUNTIME_STATE_CURRENT_SCREEN = "launcher.current_screen";
@@ -364,6 +375,27 @@ public class Launcher extends Activity
         }
     }
 
+    private Map mUnreadAppMap = new HashMap<ComponentName, Integer>();
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            IGetUnreadNumber iGetUnreadNumber = IGetUnreadNumber.Stub.asInterface(service);
+
+            try {
+                if(iGetUnreadNumber != null){
+                    mUnreadAppMap = iGetUnreadNumber.GetUnreadNumber();
+                }
+            } catch (RemoteException ex) {
+            }
+
+            mIconCache.setUnreadMap(mUnreadAppMap);
+            unbindService(mConnection);
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+        }
+    };
+
     private RotationPrefChangeHandler mRotationPrefChangeHandler;
 
     @Override
@@ -471,6 +503,20 @@ public class Launcher extends Activity
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
+        }
+
+        if(mIconCache.getAppIconReload()) {
+            Intent intent = new Intent();
+            ComponentName componentName = new ComponentName(LAUNCHER_UNREAD_SERVICE_PACKAGENAME,
+                    LAUNCHER_UNREAD_SERVICE_CLASSNAME);
+            intent.setComponent(componentName);
+
+            Intent requestIntent = Utilities.
+                    createExplicitFromImplicitIntent(this, intent);
+            if (requestIntent != null) {
+                final Intent eintent = new Intent(requestIntent);
+                bindService(eintent, mConnection, Context.BIND_AUTO_CREATE);
+            }
         }
     }
 

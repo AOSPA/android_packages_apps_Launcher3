@@ -460,6 +460,26 @@ public class DeviceProfile {
         return visibleChildren;
     }
 
+// fix the compile error
+/*
+    // TODO(twickham): b/25154513
+    public void setSearchBarHeight(int searchBarHeight) {
+        if (searchBarHeight == LauncherCallbacks.SEARCH_BAR_HEIGHT_TALL) {
+            hotseatBarHeightPx = shortHotseatBarHeightPx;
+            searchBarSpaceHeightPx = searchBarVisible ?
+                    tallSearchBarSpaceHeightPx : 5 * edgeMarginPx;
+            searchBarBottomPaddingPx = tallSearchBarBottomPaddingPx;
+            searchBarTopExtraPaddingPx = isPhone ? tallSearchBarNegativeTopPaddingPx
+                    : normalSearchBarTopExtraPaddingPx;
+        } else {
+            hotseatBarHeightPx = normalHotseatBarHeightPx;
+            searchBarSpaceHeightPx = searchBarVisible ?
+                    normalSearchBarSpaceHeightPx : 5 * edgeMarginPx;
+            searchBarBottomPaddingPx = normalSearchBarBottomPaddingPx;
+            searchBarTopExtraPaddingPx = normalSearchBarTopExtraPaddingPx;
+        }
+    }
+*/
     public void layout(Launcher launcher, boolean notifyListeners) {
         FrameLayout.LayoutParams lp;
         boolean hasVerticalBarLayout = isVerticalBarLayout();

@@ -56,6 +56,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
@@ -77,6 +78,10 @@ public class IconCache {
     private static final int LOW_RES_SCALE_FACTOR = 5;
 
     @Thunk static final Object ICON_UPDATE_TOKEN = new Object();
+
+    private Map mUnreadMap;
+
+    private boolean mAppIconReloaded = false;
 
     @Thunk static class CacheEntry {
         public Bitmap icon;
@@ -187,7 +192,7 @@ public class IconCache {
 
     private Bitmap makeDefaultIcon(UserHandleCompat user) {
         Drawable unbadged = getFullResDefaultActivityIcon();
-        return Utilities.createBadgedIconBitmap(unbadged, user, mContext);
+        return Utilities.createBadgedIconBitmap(unbadged, user, mContext, -1);
     }
 
     /**
@@ -389,7 +394,7 @@ public class IconCache {
             entry = new CacheEntry();
             entry.icon = Utilities.createBadgedIconBitmap(
                     mIconProvider.getIcon(app, mIconDpi), app.getUser(),
-                    mContext);
+                    mContext, -1);
         }
         entry.title = app.getLabel();
         entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, app.getUser());
@@ -444,7 +449,7 @@ public class IconCache {
             LauncherActivityInfoCompat info, boolean useLowResIcon) {
         UserHandleCompat user = info == null ? application.user : info.getUser();
         CacheEntry entry = cacheLocked(application.componentName, info, user,
-                false, useLowResIcon);
+                false, useLowResIcon, application.unreadNum);
         application.title = Utilities.trim(entry.title);
         application.contentDescription = entry.contentDescription;
         application.iconBitmap = getNonNullIcon(entry, user);
@@ -456,7 +461,7 @@ public class IconCache {
      */
     public synchronized void updateTitleAndIcon(AppInfo application) {
         CacheEntry entry = cacheLocked(application.componentName, null, application.user,
-                false, application.usingLowResIcon);
+                false, application.usingLowResIcon, application.unreadNum);
         if (entry.icon != null && !isDefaultIcon(entry.icon, application.user)) {
             application.title = Utilities.trim(entry.title);
             application.contentDescription = entry.contentDescription;
@@ -477,7 +482,7 @@ public class IconCache {
         }
 
         LauncherActivityInfoCompat launcherActInfo = mLauncherApps.resolveActivity(intent, user);
-        CacheEntry entry = cacheLocked(component, launcherActInfo, user, true, false /* useLowRes */);
+        CacheEntry entry = cacheLocked(component, launcherActInfo, user, true, false /* useLowRes */, -1);
         return entry.icon;
     }
 
@@ -508,12 +513,34 @@ public class IconCache {
     public synchronized void getTitleAndIcon(
             ShortcutInfo shortcutInfo, ComponentName component, LauncherActivityInfoCompat info,
             UserHandleCompat user, boolean usePkgIcon, boolean useLowResIcon) {
-        CacheEntry entry = cacheLocked(component, info, user, usePkgIcon, useLowResIcon);
+        CacheEntry entry = cacheLocked(component, info, user, usePkgIcon, useLowResIcon,
+                getUnreadNumber(component));
         shortcutInfo.setIcon(getNonNullIcon(entry, user));
         shortcutInfo.title = Utilities.trim(entry.title);
-        shortcutInfo.contentDescription = entry.contentDescription;
         shortcutInfo.usingFallbackIcon = isDefaultIcon(entry.icon, user);
         shortcutInfo.usingLowResIcon = entry.isLowResIcon;
+    }
+
+    public void setUnreadMap(Map unreadAppMap) {
+        mUnreadMap = unreadAppMap;
+    }
+
+    private int getUnreadNumber(ComponentName componentName){
+        int unreadNumber = -1;
+        if(mAppIconReloaded){
+            if(mUnreadMap != null && mUnreadMap.containsKey(componentName)) {
+                unreadNumber = (int) mUnreadMap.get(componentName);
+            }
+        }
+        return unreadNumber;
+    }
+
+    public void setAppIconReloaded(boolean enable) {
+        mAppIconReloaded = enable;
+    }
+
+    public boolean getAppIconReload() {
+        return mAppIconReloaded;
     }
 
     /**
@@ -545,19 +572,19 @@ public class IconCache {
      * This method is not thread safe, it must be called from a synchronized method.
      */
     private CacheEntry cacheLocked(ComponentName componentName, LauncherActivityInfoCompat info,
-            UserHandleCompat user, boolean usePackageIcon, boolean useLowResIcon) {
+            UserHandleCompat user, boolean usePackageIcon, boolean useLowResIcon, int unreadNum) {
         ComponentKey cacheKey = new ComponentKey(componentName, user);
         CacheEntry entry = mCache.get(cacheKey);
-        if (entry == null || (entry.isLowResIcon && !useLowResIcon)) {
+        if (entry == null || (entry.isLowResIcon && !useLowResIcon) || unreadNum >= 0) {
             entry = new CacheEntry();
             mCache.put(cacheKey, entry);
 
             // Check the DB first.
-            if (!getEntryFromDB(cacheKey, entry, useLowResIcon) || DEBUG_IGNORE_CACHE) {
+            if (!getEntryFromDB(cacheKey, entry, useLowResIcon) || DEBUG_IGNORE_CACHE || unreadNum >= 0) {
                 if (info != null) {
                     entry.icon = Utilities.createBadgedIconBitmap(
                             mIconProvider.getIcon(info, mIconDpi), info.getUser(),
-                            mContext);
+                            mContext, unreadNum);
                 } else {
                     if (usePackageIcon) {
                         CacheEntry packageEntry = getEntryForPackageLocked(
@@ -642,7 +669,7 @@ public class IconCache {
                     // Load the full res icon for the application, but if useLowResIcon is set, then
                     // only keep the low resolution icon instead of the larger full-sized icon
                     Bitmap icon = Utilities.createBadgedIconBitmap(
-                            appInfo.loadIcon(mPackageManager), user, mContext);
+                            appInfo.loadIcon(mPackageManager), user, mContext, -1);
                     Bitmap lowResIcon =  generateLowResIcon(icon, mPackageBgColor);
                     entry.title = appInfo.loadLabel(mPackageManager);
                     entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, user);
