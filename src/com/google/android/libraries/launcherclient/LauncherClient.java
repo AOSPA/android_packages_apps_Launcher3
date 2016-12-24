@@ -27,6 +27,7 @@ public class LauncherClient {
     private OverlayCallbacks mCurrentCallbacks;
     private boolean mDestroyed;
     private boolean mIsResumed;
+    private boolean mIsServiceConnected;
     private LauncherClientCallbacks mLauncherClientCallbacks;
     private ILauncherOverlay mOverlay;
     private OverlayServiceConnection mServiceConnection;
@@ -92,13 +93,17 @@ public class LauncherClient {
     }
 
     private boolean connectSafely(Context context, ServiceConnection conn, int flags) {
+        boolean bind;
         try {
-            return context.bindService(mServiceIntent, conn, flags | Context.BIND_AUTO_CREATE);
+            bind = context.bindService(mServiceIntent, conn, flags | Context.BIND_AUTO_CREATE);
+            mIsServiceConnected = true;
         }
         catch (SecurityException e) {
             Log.e("DrawerOverlayClient", "Unable to connect to overlay service");
-            return false;
+            bind = false;
+            mIsServiceConnected = false;
         }
+        return bind;
     }
 
     static Intent getServiceIntent(Context context, String targetPackage) {
@@ -126,7 +131,10 @@ public class LauncherClient {
 
     private void removeClient(boolean removeAppConnection) {
         mDestroyed = true;
-        mActivity.unbindService(mServiceConnection);
+        if (mIsServiceConnected) {
+            mActivity.unbindService(mServiceConnection);
+            mIsServiceConnected = false;
+        }
         mActivity.unregisterReceiver(mUpdateReceiver);
 
         if (mCurrentCallbacks != null) {
