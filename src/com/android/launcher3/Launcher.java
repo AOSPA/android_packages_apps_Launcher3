@@ -27,7 +27,9 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
+import android.app.IThemeCallback;
 import android.app.SearchManager;
+import android.app.ThemeManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
@@ -56,11 +58,13 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -90,6 +94,7 @@ import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DefaultAppSearchController;
 import com.android.launcher3.compat.AppWidgetManagerCompat;
@@ -315,6 +320,13 @@ public class Launcher extends Activity
 
     private boolean mMoveToDefaultScreenFromNewIntent;
 
+    private boolean mThemeEnabled;
+    private int mOriginalTextColor;
+    private int mTextColor;
+
+    private ThemeManager mThemeManager;
+    private BubbleTextView mBubbleTextView;
+
     // This is set to the view that launched the activity that navigated the user away from
     // launcher. Since there is no callback for when the activity has finished launching, enable
     // the press state and keep this reference to reset the press state when we return to launcher.
@@ -389,6 +401,13 @@ public class Launcher extends Activity
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.preOnCreate();
         }
+
+        mThemeManager = (ThemeManager) getSystemService(Context.THEME_SERVICE);
+        if (mThemeManager != null) {
+            mThemeManager.addCallback(mThemeCallback);
+        }
+
+        setTheme(selectColor());
 
         super.onCreate(savedInstanceState);
 
@@ -469,6 +488,12 @@ public class Launcher extends Activity
         // we want the screen to auto-rotate based on the current orientation
         setOrientation();
 
+        mBubbleTextView = (BubbleTextView) getLayoutInflater()
+                .inflate(R.layout.app_icon, null, false);
+
+        mTextColor = getColor(com.android.internal.R.color.white_accent_color);
+        mOriginalTextColor = getColor(R.color.quantum_panel_text_color);
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
         }
@@ -496,9 +521,9 @@ public class Launcher extends Activity
      * @param activate if true, make sure the status bar is light, otherwise base on wallpaper.
      */
     public void activateLightStatusBar(boolean activate) {
-        boolean lightStatusBar = activate || (FeatureFlags.LIGHT_STATUS_BAR
+        boolean lightStatusBar = activate && !mThemeEnabled || (FeatureFlags.LIGHT_STATUS_BAR
                 && mExtractedColors.getColor(ExtractedColors.STATUS_BAR_INDEX,
-                ExtractedColors.DEFAULT_DARK) == ExtractedColors.DEFAULT_LIGHT);
+                ExtractedColors.DEFAULT_DARK) == ExtractedColors.DEFAULT_LIGHT && !mThemeEnabled);
         int oldSystemUiFlags = getWindow().getDecorView().getSystemUiVisibility();
         int newSystemUiFlags = oldSystemUiFlags;
         if (lightStatusBar) {
@@ -533,6 +558,80 @@ public class Launcher extends Activity
             overlay.setOverlayCallbacks(new LauncherOverlayCallbacksImpl());
         }
         mWorkspace.setLauncherOverlay(overlay);
+    }
+
+    private final IThemeCallback mThemeCallback = new IThemeCallback.Stub() {
+
+        @Override
+        public void onThemeChanged(int themeMode, int color) {
+            onCallbackAdded(themeMode, color);
+            recreateActivity();
+        }
+
+        @Override
+        public void onCallbackAdded(int themeMode, int color) {
+            mThemeEnabled = themeMode != 0;
+            final Handler mUiHandler = new Handler(Looper.getMainLooper());
+            mUiHandler.post(() -> {
+                updateColor(mThemeEnabled);
+            });
+        }
+    };
+
+    private void recreateActivity() {
+        runOnUiThread(() -> {
+            recreate();
+        });
+    }
+
+    public boolean isThemeEnabled() {
+        return mThemeEnabled;
+    }
+
+    private void updateColor(boolean enabled) {
+        final int mPrimaryColor = getColor(com.android.internal.R.color.dark_primary_color);
+        final int mOriginalColor = getColor(R.color.all_apps_container_color);
+        final int mOriginalViewColor = getColor(R.color.all_apps_container_color);
+        if (mAllAppsController != null) {
+            mAllAppsController.setColor(enabled ? mPrimaryColor : mOriginalColor);
+        }
+        if (mAppsView != null) {
+            mAppsView.setBackgroundColor(enabled ? mPrimaryColor : mOriginalViewColor);
+        }
+        if (mBubbleTextView != null) {
+            mBubbleTextView.updateColor(!isAppsViewVisible() || enabled);
+                    //|| mWorkspace.getOpenFolder() == null);
+        }
+
+        AllAppsGridAdapter.setColor(enabled ? mTextColor : mOriginalTextColor);
+    }
+
+    private int selectColor() {
+        final int color = Settings.Secure.getInt(
+                getContentResolver(), Settings.Secure.THEME_ACCENT_COLOR, 0);
+        switch (color) {
+            case 1:
+                return mThemeEnabled ? R.style.white_launcher_red
+                        : R.style.dark_launcher_red;
+            case 2:
+                return mThemeEnabled ? R.style.white_launcher_blue
+                        : R.style.dark_launcher_blue;
+            case 3:
+                return mThemeEnabled ? R.style.white_launcher_orange
+                        : R.style.dark_launcher_orange;
+            case 4:
+                return mThemeEnabled ? R.style.white_launcher_green
+                        : R.style.dark_launcher_green;
+            case 5:
+                return mThemeEnabled ? R.style.white_launcher_yellow
+                        : R.style.dark_launcher_yellow;
+            case 6:
+                return mThemeEnabled ? R.style.white_launcher_purple
+                        : R.style.dark_launcher_purple;
+            case 0:
+            default:
+                return mThemeEnabled ? R.style.LauncherTheme : R.style.dark_launcher;
+        }
     }
 
     public boolean setLauncherCallbacks(LauncherCallbacks callbacks) {
@@ -3275,6 +3374,8 @@ public class Launcher extends Activity
         if (updatePredictedApps) {
             tryAndUpdatePredictedApps();
         }
+        mBubbleTextView.updateColor(mThemeEnabled);
+
         showAppsOrWidgets(State.APPS, animated, focusSearchBar);
     }
 

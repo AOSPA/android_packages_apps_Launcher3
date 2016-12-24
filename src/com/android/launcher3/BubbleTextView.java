@@ -29,6 +29,8 @@ import android.graphics.Region;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.SparseArray;
 import android.util.TypedValue;
@@ -98,6 +100,11 @@ public class BubbleTextView extends TextView
 
     private IconLoadRequest mIconLoadRequest;
 
+    private int mSecondaryTextColor;
+    private int mOriginalTextColor;
+
+    private boolean mEnabled;
+
     public BubbleTextView(Context context) {
         this(context, null, 0);
     }
@@ -152,6 +159,9 @@ public class BubbleTextView extends TextView
 
         mOutlineHelper = HolographicOutlineHelper.obtain(getContext());
         setAccessibilityDelegate(mLauncher.getAccessibilityDelegate());
+
+        mTextColor = context.getColor(com.android.internal.R.color.white_accent_color);
+        mOriginalTextColor = context.getColor(R.color.quantum_panel_text_color);
     }
 
     public void applyFromShortcutInfo(ShortcutInfo info, IconCache iconCache) {
@@ -192,6 +202,7 @@ public class BubbleTextView extends TextView
             iconDrawable.setState(FastBitmapDrawable.State.DISABLED);
         }
         setIcon(iconDrawable);
+        setTextColor(mEnabled ? mTextColor : mOriginalTextColor);
         setText(info.title);
         if (info.contentDescription != null) {
             setContentDescription(info.isDisabled()
@@ -658,6 +669,12 @@ public class BubbleTextView extends TextView
      */
     public boolean hasDeepShortcuts() {
         return !mLauncher.getShortcutIdsForItem((ItemInfo) getTag()).isEmpty();
+    }
+
+    public void updateColor(boolean enable) {
+        mEnabled = enable;
+
+        setTextColor(enable ? mTextColor : mOriginalTextColor);
     }
 
     /**

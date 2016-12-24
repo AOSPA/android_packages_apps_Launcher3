@@ -343,6 +343,8 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
 
     private int mAppsPerRow;
 
+    private static int mSecondaryColor;
+
     private BindViewCallback mBindViewCallback;
     private AllAppsSearchBarController mSearchController;
     private OnFocusChangeListener mIconFocusListener;
@@ -373,6 +375,10 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
         mSectionTextPaint.setTextSize(res.getDimensionPixelSize(
                 R.dimen.all_apps_grid_section_text_size));
         mSectionTextPaint.setColor(Utilities.getColorAccent(launcher));
+    }
+
+    public static void setColor(int color) {
+        mSecondaryColor = color;
     }
 
     public static boolean isDividerViewType(int viewType) {
@@ -514,6 +520,7 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
             case VIEW_TYPE_EMPTY_SEARCH:
                 TextView emptyViewText = (TextView) holder.mContent;
                 emptyViewText.setText(mEmptySearchMessage);
+                emptyViewText.setTextColor(mSecondaryColor);
                 emptyViewText.setGravity(mApps.hasNoFilteredResults() ? Gravity.CENTER :
                         Gravity.START | Gravity.CENTER_VERTICAL);
                 break;
