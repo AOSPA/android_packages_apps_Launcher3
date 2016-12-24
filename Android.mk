@@ -45,8 +45,6 @@ LOCAL_AAPT_FLAGS := \
     --auto-add-overlay \
     --extra-packages android.support.v7.recyclerview \
 
-LOCAL_SDK_VERSION := current
-LOCAL_MIN_SDK_VERSION := 21
 LOCAL_PACKAGE_NAME := Launcher3
 LOCAL_OVERRIDES_PACKAGES := Home Launcher2
 
@@ -59,19 +57,3 @@ include $(BUILD_PACKAGE)
 #
 # Launcher proto buffer jar used for development
 #
-include $(CLEAR_VARS)
-
-LOCAL_SRC_FILES := $(call all-proto-files-under, protos)
-
-LOCAL_PROTOC_OPTIMIZE_TYPE := nano
-LOCAL_PROTOC_FLAGS := --proto_path=$(LOCAL_PATH)/protos/
-
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE := launcher_proto_lib
-LOCAL_IS_HOST_MODULE := true
-LOCAL_STATIC_JAVA_LIBRARIES := host-libprotobuf-java-nano
-
-include $(BUILD_HOST_JAVA_LIBRARY)
-
-# ==================================================
-include $(call all-makefiles-under,$(LOCAL_PATH))
