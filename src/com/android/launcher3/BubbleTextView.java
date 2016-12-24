@@ -98,6 +98,9 @@ public class BubbleTextView extends TextView
 
     private IconLoadRequest mIconLoadRequest;
 
+    private int mSecondaryTextColor;
+    private int mOriginalTextColor;
+
     public BubbleTextView(Context context) {
         this(context, null, 0);
     }
@@ -152,6 +155,9 @@ public class BubbleTextView extends TextView
 
         mOutlineHelper = HolographicOutlineHelper.obtain(getContext());
         setAccessibilityDelegate(mLauncher.getAccessibilityDelegate());
+
+        mTextColor = context.getColor(com.android.internal.R.color.white_accent_color);
+        mOriginalTextColor = context.getColor(R.color.quantum_panel_text_color);
     }
 
     public void applyFromShortcutInfo(ShortcutInfo info, IconCache iconCache) {
@@ -193,6 +199,12 @@ public class BubbleTextView extends TextView
         }
         setIcon(iconDrawable);
         setText(info.title);
+        if (mLauncher != null && (mLauncher.isThemeEnabled()
+                || !mLauncher.isAppsViewVisible())) {
+            setTextColor(mTextColor);
+        } else {
+            setTextColor(mOriginalTextColor);
+        }
         if (info.contentDescription != null) {
             setContentDescription(info.isDisabled()
                     ? getContext().getString(R.string.disabled_app_label, info.contentDescription)
