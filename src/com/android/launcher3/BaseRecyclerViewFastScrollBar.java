@@ -19,12 +19,14 @@ import android.animation.AnimatorSet;
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Point;
+import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
@@ -48,8 +50,8 @@ public class BaseRecyclerViewFastScrollBar {
 
     private AnimatorSet mScrollbarAnimator;
 
-    private int mThumbInactiveColor;
-    private int mThumbActiveColor;
+    private static int mThumbInactiveColor;
+    private static int mThumbActiveColor;
     @Thunk Point mThumbOffset = new Point(-1, -1);
     @Thunk Paint mThumbPaint;
     private int mThumbMinWidth;
@@ -81,10 +83,8 @@ public class BaseRecyclerViewFastScrollBar {
         mTrackPaint = new Paint();
         mTrackPaint.setColor(rv.getFastScrollerTrackColor(Color.BLACK));
         mTrackPaint.setAlpha(MAX_TRACK_ALPHA);
-        mThumbActiveColor = mThumbInactiveColor = Utilities.getColorAccent(rv.getContext());
         mThumbPaint = new Paint();
         mThumbPaint.setAntiAlias(true);
-        mThumbPaint.setColor(mThumbInactiveColor);
         mThumbPaint.setStyle(Paint.Style.FILL);
         mThumbWidth = mThumbMinWidth = res.getDimensionPixelSize(R.dimen.container_fastscroll_thumb_min_width);
         mThumbMaxWidth = res.getDimensionPixelSize(R.dimen.container_fastscroll_thumb_max_width);
@@ -228,6 +228,8 @@ public class BaseRecyclerViewFastScrollBar {
             return;
         }
 
+        mThumbPaint.setColor(mThumbInactiveColor);
+
         // Draw the scroll bar track and thumb
         if (mTrackPaint.getAlpha() > 0) {
             canvas.drawRect(mThumbOffset.x, 0, mThumbOffset.x + mThumbWidth,
@@ -283,6 +285,12 @@ public class BaseRecyclerViewFastScrollBar {
                 mThumbOffset.x - mThumbCurvature, mThumbOffset.y + mThumbHeight / 2,
                 mThumbOffset.x, mThumbOffset.y);                                            // bl2tl
         mThumbPath.close();
+    }
+
+    public static void updateColor(Context context) {
+        mThumbActiveColor = mThumbInactiveColor = Utilities.getColorAccent(context);
+        BaseRecyclerViewFastScrollPopup.getDrawable().setColorFilter(
+                mThumbActiveColor, PorterDuff.Mode.SRC_ATOP);
     }
 
     /**
