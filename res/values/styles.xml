@@ -127,4 +127,65 @@
         <item name="indicatorSize">4dp</item>
         <item name="ringOutset">4dp</item>
     </style>
+
+    <style name="dark_launcher" parent="LauncherTheme">
+        <item name="android:colorPrimary">@android:color/dark_primary_color</item>
+        <item name="android:colorAccent">#ff009688</item> <!-- material deep teal 500 -->
+    </style>
+
+    <style name="dark_launcher_red" parent="dark_launcher">
+        <item name="android:colorAccent">@android:color/red_accent_color</item>
+    </style>
+
+    <style name="dark_launcher_blue" parent="dark_launcher">
+        <item name="android:colorAccent">@android:color/blue_accent_color</item>
+    </style>
+
+    <style name="dark_launcher_orange" parent="dark_launcher">
+        <item name="android:colorAccent">@android:color/orange_accent_color</item>
+    </style>
+
+    <style name="dark_launcher_green" parent="dark_launcher">
+        <item name="android:colorAccent">@android:color/green_accent_color</item>
+    </style>
+
+    <style name="dark_launcher_yellow" parent="dark_launcher">
+        <item name="android:colorAccent">@android:color/yellow_accent_color</item>
+    </style>
+
+    <style name="dark_launcher_purple" parent="dark_launcher">
+        <item name="android:colorAccent">@android:color/purple_accent_color</item>
+    </style>
+
+    <style name="dark_launcher_teal" parent="dark_launcher">
+        <item name="android:colorAccent">@android:color/teal_accent_color</item>
+    </style>
+
+    <style name="white_launcher_red" parent="LauncherTheme">
+        <item name="android:colorAccent">@android:color/red_accent_color</item>
+    </style>
+
+    <style name="white_launcher_blue" parent="LauncherTheme">
+        <item name="android:colorAccent">@android:color/blue_accent_color</item>
+    </style>
+
+    <style name="white_launcher_orange" parent="LauncherTheme">
+        <item name="android:colorAccent">@android:color/orange_accent_color</item>
+    </style>
+
+    <style name="white_launcher_green" parent="LauncherTheme">
+        <item name="android:colorAccent">@android:color/green_accent_color</item>
+    </style>
+
+    <style name="white_launcher_yellow" parent="LauncherTheme">
+        <item name="android:colorAccent">@android:color/yellow_accent_color</item>
+    </style>
+
+    <style name="white_launcher_purple" parent="LauncherTheme">
+        <item name="android:colorAccent">@android:color/purple_accent_color</item>
+    </style>
+
+    <style name="white_launcher_teal" parent="LauncherTheme">
+        <item name="android:colorAccent">@android:color/teal_accent_color</item>
+    </style>
 </resources>
