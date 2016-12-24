@@ -96,6 +96,8 @@ public class DeepShortcutsContainer extends LinearLayout implements View.OnLongC
     private boolean mDeferContainerRemoval;
     private boolean mIsOpen;
 
+    private int mOriginalTextColor;
+
     public DeepShortcutsContainer(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mLauncher = Launcher.getLauncher(context);
@@ -105,6 +107,8 @@ public class DeepShortcutsContainer extends LinearLayout implements View.OnLongC
                 R.dimen.deep_shortcuts_start_drag_threshold);
         mAccessibilityDelegate = new ShortcutMenuAccessibilityDelegate(mLauncher);
         mIsRtl = Utilities.isRtl(getResources());
+
+        mOriginalTextColor = context.getColor(R.color.quantum_panel_text_color);
     }
 
     public DeepShortcutsContainer(Context context, AttributeSet attrs) {
@@ -135,6 +139,7 @@ public class DeepShortcutsContainer extends LinearLayout implements View.OnLongC
                 ((LayoutParams) shortcut.getLayoutParams()).bottomMargin = spacing;
             }
             shortcut.getBubbleText().setAccessibilityDelegate(mAccessibilityDelegate);
+            shortcut.getBubbleText().setTextColor(mOriginalTextColor);
             addView(shortcut);
         }
         setContentDescription(getContext().getString(R.string.shortcuts_menu_description,
