@@ -27,7 +27,9 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
+import android.app.IThemeCallback;
 import android.app.SearchManager;
+import android.app.ThemeManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
@@ -56,6 +58,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.StrictMode;
 import android.os.SystemClock;
@@ -90,6 +93,7 @@ import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DefaultAppSearchController;
 import com.android.launcher3.compat.AppWidgetManagerCompat;
@@ -315,6 +319,13 @@ public class Launcher extends Activity
 
     private boolean mMoveToDefaultScreenFromNewIntent;
 
+    private boolean mThemeEnabled;
+    private int mAccentColor;
+    private int mOriginalTextColor;
+    private int mTextColor;
+
+    private ThemeManager mThemeManager;
+
     // This is set to the view that launched the activity that navigated the user away from
     // launcher. Since there is no callback for when the activity has finished launching, enable
     // the press state and keep this reference to reset the press state when we return to launcher.
@@ -388,6 +399,16 @@ public class Launcher extends Activity
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.preOnCreate();
+        }
+
+        mThemeManager = (ThemeManager) getSystemService(Context.THEME_SERVICE);
+        if (mThemeManager != null) {
+            mThemeManager.addCallback(mThemeCallback);
+        }
+
+        getTheme().applyStyle(mAccentColor, true);
+        if (mThemeEnabled) {
+            getTheme().applyStyle(R.style.DarkLauncherTheme, true);
         }
 
         super.onCreate(savedInstanceState);
@@ -469,6 +490,9 @@ public class Launcher extends Activity
         // we want the screen to auto-rotate based on the current orientation
         setOrientation();
 
+        mTextColor = getColor(com.android.internal.R.color.white_accent_color);
+        mOriginalTextColor = getColor(R.color.quantum_panel_text_color);
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
         }
@@ -496,7 +520,7 @@ public class Launcher extends Activity
      * @param activate if true, make sure the status bar is light, otherwise base on wallpaper.
      */
     public void activateLightStatusBar(boolean activate) {
-        boolean lightStatusBar = activate || (FeatureFlags.LIGHT_STATUS_BAR
+        boolean lightStatusBar = !mThemeEnabled && activate || (FeatureFlags.LIGHT_STATUS_BAR
                 && mExtractedColors.getColor(ExtractedColors.STATUS_BAR_INDEX,
                 ExtractedColors.DEFAULT_DARK) == ExtractedColors.DEFAULT_LIGHT);
         int oldSystemUiFlags = getWindow().getDecorView().getSystemUiVisibility();
@@ -533,6 +557,49 @@ public class Launcher extends Activity
             overlay.setOverlayCallbacks(new LauncherOverlayCallbacksImpl());
         }
         mWorkspace.setLauncherOverlay(overlay);
+    }
+
+    private final IThemeCallback mThemeCallback = new IThemeCallback.Stub() {
+
+        @Override
+        public void onThemeChanged(int themeMode, int color) {
+            onCallbackAdded(themeMode, color);
+            recreateActivity();
+        }
+
+        @Override
+        public void onCallbackAdded(int themeMode, int color) {
+            mThemeEnabled = themeMode != 0;
+            mAccentColor = color;
+            mHandler.post(() -> {
+                updateColor(mThemeEnabled);
+            });
+        }
+    };
+
+    private void recreateActivity() {
+        runOnUiThread(() -> {
+            recreate();
+        });
+    }
+
+    public boolean isThemeEnabled() {
+        return mThemeEnabled;
+    }
+
+    private void updateColor(boolean enabled) {
+        final int mPrimaryColor = getColor(com.android.internal.R.color.dark_primary_color);
+        final int mOriginalColor = getColor(R.color.all_apps_container_color);
+        final int mOriginalViewColor = getColor(R.color.all_apps_container_color);
+        if (mAllAppsController != null) {
+            mAllAppsController.setColor(enabled ? mPrimaryColor : mOriginalColor);
+        }
+        if (mAppsView != null) {
+            mAppsView.setBackgroundColor(enabled ? mPrimaryColor : mOriginalViewColor);
+        }
+
+        AllAppsGridAdapter.setColor(enabled ? mTextColor : mOriginalTextColor);
+        BaseRecyclerViewFastScrollBar.updateColor(this);
     }
 
     public boolean setLauncherCallbacks(LauncherCallbacks callbacks) {
