@@ -127,4 +127,23 @@
         <item name="indicatorSize">4dp</item>
         <item name="ringOutset">4dp</item>
     </style>
+
+    <style name="dark_launcher" parent="LauncherTheme">
+        <item name="android:colorPrimary">@android:color/dark_primary_color</item>
+        <item name="android:colorPrimaryDark">@android:color/dark_primary_color</item>
+        <item name="android:colorSecondary">@android:color/blue_accent_color</item>
+        <item name="android:colorAccent">@android:color/blue_accent_color</item>
+        <item name="android:colorBackground">@android:color/dark_primary_color</item>
+        <item name="android:textColorSecondary">@android:color/blue_accent_color</item>
+        <item name="android:textColorPrimary">@android:color/blue_accent_color</item>
+        <item name="android:colorControlHighlight">@android:color/blue_accent_color</item>
+    </style>
+
+    <style name="dark_launcher_red" parent="dark_launcher">
+        <item name="android:colorSecondary">@android:color/red_accent_color</item>
+        <item name="android:colorAccent">@android:color/red_accent_color</item>
+        <item name="android:textColorSecondary">@android:color/red_accent_color</item>
+        <item name="android:textColorPrimary">@android:color/red_accent_color</item>
+        <item name="android:colorControlHighlight">@android:color/red_accent_color</item>
+    </style>
 </resources>
