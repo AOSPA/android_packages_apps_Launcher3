@@ -73,7 +73,7 @@ LOCAL_MODULE := launcher_proto_lib
 LOCAL_IS_HOST_MODULE := true
 LOCAL_STATIC_JAVA_LIBRARIES := host-libprotobuf-java-nano
 
-include $(BUILD_HOST_JAVA_LIBRARY)
+#include $(BUILD_HOST_JAVA_LIBRARY)
 
 # ==================================================
-include $(call all-makefiles-under,$(LOCAL_PATH))
+#include $(call all-makefiles-under,$(LOCAL_PATH))
