@@ -27,7 +27,9 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
+import android.app.IThemeCallback;
 import android.app.SearchManager;
+import android.app.ThemeManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
@@ -56,6 +58,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.StrictMode;
 import android.os.SystemClock;
@@ -90,6 +93,7 @@ import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DefaultAppSearchController;
 import com.android.launcher3.compat.AppWidgetManagerCompat;
@@ -315,6 +319,10 @@ public class Launcher extends Activity
 
     private boolean mMoveToDefaultScreenFromNewIntent;
 
+    private boolean mAppDrawerShowing;
+    private boolean mThemeEnabled;
+    private ThemeManager mThemeManager;
+
     // This is set to the view that launched the activity that navigated the user away from
     // launcher. Since there is no callback for when the activity has finished launching, enable
     // the press state and keep this reference to reset the press state when we return to launcher.
@@ -389,6 +397,14 @@ public class Launcher extends Activity
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.preOnCreate();
         }
+
+        mThemeManager = (ThemeManager) getApplicationContext()
+                .getSystemService(Context.THEME_SERVICE);
+        if (mThemeManager != null) {
+            mThemeManager.addCallback(mThemeCallback);
+        }
+
+        setTheme(mThemeEnabled ? R.style.dark_launcher : R.style.LauncherTheme);
 
         super.onCreate(savedInstanceState);
 
@@ -496,9 +512,9 @@ public class Launcher extends Activity
      * @param activate if true, make sure the status bar is light, otherwise base on wallpaper.
      */
     public void activateLightStatusBar(boolean activate) {
-        boolean lightStatusBar = activate || (FeatureFlags.LIGHT_STATUS_BAR
+        boolean lightStatusBar = activate && !mThemeEnabled || (FeatureFlags.LIGHT_STATUS_BAR
                 && mExtractedColors.getColor(ExtractedColors.STATUS_BAR_INDEX,
-                ExtractedColors.DEFAULT_DARK) == ExtractedColors.DEFAULT_LIGHT);
+                ExtractedColors.DEFAULT_DARK) == ExtractedColors.DEFAULT_LIGHT && !mThemeEnabled);
         int oldSystemUiFlags = getWindow().getDecorView().getSystemUiVisibility();
         int newSystemUiFlags = oldSystemUiFlags;
         if (lightStatusBar) {
@@ -533,6 +549,60 @@ public class Launcher extends Activity
             overlay.setOverlayCallbacks(new LauncherOverlayCallbacksImpl());
         }
         mWorkspace.setLauncherOverlay(overlay);
+    }
+
+    private final IThemeCallback mThemeCallback = new IThemeCallback.Stub() {
+
+        @Override
+        public void onThemeSettingChanged(boolean isThemeApplied) {
+            onThemeChanged(isThemeApplied);
+            recreateActivity();
+        }
+
+        @Override
+        public void onThemeChanged(boolean isThemeApplied) {
+            mThemeEnabled = isThemeApplied;
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    updateColor(isThemeApplied);
+                }
+            });
+        }
+    };
+
+    protected boolean isAppDrawerShowing() {
+        return mAppDrawerShowing;
+    }
+
+    private void recreateActivity() {
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                recreate();
+            }
+        });
+    }
+
+    protected boolean isThemeEnabled() {
+        return mThemeEnabled;
+    }
+
+    private void updateColor(boolean enabled) {
+        final Context context = getApplicationContext();
+        final int mPrimaryColor = context.getColor(R.color.dark_primary_color);
+        final int mOriginalColor = context.getColor(R.color.all_apps_container_color);
+        final int mTextColor = context.getColor(R.color.white_secondary_color);
+        final int mOriginalTextColor = context.getColor(R.color.quantum_panel_text_color);
+        final int mOriginalViewColor = context.getColor(R.color.all_apps_container_color);
+        if (mAllAppsController != null) {
+            mAllAppsController.setColor(enabled ? mPrimaryColor : mOriginalColor);
+        }
+        if (mAppsView != null) {
+            mAppsView.setBackgroundColor(enabled ? mPrimaryColor : mOriginalViewColor);
+            mAppsView.invalidate();
+        }
+        AllAppsGridAdapter.setColor(enabled ? mTextColor : mOriginalTextColor);
     }
 
     public boolean setLauncherCallbacks(LauncherCallbacks callbacks) {
@@ -3271,6 +3341,7 @@ public class Launcher extends Activity
      */
     public void showAppsView(boolean animated, boolean updatePredictedApps,
             boolean focusSearchBar) {
+        mAppDrawerShowing = true;
         markAppsViewShown();
         if (updatePredictedApps) {
             tryAndUpdatePredictedApps();
