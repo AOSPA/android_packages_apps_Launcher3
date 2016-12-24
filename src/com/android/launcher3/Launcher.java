@@ -27,7 +27,9 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
+import android.app.IThemeCallback;
 import android.app.SearchManager;
+import android.app.ThemeManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
@@ -90,6 +92,7 @@ import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DefaultAppSearchController;
 import com.android.launcher3.compat.AppWidgetManagerCompat;
@@ -315,6 +318,10 @@ public class Launcher extends Activity
 
     private boolean mMoveToDefaultScreenFromNewIntent;
 
+    private boolean mAppDrawerShowing;
+    private boolean mThemeEnabled;
+    private ThemeManager mThemeManager;
+
     // This is set to the view that launched the activity that navigated the user away from
     // launcher. Since there is no callback for when the activity has finished launching, enable
     // the press state and keep this reference to reset the press state when we return to launcher.
@@ -472,6 +479,12 @@ public class Launcher extends Activity
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
         }
+
+        mThemeManager = (ThemeManager) getApplicationContext()
+                .getSystemService(Context.THEME_SERVICE);
+        if (mThemeManager != null) {
+            mThemeManager.addCallback(mThemeCallback);
+        }
     }
 
     @Override
@@ -533,6 +546,34 @@ public class Launcher extends Activity
             overlay.setOverlayCallbacks(new LauncherOverlayCallbacksImpl());
         }
         mWorkspace.setLauncherOverlay(overlay);
+    }
+
+    private final IThemeCallback mThemeCallback = new IThemeCallback.Stub() {
+        @Override
+        public void onThemeChanged(boolean isThemeApplied) {
+            mThemeEnabled = isThemeApplied;
+            updateColor(isThemeApplied);
+        }
+    };
+
+    protected boolean isAppDrawerShowing() {
+        return mAppDrawerShowing;
+    }
+
+    protected boolean isThemeEnabled() {
+        return mThemeEnabled;
+    }
+
+    private void updateColor(boolean enabled) {
+        final Context context = getApplicationContext();
+        final int mPrimaryColor = context.getColor(R.color.dark_primary_color);
+        final int mOriginalColor = context.getColor(R.color.all_apps_container_color);
+        final int mTextColor = context.getColor(R.color.white_secondary_color);
+        final int mOriginalTextColor = context.getColor(R.color.quantum_panel_text_color);
+        if (mAllAppsController != null) {
+            mAllAppsController.setColor(enabled ? mPrimaryColor : mOriginalColor);
+        }
+        AllAppsGridAdapter.setColor(enabled ? mTextColor : mOriginalTextColor);
     }
 
     public boolean setLauncherCallbacks(LauncherCallbacks callbacks) {
@@ -3271,6 +3312,7 @@ public class Launcher extends Activity
      */
     public void showAppsView(boolean animated, boolean updatePredictedApps,
             boolean focusSearchBar) {
+        mAppDrawerShowing = true;
         markAppsViewShown();
         if (updatePredictedApps) {
             tryAndUpdatePredictedApps();
