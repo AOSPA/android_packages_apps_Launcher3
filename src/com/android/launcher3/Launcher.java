@@ -27,7 +27,9 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
+import android.app.IThemeCallback;
 import android.app.SearchManager;
+import android.app.ThemeManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
@@ -47,6 +49,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -97,6 +100,7 @@ import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DefaultAppSearchController;
 import com.android.launcher3.compat.AppWidgetManagerCompat;
@@ -322,6 +326,13 @@ public class Launcher extends Activity
 
     private boolean mMoveToDefaultScreenFromNewIntent;
 
+    private boolean mThemeEnabled;
+    private int mAccentColor;
+    private int mOriginalTextColor;
+    private int mTextColor;
+
+    private ThemeManager mThemeManager;
+
     // This is set to the view that launched the activity that navigated the user away from
     // launcher. Since there is no callback for when the activity has finished launching, enable
     // the press state and keep this reference to reset the press state when we return to launcher.
@@ -406,6 +417,15 @@ public class Launcher extends Activity
             mLauncherCallbacks.preOnCreate();
         }
 
+        mThemeManager = (ThemeManager) getSystemService(Context.THEME_SERVICE);
+        if (mThemeManager != null) {
+            mThemeManager.addCallback(mThemeCallback);
+        }
+
+        getTheme().applyStyle(R.style.LauncherTheme, true);
+        getTheme().applyStyle(mAccentColor, true);
+        getTheme().applyStyle(R.style.LauncherThemeNoParent, true);
+
         super.onCreate(savedInstanceState);
 
         LauncherAppState app = LauncherAppState.getInstance();
@@ -489,6 +509,9 @@ public class Launcher extends Activity
         // we want the screen to auto-rotate based on the current orientation
         setOrientation();
 
+        mTextColor = getColor(android.R.color.white);
+        mOriginalTextColor = getColor(R.color.quantum_panel_text_color);
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
         }
@@ -516,7 +539,7 @@ public class Launcher extends Activity
      * @param activate if true, make sure the status bar is light, otherwise base on wallpaper.
      */
     public void activateLightStatusBar(boolean activate) {
-        boolean lightStatusBar = activate || (FeatureFlags.LIGHT_STATUS_BAR
+        boolean lightStatusBar = !mThemeEnabled && activate || (FeatureFlags.LIGHT_STATUS_BAR
                 && mExtractedColors.getColor(ExtractedColors.STATUS_BAR_INDEX,
                 ExtractedColors.DEFAULT_DARK) == ExtractedColors.DEFAULT_LIGHT);
         int oldSystemUiFlags = getWindow().getDecorView().getSystemUiVisibility();
@@ -556,6 +579,38 @@ public class Launcher extends Activity
             overlay.setOverlayCallbacks(new LauncherOverlayCallbacksImpl());
         }
         mWorkspace.setLauncherOverlay(overlay);
+    }
+
+    private final IThemeCallback mThemeCallback = new IThemeCallback.Stub() {
+
+        @Override
+        public void onThemeChanged(int themeMode, int color) {
+            onCallbackAdded(themeMode, color);
+            Launcher.this.runOnUiThread(() -> {
+                Launcher.this.recreate();
+            });
+        }
+
+        @Override
+        public void onCallbackAdded(int themeMode, int color) {
+            mThemeEnabled = themeMode == 3 || themeMode ==1;
+            mAccentColor = color;
+            mHandler.post(() -> {
+                updateColor(mThemeEnabled);
+            });
+        }
+    };
+
+    private void updateColor(boolean enabled) {
+        final TypedArray ta = obtainStyledAttributes(new int[]{android.R.attr.colorBackground});
+        final int primaryColor = enabled ? ta.getColor(0, 0) : getColor(android.R.color.white);
+        ta.recycle();
+        if (mAllAppsController != null) {
+            mAllAppsController.setColor(primaryColor);
+        }
+
+        AllAppsGridAdapter.setColor(enabled ? mTextColor : mOriginalTextColor);
+        BaseRecyclerViewFastScrollBar.updateColor(this);
     }
 
     public boolean setLauncherCallbacks(LauncherCallbacks callbacks) {
