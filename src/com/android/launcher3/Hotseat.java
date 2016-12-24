@@ -75,6 +75,13 @@ public class Hotseat extends FrameLayout
         setBackground(mBackground);
     }
 
+    protected void setBackgroundColor(int color) {
+        mBackgroundColor = ColorUtils.setAlphaComponent(
+                ContextCompat.getColor(context, color), 0);
+        mBackground = new ColorDrawable(mBackgroundColor);
+        setBackground(mBackground);
+    }
+
     public CellLayout getLayout() {
         return mContent;
     }
