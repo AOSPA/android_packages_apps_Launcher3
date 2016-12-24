@@ -136,5 +136,13 @@
 
     <style name="ChooseIconTheme" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:colorBackground">@color/icon_settings_background</item>
+    <style name="LauncherThemeNoParent">
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowShowWallpaper">true</item>
     </style>
 </resources>
