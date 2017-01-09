@@ -134,6 +134,12 @@ public class LauncherAppState {
         new ConfigMonitor(sContext).register();
 
         ExtractionUtils.startColorExtractionServiceIfNecessary(sContext);
+
+        filter = new IntentFilter();
+        if (Utilities.isUnreadCountEnabled(sContext)) {
+            filter.addAction(LauncherModel.ACTION_UNREAD_CHANGED);
+            sContext.registerReceiver(mModel, filter);
+        }
     }
 
     /**

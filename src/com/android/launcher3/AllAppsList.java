@@ -248,4 +248,35 @@ class AllAppsList {
         }
         return null;
     }
+
+    public AppInfo unreadNumbersChanged(Context context, ComponentName component,
+                                        int unreadNum) {
+
+        if (component == null) { return null; }
+
+        LauncherAppsCompat launcherApps = LauncherAppsCompat.getInstance(context);
+        UserHandleCompat myUserHandle = UserHandleCompat.myUserHandle();
+        List<LauncherActivityInfoCompat> matches =
+                launcherApps.getActivityList(component.getPackageName(), myUserHandle);
+
+        for (LauncherActivityInfoCompat info : matches) {
+            if (component.getPackageName().equals(info.getComponentName().getPackageName())) {
+
+                AppInfo appInfo = findApplicationInfoLocked(
+                        component.getPackageName(), myUserHandle,
+                        component.getClassName());
+
+                if (appInfo == null) {
+                    return null;
+                }
+
+                appInfo.unreadNum = unreadNum;
+                mIconCache.remove(appInfo.componentName, myUserHandle);
+                mIconCache.getTitleAndIcon(appInfo, info, false/* useLowResIcon */);
+                return appInfo;
+            }
+        }
+
+        return null;
+    }
 }
