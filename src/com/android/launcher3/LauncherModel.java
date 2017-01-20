@@ -26,16 +26,20 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.Intent.ShortcutIconResource;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Binder;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.Parcelable;
 import android.os.Process;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.provider.BaseColumns;
@@ -93,6 +97,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Executor;
+
+import com.qti.launcherunreadservice.IGetUnreadNumber;
+import com.qti.launcherunreadservice.IUnreadNumberCallback;
 
 /**
  * Maintains in-memory state of the Launcher. It is expected that there should be only one
@@ -194,10 +201,10 @@ public class LauncherModel extends BroadcastReceiver
 
     // </ only access in worker thread >
 
-    public static final String ACTION_UNREAD_CHANGED =
-            "com.android.launcher.action.UNREAD_CHANGED";
-    private static final String EXTRA_COMPONENT_NAME = "component_name";
-    private static final String EXTRA_UNREAD_NUMBER = "unread_number";
+    private static final String LAUNCHER_UNREAD_SERVICE_PACKAGENAME =
+            "com.qti.launcherunreadservice";
+    private static final String LAUNCHER_UNREAD_SERVICE_CLASSNAME =
+            "com.qti.launcherunreadservice.LauncherUnreadService";
 
     private IconCache mIconCache;
     private DeepShortcutManager mDeepShortcutManager;
@@ -239,6 +246,9 @@ public class LauncherModel extends BroadcastReceiver
 
     private HashMap<ComponentName, UnreadInfo> mUnreadChangedMap =
             new HashMap<ComponentName, LauncherModel.UnreadInfo>();
+    private Map mUnreadAppMap = new HashMap<ComponentName, Integer>();
+    private IGetUnreadNumber mUnreadNumberService;
+    private IBinder mToken = new Binder();
 
     private class UnreadInfo {
         ComponentName mComponentName;
@@ -325,6 +335,37 @@ public class LauncherModel extends BroadcastReceiver
     }
 
     private UnreadNumberChangeTask mUnreadUpdateTask = new UnreadNumberChangeTask();
+
+    private IUnreadNumberCallback.Stub mUnreadNumberCallback = new IUnreadNumberCallback.Stub(){
+
+        @Override
+        public void onUnreadNumberChanged(ComponentName componentName, int unreadNum){
+            if (componentName == null) return;
+            postUnreadTask(componentName, unreadNum);
+        }
+    };
+
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            mUnreadNumberService = IGetUnreadNumber.Stub.asInterface(service);
+            try {
+                if(mUnreadNumberService != null){
+                    Log.d(TAG,"LauncherModel Unread Service onServiceConnected");
+                    mUnreadAppMap = mUnreadNumberService.GetUnreadNumber();
+                    mUnreadNumberService.registerUnreadNumberCallback(mToken,
+                            mUnreadNumberCallback);
+                }
+            } catch (RemoteException ex) {
+                Log.e(TAG,"exception "+ex.toString());
+            }
+            updateUnreadIcon(mUnreadAppMap);
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mUnreadNumberService = null;
+        }
+    };
 
     public interface ItemInfoFilter {
         public boolean filterItem(ItemInfo parent, ItemInfo info, ComponentName cn);
@@ -1235,6 +1276,61 @@ public class LauncherModel extends BroadcastReceiver
             // Remove any queued UI runnables
             mHandler.cancelAll();
             mCallbacks = new WeakReference<>(callbacks);
+            Log.d(TAG,"initialize mCallbacks == "+(mCallbacks!=null? "no null":null));
+        }
+    }
+
+    private void updateUnreadIcon(Map unreadMap) {
+        Iterator iter = unreadMap.entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry entry = (Map.Entry) iter.next();
+            ComponentName componentName = (ComponentName) entry.getKey();
+            int unreadNumber = (int) entry.getValue();
+            postUnreadTask(componentName, unreadNumber);
+        }
+    }
+
+    private void postUnreadTask(ComponentName componentName, int unreadNum) {
+        synchronized (mUnreadChangedMap) {
+            mUnreadChangedMap.put(componentName, new UnreadInfo(componentName, unreadNum));
+        }
+        sWorker.removeCallbacks(mUnreadUpdateTask);
+        sWorker.post(mUnreadUpdateTask);
+    }
+
+    /**
+     * bind unread number service if service is not connected when onResume
+     */
+    public void bindUnreadService(){
+        if (Utilities.isUnreadCountEnabled(mApp.getContext())
+                && mUnreadNumberService == null) {
+            Intent intent = new Intent();
+            ComponentName componentName = new ComponentName(LAUNCHER_UNREAD_SERVICE_PACKAGENAME,
+                    LAUNCHER_UNREAD_SERVICE_CLASSNAME);
+            intent.setComponent(componentName);
+
+            Intent requestIntent = Utilities.
+                    createExplicitFromImplicitIntent(mApp.getContext(), intent);
+            if (requestIntent != null) {
+                final Intent eIntent = new Intent(requestIntent);
+                mApp.getContext().bindService(eIntent, mConnection, Context.BIND_AUTO_CREATE);
+            }
+        }
+    }
+
+    /**
+     * unbind unread number service when Launcher Activity is destroyed.
+     */
+    public void unbindUnreadService(){
+        if (mUnreadNumberService != null){
+            sWorker.removeCallbacks(mUnreadUpdateTask);
+            try{
+                mUnreadNumberService.unRegisterUnreadNumberCallback(mToken);
+                mApp.getContext().unbindService(mConnection);
+            }catch (Exception e){
+                Log.e(TAG,"exception == "+e.toString());
+            }
+            mUnreadNumberService = null;
         }
     }
 
@@ -1338,16 +1434,6 @@ public class LauncherModel extends BroadcastReceiver
             }
         } else if (Intent.ACTION_WALLPAPER_CHANGED.equals(action)) {
             ExtractionUtils.startColorExtractionServiceIfNecessary(context);
-        } else if (ACTION_UNREAD_CHANGED.equals(action)) {
-            ComponentName componentName = intent.getParcelableExtra(EXTRA_COMPONENT_NAME);
-            int unreadNum = intent.getIntExtra(EXTRA_UNREAD_NUMBER, 0);
-
-            if (componentName == null) return;
-            synchronized (mUnreadChangedMap) {
-                mUnreadChangedMap.put(componentName, new UnreadInfo(componentName, unreadNum));
-            }
-            sWorker.removeCallbacks(mUnreadUpdateTask);
-            sWorker.post(mUnreadUpdateTask);
         }
     }
 
