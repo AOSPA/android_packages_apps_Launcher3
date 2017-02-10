@@ -19,6 +19,7 @@ package com.android.launcher3;
 import android.animation.TimeInterpolator;
 import android.app.StatusBarManager;
 import android.content.Context;
+import android.os.PowerManager;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -58,14 +59,21 @@ public class PinchToOverviewListener extends ScaleGestureDetector.SimpleOnScaleG
     private PinchThresholdManager mThresholdManager;
     private PinchAnimationManager mAnimationManager;
 
-    private GestureDetector mDoubleTapGestureListener;
+    private GestureDetector mGestureListener;
 
     public PinchToOverviewListener(Launcher launcher) {
         final Context mContext = (Context) launcher;
         mLauncher = launcher;
         mPinchDetector = new ScaleGestureDetector(mContext, this);
-        mDoubleTapGestureListener =
+        mGestureListener =
                 new GestureDetector(mContext, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent event) {
+                final PowerManager pm = (PowerManager) mContext.getSystemService(
+                        Context.POWER_SERVICE);
+                pm.goToSleep(event.getEventTime());
+                return true;
+            }
             @Override
             public boolean onFling(MotionEvent e1, MotionEvent e2,
                     float velocityX, float velocityY) {
@@ -83,7 +91,7 @@ public class PinchToOverviewListener extends ScaleGestureDetector.SimpleOnScaleG
     }
 
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        mDoubleTapGestureListener.onTouchEvent(ev);
+        mGestureListener.onTouchEvent(ev);
         mPinchDetector.onTouchEvent(ev);
         return mPinchStarted;
     }
