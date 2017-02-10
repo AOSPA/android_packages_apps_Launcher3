@@ -11,6 +11,10 @@
     <!-- Folder titles -->
     <string name="google_folder_title" translatable="false">Google</string>
 
+    <!-- Gestures -->
+    <string name="dt_gesture_title">Double tap to sleep</string>
+    <string name="dt_gesture_summary">Double tap on empty space to turn screen off</string>
+
     <!-- Google Now -->
     <string name="google_feed_title">Swipe to access Google feed</string>
     <string name="google_feed_summary" translatable="false">@string/google_feed_right_summary</string>

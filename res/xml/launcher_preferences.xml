@@ -39,6 +39,13 @@
         android:defaultValue="false"
         android:persistent="true" />
 
+    <SwitchPreference
+        android:key="pref_dt_gesture"
+        android:title="@string/dt_gesture_title"
+        android:summary="@string/dt_gesture_summary"
+        android:defaultValue="true"
+        android:persistent="true" />
+
     <androidx.preference.PreferenceCategory
         android:key="google_category"
         android:title="@string/category_google">

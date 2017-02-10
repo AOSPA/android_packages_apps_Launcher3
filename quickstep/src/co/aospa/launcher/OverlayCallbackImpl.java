@@ -43,6 +43,7 @@ public class OverlayCallbackImpl
         implements LauncherOverlay, LauncherClientCallbacks, LauncherOverlayManager,
         OnSharedPreferenceChangeListener {
 
+    public static final String KEY_DT_GESTURE = "pref_dt_gesture";
     public static final String KEY_MINUS_ONE = "pref_minus_one";
     public static final String KEY_WORKSPACE_LOCK = "pref_workspace_lock";
 
