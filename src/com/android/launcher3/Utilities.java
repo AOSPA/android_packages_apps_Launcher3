@@ -93,6 +93,9 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import android.content.SharedPreferences;
+import com.android.launcher3.LauncherPrefs;
+
 /**
  * Various utilities shared amongst the Launcher's classes.
  */
@@ -131,6 +134,8 @@ public final class Utilities {
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
      */
     public static final int EDGE_NAV_BAR = 1 << 8;
+
+    public static final String KEY_DT_GESTURE = "pref_dt_gesture";
 
     /**
      * Indicates if the device has a debug build. Should only be used to store additional info or
@@ -801,5 +806,10 @@ public final class Utilities {
             default:
                 // No-Op
         }
+    }
+
+    public static boolean isDoubleTapGestureEnabled(Context context) {
+        SharedPreferences prefs = LauncherPrefs.getPrefs(context.getApplicationContext());
+        return prefs.getBoolean(KEY_DT_GESTURE, true);
     }
 }
