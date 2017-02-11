@@ -355,6 +355,8 @@ public class Launcher extends Activity
     public ViewGroupFocusHelper mFocusHandler;
     private boolean mRotationEnabled = false;
 
+    private LauncherTab mLauncherTab;
+
     @Thunk void setOrientation() {
         if (mRotationEnabled) {
             unlockScreenOrientation(true);
@@ -455,6 +457,8 @@ public class Launcher extends Activity
 
         IntentFilter filter = new IntentFilter(ACTION_APPWIDGET_HOST_RESET);
         registerReceiver(mUiBroadcastReceiver, filter);
+
+        mLauncherTab = new LauncherTab(this);
 
         mRotationEnabled = getResources().getBoolean(R.bool.allow_rotation);
         // In case we are on a device with locked rotation, we should look at preferences to check
@@ -1056,6 +1060,7 @@ public class Launcher extends Activity
             mAllAppsController.showDiscoveryBounce();
         }
         mIsResumeFromActionScreenOff = false;
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onResume();
         }
@@ -1756,6 +1761,10 @@ public class Launcher extends Activity
 
     public AllAppsContainerView getAppsView() {
         return mAppsView;
+    }
+
+    public LauncherTab getTab() {
+        return mLauncherTab;
     }
 
     public WidgetsContainerView getWidgetsView() {

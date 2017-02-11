@@ -4259,6 +4259,7 @@ public class Workspace extends PagedView
     }
 
     void moveToDefaultScreen(boolean animate) {
+        mLauncher.getTab().getClient().hideOverlay(animate);
         moveToScreen(getDefaultPage(), animate);
     }
 
