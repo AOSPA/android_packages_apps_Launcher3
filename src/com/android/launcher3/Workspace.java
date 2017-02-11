@@ -85,6 +85,9 @@ import com.android.launcher3.util.WallpaperOffsetInterpolator;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 
+import com.google.android.libraries.launcherclient.LauncherClient;
+import com.google.android.libraries.launcherclient.LauncherClientCallbacksAdapter;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -318,6 +321,8 @@ public class Workspace extends PagedView
     private AccessibilityDelegate mPagesAccessibilityDelegate;
     private OnStateChangeListener mOnStateChangeListener;
 
+    private LauncherClient mLauncherClient;
+
     /**
      * Used to inflate the Workspace from XML.
      *
@@ -356,6 +361,9 @@ public class Workspace extends PagedView
 
         // Disable multitouch across the workspace/all apps/customize tray
         setMotionEventSplittingEnabled(true);
+
+        CallbacksAdapter callbacksAdapter = new CallbacksAdapter();
+        mLauncherClient = new LauncherClient(mLauncher, callbacksAdapter, true);
     }
 
     @Override
@@ -1380,6 +1388,7 @@ public class Workspace extends PagedView
     protected void onScrollInteractionBegin() {
         super.onScrollInteractionEnd();
         mScrollInteractionBegan = true;
+        mLauncherClient.startMove();
     }
 
     protected void onScrollInteractionEnd() {
@@ -1389,6 +1398,7 @@ public class Workspace extends PagedView
             mStartedSendingScrollEvents = false;
             mLauncherOverlay.onScrollInteractionEnd();
         }
+        mLauncherClient.endMove();
     }
 
     public void setLauncherOverlay(LauncherOverlay overlay) {
@@ -1496,6 +1506,8 @@ public class Workspace extends PagedView
      * The overlay scroll is being controlled locally, just update our overlay effect
      */
     public void onOverlayScrollChanged(float scroll) {
+        mLauncherClient.updateMove(scroll);
+
         float offset = 0f;
         float slip = 0f;
 
@@ -1820,11 +1832,13 @@ public class Workspace extends PagedView
         mWallpaperOffset.setWindowToken(windowToken);
         computeScroll();
         mDragController.setWindowToken(windowToken);
+        mLauncherClient.onAttachedToWindow();
     }
 
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mWallpaperOffset.setWindowToken(null);
+        mLauncherClient.onDetachedFromWindow();
     }
 
     protected void onResume() {
@@ -1834,6 +1848,15 @@ public class Workspace extends PagedView
             setWallpaperDimension();
         }
         mWallpaperOffset.onResume();
+        mLauncherClient.onResume();
+    }
+
+    protected void onPause() {
+        mLauncherClient.onPause();
+    }
+
+    protected void onDestroy() {
+        mLauncherClient.onDestroy();
     }
 
     @Override
@@ -4361,5 +4384,17 @@ public class Workspace extends PagedView
 
     public static final boolean isQsbContainerPage(int pageNo) {
         return pageNo == 0;
+    }
+
+    private class CallbacksAdapter extends LauncherClientCallbacksAdapter {
+        @Override
+        public void onOverlayScrollChanged(float progress) {
+            Log.d("CallbacksAdapter", "onOverlayScrollChanged: \n  progress: " + progress);
+        }
+
+        @Override
+        public void onServiceStateChanged(boolean overlayAttached, boolean hotwordActive) {
+            Log.d("CallbacksAdapter", "onServiceStateChanged: \n  overlayAttached: " + overlayAttached + "\n  hotwordActive: " + hotwordActive);
+        }
     }
 }

@@ -1137,6 +1137,8 @@ public class Launcher extends Activity
         mDragController.cancelDrag();
         mDragController.resetLastGestureUpTime();
 
+        mWorkspace.onPause();
+
         // We call onHide() aggressively. The custom content callbacks should be able to
         // debounce excess onHide calls.
         if (mWorkspace.getCustomContentCallbacks() != null) {
@@ -2040,6 +2042,8 @@ public class Launcher extends Activity
         unregisterReceiver(mUiBroadcastReceiver);
 
         LauncherAnimUtils.onDestroyActivity();
+
+        mWorkspace.onPause();
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onDestroy();
