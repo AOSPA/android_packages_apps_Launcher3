@@ -1246,7 +1246,9 @@ public class Workspace extends PagedView
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        mGestureListener.onTouchEvent(ev);
+        if (!mLauncher.isOnCustomContent()) {
+            mGestureListener.onTouchEvent(ev);
+        }
         switch (ev.getAction() & MotionEvent.ACTION_MASK) {
         case MotionEvent.ACTION_DOWN:
             mXDown = ev.getX();
@@ -1405,6 +1407,7 @@ public class Workspace extends PagedView
     protected void onScrollInteractionBegin() {
         super.onScrollInteractionEnd();
         mScrollInteractionBegan = true;
+        mLauncher.getTab().getClient().startMove();
     }
 
     protected void onScrollInteractionEnd() {
@@ -1413,6 +1416,7 @@ public class Workspace extends PagedView
         if (mStartedSendingScrollEvents) {
             mStartedSendingScrollEvents = false;
             mLauncherOverlay.onScrollInteractionEnd();
+            mLauncher.getTab().getClient().startMove();
         }
     }
 

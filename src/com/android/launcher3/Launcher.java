@@ -82,6 +82,7 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.animation.OvershootInterpolator;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Advanceable;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -355,6 +356,8 @@ public class Launcher extends Activity
     public ViewGroupFocusHelper mFocusHandler;
     private boolean mRotationEnabled = false;
 
+    private LauncherTab mLauncherTab;
+
     @Thunk void setOrientation() {
         if (mRotationEnabled) {
             unlockScreenOrientation(true);
@@ -468,6 +471,8 @@ public class Launcher extends Activity
         // On large interfaces, or on devices that a user has specifically enabled screen rotation,
         // we want the screen to auto-rotate based on the current orientation
         setOrientation();
+
+        mLauncherTab = new LauncherTab(this);
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
@@ -1056,6 +1061,7 @@ public class Launcher extends Activity
             mAllAppsController.showDiscoveryBounce();
         }
         mIsResumeFromActionScreenOff = false;
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onResume();
         }
@@ -1756,6 +1762,10 @@ public class Launcher extends Activity
 
     public AllAppsContainerView getAppsView() {
         return mAppsView;
+    }
+
+    public LauncherTab getTab() {
+        return mLauncherTab;
     }
 
     public WidgetsContainerView getWidgetsView() {
