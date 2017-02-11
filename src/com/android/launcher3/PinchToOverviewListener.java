@@ -62,6 +62,10 @@ public class PinchToOverviewListener extends ScaleGestureDetector.SimpleOnScaleG
     }
 
     public boolean onInterceptTouchEvent(MotionEvent ev) {
+        // Don't listen to touch event when on custom content screen
+        if (mLauncher.isOnCustomContent()) {
+            return false;
+        }
         mPinchDetector.onTouchEvent(ev);
         return mPinchStarted;
     }
