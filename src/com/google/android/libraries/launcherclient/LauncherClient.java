@@ -111,7 +111,7 @@ public class LauncherClient {
             .setData(uri);
     }
 
-    private boolean isConnected() {
+    public boolean isConnected() {
         return mOverlay != null;
     }
 

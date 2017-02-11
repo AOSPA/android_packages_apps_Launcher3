@@ -84,6 +84,7 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.animation.OvershootInterpolator;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Advanceable;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -130,6 +131,9 @@ import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.WidgetHostViewLoader;
 import com.android.launcher3.widget.WidgetsContainerView;
+
+import com.google.android.libraries.launcherclient.LauncherClient;
+import com.google.android.libraries.launcherclient.LauncherClientCallbacksAdapter;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -365,6 +369,8 @@ public class Launcher extends Activity
     public ViewGroupFocusHelper mFocusHandler;
     private boolean mRotationEnabled = false;
 
+    private LauncherClient mLauncherClient;
+
     @Thunk void setOrientation() {
         if (mRotationEnabled) {
             unlockScreenOrientation(true);
@@ -491,6 +497,8 @@ public class Launcher extends Activity
 
         mTextColor = getColor(com.android.internal.R.color.white_accent_color);
         mOriginalTextColor = getColor(R.color.quantum_panel_text_color);
+
+        mLauncherClient = new LauncherClient(this, new LauncherClientCallbacksAdapter(), true);
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
@@ -656,10 +664,7 @@ public class Launcher extends Activity
 
     /** To be overridden by subclasses to hint to Launcher that we have custom content */
     protected boolean hasCustomContentToLeft() {
-        if (mLauncherCallbacks != null) {
-            return mLauncherCallbacks.hasCustomContentToLeft();
-        }
-        return false;
+        return true;
     }
 
     /**
@@ -668,9 +673,27 @@ public class Launcher extends Activity
      * {@link #hasCustomContentToLeft()} is {@code true}.
      */
     protected void populateCustomContentContainer() {
-        if (mLauncherCallbacks != null) {
-            mLauncherCallbacks.populateCustomContentContainer();
-        }
+        final FrameLayout frameLayout = new FrameLayout(Launcher.this);
+
+        addToCustomContentPage(frameLayout, new CustomContentCallbacks() {
+            @Override
+            public void onShow(boolean fromResume) {
+            }
+
+            @Override
+            public void onHide() {
+            }
+
+            @Override
+            public void onScrollProgressChanged(float progress) {
+                mLauncherClient.updateMove(progress);
+            }
+
+            @Override
+            public boolean isScrollingAllowed() {
+                return true;
+            }
+        }, "");
     }
 
     /**
@@ -1122,6 +1145,9 @@ public class Launcher extends Activity
             mAllAppsController.showDiscoveryBounce();
         }
         mIsResumeFromActionScreenOff = false;
+
+        mLauncherClient.onResume();
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onResume();
         }
@@ -1683,6 +1709,8 @@ public class Launcher extends Activity
         mAttached = true;
         mVisible = true;
 
+        mLauncherClient.onAttachedToWindow();
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onAttachedToWindow();
         }
@@ -1698,6 +1726,8 @@ public class Launcher extends Activity
             mAttached = false;
         }
         updateAutoAdvanceState();
+
+        mLauncherClient.onDetachedFromWindow();
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onDetachedFromWindow();
@@ -1822,6 +1852,10 @@ public class Launcher extends Activity
 
     public AllAppsContainerView getAppsView() {
         return mAppsView;
+    }
+
+    public LauncherClient getClient() {
+        return mLauncherClient;
     }
 
     public WidgetsContainerView getWidgetsView() {
@@ -2040,6 +2074,8 @@ public class Launcher extends Activity
         unregisterReceiver(mUiBroadcastReceiver);
 
         LauncherAnimUtils.onDestroyActivity();
+
+        mLauncherClient.onDestroy();
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onDestroy();

@@ -1380,6 +1380,7 @@ public class Workspace extends PagedView
     protected void onScrollInteractionBegin() {
         super.onScrollInteractionEnd();
         mScrollInteractionBegan = true;
+        mLauncher.getClient().startMove();
     }
 
     protected void onScrollInteractionEnd() {
@@ -1388,6 +1389,7 @@ public class Workspace extends PagedView
         if (mStartedSendingScrollEvents) {
             mStartedSendingScrollEvents = false;
             mLauncherOverlay.onScrollInteractionEnd();
+            mLauncher.getClient().startMove();
         }
     }
 
