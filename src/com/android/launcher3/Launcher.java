@@ -365,6 +365,8 @@ public class Launcher extends Activity
     public ViewGroupFocusHelper mFocusHandler;
     private boolean mRotationEnabled = false;
 
+    private LauncherTab mLauncherTab;
+
     @Thunk void setOrientation() {
         if (mRotationEnabled) {
             unlockScreenOrientation(true);
@@ -492,6 +494,8 @@ public class Launcher extends Activity
         mTextColor = getColor(com.android.internal.R.color.white_accent_color);
         mOriginalTextColor = getColor(R.color.quantum_panel_text_color);
 
+        mLauncherTab = new LauncherTab(this);
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onCreate(savedInstanceState);
         }
@@ -555,6 +559,7 @@ public class Launcher extends Activity
         if (overlay != null) {
             overlay.setOverlayCallbacks(new LauncherOverlayCallbacksImpl());
         }
+        mLauncherTab.setOverlayCallbacks(new LauncherOverlayCallbacksImpl());
         mWorkspace.setLauncherOverlay(overlay);
     }
 
@@ -1122,6 +1127,9 @@ public class Launcher extends Activity
             mAllAppsController.showDiscoveryBounce();
         }
         mIsResumeFromActionScreenOff = false;
+
+        mLauncherTab.onResume();
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onResume();
         }
@@ -1683,6 +1691,8 @@ public class Launcher extends Activity
         mAttached = true;
         mVisible = true;
 
+        mLauncherTab.onAttachedToWindow();
+
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onAttachedToWindow();
         }
@@ -1698,6 +1708,8 @@ public class Launcher extends Activity
             mAttached = false;
         }
         updateAutoAdvanceState();
+
+        mLauncherTab.onDetachedFromWindow();
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onDetachedFromWindow();
@@ -2040,6 +2052,8 @@ public class Launcher extends Activity
         unregisterReceiver(mUiBroadcastReceiver);
 
         LauncherAnimUtils.onDestroyActivity();
+
+        mLauncherTab.onDestroy();
 
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onDestroy();
