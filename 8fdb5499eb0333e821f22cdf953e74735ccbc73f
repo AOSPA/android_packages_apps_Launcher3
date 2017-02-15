@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa81d914_732592aa",
+        "filename": "res/values/strings.xml",
+        "patchSetId": 7
+      },
+      "lineNbr": 262,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-02-15T22:15:25Z",
+      "side": 1,
+      "message": "Remove this",
+      "revId": "8fdb5499eb0333e821f22cdf953e74735ccbc73f",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa81d914_933926db",
+        "filename": "src/com/android/launcher3/Launcher.java",
+        "patchSetId": 7
+      },
+      "lineNbr": 1063,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-02-15T22:15:25Z",
+      "side": 1,
+      "message": "Unnecessary change",
+      "revId": "8fdb5499eb0333e821f22cdf953e74735ccbc73f",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
