@@ -365,7 +365,7 @@ public class Workspace extends PagedView
 
         final PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         mGestureListener =
-                new GestureDetector(mContext, new GestureDetector.SimpleOnGestureListener() {
+                new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDoubleTap(MotionEvent event) {
                 pm.goToSleep(event.getEventTime());
