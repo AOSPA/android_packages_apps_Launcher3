@@ -187,4 +187,9 @@
     <!-- Approximates the system status bar height. Not guaranteed to be always be correct. -->
     <dimen name="status_bar_height">24dp</dimen>
 
+    <dimen name="infomation_count_height">14dp</dimen>
+    <dimen name="infomation_count_min_width">14dp</dimen>
+    <dimen name="infomation_count_textsize">11dp</dimen>
+    <dimen name="infomation_count_padding">4dp</dimen>
+    <dimen name="infomation_count_circle_radius">7dp</dimen>
 </resources>
