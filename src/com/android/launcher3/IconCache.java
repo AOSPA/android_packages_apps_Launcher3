@@ -56,7 +56,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
@@ -78,10 +77,6 @@ public class IconCache {
     private static final int LOW_RES_SCALE_FACTOR = 5;
 
     @Thunk static final Object ICON_UPDATE_TOKEN = new Object();
-
-    private Map mUnreadMap;
-
-    private boolean mAppIconReloaded = false;
 
     @Thunk static class CacheEntry {
         public Bitmap icon;
@@ -514,33 +509,11 @@ public class IconCache {
             ShortcutInfo shortcutInfo, ComponentName component, LauncherActivityInfoCompat info,
             UserHandleCompat user, boolean usePkgIcon, boolean useLowResIcon) {
         CacheEntry entry = cacheLocked(component, info, user, usePkgIcon, useLowResIcon,
-                getUnreadNumber(component));
+                LauncherAppState.getInstance().getModel().getUnreadNumberOfComponent(component));
         shortcutInfo.setIcon(getNonNullIcon(entry, user));
         shortcutInfo.title = Utilities.trim(entry.title);
         shortcutInfo.usingFallbackIcon = isDefaultIcon(entry.icon, user);
         shortcutInfo.usingLowResIcon = entry.isLowResIcon;
-    }
-
-    public void setUnreadMap(Map unreadAppMap) {
-        mUnreadMap = unreadAppMap;
-    }
-
-    private int getUnreadNumber(ComponentName componentName){
-        int unreadNumber = -1;
-        if(mAppIconReloaded){
-            if(mUnreadMap != null && mUnreadMap.containsKey(componentName)) {
-                unreadNumber = (int) mUnreadMap.get(componentName);
-            }
-        }
-        return unreadNumber;
-    }
-
-    public void setAppIconReloaded(boolean enable) {
-        mAppIconReloaded = enable;
-    }
-
-    public boolean getAppIconReload() {
-        return mAppIconReloaded;
     }
 
     /**
