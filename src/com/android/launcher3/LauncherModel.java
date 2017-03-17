@@ -248,6 +248,7 @@ public class LauncherModel extends BroadcastReceiver
             new HashMap<ComponentName, LauncherModel.UnreadInfo>();
     private Map mUnreadAppMap = new HashMap<ComponentName, Integer>();
     private IGetUnreadNumber mUnreadNumberService;
+    private boolean mAppIconReloaded = false;
     private IBinder mToken = new Binder();
 
     private class UnreadInfo {
@@ -293,7 +294,6 @@ public class LauncherModel extends BroadcastReceiver
                     }
                 }
             });
-
             // update the workspace shortcuts icon
             final UserHandleCompat user = UserHandleCompat.myUserHandle();
             final ArrayList<ShortcutInfo> updatedShortcuts = new ArrayList<>();
@@ -1298,6 +1298,15 @@ public class LauncherModel extends BroadcastReceiver
         sWorker.post(mUnreadUpdateTask);
     }
 
+    public int getUnreadNumberOfComponent(ComponentName componentName) {
+        int unreadNum = -1;
+        if(mAppIconReloaded && (mUnreadAppMap != null)
+                && mUnreadAppMap.containsKey(componentName)){
+            unreadNum = (int) mUnreadAppMap.get(componentName);
+        }
+        return unreadNum;
+    }
+
     /**
      * bind unread number service if service is not connected when onResume
      */
@@ -1466,7 +1475,7 @@ public class LauncherModel extends BroadcastReceiver
      * of doing it now.
      */
     public void startLoaderFromBackground() {
-        mIconCache.setAppIconReloaded(true);
+        mAppIconReloaded = true;
         Callbacks callbacks = getCallback();
         if (callbacks != null) {
             // Only actually run the loader if they're not paused.
@@ -3121,7 +3130,7 @@ public class LauncherModel extends BroadcastReceiver
                 }
             }
             mBgAllAppsList.updateIconsAndLabels(updatedPackages, user, updatedApps);
-            mIconCache.setAppIconReloaded(false);
+            mAppIconReloaded = false;
         }
 
         bindUpdatedShortcuts(updatedShortcuts, user);
