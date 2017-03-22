@@ -26,16 +26,20 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.Intent.ShortcutIconResource;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Binder;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.Parcelable;
 import android.os.Process;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.provider.BaseColumns;
@@ -93,6 +97,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Executor;
+
+import com.qti.launcherunreadservice.IGetUnreadNumber;
+import com.qti.launcherunreadservice.IUnreadNumberCallback;
 
 /**
  * Maintains in-memory state of the Launcher. It is expected that there should be only one
@@ -195,6 +202,11 @@ public class LauncherModel extends BroadcastReceiver
 
     // </ only access in worker thread >
 
+    private static final String LAUNCHER_UNREAD_SERVICE_PACKAGENAME =
+            "com.qti.launcherunreadservice";
+    private static final String LAUNCHER_UNREAD_SERVICE_CLASSNAME =
+            "com.qti.launcherunreadservice.LauncherUnreadService";
+
     private IconCache mIconCache;
     private DeepShortcutManager mDeepShortcutManager;
 
@@ -232,6 +244,132 @@ public class LauncherModel extends BroadcastReceiver
         public void executeOnNextDraw(ViewOnDrawExecutor executor);
         public void bindDeepShortcutMap(MultiHashMap<ComponentKey, String> deepShortcutMap);
     }
+
+    private HashMap<ComponentName, UnreadInfo> mUnreadChangedMap =
+            new HashMap<ComponentName, LauncherModel.UnreadInfo>();
+    private Map mUnreadAppMap = Collections.synchronizedMap(new HashMap<ComponentName, Integer>());
+    private IGetUnreadNumber mUnreadNumberService;
+    private boolean mAppIconReloaded = false;
+    private IBinder mToken = new Binder();
+
+    private class UnreadInfo {
+        ComponentName mComponentName;
+        int mUnreadNum;
+
+        public UnreadInfo(ComponentName componentName, int unreadNum) {
+            mComponentName = componentName;
+            mUnreadNum = unreadNum;
+        }
+    }
+
+    private class UnreadNumberChangeTask implements Runnable {
+        public void run() {
+            ArrayList<UnreadInfo> unreadInfos = new ArrayList<LauncherModel.UnreadInfo>();
+            synchronized (mUnreadChangedMap) {
+                unreadInfos.addAll(mUnreadChangedMap.values());
+                mUnreadChangedMap.clear();
+            }
+
+            final Callbacks callbacks = getCallback();
+            if (callbacks == null) {
+                Log.w(TAG, "Nobody to tell about the new app.  Launcher is probably loading.");
+                return;
+            }
+
+            final ArrayList<AppInfo> unreadChangeFinal = new ArrayList<AppInfo>();
+            for (UnreadInfo uInfo : unreadInfos) {
+                AppInfo info = mBgAllAppsList.unreadNumbersChanged(mApp.getContext(),
+                        uInfo.mComponentName, uInfo.mUnreadNum);
+                if (info != null) {
+                    unreadChangeFinal.add(info);
+                }
+            }
+
+            // update the mainmenu icon
+            if (unreadChangeFinal.isEmpty()) return;
+            mHandler.post(new Runnable() {
+                public void run() {
+                    Callbacks cb = getCallback();
+                    if (cb != null && callbacks == cb) {
+                        cb.bindAppsUpdated(unreadChangeFinal);
+                    }
+                }
+            });
+            // update the workspace shortcuts icon
+            final UserHandleCompat user = UserHandleCompat.myUserHandle();
+            final ArrayList<ShortcutInfo> updatedShortcuts = new ArrayList<>();
+            synchronized (sBgLock) {
+                for (ItemInfo info : sBgItemsIdMap) {
+                    if (info instanceof ShortcutInfo && user.equals(info.user)
+                            && info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION) {
+                        ShortcutInfo si = (ShortcutInfo) info;
+                        ComponentName cn = si.getTargetComponent();
+                        if (cn != null && unreadContains(unreadChangeFinal, cn)) {
+                            si.updateIcon(mIconCache);
+                            updatedShortcuts.add(si);
+                        }
+                    }
+                }
+            }
+
+            if (!updatedShortcuts.isEmpty()) {
+                mHandler.post(new Runnable() {
+
+                    public void run() {
+                        Callbacks cb = getCallback();
+                        if (cb != null && callbacks == cb) {
+                            cb.bindShortcutsChanged(updatedShortcuts,
+                                    new ArrayList<ShortcutInfo>(), user);
+                        }
+                    }
+                });
+            }
+        }
+        private boolean unreadContains(ArrayList<AppInfo> unreadList, ComponentName cn) {
+            for (AppInfo info : unreadList) {
+                if (info.componentName.equals(cn)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private UnreadNumberChangeTask mUnreadUpdateTask = new UnreadNumberChangeTask();
+
+    private IUnreadNumberCallback.Stub mUnreadNumberCallback = new IUnreadNumberCallback.Stub(){
+
+        @Override
+        public void onUnreadNumberChanged(ComponentName componentName, int unreadNum){
+            if (componentName == null) return;
+            synchronized (mUnreadChangedMap) {
+                mUnreadChangedMap.put(componentName, new UnreadInfo(componentName, unreadNum));
+            }
+            postUnreadTask();
+        }
+    };
+
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            mUnreadNumberService = IGetUnreadNumber.Stub.asInterface(service);
+            try {
+                if(mUnreadNumberService != null){
+                    Log.d(TAG,"LauncherModel Unread Service onServiceConnected");
+                    mUnreadAppMap = mUnreadNumberService.GetUnreadNumber();
+                    mUnreadNumberService.registerUnreadNumberCallback(mToken,
+                            mUnreadNumberCallback);
+                }
+            } catch (RemoteException ex) {
+                Log.e(TAG,"exception "+ex.toString());
+            }
+            updateUnreadIcon(mUnreadAppMap);
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mUnreadNumberService = null;
+        }
+    };
 
     public interface ItemInfoFilter {
         public boolean filterItem(ItemInfo parent, ItemInfo info, ComponentName cn);
@@ -1145,6 +1283,69 @@ public class LauncherModel extends BroadcastReceiver
         }
     }
 
+    private void updateUnreadIcon(Map unreadMap) {
+        Iterator iter = unreadMap.entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry entry = (Map.Entry) iter.next();
+            ComponentName componentName = (ComponentName) entry.getKey();
+            int unreadNumber = (int) entry.getValue();
+            synchronized (mUnreadChangedMap) {
+                mUnreadChangedMap.put(componentName, new UnreadInfo(componentName, unreadNumber));
+            }
+        }
+        postUnreadTask();
+    }
+
+    private void postUnreadTask() {
+        sWorker.removeCallbacks(mUnreadUpdateTask);
+        sWorker.post(mUnreadUpdateTask);
+    }
+
+    public int getUnreadNumberOfComponent(ComponentName componentName) {
+        int unreadNum = -1;
+        if(mAppIconReloaded && (mUnreadAppMap != null)
+                && mUnreadAppMap.containsKey(componentName)){
+            unreadNum = (int) mUnreadAppMap.get(componentName);
+        }
+        return unreadNum;
+    }
+
+    /**
+     * bind unread number service if service is not connected when onResume
+     */
+    public void bindUnreadService(){
+        if (Utilities.isUnreadCountEnabled(mApp.getContext())
+                && mUnreadNumberService == null) {
+            Intent intent = new Intent();
+            ComponentName componentName = new ComponentName(LAUNCHER_UNREAD_SERVICE_PACKAGENAME,
+                    LAUNCHER_UNREAD_SERVICE_CLASSNAME);
+            intent.setComponent(componentName);
+
+            Intent requestIntent = Utilities.
+                    createExplicitFromImplicitIntent(mApp.getContext(), intent);
+            if (requestIntent != null) {
+                final Intent eIntent = new Intent(requestIntent);
+                mApp.getContext().bindService(eIntent, mConnection, Context.BIND_AUTO_CREATE);
+            }
+        }
+    }
+
+    /**
+     * unbind unread number service when Launcher Activity is destroyed.
+     */
+    public void unbindUnreadService(){
+        if (mUnreadNumberService != null){
+            sWorker.removeCallbacks(mUnreadUpdateTask);
+            try{
+                mUnreadNumberService.unRegisterUnreadNumberCallback(mToken);
+                mApp.getContext().unbindService(mConnection);
+            }catch (Exception e){
+                Log.e(TAG,"exception == "+e.toString());
+            }
+            mUnreadNumberService = null;
+        }
+    }
+
     @Override
     public void onPackageChanged(String packageName, UserHandleCompat user) {
         int op = PackageUpdatedTask.OP_UPDATE;
@@ -1277,6 +1478,7 @@ public class LauncherModel extends BroadcastReceiver
      * of doing it now.
      */
     public void startLoaderFromBackground() {
+        mAppIconReloaded = true;
         Callbacks callbacks = getCallback();
         if (callbacks != null) {
             // Only actually run the loader if they're not paused.
@@ -2950,6 +3152,7 @@ public class LauncherModel extends BroadcastReceiver
                 }
             }
             mBgAllAppsList.updateIconsAndLabels(updatedPackages, user, updatedApps);
+            mAppIconReloaded = false;
         }
 
         bindUpdatedShortcuts(updatedShortcuts, user);

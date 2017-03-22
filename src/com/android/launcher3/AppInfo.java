@@ -52,6 +52,8 @@ public class AppInfo extends ItemInfo {
 
     public ComponentName componentName;
 
+    public int unreadNum = 0;
+
     static final int DOWNLOADED_FLAG = 1;
     static final int UPDATED_SYSTEM_APP_FLAG = 2;
 

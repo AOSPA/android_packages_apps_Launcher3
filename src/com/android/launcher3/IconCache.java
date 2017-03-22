@@ -386,10 +386,12 @@ public class IconCache {
             }
         }
         if (entry == null) {
+            int unreadNum =  LauncherAppState.getInstance().getModel()
+                    .getUnreadNumberOfComponent(app.getComponentName());
             entry = new CacheEntry();
             entry.icon = Utilities.createBadgedIconBitmap(
                     mIconProvider.getIcon(app, mIconDpi), app.getUser(),
-                    mContext);
+                    mContext, unreadNum);
         }
         entry.title = app.getLabel();
         entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, app.getUser());
@@ -444,7 +446,7 @@ public class IconCache {
             LauncherActivityInfoCompat info, boolean useLowResIcon) {
         UserHandleCompat user = info == null ? application.user : info.getUser();
         CacheEntry entry = cacheLocked(application.componentName, info, user,
-                false, useLowResIcon);
+                false, useLowResIcon, application.unreadNum);
         application.title = Utilities.trim(entry.title);
         application.contentDescription = entry.contentDescription;
         application.iconBitmap = getNonNullIcon(entry, user);
@@ -456,7 +458,7 @@ public class IconCache {
      */
     public synchronized void updateTitleAndIcon(AppInfo application) {
         CacheEntry entry = cacheLocked(application.componentName, null, application.user,
-                false, application.usingLowResIcon);
+                false, application.usingLowResIcon, application.unreadNum);
         if (entry.icon != null && !isDefaultIcon(entry.icon, application.user)) {
             application.title = Utilities.trim(entry.title);
             application.contentDescription = entry.contentDescription;
@@ -477,7 +479,7 @@ public class IconCache {
         }
 
         LauncherActivityInfoCompat launcherActInfo = mLauncherApps.resolveActivity(intent, user);
-        CacheEntry entry = cacheLocked(component, launcherActInfo, user, true, false /* useLowRes */);
+        CacheEntry entry = cacheLocked(component, launcherActInfo, user, true, false /* useLowRes */, -1);
         return entry.icon;
     }
 
@@ -508,7 +510,8 @@ public class IconCache {
     public synchronized void getTitleAndIcon(
             ShortcutInfo shortcutInfo, ComponentName component, LauncherActivityInfoCompat info,
             UserHandleCompat user, boolean usePkgIcon, boolean useLowResIcon) {
-        CacheEntry entry = cacheLocked(component, info, user, usePkgIcon, useLowResIcon);
+        CacheEntry entry = cacheLocked(component, info, user, usePkgIcon, useLowResIcon,
+                LauncherAppState.getInstance().getModel().getUnreadNumberOfComponent(component));
         shortcutInfo.setIcon(getNonNullIcon(entry, user));
         shortcutInfo.title = Utilities.trim(entry.title);
         shortcutInfo.contentDescription = entry.contentDescription;
@@ -545,19 +548,20 @@ public class IconCache {
      * This method is not thread safe, it must be called from a synchronized method.
      */
     private CacheEntry cacheLocked(ComponentName componentName, LauncherActivityInfoCompat info,
-            UserHandleCompat user, boolean usePackageIcon, boolean useLowResIcon) {
+            UserHandleCompat user, boolean usePackageIcon, boolean useLowResIcon, int unreadNum) {
         ComponentKey cacheKey = new ComponentKey(componentName, user);
         CacheEntry entry = mCache.get(cacheKey);
-        if (entry == null || (entry.isLowResIcon && !useLowResIcon)) {
+        if (entry == null || (entry.isLowResIcon && !useLowResIcon) || unreadNum >= 0) {
             entry = new CacheEntry();
             mCache.put(cacheKey, entry);
 
             // Check the DB first.
-            if (!getEntryFromDB(cacheKey, entry, useLowResIcon) || DEBUG_IGNORE_CACHE) {
+            if (!getEntryFromDB(cacheKey, entry, useLowResIcon) || DEBUG_IGNORE_CACHE
+                    || unreadNum >= 0) {
                 if (info != null) {
                     entry.icon = Utilities.createBadgedIconBitmap(
                             mIconProvider.getIcon(info, mIconDpi), info.getUser(),
-                            mContext);
+                            mContext, unreadNum);
                 } else {
                     if (usePackageIcon) {
                         CacheEntry packageEntry = getEntryForPackageLocked(
