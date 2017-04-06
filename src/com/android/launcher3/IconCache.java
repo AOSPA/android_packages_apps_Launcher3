@@ -177,10 +177,11 @@ public class IconCache {
         return getFullResDefaultActivityIcon();
     }
 
-    public Drawable getFullResIcon(ApplicationInfo info) {
+    public Drawable getFullResIcon(LauncherActivityInfoCompat info) {
         Resources resources;
         try {
-            resources = mPackageManager.getResourcesForApplication(info);
+            resources = mPackageManager.getResourcesForApplication(
+                    info.getApplicationInfo());
         } catch (PackageManager.NameNotFoundException e) {
             resources = null;
         }
@@ -438,9 +439,18 @@ public class IconCache {
         }
         if (entry == null) {
             entry = new CacheEntry();
-            entry.icon = Utilities.createBadgedIconBitmap(
-                    mIconProvider.getIcon(app, mIconDpi), app.getUser(),
-                    mContext, -1);
+            Drawable iconDrawable = getFullResIcon(app);
+            if (mIconPackHelper.isIconPackLoaded() && (mIconPackHelper
+                    .getResourceIdForActivityIcon(app) == 0)) {
+                entry.icon = Utilities.createIconBitmap(
+                        iconDrawable, mContext, mIconPackHelper.getIconBack(),
+                         mIconPackHelper.getIconMask(), mIconPackHelper.getIconUpon(),
+                         mIconPackHelper.getIconScale());
+            } else {
+                entry.icon = Utilities.createBadgedIconBitmap(
+                        mIconProvider.getIcon(app, mIconDpi), app.getUser(),
+                        mContext, -1);
+            }
         }
         entry.title = app.getLabel();
         entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, app.getUser());
@@ -720,16 +730,7 @@ public class IconCache {
                     Bitmap lowResIcon =  generateLowResIcon(icon, mPackageBgColor);
                     entry.title = appInfo.loadLabel(mPackageManager);
                     entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, user);
-                    Drawable iconDrawable = getFullResIcon(appInfo);
-                    if (mIconPackHelper.isIconPackLoaded() && (mIconPackHelper
-                            .getResourceIdForActivityIcon(appInfo) == 0)) {
-                        entry.icon = Utilities.createIconBitmap(
-                                iconDrawable, mContext, mIconPackHelper.getIconBack(),
-                                mIconPackHelper.getIconMask(), mIconPackHelper.getIconUpon(),
-                                mIconPackHelper.getIconScale());
-                    } else {
-                        entry.icon = useLowResIcon ? lowResIcon : icon;
-                    }
+                    entry.icon = useLowResIcon ? lowResIcon : icon;
                     entry.isLowResIcon = useLowResIcon;
 
                     // Add the icon in the DB here, since these do not get written during

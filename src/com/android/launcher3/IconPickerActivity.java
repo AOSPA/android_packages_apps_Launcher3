@@ -56,6 +56,7 @@ public class IconPickerActivity extends Activity {
                 in.putExtra(SELECTED_RESOURCE_EXTRA, pkgName + "|" + d.resource_name);
                 in.putExtra(SELECTED_BITMAP_EXTRA, ((BitmapDrawable)d.drawable.get()).getBitmap());
                 setResult(Activity.RESULT_OK, in);
+                android.util.Log.d("IconPickerActivity", "Item selected");
                 finish();
             }
         });

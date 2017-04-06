@@ -37,6 +37,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.preference.PreferenceManager;
 
+import com.android.launcher3.compat.LauncherActivityInfoCompat;
+
 public class IconPackHelper {
 
     static final String ICON_MASK_TAG = "iconmask";
@@ -399,6 +401,9 @@ public class IconPackHelper {
     }
 
     boolean isIconPackLoaded() {
+        if (mLoadedIconPackResource == null) android.util.Log.d("IconPackHelper", "loadedIconPackResource is null");
+        if (mLoadedIconPackName == null) android.util.Log.d("IconPackHelper", "loadedIconPackName is null");
+        if (mIconPackResources == null) android.util.Log.d("IconPackHelper", "iconPackResources is null");
         return mLoadedIconPackResource != null &&
                 mLoadedIconPackName != null &&
                 mIconPackResources != null;
@@ -413,12 +418,14 @@ public class IconPackHelper {
         return mLoadedIconPackResource;
     }
 
-    public int getResourceIdForActivityIcon(ApplicationInfo info) {
-        String drawable = mIconPackResources.get(info.packageName.toLowerCase()
-                + "." + info.name.toLowerCase());
+    public int getResourceIdForActivityIcon(LauncherActivityInfoCompat info) {
+        String packageName = info.getApplicationInfo().packageName;
+        String drawable = mIconPackResources.get(packageName.toLowerCase()
+                + "." + info.getApplicationInfo().name.toLowerCase());
         if (drawable == null) {
+            android.util.Log.d("IconPackHelper", "drawable is null!");
             // Icon pack doesn't have an icon for the activity, fallback to package icon
-            drawable = mIconPackResources.get(info.packageName.toLowerCase());
+            drawable = mIconPackResources.get(packageName.toLowerCase());
             if (drawable == null) {
                 return 0;
             }
