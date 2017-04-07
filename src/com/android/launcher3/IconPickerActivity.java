@@ -56,6 +56,7 @@ public class IconPickerActivity extends Activity {
                 in.putExtra(SELECTED_RESOURCE_EXTRA, pkgName + "|" + d.resource_name);
                 in.putExtra(SELECTED_BITMAP_EXTRA, ((BitmapDrawable)d.drawable.get()).getBitmap());
                 setResult(Activity.RESULT_OK, in);
+                android.util.Log.d("IconPickerActivity", "Item selected");
                 finish();
             }
         });
@@ -93,7 +94,7 @@ public class IconPickerActivity extends Activity {
 
         public ImageAdapter(Context c, String pkgName) {
             mContext = c;
-            Map<String, String> resources = IconPackHelper.getIconPackResources(c, pkgName);
+            Map<ComponentName, String> resources = IconPackHelper.getIconPackResources(c, pkgName);
             try {
                 mResources = c.getPackageManager().getResourcesForApplication(pkgName);
                 LinkedHashSet<String> drawables = new LinkedHashSet<String>(resources.values());

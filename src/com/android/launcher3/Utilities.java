@@ -247,15 +247,16 @@ public final class Utilities {
         return LauncherAppState.getInstance().getInvariantDeviceProfile().iconBitmapSize;
     }
 
+    public static Bitmap createIconBitmap(Bitmap icon, Context context) {
+        return createIconBitmap(icon, context, null);
+    }
+
     /**
      * Returns a bitmap which is of the appropriate size to be displayed as an icon
      */
-    public static Bitmap createIconBitmap(Bitmap icon, Context context) {
-        final int iconBitmapSize = getIconBitmapSize();
-        if (iconBitmapSize == icon.getWidth() && iconBitmapSize == icon.getHeight()) {
-            return icon;
-        }
-        return createIconBitmap(new BitmapDrawable(context.getResources(), icon), context);
+    public static Bitmap createIconBitmap(Bitmap icon, Context context, IconPackHelper helper) {
+        return createIconBitmap(new BitmapDrawable(context.getResources(), icon), context,
+                helper, 1f);
     }
 
     /**
@@ -267,7 +268,7 @@ public final class Utilities {
             Drawable icon, UserHandleCompat user, Context context, int count) {
         float scale = FeatureFlags.LAUNCHER3_DISABLE_ICON_NORMALIZATION ?
                 1 : IconNormalizer.getInstance().getScale(icon, null);
-        Bitmap bitmap = createIconBitmap(icon, context);//, scale);
+        Bitmap bitmap = createIconBitmap(icon, context, scale);
 
         // create the unread icon's info here
         if (isUnreadCountEnabled(context) && count > 0) {
@@ -305,7 +306,7 @@ public final class Utilities {
         float scale = FeatureFlags.LAUNCHER3_DISABLE_ICON_NORMALIZATION ?
                 1 : IconNormalizer.getInstance().getScale(icon, iconBounds);
         scale = Math.min(scale, ShadowGenerator.getScaleForBounds(iconBounds));
-        return createIconBitmap(icon, context);//, scale);
+        return createIconBitmap(icon, context, scale);
     }
 
     /**
@@ -337,14 +338,21 @@ public final class Utilities {
      * Returns a bitmap suitable for the all apps view.
      */
     public static Bitmap createIconBitmap(Drawable icon, Context context) {
-        return createIconBitmap(icon, context, null, null, null, 1f);
+        return createIconBitmap(icon, context, null, 1f);
+    }
+
+    /**
+     * Returns a bitmap suitable for the all apps view.
+     */
+    public static Bitmap createIconBitmap(Drawable icon, Context context, float scale) {
+        return createIconBitmap(icon, context, null, scale);
     }
 
     /**
      * @param scale the scale to apply before drawing {@param icon} on the canvas
      */
-    public static Bitmap createIconBitmap(Drawable icon, Context context, Drawable iconBack,
-            Drawable iconMask, Drawable iconUpon, float scale) {
+    public static Bitmap createIconBitmap(Drawable icon, Context context,
+            IconPackHelper helper, float scale) {
         synchronized (sCanvas) {
             final int iconBitmapSize = getIconBitmapSize();
 
@@ -400,9 +408,15 @@ public final class Utilities {
 
             sOldBounds.set(icon.getBounds());
             icon.setBounds(left, top, left+width, top+height);
-            canvas.save();
-            if (iconMask != null && iconBack != null) {
-                canvas.scale(scale, scale, width / 2, height/2);
+            canvas.save(Canvas.MATRIX_SAVE_FLAG);
+            canvas.scale(scale, scale, textureWidth / 2, textureHeight / 2);
+            Drawable iconMask = null;
+            Drawable iconBack = null;
+            Drawable iconUpon = null;
+            if (helper != null) {
+                iconMask = helper.getIconMask();
+                iconBack = helper.getIconBack();
+                iconUpon = helper.getIconUpon();
             }
             icon.draw(canvas);
             canvas.restore();

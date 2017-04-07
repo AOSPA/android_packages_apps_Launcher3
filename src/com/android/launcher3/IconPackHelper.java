@@ -37,6 +37,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.preference.PreferenceManager;
 
+import com.android.launcher3.compat.LauncherActivityInfoCompat;
+
 public class IconPackHelper {
 
     static final String ICON_MASK_TAG = "iconmask";
@@ -46,7 +48,8 @@ public class IconPackHelper {
 
     public final static String[] sSupportedActions = new String[] {
         "org.adw.launcher.THEMES",
-        "com.gau.go.launcherex.theme"
+        "com.gau.go.launcherex.theme",
+        "com.novalauncher.THEME"
     };
 
     public static final String[] sSupportedCategories = new String[] {
@@ -56,12 +59,13 @@ public class IconPackHelper {
     };
 
     // Holds package/class -> drawable
-    private Map<String, String> mIconPackResources;
-    private final Context mContext;
+    private Map<ComponentName, String> mIconPackResources = new HashMap<ComponentName, String>();
     private String mLoadedIconPackName;
     private Resources mLoadedIconPackResource;
     private Drawable mIconBack, mIconUpon, mIconMask;
     private float mIconScale;
+
+    private final Context mContext;
 
     public Drawable getIconBack() {
         return mIconBack;
@@ -79,9 +83,8 @@ public class IconPackHelper {
         return mIconScale;
     }
 
-    IconPackHelper(Context context) {
+    protected IconPackHelper(Context context) {
         mContext = context;
-        mIconPackResources = new HashMap<String, String>();
     }
 
     private Drawable getDrawableForName(String name) {
@@ -121,7 +124,8 @@ public class IconPackHelper {
     }
 
     private static void loadResourcesFromXmlParser(XmlPullParser parser,
-            Map<String, String> iconPackResources) throws XmlPullParserException, IOException {
+                                            Map<ComponentName, String> iconPackResources)
+            throws XmlPullParserException, IOException {
         int eventType = parser.getEventType();
         do {
 
@@ -130,7 +134,6 @@ public class IconPackHelper {
             }
 
             if (parser.getName().equalsIgnoreCase(ICON_MASK_TAG) ||
-                    parser.getName().equalsIgnoreCase(ICON_BACK_TAG) ||
                     parser.getName().equalsIgnoreCase(ICON_UPON_TAG)) {
                 String icon = parser.getAttributeValue(null, "img");
                 if (icon == null) {
@@ -138,7 +141,7 @@ public class IconPackHelper {
                         icon = parser.getAttributeValue(0);
                     }
                 }
-                iconPackResources.put(parser.getName().toLowerCase(), icon);
+                iconPackResources.put(new ComponentName(parser.getName().toLowerCase(), ""), icon);
                 continue;
             }
 
@@ -149,7 +152,7 @@ public class IconPackHelper {
                         factor = parser.getAttributeValue(0);
                     }
                 }
-                iconPackResources.put(parser.getName().toLowerCase(), factor);
+                iconPackResources.put(new ComponentName(parser.getName().toLowerCase(), ""), factor);
                 continue;
             }
 
@@ -174,39 +177,41 @@ public class IconPackHelper {
             // Sanitize stored value
             component = component.substring(14, component.length() - 1).toLowerCase();
 
-            ComponentName name = null;
+            ComponentName name;
             if (!component.contains("/")) {
                 // Package icon reference
-                iconPackResources.put(component, drawable);
+                name = new ComponentName(component.toLowerCase(), "");
             } else {
                 name = ComponentName.unflattenFromString(component);
-                if (name != null) {
-                    iconPackResources.put(name.getPackageName(), drawable);
-                    iconPackResources.put(name.getPackageName() + "." + name.getClassName(), drawable);
-                }
+            }
+
+            if (name != null) {
+                iconPackResources.put(name, drawable);
             }
         } while ((eventType = parser.next()) != XmlPullParser.END_DOCUMENT);
     }
 
     private static void loadApplicationResources(Context context,
-            Map<String, String> iconPackResources, String packageName) {
-        Field[] drawableItems = null;
+            Map<ComponentName, String> iconPackResources, String packageName) {
+        Field[] drawableItems;
         try {
             Context appContext = context.createPackageContext(packageName,
                     Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
-            drawableItems = Class.forName(packageName+".R$drawable",
+            drawableItems = Class.forName(packageName + ".R$drawable",
                     true, appContext.getClassLoader()).getFields();
-        } catch (Exception e){
+        } catch (Exception e) {
             return;
         }
 
+        ComponentName compName;
         for (Field f : drawableItems) {
             String name = f.getName();
 
             String icon = name.toLowerCase();
             name = name.replaceAll("_", ".");
 
-            iconPackResources.put(name, icon);
+            compName = new ComponentName(name, "");
+            iconPackResources.put(compName, icon);
 
             int activityIndex = name.lastIndexOf(".");
             if (activityIndex <= 0 || activityIndex == name.length() - 1) {
@@ -217,13 +222,19 @@ public class IconPackHelper {
             if (TextUtils.isEmpty(iconPackage)) {
                 continue;
             }
-            iconPackResources.put(iconPackage, icon);
 
             String iconActivity = name.substring(activityIndex + 1);
             if (TextUtils.isEmpty(iconActivity)) {
                 continue;
             }
-            iconPackResources.put(iconPackage + "." + iconActivity, icon);
+
+            // Store entries as lower case to ensure match
+            iconPackage = iconPackage.toLowerCase();
+            iconActivity = iconActivity.toLowerCase();
+
+            iconActivity = iconPackage + "." + iconActivity;
+            compName = new ComponentName(iconPackage, iconActivity);
+            iconPackResources.put(compName, icon);
         }
     }
 
@@ -251,12 +262,13 @@ public class IconPackHelper {
         return true;
     }
 
-    public static Map<String, String> getIconPackResources(Context context, String packageName) {
+    public static Map<ComponentName, String> getIconPackResources(
+            Context context, String packageName) {
         if (TextUtils.isEmpty(packageName)) {
             return null;
         }
 
-        Resources res = null;
+        Resources res;
         try {
             res = context.getPackageManager().getResourcesForApplication(packageName);
         } catch (PackageManager.NameNotFoundException e) {
@@ -266,7 +278,7 @@ public class IconPackHelper {
 
         XmlPullParser parser = null;
         InputStream inputStream = null;
-        Map<String, String> iconPackResources = new HashMap<String, String>();
+        Map<ComponentName, String> iconPackResources = new HashMap<>();
 
         try {
             inputStream = res.getAssets().open("appfilter.xml");
@@ -284,11 +296,9 @@ public class IconPackHelper {
 
         if (parser != null) {
             try {
-                  loadResourcesFromXmlParser(parser, iconPackResources);
-                  return iconPackResources;
-            } catch (XmlPullParserException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
+                loadResourcesFromXmlParser(parser, iconPackResources);
+                return iconPackResources;
+            } catch (XmlPullParserException | IOException e) {
                 e.printStackTrace();
             } finally {
                 // Cleanup resources
@@ -299,6 +309,7 @@ public class IconPackHelper {
                     try {
                         inputStream.close();
                     } catch (IOException e) {
+                        // ignore
                     }
                 }
             }
@@ -312,6 +323,7 @@ public class IconPackHelper {
 
         if (arrayId != 0) {
             String[] iconPack = res.getStringArray(arrayId);
+            ComponentName compName;
             for (String entry : iconPack) {
 
                 if (TextUtils.isEmpty(entry)) {
@@ -321,7 +333,8 @@ public class IconPackHelper {
                 String icon = entry.toLowerCase();
                 entry = entry.replaceAll("_", ".");
 
-                iconPackResources.put(entry, icon);
+                compName = new ComponentName(entry.toLowerCase(), "");
+                iconPackResources.put(compName, icon);
 
                 int activityIndex = entry.lastIndexOf(".");
                 if (activityIndex <= 0 || activityIndex == entry.length() - 1) {
@@ -332,13 +345,19 @@ public class IconPackHelper {
                 if (TextUtils.isEmpty(iconPackage)) {
                     continue;
                 }
-                iconPackResources.put(iconPackage, icon);
 
                 String iconActivity = entry.substring(activityIndex + 1);
                 if (TextUtils.isEmpty(iconActivity)) {
                     continue;
                 }
-                iconPackResources.put(iconPackage + "." + iconActivity, icon);
+
+                // Store entries as lower case to ensure match
+                iconPackage = iconPackage.toLowerCase();
+                iconActivity = iconActivity.toLowerCase();
+
+                iconActivity = iconPackage + "." + iconActivity;
+                compName = new ComponentName(iconPackage, iconActivity);
+                iconPackResources.put(compName, icon);
             }
         } else {
             loadApplicationResources(context, iconPackResources, packageName);
@@ -349,7 +368,6 @@ public class IconPackHelper {
     public void unloadIconPack() {
         mLoadedIconPackResource = null;
         mLoadedIconPackName = null;
-        mIconPackResources = null;
         mIconMask = null;
         mIconBack = null;
         mIconUpon = null;
@@ -398,7 +416,7 @@ public class IconPackHelper {
         builder.show();
     }
 
-    boolean isIconPackLoaded() {
+    protected boolean isIconPackLoaded() {
         return mLoadedIconPackResource != null &&
                 mLoadedIconPackName != null &&
                 mIconPackResources != null;
@@ -413,12 +431,35 @@ public class IconPackHelper {
         return mLoadedIconPackResource;
     }
 
-    public int getResourceIdForActivityIcon(ApplicationInfo info) {
-        String drawable = mIconPackResources.get(info.packageName.toLowerCase()
-                + "." + info.name.toLowerCase());
+    public int getResourceIdForActivityIcon(LauncherActivityInfoCompat info, ComponentName cn) {
+        ComponentName component;
+        if (info != null) {
+            component = info.getComponentName();
+        } else {
+            component = cn;
+        }
+
+        final ActivityInfo activityInfo;
+        try {
+            activityInfo = mContext.getPackageManager().getActivityInfo(
+                    component, PackageManager.GET_META_DATA);
+        } catch (PackageManager.NameNotFoundException e) {
+            return 0;
+        }
+        return getResourceIdForActivityIcon(activityInfo);
+    }
+
+    public int getResourceIdForActivityIcon(ActivityInfo info) {
+        if (!isIconPackLoaded()) {
+            return 0;
+        }
+        ComponentName cn = new ComponentName(info.packageName.toLowerCase(),
+                info.name.toLowerCase());
+        String drawable = mIconPackResources.get(cn);
         if (drawable == null) {
             // Icon pack doesn't have an icon for the activity, fallback to package icon
-            drawable = mIconPackResources.get(info.packageName.toLowerCase());
+            cn = new ComponentName(info.packageName.toLowerCase(), "");
+            drawable = mIconPackResources.get(cn);
             if (drawable == null) {
                 return 0;
             }
