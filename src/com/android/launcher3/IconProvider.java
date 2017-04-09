@@ -22,6 +22,8 @@ public class IconProvider {
     }
 
     public static IconProvider loadByName(String className, Context context) {
+        CustomIconProvider p = new CustomIconProvider(context);
+        if (p != null) return (IconProvider) p;
         if (TextUtils.isEmpty(className)) return new IconProvider();
         if (DBG) Log.d(TAG, "Loading IconProvider: " + className);
         try {
