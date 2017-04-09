@@ -149,6 +149,7 @@ public final class Utilities {
             TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
 
     public static final String ALLOW_ROTATION_PREFERENCE_KEY = "pref_allowRotation";
+    public static final String KEY_ICON_PACK = "icon-packs";
 
     public static boolean isPropertyEnabled(String propertyName) {
         return Log.isLoggable(propertyName, Log.VERBOSE);
