@@ -259,4 +259,7 @@
     <!-- Accessibility description for the shortcuts menu shown for an app. -->
     <string name="shortcuts_menu_description"><xliff:g id="number_of_shortcuts" example="3">%1$d</xliff:g> shortcuts for <xliff:g id="app_name" example="Messenger">%2$s</xliff:g></string>
 
+    <!-- Icon pack -->
+    <string name="default_iconpack_title">Default icons</string>
+    <string name="icons_pack_name">Icon pack</string>
 </resources>
