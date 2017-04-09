@@ -44,6 +44,17 @@
         android:textColor="@android:color/white"
         android:layout_marginTop="@dimen/vert_drop_target_vertical_gap"/>
 
+    <!-- Edit target -->
+    <com.android.launcher3.EditDropTarget
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/dynamic_grid_drop_target_size"
+        android:gravity="center"
+        android:paddingLeft="@dimen/vert_drop_target_horizontal_gap"
+        android:paddingRight="@dimen/vert_drop_target_horizontal_gap"
+        android:id="@+id/edit_target_text"
+        android:textColor="@android:color/white"
+        android:layout_marginTop="@dimen/vert_drop_target_vertical_gap"/>
+
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
