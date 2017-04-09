@@ -76,4 +76,22 @@
             android:text="@string/uninstall_drop_target_label" />
     </FrameLayout>
 
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1" >
+
+        <!-- Edit target -->
+
+        <com.android.launcher3.EditDropTarget
+            launcher:hideParentOnDisable="true"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:id="@+id/edit_target_text"
+            style="@style/DropTargetButton"
+            android:text="@string/edit_drop_target_label" />
+    </FrameLayout>
+
 </com.android.launcher3.DropTargetBar>
