@@ -23,4 +23,7 @@
             android:persistent="true"
     />
 
+    <Preference
+        android:key="icon-packs"
+        android:title="@string/icons_pack_name" />
 </PreferenceScreen>
