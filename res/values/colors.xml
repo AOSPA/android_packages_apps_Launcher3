@@ -52,4 +52,10 @@
     <color name="fallback_secondary_color">#FF37474F</color>
 
     <color name="infomation_count_circle_color">#F44336</color>
+
+    <color name="settings_action_bar_color">#ff263238</color>
+    <color name="settings_status_bar_color">#ff21272b</color>
+    <color name="launcher_accent_color">#ff2196f3</color>
+    <color name="icon_settings_background">#ff313131</color>
+    <color name="icon_settings_text">#ffafafaf</color>
 </resources>
