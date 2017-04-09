@@ -21,6 +21,7 @@ import android.content.ContentResolver;
 import android.database.ContentObserver;
 import android.os.Bundle;
 import android.os.Handler;
+import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.provider.Settings;
@@ -53,6 +54,23 @@ public class SettingsActivity extends Activity {
             getPreferenceManager().setSharedPreferencesName(LauncherFiles.SHARED_PREFERENCES_KEY);
             addPreferencesFromResource(R.xml.launcher_preferences);
 
+            ListPreference iconsPack = (ListPreference) findPreference(Utilities.KEY_ICON_PACK);
+            iconsPack.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    String listValue = (String) newValue;
+                    IconCache.getIconsHandler(getActivity().getApplicationContext())
+                            .loadIconPack(listValue);
+                    getPreferenceManager().getDefaultSharedPreferences(
+                            getActivity().getApplicationContext()).edit()
+                            .putString(Utilities.KEY_ICON_PACK, listValue).commit();
+                    LauncherAppState.getInstance().getIconCache().flush();
+                    LauncherAppState.getInstance().getModel().forceReload();
+                    return true;
+                 }
+            });
+            setListPreferenceIconsPacksData(iconsPack);
+
             // Setup allow rotation preference
             Preference rotationPref = findPreference(Utilities.ALLOW_ROTATION_PREFERENCE_KEY);
             if (getResources().getBoolean(R.bool.allow_rotation)) {
@@ -81,6 +99,22 @@ public class SettingsActivity extends Activity {
                 mRotationLockObserver = null;
             }
             super.onDestroy();
+        }
+
+        protected void setListPreferenceIconsPacksData(ListPreference lp) {
+            IconsHandler iph = IconCache.getIconsHandler(getActivity().getApplicationContext());
+            CharSequence[] entries = new CharSequence[iph.getIconPacks().size()+1];
+            CharSequence[] entryValues = new CharSequence[iph.getIconPacks().size()+1];
+            int i = 0;
+            entries[0] = this.getString(R.string.icons_pack_default_name);
+            entryValues[0] = "default";
+            for (String packageIconsPack : iph.getIconPacks().keySet()) {
+                entries[++i] = iph.getIconPacks().get(packageIconsPack);
+                entryValues[i] = packageIconsPack;
+            }
+            lp.setEntries(entries);
+            lp.setDefaultValue("default");
+            lp.setEntryValues(entryValues);
         }
     }
 
