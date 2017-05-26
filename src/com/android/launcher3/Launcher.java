@@ -127,6 +127,7 @@ import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.WidgetHostViewLoader;
 import com.android.launcher3.widget.WidgetsContainerView;
+import com.android.launcher3.util.VerticalFlingDetector;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -4046,6 +4047,36 @@ public class Launcher extends Activity
         }
         if (LauncherAppState.PROFILE_STARTUP) {
             Trace.endSection();
+        }
+
+        // Enable pulldown search even with QSB off
+        if (FeatureFlags.PULLDOWN_SEARCH) {
+            CellLayout firstPage = mWorkspace.getScreenWithId(mWorkspace.FIRST_SCREEN_ID);
+            firstPage.setOnTouchListener(new VerticalFlingDetector(this) {
+                // detect fling when touch started from empty space
+                @Override
+                public boolean onTouch(View v, MotionEvent ev) {
+                    if (mWorkspace.workspaceInModalState()) return false;
+                    if (mWorkspace.shouldConsumeTouch(v)) return true;
+                    if (super.onTouch(v, ev)) {
+                        startSearch("", false, null, false);
+                        return true;
+                    }
+                    return false;
+                }
+            });
+            firstPage.setOnInterceptTouchListener(new VerticalFlingDetector(this) {
+                // detect fling when touch started from on top of the icons
+                @Override
+                public boolean onTouch(View v, MotionEvent ev) {
+                    if (mWorkspace.shouldConsumeTouch(v)) return true;
+                    if (super.onTouch(v, ev)) {
+                        startSearch("", false, null, false);
+                        return true;
+                    }
+                    return false;
+                }
+            });
         }
     }
 

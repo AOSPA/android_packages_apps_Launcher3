@@ -82,7 +82,6 @@ import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LongArrayMap;
 import com.android.launcher3.util.MultiStateAlphaController;
 import com.android.launcher3.util.Thunk;
-import com.android.launcher3.util.VerticalFlingDetector;
 import com.android.launcher3.util.WallpaperOffsetInterpolator;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
@@ -612,35 +611,9 @@ public class Workspace extends PagedView
         if (!FeatureFlags.QSB_ON_FIRST_SCREEN) {
             return;
         }
+
         // Add the first page
         CellLayout firstPage = insertNewWorkspaceScreen(Workspace.FIRST_SCREEN_ID, 0);
-        if (FeatureFlags.PULLDOWN_SEARCH) {
-            firstPage.setOnTouchListener(new VerticalFlingDetector(mLauncher) {
-                // detect fling when touch started from empty space
-                @Override
-                public boolean onTouch(View v, MotionEvent ev) {
-                    if (workspaceInModalState()) return false;
-                    if (shouldConsumeTouch(v)) return true;
-                    if (super.onTouch(v, ev)) {
-                        mLauncher.startSearch("", false, null, false);
-                        return true;
-                    }
-                    return false;
-                }
-            });
-            firstPage.setOnInterceptTouchListener(new VerticalFlingDetector(mLauncher) {
-                // detect fling when touch started from on top of the icons
-                @Override
-                public boolean onTouch(View v, MotionEvent ev) {
-                    if (shouldConsumeTouch(v)) return true;
-                    if (super.onTouch(v, ev)) {
-                        mLauncher.startSearch("", false, null, false);
-                        return true;
-                    }
-                    return false;
-                }
-            });
-        }
 
         // QSB Hide
         boolean visible = Utilities.isShowQsbPrefEnabled(mLauncher);
@@ -1222,7 +1195,7 @@ public class Workspace extends PagedView
         return shouldConsumeTouch(v);
     }
 
-    private boolean shouldConsumeTouch(View v) {
+    protected boolean shouldConsumeTouch(View v) {
         return (workspaceInModalState() || !isFinishedSwitchingState())
                 || (!workspaceInModalState() && indexOfChild(v) != mCurrentPage);
     }
