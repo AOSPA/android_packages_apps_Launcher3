@@ -641,20 +641,26 @@ public class Workspace extends PagedView
                 }
             });
         }
-        // Always add a QSB on the first screen.
-        if (qsb == null) {
-            // In transposed layout, we add the QSB in the Grid. As workspace does not touch the
-            // edges, we do not need a full width QSB.
-            qsb = mLauncher.getLayoutInflater().inflate(
-                    mLauncher.getDeviceProfile().isVerticalBarLayout()
-                            ? R.layout.qsb_container : R.layout.qsb_blocker_view,
-                    firstPage, false);
-        }
 
-        CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(), 1);
-        lp.canReorder = false;
-        if (!firstPage.addViewToCellLayout(qsb, 0, getEmbeddedQsbId(), lp, true)) {
-            Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
+        // QSB Hide
+        boolean visible = Utilities.isShowQsbPrefEnabled(mLauncher);
+
+        if (visible) {
+            // Always add a QSB on the first screen.
+            if (qsb == null) {
+                // In transposed layout, we add the QSB in the Grid. As workspace does not touch the
+                // edges, we do not need a full width QSB.
+                qsb = mLauncher.getLayoutInflater().inflate(
+                        mLauncher.getDeviceProfile().isVerticalBarLayout()
+                                ? R.layout.qsb_container : R.layout.qsb_blocker_view,
+                        firstPage, false);
+            }
+
+            CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(), 1);
+            lp.canReorder = false;
+            if (!firstPage.addViewToCellLayout(qsb, 0, getEmbeddedQsbId(), lp, true)) {
+                Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
+            }
         }
     }
 
@@ -4386,5 +4392,36 @@ public class Workspace extends PagedView
 
     public static final boolean isQsbContainerPage(int pageNo) {
         return pageNo == 0;
+    }
+
+    // QSB Hide
+    // Core from OMNIRom - instead of hiding it, let's remove and readd the QSB using native methods
+    public void updateQsbVisibility() {
+        String TAG = "Launcher3: [dady] updateQsbVisibility: ";
+        boolean visible = Utilities.isShowQsbPrefEnabled(mLauncher);
+        View qsb = findViewById(getEmbeddedQsbId());
+        CellLayout firstPage = mWorkspaceScreens.get(FIRST_SCREEN_ID);
+        FeatureFlags.QSB_ON_FIRST_SCREEN = visible;
+
+        if (!visible) {
+            Log.d(TAG, "" + visible + ", removing QSB");
+            if (qsb != null)
+                firstPage.removeView(qsb);
+        } else {
+            Log.d(TAG, "" + visible + ", adding QSB");
+            if (qsb == null) {
+                // In transposed layout, we add the QSB in the Grid. As workspace does not touch the
+                // edges, we do not need a full width QSB.
+                qsb = mLauncher.getLayoutInflater().inflate(
+                        mLauncher.getDeviceProfile().isVerticalBarLayout()
+                                ? R.layout.qsb_container : R.layout.qsb_blocker_view,
+                        firstPage, false);
+            }
+            CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(), 1);
+            lp.canReorder = false;
+            if (!firstPage.addViewToCellLayout(qsb, 0, getEmbeddedQsbId(), lp, visible)) {
+                Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
+            }
+        }
     }
 }

@@ -355,6 +355,9 @@ public class Launcher extends Activity
     public ViewGroupFocusHelper mFocusHandler;
     private boolean mRotationEnabled = false;
 
+    private boolean mQsbShown = true;
+    private QsbShownPrefChangeHandler mQsbShownPrefChangeHandler;
+
     private LauncherTab mLauncherTab;
 
     @Thunk void setOrientation() {
@@ -393,6 +396,10 @@ public class Launcher extends Activity
         }
 
         super.onCreate(savedInstanceState);
+
+        // QSB Hide
+        boolean visible = Utilities.isShowQsbPrefEnabled(this);
+        FeatureFlags.QSB_ON_FIRST_SCREEN = visible;
 
         LauncherAppState app = LauncherAppState.getInstance();
 
@@ -468,6 +475,11 @@ public class Launcher extends Activity
             mRotationPrefChangeHandler = new RotationPrefChangeHandler();
             mSharedPrefs.registerOnSharedPreferenceChangeListener(mRotationPrefChangeHandler);
         }
+
+        mQsbShown = getResources().getBoolean(R.bool.show_qsb);
+        mQsbShown = Utilities.isShowQsbPrefEnabled(getApplicationContext());
+        mQsbShownPrefChangeHandler = new QsbShownPrefChangeHandler();
+        mSharedPrefs.registerOnSharedPreferenceChangeListener(mQsbShownPrefChangeHandler);
 
         // On large interfaces, or on devices that a user has specifically enabled screen rotation,
         // we want the screen to auto-rotate based on the current orientation
@@ -1978,6 +1990,10 @@ public class Launcher extends Activity
             mSharedPrefs.unregisterOnSharedPreferenceChangeListener(mRotationPrefChangeHandler);
         }
 
+        if (mQsbShownPrefChangeHandler != null) {
+            mSharedPrefs.unregisterOnSharedPreferenceChangeListener(mQsbShownPrefChangeHandler);
+        }
+
         try {
             mAppWidgetHost.stopListening();
         } catch (NullPointerException ex) {
@@ -3253,6 +3269,7 @@ public class Launcher extends Activity
             getWindow().getDecorView()
                     .sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
         }
+
         return changed;
     }
 
@@ -4519,6 +4536,19 @@ public class Launcher extends Activity
         @Override
         public void run() {
             setOrientation();
+        }
+    }
+
+    // QSB Hide - Preference changed event
+    private class QsbShownPrefChangeHandler implements OnSharedPreferenceChangeListener {
+        @Override
+        public void onSharedPreferenceChanged(
+                SharedPreferences sharedPreferences, String key) {
+            if (Utilities.SHOW_QSB_PREFERENCE_KEY.equals(key)) {
+                mQsbShown = Utilities.isShowQsbPrefEnabled(getApplicationContext());
+                if (mWorkspace != null)
+                    mWorkspace.updateQsbVisibility();
+            }
         }
     }
 }
