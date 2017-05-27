@@ -607,7 +607,7 @@ public class Workspace extends PagedView
      * Initializes and binds the first page
      * @param qsb an exisitng qsb to recycle or null.
      */
-    public void bindAndInitFirstWorkspaceScreen(View qsb) {
+    public void bindAndInitFirstWorkspaceScreen() {
         if (!FeatureFlags.QSB_ON_FIRST_SCREEN) {
             return;
         }
@@ -616,25 +616,7 @@ public class Workspace extends PagedView
         CellLayout firstPage = insertNewWorkspaceScreen(Workspace.FIRST_SCREEN_ID, 0);
 
         // QSB Hide
-        boolean visible = Utilities.isShowQsbPrefEnabled(mLauncher);
-
-        if (visible) {
-            // Always add a QSB on the first screen.
-            if (qsb == null) {
-                // In transposed layout, we add the QSB in the Grid. As workspace does not touch the
-                // edges, we do not need a full width QSB.
-                qsb = mLauncher.getLayoutInflater().inflate(
-                        mLauncher.getDeviceProfile().isVerticalBarLayout()
-                                ? R.layout.qsb_container : R.layout.qsb_blocker_view,
-                        firstPage, false);
-            }
-
-            CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(), 1);
-            lp.canReorder = false;
-            if (!firstPage.addViewToCellLayout(qsb, 0, getEmbeddedQsbId(), lp, true)) {
-                Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
-            }
-        }
+        updateQsbVisibility();
     }
 
     @Override
@@ -682,7 +664,7 @@ public class Workspace extends PagedView
         mWorkspaceScreens.clear();
 
         // Ensure that the first page is always present
-        bindAndInitFirstWorkspaceScreen(qsb);
+        bindAndInitFirstWorkspaceScreen();
 
         // Re-enable the layout transitions
         enableLayoutTransitions();
@@ -4389,11 +4371,11 @@ public class Workspace extends PagedView
                         mLauncher.getDeviceProfile().isVerticalBarLayout()
                                 ? R.layout.qsb_container : R.layout.qsb_blocker_view,
                         firstPage, false);
-            }
-            CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(), 1);
-            lp.canReorder = false;
-            if (!firstPage.addViewToCellLayout(qsb, 0, getEmbeddedQsbId(), lp, visible)) {
-                Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
+                CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(), 1);
+                lp.canReorder = false;
+                if (!firstPage.addViewToCellLayout(qsb, 0, getEmbeddedQsbId(), lp, visible)) {
+                    Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
+                }
             }
         }
     }
