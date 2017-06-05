@@ -127,6 +127,7 @@ import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.WidgetHostViewLoader;
 import com.android.launcher3.widget.WidgetsContainerView;
+import com.android.launcher3.util.VerticalFlingDetector;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -355,6 +356,9 @@ public class Launcher extends Activity
     public ViewGroupFocusHelper mFocusHandler;
     private boolean mRotationEnabled = false;
 
+    private boolean mQsbShown = true;
+    private QsbShownPrefChangeHandler mQsbShownPrefChangeHandler;
+
     private LauncherTab mLauncherTab;
 
     @Thunk void setOrientation() {
@@ -393,6 +397,10 @@ public class Launcher extends Activity
         }
 
         super.onCreate(savedInstanceState);
+
+        // QSB Hide
+        boolean visible = Utilities.isShowQsbPrefEnabled(this);
+        FeatureFlags.QSB_ON_FIRST_SCREEN = visible;
 
         LauncherAppState app = LauncherAppState.getInstance();
 
@@ -468,6 +476,11 @@ public class Launcher extends Activity
             mRotationPrefChangeHandler = new RotationPrefChangeHandler();
             mSharedPrefs.registerOnSharedPreferenceChangeListener(mRotationPrefChangeHandler);
         }
+
+        mQsbShown = getResources().getBoolean(R.bool.show_qsb);
+        mQsbShown = Utilities.isShowQsbPrefEnabled(getApplicationContext());
+        mQsbShownPrefChangeHandler = new QsbShownPrefChangeHandler();
+        mSharedPrefs.registerOnSharedPreferenceChangeListener(mQsbShownPrefChangeHandler);
 
         // On large interfaces, or on devices that a user has specifically enabled screen rotation,
         // we want the screen to auto-rotate based on the current orientation
@@ -1354,7 +1367,7 @@ public class Launcher extends Activity
         // Until the workspace is bound, ensure that we keep the wallpaper offset locked to the
         // default state, otherwise we will update to the wrong offsets in RTL
         mWorkspace.lockWallpaperToDefaultPage();
-        mWorkspace.bindAndInitFirstWorkspaceScreen(null /* recycled qsb */);
+        mWorkspace.bindAndInitFirstWorkspaceScreen();
         mDragController.addDragListener(mWorkspace);
 
         // Get the search/delete/uninstall bar
@@ -1976,6 +1989,10 @@ public class Launcher extends Activity
 
         if (mRotationPrefChangeHandler != null) {
             mSharedPrefs.unregisterOnSharedPreferenceChangeListener(mRotationPrefChangeHandler);
+        }
+
+        if (mQsbShownPrefChangeHandler != null) {
+            mSharedPrefs.unregisterOnSharedPreferenceChangeListener(mQsbShownPrefChangeHandler);
         }
 
         try {
@@ -2664,17 +2681,17 @@ public class Launcher extends Activity
             return;
         }
 
-        String pickerPackage = getString(R.string.wallpaper_picker_package);
+        /*String pickerPackage = getString(R.string.wallpaper_picker_package);
         if (TextUtils.isEmpty(pickerPackage)) {
             pickerPackage =  PackageManagerHelper.getWallpaperPickerPackage(getPackageManager());
-        }
+        }*/
 
         int pageScroll = mWorkspace.getScrollForPage(mWorkspace.getPageNearestToCenterOfScreen());
         float offset = mWorkspace.mWallpaperOffset.wallpaperOffsetForScroll(pageScroll);
 
         setWaitingForResult(new PendingRequestArgs(new ItemInfo()));
         Intent intent = new Intent(Intent.ACTION_SET_WALLPAPER)
-                .setPackage(pickerPackage)
+                //.setPackage(pickerPackage)
                 .putExtra(Utilities.EXTRA_WALLPAPER_OFFSET, offset);
         intent.setSourceBounds(getViewBounds(v));
         startActivityForResult(intent, REQUEST_PICK_WALLPAPER, getActivityLaunchOptions(v));
@@ -3253,6 +3270,7 @@ public class Launcher extends Activity
             getWindow().getDecorView()
                     .sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
         }
+
         return changed;
     }
 
@@ -4030,6 +4048,36 @@ public class Launcher extends Activity
         if (LauncherAppState.PROFILE_STARTUP) {
             Trace.endSection();
         }
+
+        // Enable pulldown search even with QSB off
+        if (FeatureFlags.PULLDOWN_SEARCH) {
+            CellLayout firstPage = mWorkspace.getScreenWithId(mWorkspace.FIRST_SCREEN_ID);
+            firstPage.setOnTouchListener(new VerticalFlingDetector(this) {
+                // detect fling when touch started from empty space
+                @Override
+                public boolean onTouch(View v, MotionEvent ev) {
+                    if (mWorkspace.workspaceInModalState()) return false;
+                    if (mWorkspace.shouldConsumeTouch(v)) return true;
+                    if (super.onTouch(v, ev)) {
+                        startSearch("", false, null, false);
+                        return true;
+                    }
+                    return false;
+                }
+            });
+            firstPage.setOnInterceptTouchListener(new VerticalFlingDetector(this) {
+                // detect fling when touch started from on top of the icons
+                @Override
+                public boolean onTouch(View v, MotionEvent ev) {
+                    if (mWorkspace.shouldConsumeTouch(v)) return true;
+                    if (super.onTouch(v, ev)) {
+                        startSearch("", false, null, false);
+                        return true;
+                    }
+                    return false;
+                }
+            });
+        }
     }
 
     private boolean canRunNewAppsAnimation() {
@@ -4519,6 +4567,19 @@ public class Launcher extends Activity
         @Override
         public void run() {
             setOrientation();
+        }
+    }
+
+    // QSB Hide - Preference changed event
+    private class QsbShownPrefChangeHandler implements OnSharedPreferenceChangeListener {
+        @Override
+        public void onSharedPreferenceChanged(
+                SharedPreferences sharedPreferences, String key) {
+            if (Utilities.SHOW_QSB_PREFERENCE_KEY.equals(key)) {
+                mQsbShown = Utilities.isShowQsbPrefEnabled(getApplicationContext());
+                if (mWorkspace != null)
+                    mWorkspace.updateQsbVisibility();
+            }
         }
     }
 }

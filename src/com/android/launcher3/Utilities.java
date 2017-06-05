@@ -171,6 +171,12 @@ public final class Utilities {
         return false;
     }
 
+    // QSB Hide - Preference keys
+    public static final String SHOW_QSB_PREFERENCE_KEY = "pref_showQsb";
+    public static boolean isShowQsbPrefEnabled(Context context) {
+        return getPrefs(context).getBoolean(SHOW_QSB_PREFERENCE_KEY, true);
+    }
+
     static Bitmap createIconBitmapUnreadInfo(Context context, Bitmap b, int count) {
 
         int textureWidth = b.getWidth();
