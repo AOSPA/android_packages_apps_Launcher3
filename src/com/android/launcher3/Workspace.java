@@ -25,6 +25,7 @@ import android.animation.PropertyValuesHolder;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.annotation.SuppressLint;
+import android.app.StatusBarManager;
 import android.app.WallpaperManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetProviderInfo;
@@ -364,6 +365,8 @@ public class Workspace extends PagedView
         setMotionEventSplittingEnabled(true);
 
         final PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        final StatusBarManager statusBar = (StatusBarManager) context.getSystemService(
+                Context.STATUS_BAR_SERVICE);
         mGestureListener =
                 new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
             @Override
@@ -371,11 +374,14 @@ public class Workspace extends PagedView
                 pm.goToSleep(event.getEventTime());
                 return true;
             }
+
             @Override
             public boolean onFling(MotionEvent e1, MotionEvent e2,
                     float velocityX, float velocityY) {
                 if (e1.getY() - e2.getY() > SWIPE_THRESHOLD) {
                     mLauncher.showAppsView(true, false, false);
+                } else if (e1.getY() - e2.getY() < SWIPE_THRESHOLD) {
+                    statusBar.expandNotificationsPanel();
                 }
                 return true;
             }
