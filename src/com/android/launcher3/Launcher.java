@@ -2477,17 +2477,19 @@ public class Launcher extends BaseDraggingActivity implements LauncherExterns,
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         if (Homescreen.KEY_FEED_INTEGRATION.equals(key)) {
-            if (mLauncherTab == null) {
-                    return;
+            if (mLauncherTab != null) {
+                mFeedIntegrationEnabled = isFeedIntegrationEnabled();
+                mLauncherTab.updateLauncherTab(mFeedIntegrationEnabled);
+                if (mFeedIntegrationEnabled && mLauncherTab != null) {
+                    mLauncherTab.getClient().onAttachedToWindow();
+                } else {
+                    mLauncherTab.getClient().onDestroy();
+                }
             }
-
-            mFeedIntegrationEnabled = isFeedIntegrationEnabled();
-            mLauncherTab.updateLauncherTab(mFeedIntegrationEnabled);
-            if (mFeedIntegrationEnabled) {
-                mLauncherTab.getClient().onAttachedToWindow();
-            } else {
-                mLauncherTab.getClient().onDestroy();
-            }
+        }
+        if ("pref_iconPackPackage".equals(key)) {
+            mModel.clearIconCache();
+            mModel.forceReload();
         }
     }
 }
