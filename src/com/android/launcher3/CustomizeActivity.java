@@ -50,6 +50,8 @@ public class CustomizeActivity extends Activity {
         private PackageManager mPackageManager;
         private Preference mIconPack;
 
+        private SwitchPreference mLeftPage;
+
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -63,6 +65,12 @@ public class CustomizeActivity extends Activity {
             mDefaultIconPack = getString(R.string.default_iconpack_title);
             mIconsHandler = IconCache.getIconsHandler(getActivity().getApplicationContext());
             mIconPack = (Preference) findPreference(Utilities.KEY_ICON_PACK);
+
+            boolean state = Utilities.getPrefs(getActivity()).getBoolean(
+                    Utilities.ACTION_LEFT_PAGE_CHANGED, true);
+
+            mLeftPage = (SwitchPreference) findPreference(Utilities.KEY_LEFT_PAGE);
+            mLeftPage.setChecked(state);
 
             reloadIconPackSummary();
         }
@@ -84,6 +92,15 @@ public class CustomizeActivity extends Activity {
         public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference pref) {
             if (pref == mIconPack) {
                 mIconsHandler.showDialog(getActivity());
+                return true;
+            }
+            if (pref == mLeftPage) {
+                boolean state = Utilities.getPrefs(getActivity()).getBoolean(
+                        Utilities.ACTION_LEFT_PAGE_CHANGED, true);
+                Utilities.getPrefs(getActivity()).edit().putBoolean(
+                        Utilities.ACTION_LEFT_PAGE_CHANGED, !state).commit();
+                Intent intent = new Intent(Utilities.ACTION_LEFT_PAGE_CHANGED);
+                getActivity().sendBroadcast(intent);
                 return true;
             }
             return false;

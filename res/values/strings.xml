@@ -272,4 +272,7 @@
     <string name="ok">Ok</string>
     <string name="icon_label">Label</string>
     <string name="loading">Loading, please wait</string>
+
+    <string name="left_page">Left page</string>
+    <string name="now_tab">Google Now tab</string>
 </resources>
