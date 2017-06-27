@@ -66,7 +66,11 @@ public class CustomizeActivity extends Activity {
             mIconsHandler = IconCache.getIconsHandler(getActivity().getApplicationContext());
             mIconPack = (Preference) findPreference(Utilities.KEY_ICON_PACK);
 
+            boolean state = Utilities.getPrefs(getActivity()).getBoolean(
+                    Utilities.ACTION_LEFT_PAGE_CHANGED, true);
+
             mLeftPage = (SwitchPreference) findPreference(Utilities.KEY_LEFT_PAGE);
+            mLeftPage.setChecked(state);
 
             reloadIconPackSummary();
         }
@@ -91,6 +95,10 @@ public class CustomizeActivity extends Activity {
                 return true;
             }
             if (pref == mLeftPage) {
+                boolean state = Utilities.getPrefs(getActivity()).getBoolean(
+                        Utilities.ACTION_LEFT_PAGE_CHANGED, true);
+                Utilities.getPrefs(getActivity()).edit().putBoolean(
+                        Utilities.ACTION_LEFT_PAGE_CHANGED, !state).commit();
                 Intent intent = new Intent(Utilities.ACTION_LEFT_PAGE_CHANGED);
                 getActivity().sendBroadcast(intent);
                 return true;
