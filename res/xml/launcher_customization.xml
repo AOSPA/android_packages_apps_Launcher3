@@ -25,4 +25,12 @@
             android:title="@string/icons_pack_name"
             android:icon="@drawable/icon_pack" />
     </PreferenceCategory>
+    <PreferenceCategory
+        android:key="left_page"
+        android:title="@string/left_page">
+        <SwitchPreference
+            android:key="now-tab"
+            android:title="@string/now_tab"
+            android:icon="@drawable/now_tab" />
+    </PreferenceCategory>
 </PreferenceScreen>
