@@ -64,7 +64,8 @@
         android:text="@string/settings_button_text"
         android:textAllCaps="true"
         android:textColor="@android:color/white"
-        android:textSize="12sp" />
+        android:textSize="12sp"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/customize_button"

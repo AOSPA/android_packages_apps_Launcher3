@@ -33,4 +33,14 @@
             android:title="@string/now_tab"
             android:icon="@drawable/now_tab" />
     </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="misc"
+        android:title="@string/misc">
+        <SwitchPreference
+            android:key="pref_allowRotation"
+            android:title="@string/allow_rotation_title"
+            android:defaultValue="@bool/allow_rotation"
+            android:persistent="true" />
+    </PreferenceCategory>
 </PreferenceScreen>
