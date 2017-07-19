@@ -99,7 +99,9 @@ public class QsbContainerView extends FrameLayout {
                 sSavedWidgetId = savedInstanceState.getInt(QSB_WIDGET_ID, -1);
             }
             mWrapper = new FrameLayout(getActivity());
-            mWrapper.addView(createQsb(inflater, mWrapper));
+            if (FeatureFlags.QSB_ON_FIRST_SCREEN) {
+                mWrapper.addView(createQsb(inflater, mWrapper));
+            }
             return mWrapper;
         }
 
@@ -216,7 +218,7 @@ public class QsbContainerView extends FrameLayout {
         }
 
         private void rebindFragment() {
-            if (mWrapper != null && getActivity() != null) {
+            if (FeatureFlags.QSB_ON_FIRST_SCREEN && mWrapper != null && getActivity() != null) {
                 mWrapper.removeAllViews();
                 mWrapper.addView(createQsb(getActivity().getLayoutInflater(), mWrapper));
             }
