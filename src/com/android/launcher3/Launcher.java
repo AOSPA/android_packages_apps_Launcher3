@@ -968,8 +968,6 @@ public class Launcher extends BaseActivity
 
         super.onResume();
         getUserEventDispatcher().resetElapsedSessionMillis();
-        //bind unread number service
-        mModel.bindUnreadService();
 
         // Restore the previous launcher state
         if (mOnResumeState == State.WORKSPACE) {
@@ -1861,7 +1859,6 @@ public class Launcher extends BaseActivity
         // been created. In this case, don't interfere with the new Launcher.
         if (mModel.isCurrentCallbacks(this)) {
             mModel.stopLoader();
-            mModel.unbindUnreadService();//bind unread number service
             LauncherAppState.getInstance(this).setLauncher(null);
         }
 

@@ -24,7 +24,6 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PaintFlagsDrawFilter;
 import android.graphics.Rect;
@@ -371,44 +370,5 @@ public class LauncherIcons {
         public int getIntrinsicWidth() {
             return getBitmap().getWidth();
         }
-    }
-
-    /**
-     * create a bitmap with number on upper right corner.
-     */
-    public static Bitmap createIconBitmapUnreadInfo(Context context, Bitmap b, int count) {
-        int textureWidth = b.getWidth();
-        final Resources resources = context.getResources();
-        final Canvas canvas = sCanvas;
-        canvas.setBitmap(b);
-
-        float textSize = resources.getDimension(R.dimen.infomation_count_textsize);
-        Paint countPaint = new Paint(Paint.ANTI_ALIAS_FLAG|Paint.DEV_KERN_TEXT_FLAG);
-        countPaint.setColor(Color.WHITE);
-        countPaint.setTextSize(textSize);
-
-        String text = String.valueOf(count);
-        if (count >= 1000) {
-            text = "999+";
-        }
-
-        float count_hight = resources.getDimension(R.dimen.infomation_count_height);
-        float padding = resources.getDimension(R.dimen.infomation_count_padding);
-        float radius = resources.getDimension(R.dimen.infomation_count_circle_radius);
-        int  textwidth = (int) (countPaint.measureText(text) + 1);
-        float width =textwidth + padding * 2;
-        width = Math.max(width, resources.getDimensionPixelSize(R.dimen.infomation_count_min_width));
-
-        RectF rect = new RectF(textureWidth - width -1, 1, textureWidth - 1, count_hight + 1);
-        Paint paint = new Paint();
-        paint.setAntiAlias(true);
-        paint.setColor(resources.getColor(R.color.infomation_count_circle_color));
-        canvas.drawRoundRect(rect , radius, radius, paint);
-
-        float x = textureWidth - (width + textwidth ) / 2 - 1;
-        float y = textSize;
-        canvas.drawText(text, x, y, countPaint);
-
-        return b;
     }
 }

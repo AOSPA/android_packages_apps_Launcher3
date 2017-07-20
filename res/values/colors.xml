@@ -49,7 +49,4 @@
 
     <color name="legacy_icon_background">#FFFFFF</color>
     <color name="icon_background">#E0E0E0</color> <!-- Gray 300 -->
-
-    <!-- Unread number -->
-    <color name="infomation_count_circle_color">#F44336</color>
 </resources>
