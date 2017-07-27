@@ -245,31 +245,4 @@ public class AllAppsList {
         }
         return null;
     }
-
-    /**
-     * update the component badge icon when unread number changed
-     */
-    public AppInfo unreadNumbersChanged(Context context, ComponentName component) {
-        final LauncherAppsCompat launcherApps = LauncherAppsCompat.getInstance(context);
-        final List<LauncherActivityInfo> matches =
-                launcherApps.getActivityList(component.getPackageName(),
-                        android.os.Process.myUserHandle());
-        for (LauncherActivityInfo info : matches) {
-            if (component.equals(info.getComponentName())) {
-                AppInfo appInfo = findApplicationInfoLocked(
-                        component.getPackageName(), android.os.Process.myUserHandle(),
-                        component.getClassName());
-
-                if (appInfo != null) {
-                    mIconCache.updateCacheUnreadBadgeIcon(info,
-                            appInfo.componentName.getPackageName(),
-                            android.os.Process.myUserHandle());
-                    mIconCache.getTitleAndIcon(appInfo, false);
-                    return appInfo;
-                }
-            }
-        }
-
-        return null;
-    }
 }

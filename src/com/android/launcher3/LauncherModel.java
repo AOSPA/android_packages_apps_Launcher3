@@ -24,16 +24,12 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.content.pm.LauncherActivityInfo;
 import android.net.Uri;
-import android.os.Binder;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.IBinder;
 import android.os.Looper;
 import android.os.Process;
-import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -80,9 +76,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
-
-import com.qti.launcherunreadservice.IGetUnreadNumber;
-import com.qti.launcherunreadservice.IUnreadNumberCallback;
 
 /**
  * Maintains in-memory state of the Launcher. It is expected that there should be only one
@@ -144,23 +137,6 @@ public class LauncherModel extends BroadcastReceiver
         }
     };
 
-    /**
-     * All the static data should be accessed on the background thread, A lock should be acquired
-     * on this object when accessing any data from this model.
-     */
-    static final BgDataModel sBgDataModel = new BgDataModel();
-
-    // </ only access in worker thread >
-
-    private static final String LAUNCHER_UNREAD_SERVICE_PACKAGENAME =
-            "com.qti.launcherunreadservice";
-    private static final String LAUNCHER_UNREAD_SERVICE_CLASSNAME =
-            "com.qti.launcherunreadservice.LauncherUnreadService";
-    private final IconCache mIconCache;
-
-    private final LauncherAppsCompat mLauncherApps;
-    private final UserManagerCompat mUserManager;
-
     public interface Callbacks {
         public boolean setLoadOnResume();
         public int getCurrentWorkspaceScreen();
@@ -193,48 +169,6 @@ public class LauncherModel extends BroadcastReceiver
         public void executeOnNextDraw(ViewOnDrawExecutor executor);
         public void bindDeepShortcutMap(MultiHashMap<ComponentKey, String> deepShortcutMap);
     }
-
-    //Mms/Call unread number data
-    private HashMap<ComponentName, UnreadInfo> mUnreadMap =
-            new HashMap<ComponentName, LauncherModel.UnreadInfo>();
-    private IGetUnreadNumber mUnreadNumberService;
-    private IBinder mToken = new Binder();
-    private UnreadNumberChangeTask mUnreadUpdateTask = new UnreadNumberChangeTask();
-
-    private IUnreadNumberCallback.Stub mUnreadNumberCallback = new IUnreadNumberCallback.Stub(){
-
-        @Override
-        public void onUnreadNumberChanged(ComponentName componentName, int unreadNum){
-            synchronized (mUnreadMap) {
-                final int cachedUnreadNum = getUnreadNumberOfComponent(componentName);
-                if (cachedUnreadNum  != unreadNum){
-                    mUnreadMap.put(componentName, new UnreadInfo(componentName, unreadNum));
-                    postUnreadTask();
-                }
-            }
-        }
-    };
-
-    private ServiceConnection mUnreadConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            mUnreadNumberService = IGetUnreadNumber.Stub.asInterface(service);
-            try {
-                if(mUnreadNumberService != null){
-                    Log.d(TAG,"LauncherModel Unread onServiceConnected = "+mModelLoaded);
-                    mUnreadNumberService.registerUnreadNumberCallback(mToken,
-                            mUnreadNumberCallback);
-                }
-            } catch (RemoteException ex) {
-                Log.e(TAG,"exception "+ex.toString());
-            }
-            updateUnreadNumber();
-        }
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            mUnreadNumberService = null;
-        }
-    };
 
     LauncherModel(LauncherAppState app, IconCache iconCache, AppFilter appFilter) {
         mApp = app;
@@ -627,81 +561,6 @@ public class LauncherModel extends BroadcastReceiver
                 }
                 mTask = task;
                 mIsLoaderTaskRunning = true;
-            }
-
-            try {
-                if (DEBUG_LOADERS) Log.d(TAG, "step 1.1: loading workspace");
-                // Set to false in bindWorkspace()
-                mIsLoadingAndBindingWorkspace = true;
-                loadWorkspace();
-
-                verifyNotStopped();
-                if (DEBUG_LOADERS) Log.d(TAG, "step 1.2: bind workspace workspace");
-                bindWorkspace(mPageToBindFirst);
-
-                // Take a break
-                if (DEBUG_LOADERS) Log.d(TAG, "step 1 completed, wait for idle");
-                waitForIdle();
-                verifyNotStopped();
-
-                // second step
-                if (DEBUG_LOADERS) Log.d(TAG, "step 2.1: loading all apps");
-                loadAllApps();
-
-                verifyNotStopped();
-                if (DEBUG_LOADERS) Log.d(TAG, "step 2.2: Update icon cache");
-                updateIconCache();
-
-                // Take a break
-                if (DEBUG_LOADERS) Log.d(TAG, "step 2 completed, wait for idle");
-                waitForIdle();
-                verifyNotStopped();
-
-                // third step
-                if (DEBUG_LOADERS) Log.d(TAG, "step 3.1: loading deep shortcuts");
-                loadDeepShortcuts();
-
-                verifyNotStopped();
-                if (DEBUG_LOADERS) Log.d(TAG, "step 3.2: bind deep shortcuts");
-                bindDeepShortcuts();
-
-                // Take a break
-                if (DEBUG_LOADERS) Log.d(TAG, "step 3 completed, wait for idle");
-                waitForIdle();
-                verifyNotStopped();
-
-                // fourth step
-                if (DEBUG_LOADERS) Log.d(TAG, "step 4.1: loading widgets");
-                refreshAndBindWidgetsAndShortcuts(getCallback(), false /* bindFirst */,
-                        null /* packageUser */);
-
-                synchronized (mLock) {
-                    // Everything loaded bind the data.
-                    mModelLoaded = true;
-                    mHasLoaderCompletedOnce = true;
-                }
-            } catch (CancellationException e) {
-              // Loader stopped, ignore
-            } finally {
-                // Clear out this reference, otherwise we end up holding it until all of the
-                // callback runnables are done.
-                mContext = null;
-
-                synchronized (mLock) {
-                    // If we are still the last one to be scheduled, remove ourselves.
-                    if (mLoaderTask == this) {
-                        mLoaderTask = null;
-                    }
-                    mIsLoaderTaskRunning = false;
-                    updateUnreadNumberAfterLoaded();
-                }
-            }
-        }
-
-        public void stopLocked() {
-            synchronized (LoaderTask.this) {
-                mStopped = true;
-                this.notify();
                 mModelLoaded = false;
             }
         }
@@ -834,178 +693,5 @@ public class LauncherModel extends BroadcastReceiver
      */
     public static Looper getWorkerLooper() {
         return sWorkerThread.getLooper();
-    }
-
-    /**
-     * bind unread number service if service is not connected when onResume
-     */
-    public void bindUnreadService(){
-        if (Utilities.isUnreadCountEnabled(mApp.getContext())
-                && mUnreadNumberService == null) {
-            Intent intent = new Intent();
-            ComponentName componentName = new ComponentName(LAUNCHER_UNREAD_SERVICE_PACKAGENAME,
-                    LAUNCHER_UNREAD_SERVICE_CLASSNAME);
-            intent.setComponent(componentName);
-
-            Intent requestIntent = Utilities.
-                    createExplicitFromImplicitIntent(mApp.getContext(), intent);
-            if (requestIntent != null) {
-                final Intent eIntent = new Intent(requestIntent);
-                mApp.getContext().bindService(eIntent, mUnreadConnection, Context.BIND_AUTO_CREATE);
-            }
-        }
-    }
-
-    /**
-     * unbind unread number service when Launcher Activity is destroyed.
-     */
-    public void unbindUnreadService(){
-        if (mUnreadNumberService != null){
-            sWorker.removeCallbacks(mUnreadUpdateTask);
-            try{
-                mUnreadNumberService.unRegisterUnreadNumberCallback(mToken);
-                mApp.getContext().unbindService(mUnreadConnection);
-            }catch (Exception e){
-                Log.e(TAG,"exception == "+e.toString());
-            }
-            mUnreadNumberService = null;
-        }
-    }
-
-    public int getUnreadNumberOfComponent(ComponentName componentName) {
-        synchronized (mUnreadMap) {
-            if ((mUnreadMap != null) && mUnreadMap.containsKey(componentName)) {
-                UnreadInfo info = mUnreadMap.get(componentName);
-                return info != null ? info.mUnreadNum : -1;
-            }
-        }
-        return -1;
-    }
-
-    private void updateUnreadNumberAfterLoaded(){
-        runOnMainThread(new Runnable() {
-            @Override
-            public void run() {
-                updateUnreadNumber();
-            }
-        });
-    }
-
-    private void updateUnreadNumber(){
-        if (isModelLoaded() && mUnreadNumberService != null){
-            try {
-                Map unreadAppMap = mUnreadNumberService.GetUnreadNumber();
-                updateUnreadIcon(unreadAppMap);
-            }catch (RemoteException exception){
-                exception.printStackTrace();
-            }
-        }
-    }
-
-    private void updateUnreadIcon(Map unreadMap) {
-        Iterator iterator = unreadMap.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry entry = (Map.Entry) iterator.next();
-            ComponentName componentName = (ComponentName) entry.getKey();
-            if (componentName != null) {
-                final int unreadNumber = (int) entry.getValue();
-                synchronized (mUnreadMap) {
-                    mUnreadMap.put(componentName, new UnreadInfo(componentName, unreadNumber));
-                }
-            }
-        }
-        postUnreadTask();
-    }
-
-    private void postUnreadTask() {
-        sWorker.removeCallbacks(mUnreadUpdateTask);
-        sWorker.post(mUnreadUpdateTask);
-    }
-
-    private class UnreadInfo {
-        ComponentName mComponentName;
-        int mUnreadNum;
-
-        public UnreadInfo(ComponentName componentName, int unreadNum) {
-            mComponentName = componentName;
-            mUnreadNum = unreadNum;
-        }
-    }
-
-    /**
-     * notify launcher refresh ui
-     *  1) refresh shortcuts ui
-     *  2) refresh allApps ui
-     */
-    private class UnreadNumberChangeTask implements Runnable {
-        public void run() {
-            ArrayList<UnreadInfo> unreadInfos = new ArrayList<LauncherModel.UnreadInfo>();
-            synchronized (mUnreadMap) {
-                unreadInfos.addAll(mUnreadMap.values());
-            }
-
-            final Callbacks callbacks = getCallback();
-            if (callbacks == null) {
-                Log.w(TAG, "Nobody to tell about the new app.  Launcher is probably loading.");
-                return;
-            }
-
-            final ArrayList<AppInfo> unreadChangeFinal = new ArrayList<AppInfo>();
-            for (UnreadInfo uInfo : unreadInfos) {
-                AppInfo info = mBgAllAppsList.unreadNumbersChanged(mApp.getContext(),
-                        uInfo.mComponentName);
-                if (info != null) {
-                    unreadChangeFinal.add(info);
-                }
-            }
-
-            // update the mainmenu icon
-            if (unreadChangeFinal.isEmpty()) return;
-            mHandler.post(new Runnable() {
-                public void run() {
-                    Callbacks cb = getCallback();
-                    if (cb != null && callbacks == cb) {
-                        cb.bindAppsUpdated(unreadChangeFinal);
-                    }
-                }
-            });
-            // update the workspace shortcuts icon
-            final UserHandle user = android.os.Process.myUserHandle();
-            final ArrayList<ShortcutInfo> updatedShortcuts = new ArrayList<>();
-            synchronized (sBgDataModel) {
-                for (ItemInfo info : sBgDataModel.itemsIdMap) {
-                    if (info instanceof ShortcutInfo && user.equals(info.user)
-                            && info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION) {
-                        ShortcutInfo si = (ShortcutInfo) info;
-                        ComponentName cn = si.getTargetComponent();
-                        if (cn != null && unreadContains(unreadChangeFinal, cn)) {
-                            mIconCache.getTitleAndIcon(si, false);
-                            updatedShortcuts.add(si);
-                        }
-                    }
-                }
-            }
-
-            if (!updatedShortcuts.isEmpty()) {
-                mHandler.post(new Runnable() {
-
-                    public void run() {
-                        Callbacks cb = getCallback();
-                        if (cb != null && callbacks == cb) {
-                            cb.bindShortcutsChanged(updatedShortcuts,
-                                    new ArrayList<ShortcutInfo>(), user);
-                        }
-                    }
-                });
-            }
-        }
-        private boolean unreadContains(ArrayList<AppInfo> unreadList, ComponentName cn) {
-            for (AppInfo info : unreadList) {
-                if (info.componentName.equals(cn)) {
-                    return true;
-                }
-            }
-            return false;
-        }
     }
 }

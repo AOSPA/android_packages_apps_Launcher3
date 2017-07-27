@@ -366,7 +366,6 @@ public class IconCache {
             entry = new CacheEntry();
             entry.icon = LauncherIcons.createBadgedIconBitmap(getFullResIcon(app), app.getUser(),
                     mContext,  app.getApplicationInfo().targetSdkVersion);
-            updateBadgeIconBitmap(mContext, entry, app.getComponentName());
         }
         entry.title = app.getLabel();
         entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, app.getUser());
@@ -525,7 +524,6 @@ public class IconCache {
                     entry.icon = LauncherIcons.createBadgedIconBitmap(
                             getFullResIcon(info), info.getUser(), mContext,
                             infoProvider.get().getApplicationInfo().targetSdkVersion);
-                    updateBadgeIconBitmap(mContext, entry, componentName);
                 } else {
                     if (usePackageIcon) {
                         CacheEntry packageEntry = getEntryForPackageLocked(
@@ -628,7 +626,6 @@ public class IconCache {
                     entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, user);
                     entry.icon = useLowResIcon ? lowResIcon : icon;
                     entry.isLowResIcon = useLowResIcon;
-                    updateBadgeIconBitmap(mContext, entry, cacheKey.componentName);
 
                     // Add the icon in the DB here, since these do not get written during
                     // package updates.
@@ -846,38 +843,5 @@ public class IconCache {
     public interface ItemInfoUpdateReceiver {
 
         void reapplyItemInfo(ItemInfoWithIcon info);
-    }
-
-    /**
-     * we should update the cache icon and db icon when unread number is changed
-     */
-    public void updateCacheUnreadBadgeIcon(LauncherActivityInfo app, String packageName,
-                                           UserHandle user){
-        removeIconsForPkg(packageName, user);
-        try {
-            PackageInfo info = mPackageManager.getPackageInfo(packageName,
-                    PackageManager.GET_UNINSTALLED_PACKAGES);
-            long userSerial = mUserManager.getSerialNumberForUser(user);
-            addIconToDBAndMemCache(app, info, userSerial, true /*replace existing*/);
-        } catch (NameNotFoundException e) {
-            Log.d(TAG, "Package not found", e);
-            return;
-        }
-    }
-
-    /**
-     * we should create and update the badge icon if we find unread number > 0
-     */
-    private void updateBadgeIconBitmap(Context context, CacheEntry entry,
-                                       ComponentName component){
-        int unreadNumber = LauncherAppState.getInstance(mContext).getModel()
-                .getUnreadNumberOfComponent(component);
-        Log.d(Launcher.TAG,"updateBadgeIconBitmap component == "+ component
-                +"  unreadNumber == "+unreadNumber);
-        // create the unread icon's info here
-        if (Utilities.isUnreadCountEnabled(context) && unreadNumber > 0) {
-            entry.icon = LauncherIcons.createIconBitmapUnreadInfo(context,
-                    entry.icon, unreadNumber);
-        }
     }
 }
