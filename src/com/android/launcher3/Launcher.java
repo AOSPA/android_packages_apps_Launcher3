@@ -428,6 +428,9 @@ public class Launcher extends Activity
 
         super.onCreate(savedInstanceState);
 
+        boolean visible = Utilities.isShowSearchBar(this);
+        FeatureFlags.QSB_ON_FIRST_SCREEN = visible;
+
         LauncherAppState app = LauncherAppState.getInstance();
 
         // Load configuration-specific DeviceProfile
@@ -3347,6 +3350,7 @@ public class Launcher extends Activity
             getWindow().getDecorView()
                     .sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
         }
+        mWorkspace.updateQsbVisibility();
         return changed;
     }
 
