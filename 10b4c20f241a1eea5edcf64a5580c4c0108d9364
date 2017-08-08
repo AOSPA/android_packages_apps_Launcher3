@@ -1,0 +1,9 @@
+Presubmit-Ready+1: Alex Naidis <alex.naidis@linux.com>
+Verified+1: Friendly BuildBot
+Code-Review+2: Alex Naidis <alex.naidis@linux.com>
+Verified+1: Alex Naidis <alex.naidis@linux.com>
+Submitted-by: Alex Naidis <alex.naidis@linux.com>
+Submitted-at: Tue, 08 Aug 2017 15:21:19 +0000
+Reviewed-on: https://gerrit.aospa.co/3674
+Project: AOSPA/android_packages_apps_Launcher3
+Branch: refs/heads/nougat-mr2
