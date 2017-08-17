@@ -137,7 +137,7 @@ public class LauncherModel extends BroadcastReceiver
         }
     };
 
-    public interface Callbacks {
+    public interface Callbacks extends LauncherAppWidgetHost.ProviderChangedListener {
         public boolean setLoadOnResume();
         public int getCurrentWorkspaceScreen();
         public void clearPendingBinds();
@@ -163,7 +163,6 @@ public class LauncherModel extends BroadcastReceiver
                 HashSet<String> packageNames, HashSet<ComponentName> components,
                 UserHandle user);
         public void bindAppInfosRemoved(ArrayList<AppInfo> appInfos);
-        public void notifyWidgetProvidersChanged();
         public void bindAllWidgets(MultiHashMap<PackageItemInfo, WidgetItem> widgets);
         public void onPageBoundSynchronously(int page);
         public void executeOnNextDraw(ViewOnDrawExecutor executor);
