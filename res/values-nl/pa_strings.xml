@@ -20,12 +20,12 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <!-- Icon pack -->
   <string name="default_iconpack_title">Standaard</string>
-  <string name="icons_pack_name">Pictogram pack</string>
-  <string name="edit_drop_target_label">Bewerken</string>
+  <string name="icons_pack_name">Pictogrampakket</string>
+  <string name="edit_drop_target_label">Bewerk</string>
   <string name="edit_app">Bewerken</string>
   <string name="reset_icon">Herstellen</string>
   <string name="customize">Aanpassen</string>
-  <string name="visual">Visuele</string>
+  <string name="visual">Visueel</string>
   <string name="all_icons">Alle iconen</string>
   <string name="similar_icons">Vergelijkbare icoontjes</string>
   <string name="ok">Oké</string>
