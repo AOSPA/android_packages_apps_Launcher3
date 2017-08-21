@@ -20,15 +20,15 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <!-- Icon pack -->
   <string name="default_iconpack_title">Standard</string>
-  <string name="icons_pack_name">Icon-Paket</string>
+  <string name="icons_pack_name">Symbolbibliothek</string>
   <string name="edit_drop_target_label">Bearbeiten</string>
   <string name="edit_app">Bearbeiten</string>
   <string name="reset_icon">Zurücksetzen</string>
   <string name="customize">Personalisieren</string>
-  <string name="visual">Optisch</string>
+  <string name="visual">Visuell</string>
   <string name="all_icons">Alle Symbole</string>
   <string name="similar_icons">Ähnliche Symbole</string>
   <string name="ok">Ok</string>
-  <string name="icon_label">Beschreibung</string>
+  <string name="icon_label">Bezeichnung</string>
   <string name="loading">Wird geladen, bitte warten</string>
 </resources>
