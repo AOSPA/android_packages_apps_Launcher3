@@ -20,10 +20,10 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <!-- Icon pack -->
   <string name="default_iconpack_title">Per defecte</string>
-  <string name="icons_pack_name">Pack icona</string>
+  <string name="icons_pack_name">Paquet d\'icones</string>
   <string name="edit_drop_target_label">Editar</string>
   <string name="edit_app">Editar</string>
-  <string name="reset_icon">Restablir</string>
+  <string name="reset_icon">Restableix</string>
   <string name="customize">Personalitzar</string>
   <string name="visual">Visual</string>
   <string name="all_icons">Totes les icones</string>
