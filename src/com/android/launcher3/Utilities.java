@@ -416,7 +416,15 @@ public final class Utilities {
             return bitmap;
         }
     }
-
+	
+	//get normalized icon for edit icon dialog and for reset purposes
+	static Bitmap getEditIconBitmap(Context context, IconCache mIconCache, ItemInfo info) {
+ 
+		Drawable defaultIcon = mIconCache.getDefaultIcon(info);
+ 
+ 		return createBadgedIconBitmap(defaultIcon, info.user, context);
+ 	}
+	
     /**
      * Given a coordinate relative to the descendant, find the coordinate in a parent view's
      * coordinates.
