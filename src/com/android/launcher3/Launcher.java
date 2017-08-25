@@ -4477,7 +4477,7 @@ public class Launcher extends Activity
         return createAppDragInfo(appLaunchIntent, user);
     }
 
-    protected void startEdit(final Bitmap bm, final ItemInfo info, final ComponentName component) {
+    protected void startEdit(final ItemInfo info, final ComponentName component) {
         LauncherActivityInfoCompat app = LauncherAppsCompat.getInstance(this)
                 .resolveActivity(info.getIntent(), info.user);
         mIconPackView = getLayoutInflater().inflate(R.layout.edit_dialog, null);
@@ -4487,9 +4487,10 @@ public class Launcher extends Activity
         mEditText.setSelection(mEditText.getText().length());
 
         final Resources res = getResources();
-        Bitmap defaultIcon = mIconsHandler.getDrawableIconForPackage(component);
-        Drawable icon = new BitmapDrawable(res, defaultIcon);
-        mPackageIcon.setImageBitmap(bm);
+		
+        Bitmap defaultIcon =  Utilities.getEditIconBitmap(this, mIconsHandler, info);
+        final Drawable icon = new BitmapDrawable(res, defaultIcon);
+        mPackageIcon.setImageBitmap(defaultIcon);
 
         final int popupWidth = getResources().getDimensionPixelSize(R.dimen.edit_dialog_min_width);
         Pair<List<String>, List<String>> iconPacks = mIconsHandler.getAllIconPacks();
@@ -4534,8 +4535,7 @@ public class Launcher extends Activity
                     new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                            mIconCache.addCustomInfoToDataBase(new BitmapDrawable(res, bm),
-                                    info, mEditText.getText());
+                            mIconCache.addCustomInfoToDataBase(icon, info, mEditText.getText());
                             mIconPackDialog.dismiss();
                         }
                 });
