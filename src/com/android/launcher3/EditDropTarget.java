@@ -18,7 +18,6 @@ package com.android.launcher3;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
 import android.util.AttributeSet;
 
 public class EditDropTarget extends ButtonDropTarget {
@@ -50,19 +49,16 @@ public class EditDropTarget extends ButtonDropTarget {
 
     @Override
     public void completeDrop(DragObject d) {
-        Bitmap bitmap = null;
         ComponentName componentName = null;
         ItemInfo info = d.dragInfo;
         if (info instanceof AppInfo) {
             componentName = ((AppInfo) info).componentName;
-            bitmap = ((AppInfo) info).iconBitmap;
         } else if (info instanceof ShortcutInfo) {
             componentName = ((ShortcutInfo) info).intent.getComponent();
-            bitmap = ((ShortcutInfo) info).getIcon(LauncherAppState.getInstance().getIconCache());
         }
 
-        if (bitmap != null && componentName != null) {
-            mLauncher.startEdit(bitmap, info, componentName);
+        if (componentName != null) {
+            mLauncher.startEdit(info, componentName);
         }
     }
 }
