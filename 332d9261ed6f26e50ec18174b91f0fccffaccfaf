@@ -33,6 +33,23 @@
       "revId": "332d9261ed6f26e50ec18174b91f0fccffaccfaf",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "537cf118_10042536",
+        "filename": "src/com/android/launcher3/Utilities.java",
+        "patchSetId": 8
+      },
+      "lineNbr": 422,
+      "author": {
+        "id": 1000011
+      },
+      "writtenOn": "2017-08-28T15:06:29Z",
+      "side": 1,
+      "message": "Whitespace",
+      "revId": "332d9261ed6f26e50ec18174b91f0fccffaccfaf",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
     }
   ]
 }
