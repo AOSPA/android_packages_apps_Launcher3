@@ -46,13 +46,16 @@ public class CustomizeActivity extends Activity {
 
         private IconsHandler mIconsHandler;
         private PackageManager mPackageManager;
-        private Preference mIconPack;
+        private Preference mIconPack, mRoundIcons;
+        private static PreferenceScreen mPreferenceScreen;
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
             getPreferenceManager().setSharedPreferencesName(LauncherFiles.SHARED_PREFERENCES_KEY);
             addPreferencesFromResource(R.xml.launcher_customization);
+
+            mPreferenceScreen = getPreferenceScreen();
 
             PreferenceManager.getDefaultSharedPreferences(getActivity())
                     .registerOnSharedPreferenceChangeListener(this);
@@ -63,6 +66,11 @@ public class CustomizeActivity extends Activity {
             mIconPack = (Preference) findPreference(Utilities.KEY_ICON_PACK);
 
             reloadIconPackSummary();
+
+            // setup round icon preference
+            roundIconsPreference = (Preference) findPreference(Utilities.ROUND_ICONS_KEY);
+
+            manageRoundIconsPref();
         }
 
         @Override
@@ -89,7 +97,17 @@ public class CustomizeActivity extends Activity {
 
         @Override
         public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-            reloadIconPackSummary();
+
+            switch (key) {
+
+                case Utilities.KEY_ICON_PACK:
+                    reloadIconPackSummary();
+                    break;
+
+                case Utilities.KEY_ROUND_ICONS:
+                    manageRoundIconsPref();
+                    break;
+            }
         }
 
         private void reloadIconPackSummary() {
@@ -106,6 +124,15 @@ public class CustomizeActivity extends Activity {
                 }
             }
             mIconPack.setSummary(iconPack);
+        }
+
+        //disable round icons if a icon pack different from the default is selected
+        private void manageRoundIconsPref() {
+            if (PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(Utilities.KEY_ICON_PACK, "").isEmpty()) {
+                mPreferenceScreen.removePreference(mRoundIcons);
+            } else {
+                mPreferenceScreen.addPreference(mRoundIcons);
+            }
         }
     }
 }
