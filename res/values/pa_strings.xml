@@ -30,4 +30,6 @@
     <string name="ok">Ok</string>
     <string name="icon_label">Label</string>
     <string name="loading">Loading, please wait</string>
+	<string name="round_icons">Enable round icons</string>
+	<string name="round_icons_sum">Force the usage of round icons when available</string>
 </resources>
