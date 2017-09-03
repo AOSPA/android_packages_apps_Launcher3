@@ -134,8 +134,9 @@
         <item name="android:colorAccent">@color/launcher_accent_color</item>
     </style>
 
-    <style name="ChooseIconTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <style name="ChooseIconTheme" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="android:colorBackground">@color/icon_settings_background</item>
+        <item name="colorAccent">@color/launcher_accent_color</item>
     </style>
     <style name="LauncherThemeNoParent">
         <item name="android:colorBackgroundCacheHint">@null</item>

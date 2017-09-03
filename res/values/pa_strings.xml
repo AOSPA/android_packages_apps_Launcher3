@@ -27,6 +27,7 @@
     <string name="visual">Visual</string>
     <string name="all_icons">All icons</string>
     <string name="similar_icons">Similar icons</string>
+    <string name="choose_icon">Choose an icon</string>
     <string name="ok">Ok</string>
     <string name="icon_label">Label</string>
     <string name="loading">Loading, please wait</string>

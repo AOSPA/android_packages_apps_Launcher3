@@ -19,6 +19,9 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+
+    <include android:id="@+id/toolbar" layout="@layout/toolbar" />
+
     <ProgressBar
         android:id="@+id/icons_grid_progress"
         android:layout_width="100dp"
@@ -28,6 +31,7 @@
 
     <android.support.v7.widget.RecyclerView
         android:id="@+id/icons_grid"
+        android:layout_below="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center" />
