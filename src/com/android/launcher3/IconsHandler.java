@@ -26,7 +26,9 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
+import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.content.res.XmlResourceParser;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
@@ -187,6 +189,27 @@ public class IconsHandler {
         } catch (Exception e) {
             Log.e(TAG, "Error parsing appfilter.xml " + e);
         }
+    }
+
+    //get round icon for package if available
+    Drawable getRoundIcon(String packageName, int iconDpi) {
+
+        try {
+            Resources resourcesForApplication = mPackageManager.getResourcesForApplication(packageName);
+            AssetManager assets = resourcesForApplication.getAssets();
+            XmlResourceParser parseXml = assets.openXmlResourceParser("AndroidManifest.xml");
+            int eventType;
+            while ((eventType = parseXml.nextToken()) != XmlPullParser.END_DOCUMENT)
+                if (eventType == XmlPullParser.START_TAG && parseXml.getName().equals("application"))
+                    for (int i = 0; i < parseXml.getAttributeCount(); i++)
+                        if (parseXml.getAttributeName(i).equals("roundIcon"))
+                            return resourcesForApplication.getDrawableForDensity(Integer.parseInt(parseXml.getAttributeValue(i).substring(1)), iconDpi, mContext.getTheme());
+            parseXml.close();
+        }
+        catch (Exception ex) {
+            Log.w("getRoundIcon", ex);
+        }
+        return null;
     }
 
     public List<String> getAllDrawables(final String packageName) {
