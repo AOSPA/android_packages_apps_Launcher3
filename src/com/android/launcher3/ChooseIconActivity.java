@@ -48,11 +48,28 @@ public class ChooseIconActivity extends Activity {
 
     private float mIconMargin;
     private int mIconSize;
+    private ActionBar mActionBar;
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            // Respond to the action bar's Up/Home button
+            case android.R.id.home:
+                finish();
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.all_icons_view);
+
+        if (getActionBar() != null) {
+            mActionBar = getActionBar();
+            mActionBar.setDisplayHomeAsUpEnabled(true);
+        }
 
         mCurrentPackageName = getIntent().getStringExtra("app_package");
         mCurrentPackageLabel = getIntent().getStringExtra("app_label");
@@ -68,6 +85,7 @@ public class ChooseIconActivity extends Activity {
         mGridLayout = new GridLayoutManager(this, 4);
         mIconsGrid.setLayoutManager(mGridLayout);
         mIconsGrid.setAlpha(0.0f);
+        mActionBar.hide();
 
         mProgressBar = (ProgressBar) findViewById(R.id.icons_grid_progress);
 
@@ -89,6 +107,7 @@ public class ChooseIconActivity extends Activity {
                         mIconsGrid.setAdapter(adapter);
                         mProgressBar.setVisibility(View.GONE);
                         mIconsGrid.animate().alpha(1.0f);
+                        mActionBar.show();
                     }
                 });
             }
