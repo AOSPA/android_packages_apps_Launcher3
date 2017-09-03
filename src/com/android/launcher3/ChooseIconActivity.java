@@ -16,13 +16,14 @@
 
 package com.android.launcher3;
 
-import android.app.Activity;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.GridLayoutManager.SpanSizeLookup;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -32,7 +33,7 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ChooseIconActivity extends Activity {
+public class ChooseIconActivity extends AppCompatActivity {
 
     private String mCurrentPackageLabel;
     private String mCurrentPackageName;
@@ -54,6 +55,22 @@ public class ChooseIconActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.all_icons_view);
 
+        //set the toolbar
+        final Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
+        //provide back navigation
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
+        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                finish();
+            }
+        });
+
         mCurrentPackageName = getIntent().getStringExtra("app_package");
         mCurrentPackageLabel = getIntent().getStringExtra("app_label");
         mIconPackPackageName = getIntent().getStringExtra("icon_pack_package");
@@ -68,6 +85,7 @@ public class ChooseIconActivity extends Activity {
         mGridLayout = new GridLayoutManager(this, 4);
         mIconsGrid.setLayoutManager(mGridLayout);
         mIconsGrid.setAlpha(0.0f);
+        toolbar.setAlpha(0.0f);
 
         mProgressBar = (ProgressBar) findViewById(R.id.icons_grid_progress);
 
@@ -89,6 +107,7 @@ public class ChooseIconActivity extends Activity {
                         mIconsGrid.setAdapter(adapter);
                         mProgressBar.setVisibility(View.GONE);
                         mIconsGrid.animate().alpha(1.0f);
+                        toolbar.animate().alpha(1.0f);
                     }
                 });
             }
