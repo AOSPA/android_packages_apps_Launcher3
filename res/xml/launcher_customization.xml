@@ -24,5 +24,10 @@
             android:key="icon-packs"
             android:title="@string/icons_pack_name"
             android:icon="@drawable/icon_pack" />
+		<SwitchPreference
+            android:key="round-icons"
+            android:defaultValue="false"
+            android:title="@string/round_icons"
+            android:summary="@string/round_icons_sum" />
     </PreferenceCategory>
 </PreferenceScreen>
