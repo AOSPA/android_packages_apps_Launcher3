@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1026e787_b6a7c09c",
+        "filename": "src/com/android/launcher3/CustomizeActivity.java",
+        "patchSetId": 4
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-09-03T20:26:11Z",
+      "side": 1,
+      "message": "this doesn\u0027t have to be static",
+      "revId": "759726a68d0b9627829463dfb0395079d3c7e60f",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
