@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1d1679eb_6fb455a9",
+        "filename": "res/values/styles.xml",
+        "patchSetId": 2
+      },
+      "lineNbr": 139,
+      "author": {
+        "id": 1000055
+      },
+      "writtenOn": "2017-09-03T21:24:07Z",
+      "side": 1,
+      "message": "Missing \"android:\"",
+      "revId": "713860e4707c52d333e18aeb373a1ea10d963290",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
