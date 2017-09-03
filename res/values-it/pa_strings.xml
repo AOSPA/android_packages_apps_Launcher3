@@ -31,4 +31,6 @@
   <string name="ok">Ok</string>
   <string name="icon_label">Etichetta</string>
   <string name="loading">Caricamento, attendere prego</string>
+  <string name="round_icons">Abilita icone tonde</string>
+  <string name="round_icons_sum">Forza l\'uso di icone tonde quando disponibili</string>
 </resources>

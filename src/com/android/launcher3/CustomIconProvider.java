@@ -36,11 +36,16 @@ public class CustomIconProvider extends IconProvider {
 
     @Override
     public Drawable getIcon(LauncherActivityInfoCompat info, int iconDpi) {
+        Drawable icon = Utilities.isRoundIconsPrefEnabled(mContext)? mIconsHandler.getRoundIcon(info.getApplicationInfo().packageName, iconDpi) : getIconFromHandler(info);
+        return icon != null? icon : info.getIcon(iconDpi);
+    }
+
+    //get drawable icon for package
+    private Drawable getIconFromHandler(LauncherActivityInfoCompat info) {
         Bitmap bm = mIconsHandler.getDrawableIconForPackage(info.getComponentName());
         if (bm == null) {
-            return info.getIcon(iconDpi);
+            return null;
         }
-
         return new BitmapDrawable(mContext.getResources(), Utilities.createIconBitmap(bm, mContext));
     }
 }

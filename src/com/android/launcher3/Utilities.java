@@ -47,6 +47,7 @@ import android.graphics.drawable.PaintDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.preference.PreferenceManager;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;
@@ -150,6 +151,7 @@ public final class Utilities {
 
     public static final String ALLOW_ROTATION_PREFERENCE_KEY = "pref_allowRotation";
     public static final String KEY_ICON_PACK = "icon-packs";
+    public static final String KEY_ROUND_ICONS = "round-icons";
 
     public static boolean isPropertyEnabled(String propertyName) {
         return Log.isLoggable(propertyName, Log.VERBOSE);
@@ -158,6 +160,10 @@ public final class Utilities {
     public static boolean isAllowRotationPrefEnabled(Context context) {
         return getPrefs(context).getBoolean(ALLOW_ROTATION_PREFERENCE_KEY,
                 getAllowRotationDefaultValue(context));
+    }
+
+    public static boolean isRoundIconsPrefEnabled(Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_ROUND_ICONS, false);
     }
 
     public static boolean getAllowRotationDefaultValue(Context context) {
