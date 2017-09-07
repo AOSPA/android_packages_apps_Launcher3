@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2fc71f31_08c5c0f2",
+        "filename": "res/xml/launcher_customization.xml",
+        "patchSetId": 1
+      },
+      "lineNbr": 31,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-09-07T18:56:12Z",
+      "side": 1,
+      "message": "we should add some icon showing  a circle for this",
+      "revId": "caed9b01a10d00dd39df9d051fa689a72efbbda1",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "2192ea06_a3c537a6",
+        "filename": "src/com/android/launcher3/CustomizeActivity.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-09-07T18:56:12Z",
+      "side": 1,
+      "message": "swap this to prevent NPE (So if Utilities.***.equals(key))",
+      "revId": "caed9b01a10d00dd39df9d051fa689a72efbbda1",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "4adca6bf_67d43560",
+        "filename": "src/com/android/launcher3/CustomizeActivity.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 123,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-09-07T18:56:12Z",
+      "side": 1,
+      "message": "rename to roundIcons instead of mRoundIcons",
+      "revId": "caed9b01a10d00dd39df9d051fa689a72efbbda1",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ac3c8269_3ea2295a",
+        "filename": "src/com/android/launcher3/Utilities.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 167,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-09-07T18:56:12Z",
+      "side": 1,
+      "message": "rename to defaultIconPack instead of mDefaultIconPack",
+      "revId": "caed9b01a10d00dd39df9d051fa689a72efbbda1",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
