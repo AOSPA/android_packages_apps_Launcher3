@@ -21,11 +21,11 @@ import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
-import android.preference.PreferenceCategory;
 import android.preference.PreferenceScreen;
 
 public class CustomizeActivity extends Activity {
@@ -51,11 +51,9 @@ public class CustomizeActivity extends Activity {
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
-            getPreferenceManager().setSharedPreferencesName(LauncherFiles.SHARED_PREFERENCES_KEY);
+
             addPreferencesFromResource(R.xml.launcher_customization);
 
-            PreferenceManager.getDefaultSharedPreferences(getActivity())
-                    .registerOnSharedPreferenceChangeListener(this);
             mPackageManager = getActivity().getPackageManager();
 
             mDefaultIconPack = getString(R.string.default_iconpack_title);
@@ -66,16 +64,18 @@ public class CustomizeActivity extends Activity {
         }
 
         @Override
-        public void onPause() {
-            super.onPause();
-            mIconsHandler.hideDialog();
+        public void onResume() {
+            PreferenceManager.getDefaultSharedPreferences(getActivity())
+                    .registerOnSharedPreferenceChangeListener(this);
+            super.onResume();
         }
 
         @Override
-        public void onDestroy() {
+        public void onPause() {
+            super.onPause();
             PreferenceManager.getDefaultSharedPreferences(getActivity())
                     .unregisterOnSharedPreferenceChangeListener(this);
-            super.onDestroy();
+            mIconsHandler.hideDialog();
         }
 
         @Override
@@ -89,6 +89,10 @@ public class CustomizeActivity extends Activity {
 
         @Override
         public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+
+            if (Utilities.KEY_ROUND_ICONS.equals(key)) {
+                mIconsHandler.switchIconPacks(mDefaultIconPack);
+            }
             reloadIconPackSummary();
         }
 
@@ -96,16 +100,28 @@ public class CustomizeActivity extends Activity {
             ApplicationInfo info = null;
             String iconPack = PreferenceManager.getDefaultSharedPreferences(getActivity())
                     .getString(Utilities.KEY_ICON_PACK, mDefaultIconPack);
+
+            Drawable packageIcon = getActivity().getDrawable(R.drawable.icon_pack);
             if (!mIconsHandler.isDefaultIconPack()) {
                 try {
                     info = mPackageManager.getApplicationInfo(iconPack, 0);
                 } catch (PackageManager.NameNotFoundException e) {
+                    e.printStackTrace();
                 }
                 if (info != null) {
                     iconPack = mPackageManager.getApplicationLabel(info).toString();
+                    packageIcon = mPackageManager.getApplicationIcon(info);
                 }
             }
             mIconPack.setSummary(iconPack);
+            mIconPack.setIcon(packageIcon);
+            manageRoundIconsPref();
+        }
+
+        private void manageRoundIconsPref() {
+
+            Preference roundIcons = (Preference) findPreference(Utilities.KEY_ROUND_ICONS);
+            roundIcons.setEnabled(mIconsHandler.isDefaultIconPack());
         }
     }
 }

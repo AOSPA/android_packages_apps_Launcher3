@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
      Copyright (C) 2017 Paranoid Android
 
      Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,9 +19,17 @@
     <PreferenceCategory
         android:key="visual"
         android:title="@string/visual">
+
         <Preference
+            android:persistent="true"
             android:key="icon-packs"
             android:title="@string/icons_pack_name"
-            android:icon="@drawable/icon_pack" />
+            android:icon="@drawable/icon_pack"/>
+
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="round-icons"
+            android:summary="@string/round_icons_sum"
+            android:title="@string/round_icons" />
     </PreferenceCategory>
 </PreferenceScreen>

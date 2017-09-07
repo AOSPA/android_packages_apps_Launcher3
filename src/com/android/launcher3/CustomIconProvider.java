@@ -17,8 +17,6 @@
 package com.android.launcher3;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 
 import com.android.launcher3.compat.LauncherActivityInfoCompat;
@@ -36,11 +34,9 @@ public class CustomIconProvider extends IconProvider {
 
     @Override
     public Drawable getIcon(LauncherActivityInfoCompat info, int iconDpi) {
-        Bitmap bm = mIconsHandler.getDrawableIconForPackage(info.getComponentName());
-        if (bm == null) {
-            return info.getIcon(iconDpi);
-        }
 
-        return new BitmapDrawable(mContext.getResources(), Utilities.createIconBitmap(bm, mContext));
+        Drawable drawable = Utilities.isRoundIconsPrefEnabled(mContext) ? mIconsHandler.getRoundIcon(mContext, info.getComponentName().getPackageName(), iconDpi) : mIconsHandler.getIconFromHandler(mContext, info);
+
+        return drawable != null ? drawable : info.getIcon(iconDpi);
     }
 }
