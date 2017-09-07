@@ -26,7 +26,9 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
+import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.content.res.XmlResourceParser;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
@@ -47,6 +49,8 @@ import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.RadioButton;
 import android.widget.TextView;
+
+import com.android.launcher3.compat.LauncherActivityInfoCompat;
 
 import org.xmlpull.v1.XmlPullParser;
 
@@ -201,9 +205,37 @@ public class IconsHandler {
         return mDrawables;
     }
 
+    Drawable getRoundIcon(Context context,String packageName, int iconDpi) {
+
+        try {
+            Resources resourcesForApplication = mPackageManager.getResourcesForApplication(packageName);
+            AssetManager assets = resourcesForApplication.getAssets();
+            XmlResourceParser parseXml = assets.openXmlResourceParser("AndroidManifest.xml");
+            int eventType;
+            while ((eventType = parseXml.nextToken()) != XmlPullParser.END_DOCUMENT)
+                if (eventType == XmlPullParser.START_TAG && parseXml.getName().equals("application"))
+                    for (int i = 0; i < parseXml.getAttributeCount(); i++)
+                        if (parseXml.getAttributeName(i).equals("roundIcon"))
+                            return resourcesForApplication.getDrawableForDensity(Integer.parseInt(parseXml.getAttributeValue(i).substring(1)), iconDpi, context.getTheme());
+            parseXml.close();
+        }
+        catch (Exception ex) {
+            Log.w("getRoundIcon", ex);
+        }
+        return null;
+    }
+
+    Drawable getIconFromHandler(Context context, LauncherActivityInfoCompat info) {
+        Bitmap bm = getDrawableIconForPackage(info.getComponentName());
+        if (bm == null) {
+            return null;
+        }
+        return new BitmapDrawable(context.getResources(), Utilities.createIconBitmap(bm, context));
+    }
+
     private void loadAllDrawables(String packageName) {
         mDrawables.clear();
-        XmlPullParser xpp = null;
+        XmlPullParser xpp;
         try {
             Resources res = mPackageManager.getResourcesForApplication(packageName);
             mCurrentIconPackRes = res;
@@ -237,11 +269,12 @@ public class IconsHandler {
     }
 
     public List<String> getMatchingDrawables(String packageName) {
-        List<String> matchingDrawables = new ArrayList();
+        List<String> matchingDrawables = new ArrayList<>();
         ApplicationInfo info = null;
         try {
             info = mPackageManager.getApplicationInfo(packageName, 0);
         } catch (NameNotFoundException e) {
+            e.printStackTrace();
         }
         String packageLabel = (info != null ? mPackageManager.getApplicationLabel(info).toString()
                 : packageName).replaceAll("[^a-zA-Z]", "").toLowerCase().trim();
@@ -256,7 +289,7 @@ public class IconsHandler {
         return matchingDrawables;
     }
 
-    public int getIdentifier(String packageName, String drawableName, boolean currentIconPack) {
+    private int getIdentifier(String packageName, String drawableName, boolean currentIconPack) {
         if (drawableName == null) {
             return 0;
         }
@@ -273,7 +306,7 @@ public class IconsHandler {
         }
         int id = getIdentifier(packageName, drawableName, currentIconPack);
         if (id > 0) {
-            return (!currentIconPack ? mOriginalIconPackRes : mCurrentIconPackRes).getDrawable(id);
+            return (!currentIconPack ? mOriginalIconPackRes : mCurrentIconPackRes).getDrawable(id, mContext.getTheme());
         }
         return null;
     }
@@ -305,6 +338,7 @@ public class IconsHandler {
     }
 
     public void switchIconPacks(String packageName) {
+
         if (packageName.equals(mIconPackPackageName)) {
             packageName = mDefaultIconPack;
         }
@@ -369,8 +403,8 @@ public class IconsHandler {
     }
 
     public Pair<List<String>, List<String>> getAllIconPacks() {
-        List<String> iconPackNames = new ArrayList();
-        List<String> iconPackLabels = new ArrayList();
+        List<String> iconPackNames = new ArrayList<>();
+        List<String> iconPackLabels = new ArrayList<>();
         List<IconPackInfo> iconPacks = new ArrayList<IconPackInfo>(mIconPacks.values());
         Collections.sort(iconPacks, new Comparator<IconPackInfo>() {
             @Override
@@ -382,7 +416,7 @@ public class IconsHandler {
             iconPackNames.add(info.packageName);
             iconPackLabels.add(info.label.toString());
         }
-        return new Pair(iconPackNames, iconPackLabels);
+        return new Pair<>(iconPackNames, iconPackLabels);
     }
 
     private void loadAvailableIconPacks() {
@@ -468,7 +502,9 @@ public class IconsHandler {
             @Override
             public void onClick(DialogInterface dialog, int position) {
                 String selected = adapter.getItem(position);
-                switchIconPacks(selected);
+                if (!PreferenceManager.getDefaultSharedPreferences(mContext).getString(Utilities.KEY_ICON_PACK, mDefaultIconPack).equals(selected)) {
+                    switchIconPacks(selected);
+                }
             }
         });
         mAlertDialog = builder.create();
@@ -518,7 +554,7 @@ public class IconsHandler {
 
             Resources res = context.getResources();
 
-            Drawable icon = res.getDrawable(R.mipmap.ic_launcher_home);
+            Drawable icon = res.getDrawable(R.mipmap.ic_launcher_home, context.getTheme());
             String defaultLabel = res.getString(R.string.default_iconpack_title);
 
             mSupportedPackages.add(0, new IconPackInfo(defaultLabel, icon, defaultLabel));
@@ -574,7 +610,7 @@ public class IconsHandler {
         @Override
         protected void onPostExecute(Void aVoid) {
             PreferenceManager.getDefaultSharedPreferences(mContext).edit()
-                    .putString(Utilities.KEY_ICON_PACK, mIconPackPackageName).commit();
+                    .putString(Utilities.KEY_ICON_PACK, mIconPackPackageName).apply();
             mIconCache.clearIconDataBase();
             mIconCache.flush();
             LauncherAppState.getInstance().getModel().forceReload();
