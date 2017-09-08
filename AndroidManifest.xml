@@ -108,6 +108,7 @@
         <activity
             android:name="com.android.launcher3.ChooseIconActivity"
             android:autoRemoveFromRecents="true"
+            android:label="@string/icon_chooser"
             android:theme="@style/ChooseIconTheme" />
 
         <!--

@@ -16,17 +16,24 @@
 
 package com.android.launcher3;
 
+import android.app.ActionBar;
 import android.app.Activity;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.GridLayoutManager.SpanSizeLookup;
 import android.support.v7.widget.RecyclerView;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.SearchView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -46,13 +53,31 @@ public class ChooseIconActivity extends Activity {
 
     private static ItemInfo sItemInfo;
 
-    private float mIconMargin;
     private int mIconSize;
+
+    private List<String> mAllIcons;
+    private List<String> mMatchingIcons;
+    private GridAdapter mGridAdapter;
+    private ActionBar mActionBar;
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+
+        getMenuInflater().inflate(R.menu.search_menu, menu);
+
+        MenuItem search = menu.findItem(R.id.search);
+        SearchView searchView = (SearchView) MenuItemCompat.getActionView(search);
+        initQueryTextListener(searchView);
+
+        return true;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.all_icons_view);
+
+        mActionBar = getActionBar();
 
         mCurrentPackageName = getIntent().getStringExtra("app_package");
         mCurrentPackageLabel = getIntent().getStringExtra("app_label");
@@ -68,27 +93,26 @@ public class ChooseIconActivity extends Activity {
         mGridLayout = new GridLayoutManager(this, 4);
         mIconsGrid.setLayoutManager(mGridLayout);
         mIconsGrid.setAlpha(0.0f);
+        mActionBar.hide();
 
         mProgressBar = (ProgressBar) findViewById(R.id.icons_grid_progress);
 
         mIconSize = getResources().getDimensionPixelSize(R.dimen.icon_pack_icon_size);
-        mIconMargin = getResources().getDimensionPixelSize(R.dimen.icon_margin);
 
         new Thread(new Runnable() {
             @Override
             public void run() {
                 final Activity activity = ChooseIconActivity.this;
-                final List<String> allDrawables =
-                        mIconsHandler.getAllDrawables(mIconPackPackageName);
-                final List<String> matchingDrawables =
-                        mIconsHandler.getMatchingDrawables(mCurrentPackageName);
+                mAllIcons = mIconsHandler.getAllDrawables(mIconPackPackageName);
+                mMatchingIcons = mIconsHandler.getMatchingDrawables(mCurrentPackageName);
                 activity.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        GridAdapter adapter = new GridAdapter(allDrawables, matchingDrawables);
-                        mIconsGrid.setAdapter(adapter);
+                        mGridAdapter = new GridAdapter(mAllIcons, mMatchingIcons);
+                        mIconsGrid.setAdapter(mGridAdapter);
                         mProgressBar.setVisibility(View.GONE);
                         mIconsGrid.animate().alpha(1.0f);
+                        mActionBar.show();
                     }
                 });
             }
@@ -99,7 +123,7 @@ public class ChooseIconActivity extends Activity {
         sItemInfo = info;
     }
 
-    private class GridAdapter extends RecyclerView.Adapter<GridAdapter.ViewHolder> {
+    class GridAdapter extends RecyclerView.Adapter<GridAdapter.ViewHolder> implements Filterable {
 
         private static final int TYPE_MATCHING_HEADER = 0;
         private static final int TYPE_MATCHING_ICONS = 1;
@@ -108,8 +132,15 @@ public class ChooseIconActivity extends Activity {
 
         private boolean mNoMatchingDrawables;
 
-        private List<String> mAllDrawables = new ArrayList();
-        private List<String> mMatchingDrawables = new ArrayList();
+        private List<String> mAllDrawables = new ArrayList<>();
+        private List<String> mMatchingDrawables = new ArrayList<>();
+
+        void filterList(List<String> filteredAllDrawables, List<String> filteredMatchingDrawables) {
+
+            mAllDrawables = filteredAllDrawables;
+            mMatchingDrawables = filteredMatchingDrawables;
+            notifyDataSetChanged();
+        }
 
         private GridAdapter(List<String> allDrawables, List<String> matchingDrawables) {
             mAllDrawables.add(null);
@@ -121,6 +152,23 @@ public class ChooseIconActivity extends Activity {
             if (mNoMatchingDrawables) {
                 mMatchingDrawables.clear();
             }
+        }
+
+        @Override
+        public Filter getFilter() {
+
+            return new Filter() {
+                @Override
+                protected FilterResults performFiltering(CharSequence charSequence) {
+
+                    return new FilterResults();
+                }
+
+                @Override
+                protected void publishResults(CharSequence charSequence, FilterResults filterResults) {
+                    //do nothing
+                }
+            };
         }
 
         @Override
@@ -148,20 +196,20 @@ public class ChooseIconActivity extends Activity {
 
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            Activity activity = ChooseIconActivity.this;
+
             if (viewType == TYPE_MATCHING_HEADER) {
-                TextView text = (TextView) activity.getLayoutInflater().inflate(
+                TextView text = (TextView) getLayoutInflater().inflate(
                         R.layout.all_icons_view_header, null);
                 text.setText(R.string.similar_icons);
                 return new ViewHolder(text);
             }
             if (viewType == TYPE_ALL_HEADER) {
-                TextView text = (TextView) activity.getLayoutInflater().inflate(
+                TextView text = (TextView) getLayoutInflater().inflate(
                         R.layout.all_icons_view_header, null);
                 text.setText(R.string.all_icons);
                 return new ViewHolder(text);
             }
-            ImageView view = new ImageView(activity);
+            ImageView view = new ImageView(ChooseIconActivity.this);
             RecyclerView.LayoutParams params = new RecyclerView.LayoutParams(
                     RecyclerView.LayoutParams.MATCH_PARENT, mIconSize);
             view.setLayoutParams(params);
@@ -169,7 +217,7 @@ public class ChooseIconActivity extends Activity {
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder holder, final int position) {
+        public void onBindViewHolder(final ViewHolder holder, final int position) {
             if (holder.getItemViewType() != TYPE_MATCHING_HEADER
                     && holder.getItemViewType() != TYPE_ALL_HEADER) {
                 boolean drawablesMatching = holder.getItemViewType() == TYPE_MATCHING_ICONS;
@@ -182,7 +230,7 @@ public class ChooseIconActivity extends Activity {
                     @Override
                     public void onClick(View v) {
                         Drawable icon = mIconsHandler.loadDrawable(
-                                mIconPackPackageName, drawables.get(position), true);
+                                mIconPackPackageName, drawables.get(holder.getAdapterPosition()), true);
                         if (icon != null) {
                             mIconCache.addCustomInfoToDataBase(icon, sItemInfo, mCurrentPackageLabel);
                         }
@@ -212,7 +260,7 @@ public class ChooseIconActivity extends Activity {
             }
         };
 
-        private class ViewHolder extends RecyclerView.ViewHolder {
+        class ViewHolder extends RecyclerView.ViewHolder {
             private ViewHolder(View v) {
                 super(v);
             }
@@ -231,5 +279,23 @@ public class ChooseIconActivity extends Activity {
                  RecyclerView.State state) {
             outRect.top = spacing;
         }
+    }
+
+    private void initQueryTextListener(SearchView searchView) {
+
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+
+                IconsSearchUtils.filter(newText, mMatchingIcons, mAllIcons, mGridAdapter);
+                return true;
+            }
+        });
     }
 }
