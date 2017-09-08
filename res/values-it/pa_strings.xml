@@ -33,4 +33,6 @@
   <string name="loading">Caricamento, attendere prego</string>
   <string name="round_icons">Usa icone tonde</string>
   <string name="round_icons_sum">Forza l\'uso delle icone tonde quando disponibili</string>
+  <string name="icon_chooser">Scelta icona</string>
+  <string name="icon_search">Cerca icone</string>
 </resources>
