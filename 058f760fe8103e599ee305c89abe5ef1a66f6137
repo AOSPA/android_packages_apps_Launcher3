@@ -1,0 +1,11 @@
+Code-Review+1: Lennart Wieboldt <lennart.1997@gmx.de>
+Code-Review+1: Hernán Castañón Álvarez <hernanderes34@gmail.com>
+Presubmit-Ready+1: Alex Naidis <alex.naidis@linux.com>
+Verified+1: Friendly BuildBot
+Verified+1: Alex Naidis <alex.naidis@linux.com>
+Code-Review+2: Alex Naidis <alex.naidis@linux.com>
+Submitted-by: Alex Naidis <alex.naidis@linux.com>
+Submitted-at: Tue, 12 Sep 2017 23:05:20 +0000
+Reviewed-on: https://gerrit.aospa.co/3933
+Project: AOSPA/android_packages_apps_Launcher3
+Branch: refs/heads/nougat-mr2
