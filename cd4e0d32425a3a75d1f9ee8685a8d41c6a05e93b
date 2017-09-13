@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "957f3f77_9ff64b11",
+        "filename": "src/com/android/launcher3/IconsSearchUtils.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000011
+      },
+      "writtenOn": "2017-09-13T18:03:58Z",
+      "side": 1,
+      "message": "Our copyright here please",
+      "revId": "cd4e0d32425a3a75d1f9ee8685a8d41c6a05e93b",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
