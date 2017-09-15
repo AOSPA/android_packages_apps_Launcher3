@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e4307ece_411f4c3f",
+        "filename": "src/com/android/launcher3/Utilities.java",
+        "patchSetId": 3
+      },
+      "lineNbr": 430,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-09-15T23:44:12Z",
+      "side": 1,
+      "message": "mIconCache-\u003eiconCache",
+      "revId": "8e3bbf5d783f8305a7a329374950418d944406c2",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
