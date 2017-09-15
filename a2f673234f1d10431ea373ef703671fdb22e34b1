@@ -1,0 +1,22 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bbcbfdc8_29e3386c",
+        "filename": "src/com/android/launcher3/Launcher.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 386,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2017-09-15T23:42:40Z",
+      "side": 1,
+      "message": "rename to sUpdateHotseatColor",
+      "parentUuid": "",
+      "revId": "a2f673234f1d10431ea373ef703671fdb22e34b1",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
