@@ -42,6 +42,7 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
+import android.preference.PreferenceManager;
 import android.provider.BaseColumns;
 import android.text.TextUtils;
 import android.util.Log;
@@ -1348,7 +1349,6 @@ public class LauncherModel extends BroadcastReceiver
         int op = PackageUpdatedTask.OP_UPDATE;
         enqueueItemUpdatedTask(new PackageUpdatedTask(op, new String[] { packageName },
                 user));
-        IconCache.getIconsHandler(mApp.getContext()).switchIconPacks(packageName);
     }
 
     @Override
@@ -1356,7 +1356,14 @@ public class LauncherModel extends BroadcastReceiver
         int op = PackageUpdatedTask.OP_REMOVE;
         enqueueItemUpdatedTask(new PackageUpdatedTask(op, new String[] { packageName },
                 user));
-        IconCache.getIconsHandler(mApp.getContext()).switchIconPacks(packageName);
+
+        Context context = mApp.getContext();
+        String defaultIconPack = context.getString(R.string.default_iconpack_title);
+
+        //switch to default icon pack if the applied one is removed
+        if (PreferenceManager.getDefaultSharedPreferences(context).getString(Utilities.KEY_ICON_PACK, defaultIconPack).equals(packageName)) {
+            IconCache.getIconsHandler(context).switchIconPacks(defaultIconPack);
+        }
     }
 
     @Override
