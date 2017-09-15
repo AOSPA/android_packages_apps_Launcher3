@@ -382,6 +382,10 @@ public class Launcher extends Activity
     private IconsHandler mIconsHandler;
     private View mIconPackView;
 
+    //hotseat
+    private static boolean sUpdateHotseatColor;
+    int mHotseatAccentColor;
+
     @Thunk void setOrientation() {
         if (mRotationEnabled) {
             unlockScreenOrientation(true);
@@ -455,6 +459,8 @@ public class Launcher extends Activity
         // this also ensures that any synchronous binding below doesn't re-trigger another
         // LauncherModel load.
         mPaused = false;
+
+        mHotseatAccentColor = Utilities.getColorAccent(this);
 
         setContentView(R.layout.launcher);
 
@@ -532,6 +538,11 @@ public class Launcher extends Activity
             // so always use light status bar in that case.
             activateLightStatusBar(isAllAppsVisible());
         }
+    }
+
+    //method to set sUpdateHotseatColor boolean to apply changes on resume from settings
+    public static void setUpdateHotseatColor() {
+        sUpdateHotseatColor = true;
     }
 
     /**
@@ -1131,6 +1142,12 @@ public class Launcher extends Activity
 
             // Refresh shortcuts if the permission changed.
             mModel.refreshShortcutsIfRequired();
+
+            //update hotseat color
+            if (sUpdateHotseatColor) {
+                sUpdateHotseatColor = false;
+                mHotseat.updateColor(mExtractedColors, !mPaused);
+            }
         }
 
         if (shouldShowDiscoveryBounce()) {

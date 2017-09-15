@@ -39,7 +39,7 @@ public class ExtractedColors {
     public static final int VERSION_INDEX = 0;
     public static final int HOTSEAT_INDEX = 1;
     public static final int STATUS_BAR_INDEX = 2;
-    // public static final int VIBRANT_INDEX = 2;
+    public static final int VIBRANT_INDEX = 2;
     // public static final int VIBRANT_DARK_INDEX = 3;
     // public static final int VIBRANT_LIGHT_INDEX = 4;
     // public static final int MUTED_INDEX = 5;
@@ -125,8 +125,8 @@ public class ExtractedColors {
             // We currently don't use any of the colors defined by the Palette API,
             // but this is how we would add them if we ever need them.
 
-            // setColorAtIndex(ExtractedColors.VIBRANT_INDEX,
-                // palette.getVibrantColor(ExtractedColors.DEFAULT_COLOR));
+            setColorAtIndex(ExtractedColors.VIBRANT_INDEX,
+                palette.getVibrantColor(ExtractedColors.DEFAULT_COLOR));
             // setColorAtIndex(ExtractedColors.VIBRANT_DARK_INDEX,
                 // palette.getDarkVibrantColor(ExtractedColors.DEFAULT_DARK));
             // setColorAtIndex(ExtractedColors.VIBRANT_LIGHT_INDEX,
@@ -148,14 +148,20 @@ public class ExtractedColors {
      */
     public void updateHotseatPalette(Palette hotseatPalette) {
         int hotseatColor;
+        int vibrantColor;
+
         if (hotseatPalette != null && ExtractionUtils.isSuperLight(hotseatPalette)) {
             hotseatColor = ColorUtils.setAlphaComponent(Color.BLACK, (int) (0.12f * 255));
+            vibrantColor = ColorUtils.setAlphaComponent(getColor(VIBRANT_INDEX, Color.TRANSPARENT), (int) (0.12f * 255));
         } else if (hotseatPalette != null && ExtractionUtils.isSuperDark(hotseatPalette)) {
             hotseatColor = ColorUtils.setAlphaComponent(Color.WHITE, (int) (0.18f * 255));
+            vibrantColor = ColorUtils.setAlphaComponent(getColor(VIBRANT_INDEX, Color.TRANSPARENT), (int) (0.18f * 255));
         } else {
             hotseatColor = ColorUtils.setAlphaComponent(Color.WHITE, (int) (0.25f * 255));
+            vibrantColor = ColorUtils.setAlphaComponent(getColor(VIBRANT_INDEX, Color.TRANSPARENT), (int) (0.25f * 255));
         }
         setColorAtIndex(HOTSEAT_INDEX, hotseatColor);
+        setColorAtIndex(VERSION_INDEX, vibrantColor);
     }
 
     public void updateStatusBarPalette(Palette statusBarPalette) {
