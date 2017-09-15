@@ -34,4 +34,9 @@
     <string name="round_icons_sum">Force the usage of round icons when available</string>
     <string name="icon_chooser">Icon chooser</string>
     <string name="icon_search">Search for icons</string>
+    <!-- Hotseat -->
+    <string name="hotseat_pref">Dock color</string>
+    <string name="hotseat_transparent">Transparent</string>
+    <string name="hotseat_extracted">Wallpaper extracted</string>
+    <string name="hotseat_accent">Theme accent</string>
 </resources>

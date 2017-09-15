@@ -180,7 +180,10 @@ public class Hotseat extends FrameLayout
 
     public void updateColor(ExtractedColors extractedColors, boolean animate) {
         if (!mHasVerticalHotseat) {
-            int color = extractedColors.getColor(ExtractedColors.HOTSEAT_INDEX, Color.TRANSPARENT);
+
+        int selectedIndex = Utilities.resolveHotseatColor(mLauncher);
+        int color = Utilities.isAccentColoredHotseatPrefEnabled(mLauncher)? ColorUtils.setAlphaComponent(mLauncher.mHotseatAccentColor, (int) (0.18f * 255)) : extractedColors.getColor(selectedIndex, Color.TRANSPARENT);
+
             if (mBackgroundColorAnimator != null) {
                 mBackgroundColorAnimator.cancel();
             }
