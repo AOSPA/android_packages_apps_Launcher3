@@ -31,5 +31,12 @@
             android:key="round-icons"
             android:summary="@string/round_icons_sum"
             android:title="@string/round_icons" />
+        <ListPreference
+            android:defaultValue="0"
+            android:entries="@array/hotseat_color_options"
+            android:entryValues="@array/hotseat_color_values"
+            android:key="hotseat-color"
+            android:summary="%s"
+            android:title="@string/hotseat_pref" />
     </PreferenceCategory>
 </PreferenceScreen>

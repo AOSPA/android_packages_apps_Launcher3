@@ -67,6 +67,7 @@ import com.android.launcher3.compat.LauncherActivityInfoCompat;
 import com.android.launcher3.compat.UserHandleCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.config.ProviderConfig;
+import com.android.launcher3.dynamicui.ExtractedColors;
 import com.android.launcher3.graphics.ShadowGenerator;
 import com.android.launcher3.util.IconNormalizer;
 
@@ -153,6 +154,7 @@ public final class Utilities {
     public static final String ALLOW_ROTATION_PREFERENCE_KEY = "pref_allowRotation";
     public static final String KEY_ICON_PACK = "icon-packs";
     static final String KEY_ROUND_ICONS = "round-icons";
+    static final String KEY_HOTSEAT = "hotseat-color";
 
     public static boolean isPropertyEnabled(String propertyName) {
         return Log.isLoggable(propertyName, Log.VERBOSE);
@@ -167,6 +169,30 @@ public final class Utilities {
 
         String defaultIconPack = context.getString(R.string.default_iconpack_title);
         return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_ROUND_ICONS, false) && PreferenceManager.getDefaultSharedPreferences(context).getString(KEY_ICON_PACK, defaultIconPack).equals(defaultIconPack);
+    }
+
+    //resolve hotseat color
+    static int resolveHotseatColor(Context context) {
+
+        String hotseatColor = PreferenceManager.getDefaultSharedPreferences(context).getString(KEY_HOTSEAT, String.valueOf(0));
+
+        switch (Integer.parseInt(hotseatColor)) {
+            default:
+            case 0:
+                return ExtractedColors.HOTSEAT_INDEX;
+
+            case 1:
+                return 0;
+
+            case 2:
+                return ExtractedColors.VIBRANT_INDEX;
+        }
+    }
+
+    static boolean isAccentColoredHotseatPrefEnabled(Context context) {
+
+        String hotseatColor = PreferenceManager.getDefaultSharedPreferences(context).getString(KEY_HOTSEAT, String.valueOf(0));
+        return Integer.parseInt(hotseatColor) == 3;
     }
 
     public static boolean getAllowRotationDefaultValue(Context context) {
