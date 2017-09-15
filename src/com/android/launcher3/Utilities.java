@@ -63,6 +63,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.Toast;
 
+import com.android.launcher3.compat.LauncherActivityInfoCompat;
 import com.android.launcher3.compat.UserHandleCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.config.ProviderConfig;
@@ -426,9 +427,9 @@ public final class Utilities {
     }
 
     //get normalized icon for edit icon dialog and for reset purposes
-    static Bitmap getEditIconBitmap(Context context, IconsHandler mIconsHandler, ItemInfo info) {
-        Bitmap defaultIcon = mIconsHandler.getDrawableIconForPackage(info.getTargetComponent());
-        return createBadgedIconBitmap(new BitmapDrawable(context.getResources(), defaultIcon), info.user, context, 0);
+    static Bitmap getEditIconBitmap(Context context, IconCache iconCache, LauncherActivityInfoCompat app, ItemInfo info) {
+        Drawable defaultIcon = new BitmapDrawable(context.getResources(), iconCache.getNonNullIcon(iconCache.getCacheEntry(app), info.user));
+        return createBadgedIconBitmap(defaultIcon, info.user, context, 0);
     }
 
     /**

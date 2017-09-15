@@ -477,7 +477,7 @@ public class IconCache {
         return new IconLoadRequest(request, mWorkerHandler);
     }
 
-    private Bitmap getNonNullIcon(CacheEntry entry, UserHandleCompat user) {
+    Bitmap getNonNullIcon(CacheEntry entry, UserHandleCompat user) {
         return entry.icon == null ? getDefaultIcon(user) : entry.icon;
     }
 
