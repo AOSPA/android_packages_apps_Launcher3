@@ -35,4 +35,10 @@
   <string name="round_icons_sum">Forza l\'uso delle icone tonde quando disponibili</string>
   <string name="icon_chooser">Scelta icona</string>
   <string name="icon_search">Cerca icone</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Colore dock</string>
+  <string name="hotseat_default">Predefinito</string>
+  <string name="hotseat_transparent">Trasparente</string>
+  <string name="hotseat_extracted">Estratto dallo sfondo</string>
+  <string name="hotseat_accent">Accento tema</string>
 </resources>
