@@ -93,6 +93,9 @@ public class CustomizeActivity extends Activity {
             if (Utilities.KEY_ROUND_ICONS.equals(key)) {
                 mIconsHandler.switchIconPacks(mDefaultIconPack);
             }
+            if (Utilities.KEY_HOTSEAT.equals(key)) {
+                Launcher.setUpdateHotseatColor();
+            }
             reloadIconPackSummary();
         }
 
