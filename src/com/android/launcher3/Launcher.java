@@ -327,7 +327,7 @@ public class Launcher extends Activity
     private boolean mMoveToDefaultScreenFromNewIntent;
 
     private boolean mThemeEnabled;
-    private int mAccentColor;
+    public int mAccentColor;
     private int mOriginalTextColor;
     private int mTextColor;
 
@@ -381,6 +381,9 @@ public class Launcher extends Activity
     private ImageView mPackageIcon;
     private IconsHandler mIconsHandler;
     private View mIconPackView;
+
+    //hotseat
+    private static boolean updateHotseatColor;
 
     @Thunk void setOrientation() {
         if (mRotationEnabled) {
@@ -532,6 +535,11 @@ public class Launcher extends Activity
             // so always use light status bar in that case.
             activateLightStatusBar(isAllAppsVisible());
         }
+    }
+
+    //method to set updateHotseatColor boolean to apply changes on resume from settings
+    public static void setUpdateHotseatColor() {
+        updateHotseatColor = true;
     }
 
     /**
@@ -1131,6 +1139,12 @@ public class Launcher extends Activity
 
             // Refresh shortcuts if the permission changed.
             mModel.refreshShortcutsIfRequired();
+
+            //update hotseat color
+            if (updateHotseatColor) {
+                updateHotseatColor = false;
+                mHotseat.updateColor(mExtractedColors, !mPaused);
+            }
         }
 
         if (shouldShowDiscoveryBounce()) {
