@@ -376,7 +376,7 @@ public class LauncherModel extends BroadcastReceiver
             DeepShortcutManager deepShortcutManager) {
         Context context = app.getContext();
         mApp = app;
-        mBgAllAppsList = new AllAppsList(iconCache, appFilter);
+        mBgAllAppsList = new AllAppsList(context, iconCache, appFilter);
         mBgWidgetsModel = new WidgetsModel(context, iconCache, appFilter);
         mIconCache = iconCache;
         mDeepShortcutManager = deepShortcutManager;
