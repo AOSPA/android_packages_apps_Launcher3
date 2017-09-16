@@ -17,6 +17,7 @@
 package com.android.launcher3;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.ApplicationInfo;
@@ -82,6 +83,11 @@ public class CustomizeActivity extends Activity {
         public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference pref) {
             if (pref == mIconPack) {
                 mIconsHandler.showDialog(getActivity());
+                return true;
+            }
+            if (pref == mHiddenApps) {
+                Intent intent = new Intent(getActivity(), MultiSelectRecyclerViewActivity.class);
+                startActivity(intent);
                 return true;
             }
             return false;

@@ -110,6 +110,11 @@
             android:autoRemoveFromRecents="true"
             android:label="@string/icon_chooser"
             android:theme="@style/ChooseIconTheme" />
+	
+        <activity
+            android:name="com.android.launcher3.MultiSelectRecyclerViewActivity"
+            android:autoRemoveFromRecents="true"
+            android:theme="@style/SettingsTheme" />
 
         <!--
         The settings provider contains Home's data, like the workspace favorites. The permissions

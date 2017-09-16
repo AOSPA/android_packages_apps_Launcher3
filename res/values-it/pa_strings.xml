@@ -40,4 +40,10 @@
   <string name="hotseat_transparent">Trasparente</string>
   <string name="hotseat_extracted">Estratto dallo sfondo</string>
   <string name="hotseat_accent">Accento tema</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Nascondi app</string>
+  <string name="hide_app_sum">Nascondi app dall\'app drawer</string>
+  <string name="hide_app_selected">&#160;selezionate</string>
+  <string name="hidden_app">App nascoste</string>
+  <string name="hide_selected">Nascondi app selezionate</string>
 </resources>
