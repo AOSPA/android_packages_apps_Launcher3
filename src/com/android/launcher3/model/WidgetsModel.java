@@ -51,7 +51,12 @@ public class WidgetsModel {
 
     private ArrayList<WidgetItem> mRawList;
 
+    private Context mContext;
+
     public WidgetsModel(Context context,  IconCache iconCache, AppFilter appFilter) {
+
+        mContext = context;
+
         mAppWidgetMgr = AppWidgetManagerCompat.getInstance(context);
         mAppNameComparator = (new AppNameComparator(context)).getAppInfoComparator();
         mIconCache = iconCache;
@@ -167,7 +172,7 @@ public class WidgetsModel {
                 }
             }
 
-            if (mAppFilter != null && !mAppFilter.shouldShowApp(item.componentName)) {
+            if (mAppFilter != null && !mAppFilter.shouldShowApp(item.componentName.getPackageName(), mContext) {
                 if (DEBUG) {
                     Log.d(TAG, String.format("%s is filtered and not added to the widget tray.",
                             item.componentName));
