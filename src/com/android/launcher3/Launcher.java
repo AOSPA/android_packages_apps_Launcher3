@@ -2789,6 +2789,9 @@ public class Launcher extends Activity
      * on the home screen.
      */
     public void onClickSettingsButton(View v) {
+        if (mWorkspace.isInOverviewMode()) {
+            showWorkspace(false);
+        }
         if (LOGD) Log.d(TAG, "onClickSettingsButton");
         Intent intent = new Intent(Intent.ACTION_APPLICATION_PREFERENCES)
                 .setPackage(getPackageName());
@@ -2797,6 +2800,9 @@ public class Launcher extends Activity
     }
 
     private void onClickCustomizeButton(View v) {
+        if (mWorkspace.isInOverviewMode()) {
+            showWorkspace(false);
+        }
         Intent intent = new Intent(this, CustomizeActivity.class);
         intent.setPackage(getPackageName());
         intent.setSourceBounds(getViewBounds(v));
