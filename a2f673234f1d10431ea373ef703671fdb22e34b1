@@ -2,6 +2,23 @@
   "comments": [
     {
       "key": {
+        "uuid": "d4063d30_9003cde9",
+        "filename": "res/values/pa_strings.xml",
+        "patchSetId": 2
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 1000130
+      },
+      "writtenOn": "2017-09-16T00:15:53Z",
+      "side": 1,
+      "message": "Default is already an available string https://github.com/AOSPA/android_packages_apps_Launcher3/blob/a2f673234f1d10431ea373ef703671fdb22e34b1/res/values/pa_strings.xml#L21",
+      "revId": "a2f673234f1d10431ea373ef703671fdb22e34b1",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "bbcbfdc8_29e3386c",
         "filename": "src/com/android/launcher3/Launcher.java",
         "patchSetId": 2
