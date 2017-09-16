@@ -155,6 +155,8 @@ public final class Utilities {
     public static final String KEY_ICON_PACK = "icon-packs";
     static final String KEY_ROUND_ICONS = "round-icons";
     static final String KEY_HOTSEAT = "hotseat-color";
+    static final String KEY_HIDDEN_APPS = "hidden-app";
+    static final String KEY_HIDDEN_APPS_SET = "hidden-app-set";
 
     public static boolean isPropertyEnabled(String propertyName) {
         return Log.isLoggable(propertyName, Log.VERBOSE);

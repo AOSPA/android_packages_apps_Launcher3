@@ -17,6 +17,7 @@
 package com.android.launcher3;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.ApplicationInfo;
@@ -47,6 +48,7 @@ public class CustomizeActivity extends Activity {
         private IconsHandler mIconsHandler;
         private PackageManager mPackageManager;
         private Preference mIconPack;
+        private Preference mHiddenApp;
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
@@ -59,6 +61,7 @@ public class CustomizeActivity extends Activity {
             mDefaultIconPack = getString(R.string.default_iconpack_title);
             mIconsHandler = IconCache.getIconsHandler(getActivity().getApplicationContext());
             mIconPack = (Preference) findPreference(Utilities.KEY_ICON_PACK);
+            mHiddenApp = (Preference) findPreference(Utilities.KEY_HIDDEN_APPS);
 
             reloadIconPackSummary();
         }
@@ -82,6 +85,11 @@ public class CustomizeActivity extends Activity {
         public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference pref) {
             if (pref == mIconPack) {
                 mIconsHandler.showDialog(getActivity());
+                return true;
+            }
+            if (pref == mHiddenApp) {
+                Intent intent = new Intent(getActivity(), MultiSelectRecyclerViewActivity.class);
+                startActivity(intent);
                 return true;
             }
             return false;
