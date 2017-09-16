@@ -1,0 +1,106 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "86c9464c_8260bbaf",
+        "filename": "res/drawable/ic_check_circle.xml",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-16T19:46:06Z",
+      "side": 1,
+      "message": "move the comment to a newline",
+      "revId": "aa91dd7ac9982290c87a4427ca36228bc985484c",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "0ef4296e_fff41b38",
+        "filename": "res/layout/activity_multiselect.xml",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-16T19:46:06Z",
+      "side": 1,
+      "message": "comment to newline",
+      "revId": "aa91dd7ac9982290c87a4427ca36228bc985484c",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "04129363_54ef5869",
+        "filename": "res/layout/hide_item.xml",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-16T19:46:06Z",
+      "side": 1,
+      "message": "comment to newline",
+      "revId": "aa91dd7ac9982290c87a4427ca36228bc985484c",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "4d1665fd_44790967",
+        "filename": "res/xml/launcher_customization.xml",
+        "patchSetId": 1
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-16T19:46:06Z",
+      "side": 1,
+      "message": "I\u0027d suggest putting this in its own preference category.",
+      "revId": "aa91dd7ac9982290c87a4427ca36228bc985484c",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "61530317_096de58a",
+        "filename": "src/com/android/launcher3/MultiSelectRecyclerViewActivity.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-16T19:46:06Z",
+      "side": 1,
+      "message": "don\u0027t use a switch statement here for a single choice. A simple if is fine and easier to read.",
+      "revId": "aa91dd7ac9982290c87a4427ca36228bc985484c",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "48948b9b_0ef58236",
+        "filename": "src/com/android/launcher3/MultiSelectRecyclerViewAdapter.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 71,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-16T19:46:06Z",
+      "side": 1,
+      "message": "doesn\u0027t need to be static.",
+      "revId": "aa91dd7ac9982290c87a4427ca36228bc985484c",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "aa5b25fc_ce8a1780",
+        "filename": "res/values/config.xml",
+        "patchSetId": 1
+      },
+      "lineNbr": 71,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-16T19:46:06Z",
+      "side": 0,
+      "message": "why was this removed?",
+      "revId": "6f844d3bd7c570d6417c8c7b5a6f62606f683c40",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
