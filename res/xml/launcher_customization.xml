@@ -39,4 +39,8 @@
             android:summary="%s"
             android:title="@string/hotseat_pref" />
     </PreferenceCategory>
+    <Preference
+        android:key="hidden-app"
+        android:title="@string/hide_app"
+        android:summary="@string/hide_app_sum"/>
 </PreferenceScreen>
