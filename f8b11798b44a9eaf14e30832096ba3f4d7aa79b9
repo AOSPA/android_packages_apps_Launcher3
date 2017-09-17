@@ -1,0 +1,56 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2699b9fd_c95012ad",
+        "filename": "res/drawable/ic_check_circle.xml",
+        "patchSetId": 5
+      },
+      "lineNbr": 3,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-17T21:05:06Z",
+      "side": 1,
+      "message": "is this really copyright AOSP?",
+      "revId": "f8b11798b44a9eaf14e30832096ba3f4d7aa79b9",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "24afdb41_ed3d6cdd",
+        "filename": "res/layout/activity_multiselect.xml",
+        "patchSetId": 5
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-17T21:05:06Z",
+      "side": 1,
+      "message": "make consistent with other headers (comment open bracket is on its own line)\nalso is this really copyright AOSP?",
+      "parentUuid": "",
+      "revId": "f8b11798b44a9eaf14e30832096ba3f4d7aa79b9",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "43e11f09_d2fdbf6d",
+        "filename": "res/menu/hide_menu.xml",
+        "patchSetId": 5
+      },
+      "lineNbr": 3,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-09-17T21:05:06Z",
+      "side": 1,
+      "message": "make formatting consistent with other xml headers",
+      "revId": "f8b11798b44a9eaf14e30832096ba3f4d7aa79b9",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
