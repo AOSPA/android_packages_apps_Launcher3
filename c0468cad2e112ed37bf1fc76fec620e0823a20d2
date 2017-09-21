@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "69cdc3ec_d7e7939a",
+        "filename": "src/com/android/launcher3/MultiSelectRecyclerViewActivity.java",
+        "patchSetId": 9
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 1000009
+      },
+      "writtenOn": "2017-09-21T23:18:39Z",
+      "side": 1,
+      "message": "This string is broken it seems, when you create the new activity it\u0027s \"string/hiden_app\" and not \"Hidden app\" in the title bar.",
+      "revId": "c0468cad2e112ed37bf1fc76fec620e0823a20d2",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
