@@ -114,7 +114,7 @@
         <activity
             android:name="com.android.launcher3.MultiSelectRecyclerViewActivity"
             android:autoRemoveFromRecents="true"
-            android:label="string/hidden_app"
+            android:label="@string/hidden_app"
             android:theme="@style/SettingsTheme" />
 
         <!--
