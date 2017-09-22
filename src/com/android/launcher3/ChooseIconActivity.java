@@ -18,6 +18,8 @@ package com.android.launcher3;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -82,6 +84,16 @@ public class ChooseIconActivity extends Activity {
         mCurrentPackageName = getIntent().getStringExtra("app_package");
         mCurrentPackageLabel = getIntent().getStringExtra("app_label");
         mIconPackPackageName = getIntent().getStringExtra("icon_pack_package");
+
+        PackageManager packageManager = getPackageManager();
+        ApplicationInfo iconPackInfo;
+        try {
+            iconPackInfo = packageManager.getApplicationInfo(mIconPackPackageName, 0);
+            mActionBar.setSubtitle(packageManager.getApplicationLabel(iconPackInfo));
+
+        } catch (final PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
 
         mIconCache = LauncherAppState.getInstance().getIconCache();
         mIconsHandler = IconCache.getIconsHandler(this);
