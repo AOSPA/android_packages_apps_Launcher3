@@ -403,6 +403,10 @@ public class IconsHandler {
     }
 
     public Pair<List<String>, List<String>> getAllIconPacks() {
+
+        //be sure to update the icon packs list
+        loadAvailableIconPacks();
+
         List<String> iconPackNames = new ArrayList<>();
         List<String> iconPackLabels = new ArrayList<>();
         List<IconPackInfo> iconPacks = new ArrayList<IconPackInfo>(mIconPacks.values());
