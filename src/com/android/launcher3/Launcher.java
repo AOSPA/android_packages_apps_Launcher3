@@ -4510,9 +4510,9 @@ public class Launcher extends Activity
         mEditText.setSelection(mEditText.getText().length());
 
         final Resources res = getResources();
-        Bitmap defaultIcon =  Utilities.getEditIconBitmap(this, mIconCache, app, info);
-        final Drawable icon = new BitmapDrawable(res, defaultIcon);
-        mPackageIcon.setImageBitmap(defaultIcon);
+
+        final Bitmap appliedIcon = mIconsHandler.getAppliedIconBitmap(this, mIconCache, app, info);
+        mPackageIcon.setImageBitmap(appliedIcon);
 
         final int popupWidth = getResources().getDimensionPixelSize(R.dimen.edit_dialog_min_width);
         Pair<List<String>, List<String>> iconPacks = mIconsHandler.getAllIconPacks();
@@ -4549,7 +4549,7 @@ public class Launcher extends Activity
                     new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                            mIconCache.addCustomInfoToDataBase(icon, info, null);
+                            mIconCache.addCustomInfoToDataBase(mIconsHandler.getResetIconDrawable(Launcher.this, app, info), info, null);
                             mIconPackDialog.dismiss();
                         }
                 })
@@ -4557,7 +4557,7 @@ public class Launcher extends Activity
                     new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                            mIconCache.addCustomInfoToDataBase(icon, info, mEditText.getText());
+                            mIconCache.addCustomInfoToDataBase(new BitmapDrawable(res, appliedIcon), info, mEditText.getText());
                             mIconPackDialog.dismiss();
                         }
                 });
