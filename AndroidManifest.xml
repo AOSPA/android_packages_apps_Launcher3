@@ -74,7 +74,7 @@
             android:theme="@style/LauncherTheme"
             android:windowSoftInputMode="adjustPan"
             android:screenOrientation="nosensor"
-            android:configChanges="keyboard|keyboardHidden|navigation"
+            android:configChanges="keyboard|keyboardHidden|navigation|layoutDirection|locale"
             android:resumeWhilePausing="true"
             android:taskAffinity=""
             android:enabled="true">
