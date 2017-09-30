@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "90c54354_3b595122",
+        "filename": "src/com/android/launcher3/IconsHandler.java",
+        "patchSetId": 4
+      },
+      "lineNbr": 373,
+      "author": {
+        "id": 1000011
+      },
+      "writtenOn": "2017-09-30T14:20:37Z",
+      "side": 1,
+      "message": "Should we mark this as final?",
+      "range": {
+        "startLine": 373,
+        "startChar": 17,
+        "endLine": 373,
+        "endChar": 21
+      },
+      "revId": "d664ba2e3dcace0c1f217b117cddbb0bc7d20c9f",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "34b60a5d_09c6b403",
+        "filename": "src/com/android/launcher3/IconsHandler.java",
+        "patchSetId": 4
+      },
+      "lineNbr": 379,
+      "author": {
+        "id": 1000011
+      },
+      "writtenOn": "2017-09-30T14:20:37Z",
+      "side": 1,
+      "message": "same here",
+      "range": {
+        "startLine": 379,
+        "startChar": 17,
+        "endLine": 379,
+        "endChar": 28
+      },
+      "revId": "d664ba2e3dcace0c1f217b117cddbb0bc7d20c9f",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
