@@ -225,6 +225,48 @@ public class IconsHandler {
         return null;
     }
 
+	//get default label for package
+    String getDefaultAppLabel(ItemInfo itemInfo) {
+
+        ApplicationInfo applicationInfo;
+        String defaultLabel = "";
+
+        try {
+            applicationInfo = mPackageManager.getApplicationInfo(itemInfo.getTargetComponent().getPackageName(), 0);
+            defaultLabel = String.valueOf(mPackageManager.getApplicationLabel(applicationInfo));
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+        return defaultLabel;
+    }
+
+	//get default icon for package
+    Bitmap getStockIconForPackage(Context context, ItemInfo info) {
+
+        ApplicationInfo iconPackInfo = null;
+
+        try {
+            iconPackInfo = mPackageManager.getApplicationInfo(info.getTargetComponent().getPackageName(), 0);
+
+        } catch (final PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+        return Utilities.createBadgedIconBitmap(mPackageManager.getApplicationIcon(iconPackInfo), info.user, context, 0);
+    }
+	
+    // Get the first icon pack parsed icon or round icon (when enabled) for reset purposes
+    Drawable getResetIconDrawable(Context context, IconCache iconCache, ItemInfo info) {
+
+        Drawable resetIcon = Utilities.isRoundIconsPrefEnabled(context)? getRoundIcon(context, info.getTargetComponent().getPackageName(), iconCache.getIconDpi()) : new BitmapDrawable(context.getResources(), getDrawableIconForPackage(info.getTargetComponent()));
+        return new BitmapDrawable(context.getResources(), Utilities.createBadgedIconBitmap(resetIcon, info.user, context, 0));
+    }
+
+    // Get the applied icon
+    Bitmap getAppliedIconBitmap(Context context, IconCache iconCache, LauncherActivityInfoCompat app, ItemInfo info) {
+        final Drawable defaultIcon = new BitmapDrawable(context.getResources(), iconCache.getNonNullIcon(iconCache.getCacheEntry(app), info.user));
+        return Utilities.createBadgedIconBitmap(defaultIcon, info.user, context, 0);
+    }
+
     Drawable getIconFromHandler(Context context, LauncherActivityInfoCompat info) {
         Bitmap bm = getDrawableIconForPackage(info.getComponentName());
         if (bm == null) {
@@ -366,18 +408,6 @@ public class IconsHandler {
         }
 
         return getDefaultAppDrawable(componentName);
-    }
-
-    // Get the first icon pack parsed icon for reset purposes
-    Drawable getResetIconDrawable(Context context, LauncherActivityInfoCompat app, ItemInfo info) {
-        final Drawable icon = new BitmapDrawable(context.getResources(), getDrawableIconForPackage(info.getTargetComponent()));
-        return new BitmapDrawable(context.getResources(), Utilities.createBadgedIconBitmap(icon, info.user, context, 0));
-    }
-
-    // Get the applied icon
-    Bitmap getAppliedIconBitmap(Context context, IconCache iconCache, LauncherActivityInfoCompat app, ItemInfo info) {
-        final Drawable defaultIcon = new BitmapDrawable(context.getResources(), iconCache.getNonNullIcon(iconCache.getCacheEntry(app), info.user));
-        return Utilities.createBadgedIconBitmap(defaultIcon, info.user, context, 0);
     }
 
     private Bitmap generateBitmap(ComponentName componentName, Bitmap defaultBitmap) {

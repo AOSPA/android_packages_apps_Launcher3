@@ -23,12 +23,9 @@
   <string name="icons_pack_name">Zestaw ikon</string>
   <string name="edit_drop_target_label">Edytuj</string>
   <string name="edit_app">Edytuj</string>
-  <string name="reset_icon">Przywróć domyślne</string>
   <string name="customize">Dostosuj</string>
   <string name="visual">Wygląd</string>
   <string name="all_icons">Wszystkie ikony</string>
   <string name="similar_icons">Podobne ikony</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Etykieta</string>
-  <string name="loading">Ładowanie, proszę czekać</string>
 </resources>
