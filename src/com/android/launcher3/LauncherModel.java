@@ -1358,7 +1358,7 @@ public class LauncherModel extends BroadcastReceiver
                 user));
 
         Context context = mApp.getContext();
-        String defaultIconPack = context.getString(R.string.default_iconpack_title);
+        String defaultIconPack = context.getString(R.string.default_iconpack);
 
         //switch to default icon pack if the applied one is removed
         if (PreferenceManager.getDefaultSharedPreferences(context).getString(Utilities.KEY_ICON_PACK, defaultIconPack).equals(packageName)) {
