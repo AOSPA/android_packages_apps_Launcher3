@@ -58,7 +58,7 @@ public class CustomizeActivity extends Activity {
 
             mPackageManager = getActivity().getPackageManager();
 
-            mDefaultIconPack = getString(R.string.default_iconpack_title);
+            mDefaultIconPack = getString(R.string.default_iconpack);
             mIconsHandler = IconCache.getIconsHandler(getActivity().getApplicationContext());
             mIconPack = (Preference) findPreference(Utilities.KEY_ICON_PACK);
             mHiddenApp = (Preference) findPreference(Utilities.KEY_HIDDEN_APPS);
@@ -112,6 +112,7 @@ public class CustomizeActivity extends Activity {
             String iconPack = PreferenceManager.getDefaultSharedPreferences(getActivity())
                     .getString(Utilities.KEY_ICON_PACK, mDefaultIconPack);
 
+            String packageLabel = getActivity().getString(R.string.default_iconpack_title);
             Drawable packageIcon = getActivity().getDrawable(R.drawable.icon_pack);
             if (!mIconsHandler.isDefaultIconPack()) {
                 try {
@@ -120,11 +121,11 @@ public class CustomizeActivity extends Activity {
                     e.printStackTrace();
                 }
                 if (info != null) {
-                    iconPack = mPackageManager.getApplicationLabel(info).toString();
+                    packageLabel = mPackageManager.getApplicationLabel(info).toString();
                     packageIcon = mPackageManager.getApplicationIcon(info);
                 }
             }
-            mIconPack.setSummary(iconPack);
+            mIconPack.setSummary(packageLabel);
             mIconPack.setIcon(packageIcon);
             manageRoundIconsPref();
         }
