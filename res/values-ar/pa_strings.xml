@@ -23,12 +23,9 @@
   <string name="icons_pack_name">حزمة أيقونات</string>
   <string name="edit_drop_target_label">تحرير</string>
   <string name="edit_app">تحرير</string>
-  <string name="reset_icon">إعادة ضبط</string>
   <string name="customize">تخصيص</string>
   <string name="visual">البصرية</string>
   <string name="all_icons">كل الأيقونات</string>
   <string name="similar_icons">أيقونات مشابهة</string>
-  <string name="ok">موافق</string>
   <string name="icon_label">عنوان</string>
-  <string name="loading">جاري التحميل ، يرجى الانتظار</string>
 </resources>

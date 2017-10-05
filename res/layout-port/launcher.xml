@@ -81,4 +81,7 @@
             launcher:layout_ignoreInsets="true" />
     </com.android.launcher3.dragndrop.DragLayer>
 
+    <include layout="@layout/edit_icon"
+        android:id="@+id/edit_view"
+        android:visibility="invisible"/>
 </com.android.launcher3.LauncherRootView>

@@ -23,12 +23,9 @@
   <string name="icons_pack_name">आइकन पैक</string>
   <string name="edit_drop_target_label">संपादित करें</string>
   <string name="edit_app">संपादित करें</string>
-  <string name="reset_icon">रीसेट</string>
   <string name="customize">अनुकूलित करें</string>
   <string name="visual">दृश्य</string>
   <string name="all_icons">सभी आइकन्स</string>
   <string name="similar_icons">समान आइकन्स</string>
-  <string name="ok">ठीक है</string>
   <string name="icon_label">लेबल</string>
-  <string name="loading">लोड हो रहा है, कृपया प्रतीक्षा करें</string>
 </resources>
