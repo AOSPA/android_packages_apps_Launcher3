@@ -18,6 +18,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- Icon pack -->
+    <string name="default_iconpack" translatable="false">Stock</string>
     <string name="default_iconpack_title">Default</string>
     <string name="icons_pack_name">Icon pack</string>
     <string name="edit_drop_target_label">Edit</string>

@@ -103,7 +103,7 @@ public class IconsHandler {
         mContext = context;
         mPackageManager = context.getPackageManager();
 
-        mDefaultIconPack = context.getString(R.string.default_iconpack_title);
+        mDefaultIconPack = context.getString(R.string.default_iconpack);
 
         String iconPack = PreferenceManager.getDefaultSharedPreferences(mContext)
                     .getString(Utilities.KEY_ICON_PACK, mDefaultIconPack);
@@ -572,10 +572,11 @@ public class IconsHandler {
 
             Drawable icon = res.getDrawable(R.mipmap.ic_launcher_home, context.getTheme());
             String defaultLabel = res.getString(R.string.default_iconpack_title);
+            String defaultName = res.getString(R.string.default_iconpack);
 
-            mSupportedPackages.add(0, new IconPackInfo(defaultLabel, icon, defaultLabel));
+            mSupportedPackages.add(0, new IconPackInfo(defaultLabel, icon, defaultName));
             mCurrentIconPack = PreferenceManager.getDefaultSharedPreferences(context)
-                    .getString(Utilities.KEY_ICON_PACK, defaultLabel);
+                    .getString(Utilities.KEY_ICON_PACK, defaultName);
         }
 
         @Override

@@ -168,7 +168,7 @@ public final class Utilities {
 
     static boolean isRoundIconsPrefEnabled(Context context) {
 
-        String defaultIconPack = context.getString(R.string.default_iconpack_title);
+        String defaultIconPack = context.getString(R.string.default_iconpack);
         return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_ROUND_ICONS, false) && PreferenceManager.getDefaultSharedPreferences(context).getString(KEY_ICON_PACK, defaultIconPack).equals(defaultIconPack);
     }
 
