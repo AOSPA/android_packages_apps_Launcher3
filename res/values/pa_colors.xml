@@ -22,4 +22,5 @@
     <color name="launcher_accent_color">#ff2196f3</color>
     <color name="icon_settings_background">#ff313131</color>
     <color name="icon_settings_text">#ffafafaf</color>
+    <color name="app_action_color_dark">#90000000</color>
 </resources>
