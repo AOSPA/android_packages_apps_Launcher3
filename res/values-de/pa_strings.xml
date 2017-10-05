@@ -23,12 +23,9 @@
   <string name="icons_pack_name">Symbolbibliothek</string>
   <string name="edit_drop_target_label">Bearbeiten</string>
   <string name="edit_app">Bearbeiten</string>
-  <string name="reset_icon">Zurücksetzen</string>
   <string name="customize">Personalisieren</string>
   <string name="visual">Visuell</string>
   <string name="all_icons">Alle Symbole</string>
   <string name="similar_icons">Ähnliche Symbole</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Bezeichnung</string>
-  <string name="loading">Wird geladen, bitte warten</string>
 </resources>
