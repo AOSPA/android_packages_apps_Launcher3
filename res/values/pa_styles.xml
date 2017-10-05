@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
 /**
- * Copyright (c) 2015-2017, Paranoid Android
+ * Copyright (c) 2017, Paranoid Android
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,12 @@
  * limitations under the License.
  */
 -->
-<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <dimen name="app_icon_size">65dp</dimen>
-    <dimen name="icon_pack_icon_size">48dp</dimen>
-    <dimen name="grid_item_spacing">15dp</dimen>
+<resources>
+    <style name="EditButtonIcon">
+        <item name="android:gravity">center</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/ripple</item>
+        <item name="android:padding">32dp</item>
+    </style>
 </resources>
