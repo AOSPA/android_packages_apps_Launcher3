@@ -23,12 +23,9 @@
   <string name="icons_pack_name">Balíček ikon</string>
   <string name="edit_drop_target_label">Editovať</string>
   <string name="edit_app">Editovať</string>
-  <string name="reset_icon">Resetovať</string>
   <string name="customize">Prispôsobiť</string>
   <string name="visual">Zobrazenie</string>
   <string name="all_icons">Všetky ikony</string>
   <string name="similar_icons">Podobné ikony</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Menovka</string>
-  <string name="loading">Nahrávanie, čakajte prosím</string>
 </resources>
