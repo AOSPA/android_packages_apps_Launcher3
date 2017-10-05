@@ -23,12 +23,9 @@
   <string name="icons_pack_name">Набор иконок</string>
   <string name="edit_drop_target_label">Изменить</string>
   <string name="edit_app">Изменить</string>
-  <string name="reset_icon">Сброс</string>
   <string name="customize">Настройки</string>
   <string name="visual">Внешний вид</string>
   <string name="all_icons">Все иконки</string>
   <string name="similar_icons">Похожие иконки</string>
-  <string name="ok">Ок</string>
   <string name="icon_label">Название</string>
-  <string name="loading">Загрузка, пожалуйста, подождите</string>
 </resources>

@@ -23,12 +23,9 @@
   <string name="icons_pack_name">图标包</string>
   <string name="edit_drop_target_label">编辑</string>
   <string name="edit_app">编辑</string>
-  <string name="reset_icon">重置</string>
   <string name="customize">自定义</string>
   <string name="visual">视觉</string>
   <string name="all_icons">所有的图标</string>
   <string name="similar_icons">相似的图标</string>
-  <string name="ok">还行</string>
   <string name="icon_label">标签</string>
-  <string name="loading">正在加载，请稍候</string>
 </resources>

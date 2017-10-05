@@ -48,7 +48,6 @@ import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
@@ -66,12 +65,13 @@ import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.method.TextKeyListener;
 import android.util.Log;
-import android.util.Pair;
 import android.view.Display;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
@@ -87,12 +87,9 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.animation.OvershootInterpolator;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.AdapterView;
 import android.widget.Advanceable;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.ListPopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -376,11 +373,12 @@ public class Launcher extends Activity
     private LauncherTab mLauncherTab;
 
     // icon pack
-    private AlertDialog mIconPackDialog;
-    private EditText mEditText;
     private ImageView mPackageIcon;
     private IconsHandler mIconsHandler;
-    private View mIconPackView;
+    private Bitmap mAppliedIcon;
+    private View mEditView;
+    private ItemInfo mItemInfo;
+    private EditText mPackageLabel;
 
     //hotseat
     private static boolean sUpdateHotseatColor;
@@ -1471,6 +1469,8 @@ public class Launcher extends Activity
         if (TestingUtils.MEMORY_DUMP_ENABLED) {
             TestingUtils.addWeightWatcher(this);
         }
+
+        mEditView = findViewById(R.id.edit_view);
     }
 
     private void setupOverviewPanel() {
@@ -1917,11 +1917,29 @@ public class Launcher extends Activity
         return mDeviceProfile;
     }
 
+    ItemInfo getItemInfoForEdit() {
+        return mItemInfo;
+    }
+
+    String getPackageLabelForEdit() {
+        return String.valueOf(mPackageLabel.getText());
+    }
+
     public void closeSystemDialogs() {
         getWindow().closeAllPanels();
 
         // Whatever we were doing is hereby canceled.
         setWaitingForResult(null);
+    }
+
+    void closeKeyboard() {
+
+        final View v = getWindow().peekDecorView();
+        if (v != null && v.getWindowToken() != null) {
+            InputMethodManager imm = (InputMethodManager) getSystemService(
+                    INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+        }
     }
 
     @Override
@@ -1964,12 +1982,7 @@ public class Launcher extends Activity
                 mOnResumeState = State.WORKSPACE;
             }
 
-            final View v = getWindow().peekDecorView();
-            if (v != null && v.getWindowToken() != null) {
-                InputMethodManager imm = (InputMethodManager) getSystemService(
-                        INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-            }
+            closeKeyboard();
 
             // Reset the apps view
             if (!alreadyOnHome && mAppsView != null) {
@@ -2013,6 +2026,11 @@ public class Launcher extends Activity
                     public void run() {
                         if (mWorkspace != null) {
                             mWorkspace.moveToDefaultScreen(true);
+
+                            //close edit icon view
+                            if (mEditView.getVisibility() == View.VISIBLE) {
+                                RevealEditView.close(Launcher.this, mEditView, false, null);
+                            }
                         }
                     }
                 });
@@ -2467,6 +2485,11 @@ public class Launcher extends Activity
     public void onBackPressed() {
         if (mLauncherCallbacks != null && mLauncherCallbacks.handleBackPressed()) {
             return;
+        }
+
+        //close edit icon view
+        if (mEditView.getVisibility() == View.VISIBLE) {
+            RevealEditView.close(this, mEditView, false, null);
         }
 
         if (mDragController.isDragging()) {
@@ -4500,77 +4523,68 @@ public class Launcher extends Activity
         return createAppDragInfo(appLaunchIntent, user);
     }
 
-    protected void startEdit(final ItemInfo info, final ComponentName component) {
-        LauncherActivityInfoCompat app = LauncherAppsCompat.getInstance(this)
+    protected void startEdit(final ItemInfo info) {
+
+        LauncherActivityInfoCompat launcherActivityInfoCompat = LauncherAppsCompat.getInstance(this)
                 .resolveActivity(info.getIntent(), info.user);
-        mIconPackView = getLayoutInflater().inflate(R.layout.edit_dialog, null);
-        mPackageIcon = (ImageView) mIconPackView.findViewById(R.id.package_icon);
-        mEditText = (EditText) mIconPackView.findViewById(R.id.editText);
-        mEditText.setText(mIconCache.getCacheEntry(app).title);
-        mEditText.setSelection(mEditText.getText().length());
 
-        final Resources res = getResources();
+        mItemInfo = info;
+        mAppliedIcon = mIconsHandler.getAppliedIconBitmap(this, mIconCache, launcherActivityInfoCompat, info);
 
-        final Bitmap appliedIcon = mIconsHandler.getAppliedIconBitmap(this, mIconCache, app, info);
-        mPackageIcon.setImageBitmap(appliedIcon);
+        //views
+        mPackageIcon = (ImageView) mEditView.findViewById(R.id.package_icon);
+        mPackageLabel = (EditText) mEditView.findViewById(R.id.editText);
+        ImageView defaultIcon = (ImageView) mEditView.findViewById(R.id.app_icon);
+        TextView resetSubtitle = (TextView) mEditView.findViewById(R.id.app_label);
 
-        final int popupWidth = getResources().getDimensionPixelSize(R.dimen.edit_dialog_min_width);
-        Pair<List<String>, List<String>> iconPacks = mIconsHandler.getAllIconPacks();
-        ListPopupWindow listPopupWindow = new ListPopupWindow(this);
-        listPopupWindow.setAdapter(new ArrayAdapter(this,
-                R.layout.edit_dialog_item, iconPacks.second));
-        listPopupWindow.setWidth(popupWidth);
-        listPopupWindow.setAnchorView(mPackageIcon);
-        listPopupWindow.setModal(true);
-        listPopupWindow.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
-                Intent intent = new Intent(Launcher.this, ChooseIconActivity.class);
-                ChooseIconActivity.setItemInfo(info);
-                intent.putExtra("app_package", component.getPackageName());
-                intent.putExtra("app_label", mEditText.getText().toString());
-                intent.putExtra("icon_pack_package", iconPacks.first.get(position));
-                Launcher.this.startActivity(intent);
-                mIconPackDialog.dismiss();
-            }
-        });
+        //set up rv
+        RecyclerView iconPacksRecyclerView = (RecyclerView) mEditView.findViewById(R.id.rv);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false);
+        iconPacksRecyclerView.setHasFixedSize(true);
+        iconPacksRecyclerView.setLayoutManager(layoutManager);
+        iconPacksRecyclerView.setAdapter(new IconPacksRecyclerViewAdapter(this, mIconsHandler.getAllIconPacks()));
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-                .setView(mIconPackView)
-                .setTitle(getString(R.string.edit_app))
-                .setOnDismissListener(new DialogInterface.OnDismissListener() {
-                    @Override
-                    public void onDismiss(DialogInterface dialog) {
-                        // reload workspace
-                        LauncherAppState.getInstance().getModel().forceReload();
-                    }
-                })
-                .setNeutralButton(R.string.reset_icon,
-                    new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            mIconCache.addCustomInfoToDataBase(mIconsHandler.getResetIconDrawable(Launcher.this, app, info), info, null);
-                            mIconPackDialog.dismiss();
-                        }
-                })
-                .setPositiveButton(R.string.ok,
-                    new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            mIconCache.addCustomInfoToDataBase(new BitmapDrawable(res, appliedIcon), info, mEditText.getText());
-                            mIconPackDialog.dismiss();
-                        }
-                });
-        mIconPackDialog = builder.create();
-        mPackageIcon.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!iconPacks.second.isEmpty()) {
-                    listPopupWindow.show();
-                }
-            }
-        });
-        mIconPackDialog.show();
+        mPackageIcon.setImageBitmap(mAppliedIcon);
+        updateEditLabel(mIconCache.getCacheEntry(launcherActivityInfoCompat).title);
+        defaultIcon.setImageBitmap(mIconsHandler.getStockIconForPackage(this, info));
+        resetSubtitle.setText(mIconsHandler.getDefaultAppLabel(info));
+
+        RevealEditView.show(this, mEditView);
+    }
+
+    void openIconChooserForIconPack(String iconPack) {
+        RevealEditView.close(this, mEditView, true, iconPack);
+    }
+
+    private void updateEditLabel(CharSequence editText) {
+        mPackageLabel.setText(editText);
+        mPackageLabel.setSelection(mPackageLabel.getText().length());
+    }
+
+    public void resetIconToFirstParsed(View view) {
+
+        mAppliedIcon = ((BitmapDrawable) mIconsHandler.getResetIconDrawable(this, mIconCache, mItemInfo)).getBitmap();
+
+        mPackageIcon.setImageBitmap(mAppliedIcon);
+        updateEditLabel(mPackageLabel.getText());
+    }
+
+    public void resetIconToDefault(View view) {
+
+        mAppliedIcon = mIconsHandler.getStockIconForPackage(this, mItemInfo);
+
+        mPackageIcon.setImageBitmap(mAppliedIcon);
+        updateEditLabel(mIconsHandler.getDefaultAppLabel(mItemInfo));
+    }
+
+    public void applyEdit(View view) {
+
+        mIconCache.addCustomInfoToDataBase(new BitmapDrawable(getResources(), mAppliedIcon), mItemInfo, mPackageLabel.getText());
+        RevealEditView.close(this, mEditView, false, null);
+    }
+
+    public void stopEdit(View view) {
+        RevealEditView.close(this, mEditView, false, null);
     }
 
     // TODO: This method should be a part of LauncherSearchCallback
