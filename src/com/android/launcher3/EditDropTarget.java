@@ -15,9 +15,7 @@
  */
 package com.android.launcher3;
 
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.res.Resources;
 import android.util.AttributeSet;
 
 public class EditDropTarget extends ButtonDropTarget {
@@ -49,16 +47,7 @@ public class EditDropTarget extends ButtonDropTarget {
 
     @Override
     public void completeDrop(DragObject d) {
-        ComponentName componentName = null;
         ItemInfo info = d.dragInfo;
-        if (info instanceof AppInfo) {
-            componentName = ((AppInfo) info).componentName;
-        } else if (info instanceof ShortcutInfo) {
-            componentName = ((ShortcutInfo) info).intent.getComponent();
-        }
-
-        if (componentName != null) {
-            mLauncher.startEdit(info, componentName);
-        }
+        mLauncher.startEdit(info);
     }
 }

@@ -23,12 +23,9 @@
   <string name="icons_pack_name">Sadu ikon</string>
   <string name="edit_drop_target_label">Úpravy</string>
   <string name="edit_app">Úpravy</string>
-  <string name="reset_icon">Obnovit</string>
   <string name="customize">Vlastní nastavení</string>
   <string name="visual">Vizuální</string>
   <string name="all_icons">Všechny ikony</string>
   <string name="similar_icons">Podobné ikony</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Popisek</string>
-  <string name="loading">Načítání, prosím počkejte</string>
 </resources>

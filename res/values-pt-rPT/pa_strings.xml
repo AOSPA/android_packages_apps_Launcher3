@@ -23,12 +23,9 @@
   <string name="icons_pack_name">Pacote de ícones</string>
   <string name="edit_drop_target_label">Editar</string>
   <string name="edit_app">Editar</string>
-  <string name="reset_icon">Repor</string>
   <string name="customize">Personalizar</string>
   <string name="visual">Visual</string>
   <string name="all_icons">Todos os ícones</string>
   <string name="similar_icons">Ícones semelhantes</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Etiqueta</string>
-  <string name="loading">A carregar, por favor aguarde</string>
 </resources>

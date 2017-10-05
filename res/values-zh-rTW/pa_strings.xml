@@ -23,12 +23,9 @@
   <string name="icons_pack_name">圖示集</string>
   <string name="edit_drop_target_label">編輯</string>
   <string name="edit_app">編輯</string>
-  <string name="reset_icon">重設</string>
   <string name="customize">自訂</string>
   <string name="visual">視覺</string>
   <string name="all_icons">所有的圖示</string>
   <string name="similar_icons">相似的圖示</string>
-  <string name="ok">確定</string>
   <string name="icon_label">標籤</string>
-  <string name="loading">正在載入，請稍候</string>
 </resources>

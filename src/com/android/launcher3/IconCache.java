@@ -114,6 +114,10 @@ public class IconCache {
 
     private static IconsHandler sIconsHandler;
 
+    int getIconDpi() {
+        return mIconDpi;
+    }
+
     public IconCache(Context context, InvariantDeviceProfile inv) {
         mContext = context;
         mPackageManager = context.getPackageManager();
