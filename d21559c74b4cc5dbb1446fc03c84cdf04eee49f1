@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8871cbd5_1157d568",
+        "filename": "src/com/android/launcher3/Launcher.java",
+        "patchSetId": 8
+      },
+      "lineNbr": 379,
+      "author": {
+        "id": 1000055
+      },
+      "writtenOn": "2017-10-06T14:47:15Z",
+      "side": 0,
+      "message": "This needs to be removed?",
+      "revId": "d21559c74b4cc5dbb1446fc03c84cdf04eee49f1",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
