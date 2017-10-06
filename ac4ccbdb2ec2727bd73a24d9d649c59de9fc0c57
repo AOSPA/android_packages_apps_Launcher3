@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "43545a17_1ed821eb",
+        "filename": "src/com/android/launcher3/Launcher.java",
+        "patchSetId": 7
+      },
+      "lineNbr": 1925,
+      "author": {
+        "id": 1000055
+      },
+      "writtenOn": "2017-10-06T14:16:37Z",
+      "side": 1,
+      "message": "Whitespace",
+      "revId": "ac4ccbdb2ec2727bd73a24d9d649c59de9fc0c57",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "f4621a17_16e3df6e",
+        "filename": "src/com/android/launcher3/Launcher.java",
+        "patchSetId": 7
+      },
+      "lineNbr": 4556,
+      "author": {
+        "id": 1000055
+      },
+      "writtenOn": "2017-10-06T14:16:37Z",
+      "side": 1,
+      "message": "Whitespace",
+      "revId": "ac4ccbdb2ec2727bd73a24d9d649c59de9fc0c57",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
