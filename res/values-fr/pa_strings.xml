@@ -23,12 +23,23 @@
   <string name="icons_pack_name">Pack d\'icônes</string>
   <string name="edit_drop_target_label">Modifier</string>
   <string name="edit_app">Modifier</string>
-  <string name="reset_icon">Réinitialiser</string>
   <string name="customize">Personnaliser</string>
   <string name="visual">Visuel</string>
   <string name="all_icons">Toutes les icônes</string>
   <string name="similar_icons">Icônes similaires</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Légende</string>
-  <string name="loading">Chargement, veuillez patienter</string>
+  <string name="round_icons">Utiliser des icônes rondes</string>
+  <string name="round_icons_sum">Forcer l’utilisation d’icônes rondes si disponibles</string>
+  <string name="icon_chooser">Sélecteur d\'icônes</string>
+  <string name="icon_search">Rechercher des icônes</string>
+  <!-- Hotseat -->
+  <string name="hotseat_transparent">Transparent</string>
+  <string name="hotseat_extracted">Extraite du fond d\'écran</string>
+  <string name="hotseat_accent">Couleur du thème</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Masquer application</string>
+  <string name="hide_app_sum">Masquer l\'application de la liste des applications</string>
+  <string name="hide_app_selected">&#160;sélectionnée(s)</string>
+  <string name="hidden_app">Application masquée</string>
+  <string name="more">Plus</string>
 </resources>

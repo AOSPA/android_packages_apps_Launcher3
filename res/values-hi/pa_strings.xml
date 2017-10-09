@@ -31,4 +31,20 @@
   <string name="ok">ठीक है</string>
   <string name="icon_label">लेबल</string>
   <string name="loading">लोड हो रहा है, कृपया प्रतीक्षा करें</string>
+  <string name="round_icons">गोल चिह्न का उपयोग करें</string>
+  <string name="round_icons_sum">जब उपलब्ध हो तो राउंड चिह्नों के उपयोग को बाध्य करें</string>
+  <string name="icon_chooser">चिह्न चयनकर्ता</string>
+  <string name="icon_search">चिह्न खोजें</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">डॉक रंग</string>
+  <string name="hotseat_transparent">पारदर्शी</string>
+  <string name="hotseat_extracted">वॉलपेपर निकाले गए</string>
+  <string name="hotseat_accent">थीम एक्सेंट</string>
+  <!-- Hidden app -->
+  <string name="hide_app">एप्लिकेशन छुपाएँ</string>
+  <string name="hide_app_sum">एप्लिकेशन दराज से छुपाएँ</string>
+  <string name="hide_app_selected">&#160; चयनित</string>
+  <string name="hidden_app">छिपे हुए ऐप</string>
+  <string name="hide_selected">चयनित एप्लिकेशन छुपाएँ</string>
+  <string name="more">अतिरिक्त</string>
 </resources>

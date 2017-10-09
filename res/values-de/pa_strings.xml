@@ -31,4 +31,20 @@
   <string name="ok">Ok</string>
   <string name="icon_label">Bezeichnung</string>
   <string name="loading">Wird geladen, bitte warten</string>
+  <string name="round_icons">Runde Symbole benutzen</string>
+  <string name="round_icons_sum">Erzwingen der Verwendung von runden Symbolen falls verfügbar</string>
+  <string name="icon_chooser">Icon Auswahl</string>
+  <string name="icon_search">Nach Icons suchen</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Dock-Farbe</string>
+  <string name="hotseat_transparent">Transparent</string>
+  <string name="hotseat_extracted">Hintergrundbild extrahiert</string>
+  <string name="hotseat_accent">Theme Akzent</string>
+  <!-- Hidden app -->
+  <string name="hide_app">App ausblenden</string>
+  <string name="hide_app_sum">App in der App-Übersicht ausblenden</string>
+  <string name="hide_app_selected">&#160;ausgewählt</string>
+  <string name="hidden_app">Ausgeblendete App</string>
+  <string name="hide_selected">Ausgewählte App ausblenden</string>
+  <string name="more">Mehr</string>
 </resources>

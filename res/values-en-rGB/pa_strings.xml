@@ -23,12 +23,11 @@
   <string name="icons_pack_name">Icon pack</string>
   <string name="edit_drop_target_label">Edit</string>
   <string name="edit_app">Edit</string>
-  <string name="reset_icon">Reset</string>
   <string name="customize">Customise</string>
   <string name="visual">Visual</string>
   <string name="all_icons">All icons</string>
   <string name="similar_icons">Similar icons</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Label</string>
-  <string name="loading">Loading, please wait</string>
+  <!-- Hotseat -->
+  <!-- Hidden app -->
 </resources>

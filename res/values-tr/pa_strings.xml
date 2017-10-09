@@ -31,4 +31,20 @@
   <string name="ok">Tamam</string>
   <string name="icon_label">Etiket</string>
   <string name="loading">Yükleniyor, lütfen bekleyin</string>
+  <string name="round_icons">Yuvarlak simgeleri kullan</string>
+  <string name="round_icons_sum">Mümkünse yuvarlak simgelerin kullanımını zorla</string>
+  <string name="icon_chooser">Simge seçici</string>
+  <string name="icon_search">Simgeleri ara</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Alt panel rengi</string>
+  <string name="hotseat_transparent">Şeffaf</string>
+  <string name="hotseat_extracted">Duvar kağıdından al</string>
+  <string name="hotseat_accent">Tema vurgu rengi</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Uygulamayı gizle</string>
+  <string name="hide_app_sum">Uygulamayı uygulama çekmecesinden gizle</string>
+  <string name="hide_app_selected">&#160;seçildi</string>
+  <string name="hidden_app">Gizli uygulama</string>
+  <string name="hide_selected">Seçilen uygulamayı gizle</string>
+  <string name="more">Daha fazla</string>
 </resources>

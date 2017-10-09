@@ -19,15 +19,6 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <!-- Icon pack -->
-  <string name="default_iconpack_title">الافتراضي</string>
-  <string name="icons_pack_name">حزمة أيقونات</string>
-  <string name="edit_drop_target_label">تحرير</string>
-  <string name="edit_app">تحرير</string>
-  <string name="customize">تخصيص</string>
-  <string name="visual">البصرية</string>
-  <string name="all_icons">كل الأيقونات</string>
-  <string name="similar_icons">أيقونات مشابهة</string>
-  <string name="icon_label">عنوان</string>
   <!-- Hotseat -->
   <!-- Hidden app -->
 </resources>
