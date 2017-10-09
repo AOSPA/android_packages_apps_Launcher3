@@ -23,12 +23,24 @@
   <string name="icons_pack_name">Ikon-pakke</string>
   <string name="edit_drop_target_label">Rediger</string>
   <string name="edit_app">Rediger</string>
-  <string name="reset_icon">Tilbakestill</string>
   <string name="customize">Tilpass</string>
   <string name="visual">Visuell</string>
   <string name="all_icons">Alle ikoner</string>
   <string name="similar_icons">Lignende ikoner</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Etikett</string>
-  <string name="loading">Laster inn, vennligst vent</string>
+  <string name="round_icons">Bruk runde ikoner</string>
+  <string name="round_icons_sum">Innfør bruk av runde ikoner der mulig</string>
+  <string name="icon_chooser">Ikon velger</string>
+  <string name="icon_search">Søk etter ikoner</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Docking farge</string>
+  <string name="hotseat_transparent">Gjennomsiktig</string>
+  <string name="hotseat_extracted">Hentet fra bakgrunnsbilde</string>
+  <string name="hotseat_accent">Tema aksent</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Skjul app</string>
+  <string name="hide_app_sum">Skjul app fra app-skuff</string>
+  <string name="hidden_app">Skjult app</string>
+  <string name="hide_selected">Skjul valgte app</string>
+  <string name="more">Mer</string>
 </resources>

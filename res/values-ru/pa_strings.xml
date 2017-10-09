@@ -19,16 +19,32 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <!-- Icon pack -->
-  <string name="default_iconpack_title">Стандартная</string>
+  <string name="default_iconpack_title">По умолчанию</string>
   <string name="icons_pack_name">Набор иконок</string>
   <string name="edit_drop_target_label">Изменить</string>
   <string name="edit_app">Изменить</string>
   <string name="reset_icon">Сброс</string>
-  <string name="customize">Настройки</string>
+  <string name="customize">Настроить</string>
   <string name="visual">Внешний вид</string>
   <string name="all_icons">Все иконки</string>
   <string name="similar_icons">Похожие иконки</string>
   <string name="ok">Ок</string>
-  <string name="icon_label">Название</string>
+  <string name="icon_label">Подпись</string>
   <string name="loading">Загрузка, пожалуйста, подождите</string>
+  <string name="round_icons">Использовать круглые иконки</string>
+  <string name="round_icons_sum">При возможности принудительно использовать круглые иконки</string>
+  <string name="icon_chooser">Выбор иконки</string>
+  <string name="icon_search">Найти иконку</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Цвет панели</string>
+  <string name="hotseat_transparent">Прозрачный</string>
+  <string name="hotseat_extracted">На основе обоев</string>
+  <string name="hotseat_accent">Акцент темы</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Скрыть приложение</string>
+  <string name="hide_app_sum">Скрыть приложение из меню</string>
+  <string name="hide_app_selected">&#160;выбрано</string>
+  <string name="hidden_app">Скрытое приложение</string>
+  <string name="hide_selected">Скрыть выбранное приложение</string>
+  <string name="more">Дополнительно</string>
 </resources>

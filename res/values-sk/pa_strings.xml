@@ -23,12 +23,25 @@
   <string name="icons_pack_name">Balíček ikon</string>
   <string name="edit_drop_target_label">Editovať</string>
   <string name="edit_app">Editovať</string>
-  <string name="reset_icon">Resetovať</string>
   <string name="customize">Prispôsobiť</string>
   <string name="visual">Zobrazenie</string>
   <string name="all_icons">Všetky ikony</string>
   <string name="similar_icons">Podobné ikony</string>
-  <string name="ok">Ok</string>
   <string name="icon_label">Menovka</string>
-  <string name="loading">Nahrávanie, čakajte prosím</string>
+  <string name="round_icons">Použiť kruhové ikony</string>
+  <string name="round_icons_sum">Vynútené použitie kruhových ikon, pokiaľ sú k dispozícii</string>
+  <string name="icon_chooser">Výber ikony</string>
+  <string name="icon_search">Vyhľadávanie ikon</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Farva doku</string>
+  <string name="hotseat_transparent">Priehľadná</string>
+  <string name="hotseat_extracted">Extrahované tapety</string>
+  <string name="hotseat_accent">Farba témy</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Skryť aplikáciu</string>
+  <string name="hide_app_sum">Skryť aplikácie zo zoznamu aplikácií</string>
+  <string name="hide_app_selected">&#160;vybrané</string>
+  <string name="hidden_app">Skryté aplikácia</string>
+  <string name="hide_selected">Skryť vybranú aplikáciu</string>
+  <string name="more">Viac</string>
 </resources>
