@@ -28,7 +28,23 @@
   <string name="visual">视觉</string>
   <string name="all_icons">所有的图标</string>
   <string name="similar_icons">相似的图标</string>
-  <string name="ok">还行</string>
+  <string name="ok">确认</string>
   <string name="icon_label">标签</string>
   <string name="loading">正在加载，请稍候</string>
+  <string name="round_icons">使用圆形图标</string>
+  <string name="round_icons_sum">强制使用可用圆形图标</string>
+  <string name="icon_chooser">图标选择器</string>
+  <string name="icon_search">搜索图标</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">底座颜色</string>
+  <string name="hotseat_transparent">透明</string>
+  <string name="hotseat_extracted">提取的壁纸</string>
+  <string name="hotseat_accent">主题偏好</string>
+  <!-- Hidden app -->
+  <string name="hide_app">隐藏应用程序</string>
+  <string name="hide_app_sum">从抽屉隐藏应用</string>
+  <string name="hide_app_selected">&#160;已选择</string>
+  <string name="hidden_app">隐藏的应用</string>
+  <string name="hide_selected">隐藏选定应用</string>
+  <string name="more">更多</string>
 </resources>

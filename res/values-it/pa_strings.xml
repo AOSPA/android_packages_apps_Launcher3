@@ -23,7 +23,7 @@
   <string name="icons_pack_name">Pacchetto icone</string>
   <string name="edit_drop_target_label">Modifica</string>
   <string name="edit_app">Modifica</string>
-  <string name="reset_icon">Resetta</string>
+  <string name="reset_icon">Reset</string>
   <string name="customize">Personalizza</string>
   <string name="visual">Visuale</string>
   <string name="all_icons">Tutte le icone</string>
@@ -32,19 +32,19 @@
   <string name="icon_label">Etichetta</string>
   <string name="loading">Caricamento, attendere prego</string>
   <string name="round_icons">Usa icone tonde</string>
-  <string name="round_icons_sum">Forza l\'uso delle icone tonde quando disponibili</string>
-  <string name="icon_chooser">Scelta icona</string>
+  <string name="round_icons_sum">Forza l\'utilizzo di icone tonde quando disponibili</string>
+  <string name="icon_chooser">Selettore di icone</string>
   <string name="icon_search">Cerca icone</string>
   <!-- Hotseat -->
-  <string name="hotseat_pref">Colore dock</string>
+  <string name="hotseat_pref">Colore della dock</string>
   <string name="hotseat_transparent">Trasparente</string>
-  <string name="hotseat_extracted">Estratto dallo sfondo</string>
-  <string name="hotseat_accent">Accento tema</string>
+  <string name="hotseat_extracted">Sfondo estratto</string>
+  <string name="hotseat_accent">Colore secondario</string>
   <!-- Hidden app -->
   <string name="hide_app">Nascondi app</string>
-  <string name="hide_app_sum">Nascondi app dall\'app drawer</string>
-  <string name="hide_app_selected">&#160;selezionate</string>
+  <string name="hide_app_sum">Nascondi app dal drawer</string>
+  <string name="hide_app_selected">&#160;selezionato</string>
   <string name="hidden_app">App nascoste</string>
-  <string name="hide_selected">Nascondi app selezionate</string>
+  <string name="hide_selected">Nascondi le app selezionate</string>
   <string name="more">Altro</string>
 </resources>

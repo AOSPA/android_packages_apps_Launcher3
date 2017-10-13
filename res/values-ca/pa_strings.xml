@@ -23,12 +23,11 @@
   <string name="icons_pack_name">Paquet d\'icones</string>
   <string name="edit_drop_target_label">Editar</string>
   <string name="edit_app">Editar</string>
-  <string name="reset_icon">Restableix</string>
   <string name="customize">Personalitzar</string>
   <string name="visual">Visual</string>
   <string name="all_icons">Totes les icones</string>
   <string name="similar_icons">Icones similars</string>
-  <string name="ok">Correcte</string>
   <string name="icon_label">Etiqueta</string>
-  <string name="loading">Carregant, esperi si us plau</string>
+  <!-- Hotseat -->
+  <!-- Hidden app -->
 </resources>

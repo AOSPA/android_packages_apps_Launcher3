@@ -31,4 +31,20 @@
   <string name="ok">Ok</string>
   <string name="icon_label">Etikett</string>
   <string name="loading">Läser in, vänligen vänta</string>
+  <string name="round_icons">Använd runda ikoner</string>
+  <string name="round_icons_sum">Tvinga användning av runda ikoner när tillgängligt</string>
+  <string name="icon_chooser">Ikon väljare</string>
+  <string name="icon_search">Sök efter ikoner</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Docka färg</string>
+  <string name="hotseat_transparent">Genomskinlig</string>
+  <string name="hotseat_extracted">Bakgrundsbild extraherad</string>
+  <string name="hotseat_accent">Tema accent</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Dölj app</string>
+  <string name="hide_app_sum">Göm från appmenyn</string>
+  <string name="hide_app_selected">&#160;vald</string>
+  <string name="hidden_app">Dold app</string>
+  <string name="hide_selected">Dölj vald app</string>
+  <string name="more">Mer</string>
 </resources>

@@ -28,7 +28,23 @@
   <string name="visual">Visual</string>
   <string name="all_icons">Todos os ícones</string>
   <string name="similar_icons">Ícones semelhantes</string>
-  <string name="ok">Ok</string>
+  <string name="ok">OK</string>
   <string name="icon_label">Etiqueta</string>
-  <string name="loading">A carregar, por favor aguarde</string>
+  <string name="loading">A carregar. Por favor, aguarde</string>
+  <string name="round_icons">Usar ícones redondos</string>
+  <string name="round_icons_sum">Forçar a utilização de ícones redondos, quando disponíveis</string>
+  <string name="icon_chooser">Seletor de ícones</string>
+  <string name="icon_search">Procurar ícones</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Cor da doca</string>
+  <string name="hotseat_transparent">Transparente</string>
+  <string name="hotseat_extracted">Selecionar da imagem de fundo</string>
+  <string name="hotseat_accent">Cor de destaque do tema</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Ocultar aplicações</string>
+  <string name="hide_app_sum">Ocultar aplicações da gaveta de aplicações</string>
+  <string name="hide_app_selected">&#160;selecionada</string>
+  <string name="hidden_app">Aplicações ocultadas</string>
+  <string name="hide_selected">Ocultar a aplicação selecionada</string>
+  <string name="more">Mais</string>
 </resources>
