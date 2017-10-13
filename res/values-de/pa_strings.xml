@@ -20,15 +20,31 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <!-- Icon pack -->
   <string name="default_iconpack_title">Standard</string>
-  <string name="icons_pack_name">Symbolbibliothek</string>
+  <string name="icons_pack_name">Icon-Paket</string>
   <string name="edit_drop_target_label">Bearbeiten</string>
   <string name="edit_app">Bearbeiten</string>
   <string name="reset_icon">Zurücksetzen</string>
   <string name="customize">Personalisieren</string>
-  <string name="visual">Visuell</string>
+  <string name="visual">Optisch</string>
   <string name="all_icons">Alle Symbole</string>
   <string name="similar_icons">Ähnliche Symbole</string>
   <string name="ok">Ok</string>
   <string name="icon_label">Bezeichnung</string>
   <string name="loading">Wird geladen, bitte warten</string>
+  <string name="round_icons">Runde Symbole benutzen</string>
+  <string name="round_icons_sum">Erzwingen der Verwendung von runden Symbolen falls verfügbar</string>
+  <string name="icon_chooser">Icon Auswahl</string>
+  <string name="icon_search">Nach Icons suchen</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Dock-Farbe</string>
+  <string name="hotseat_transparent">Transparent</string>
+  <string name="hotseat_extracted">Hintergrundbild extrahiert</string>
+  <string name="hotseat_accent">Theme Akzent</string>
+  <!-- Hidden app -->
+  <string name="hide_app">App ausblenden</string>
+  <string name="hide_app_sum">App in der App-Übersicht ausblenden</string>
+  <string name="hide_app_selected">&#160;ausgewählt</string>
+  <string name="hidden_app">Ausgeblendete App</string>
+  <string name="hide_selected">Ausgewählte App ausblenden</string>
+  <string name="more">Mehr</string>
 </resources>

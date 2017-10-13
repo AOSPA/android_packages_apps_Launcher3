@@ -31,4 +31,20 @@
   <string name="ok">Ok</string>
   <string name="icon_label">Popisek</string>
   <string name="loading">Načítání, prosím počkejte</string>
+  <string name="round_icons">Použít kruhové ikony</string>
+  <string name="round_icons_sum">Vynucené použití kruhových ikon, pokud jsou k dispozici</string>
+  <string name="icon_chooser">Výběr ikony</string>
+  <string name="icon_search">Vyhledávání ikon</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Barva doku</string>
+  <string name="hotseat_transparent">Průhledná</string>
+  <string name="hotseat_extracted">Extrahované tapety</string>
+  <string name="hotseat_accent">Barva motivu</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Skrýt aplikaci</string>
+  <string name="hide_app_sum">Skrýt aplikaci v seznamu aplikací</string>
+  <string name="hide_app_selected">&#160;vybráno</string>
+  <string name="hidden_app">Skrytá aplikace</string>
+  <string name="hide_selected">Skrýt vybranou aplikaci</string>
+  <string name="more">Více</string>
 </resources>

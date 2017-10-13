@@ -31,4 +31,20 @@
   <string name="ok">Vale</string>
   <string name="icon_label">Etiqueta</string>
   <string name="loading">Cargando, por favor espere</string>
+  <string name="round_icons">Usar iconos circulares</string>
+  <string name="round_icons_sum">Forzar el uso de iconos redondos cuando esté disponible</string>
+  <string name="icon_chooser">Selector de icono</string>
+  <string name="icon_search">Buscar iconos</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Color del dock</string>
+  <string name="hotseat_transparent">Transparente</string>
+  <string name="hotseat_extracted">Extraído del fondo de pantalla</string>
+  <string name="hotseat_accent">Acentuación de tema</string>
+  <!-- Hidden app -->
+  <string name="hide_app">Ocultar aplicación</string>
+  <string name="hide_app_sum">Ocultar aplicación del cajón de aplicaciones</string>
+  <string name="hide_app_selected">&#160; seleccionado</string>
+  <string name="hidden_app">Aplicación oculta</string>
+  <string name="hide_selected">Ocultar aplicación seleccionada</string>
+  <string name="more">Más</string>
 </resources>

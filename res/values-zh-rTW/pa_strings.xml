@@ -31,4 +31,20 @@
   <string name="ok">確定</string>
   <string name="icon_label">標籤</string>
   <string name="loading">正在載入，請稍候</string>
+  <string name="round_icons">使用圓形圖示</string>
+  <string name="round_icons_sum">當情況允許，永遠使用圓形圖示</string>
+  <string name="icon_chooser">圖示選擇器</string>
+  <string name="icon_search">搜尋圖示</string>
+  <!-- Hotseat -->
+  <string name="hotseat_pref">Dock 的顏色</string>
+  <string name="hotseat_transparent">透明</string>
+  <string name="hotseat_extracted">已提取桌布</string>
+  <string name="hotseat_accent">主題偏好</string>
+  <!-- Hidden app -->
+  <string name="hide_app">隱藏應用程式</string>
+  <string name="hide_app_sum">從App Drawer隱藏應用程式</string>
+  <string name="hide_app_selected">&#160;已選</string>
+  <string name="hidden_app">隱藏的應用程式</string>
+  <string name="hide_selected">隱藏所選應用程式</string>
+  <string name="more">更多</string>
 </resources>
