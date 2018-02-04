@@ -31,6 +31,14 @@
         launcher:logIdOn="615"
         launcher:logIdOff="616" />
 
+    <SwitchPreference
+        android:key="pref_workspace_lock"
+        android:title="@string/lock_layout_title"
+        android:summaryOn="@string/lock_layout_summary_on"
+        android:summaryOff="@string/lock_layout_summary_off"
+        android:defaultValue="false"
+        android:persistent="true" />
+
     <androidx.preference.PreferenceCategory
         android:key="google_category"
         android:title="@string/category_google">

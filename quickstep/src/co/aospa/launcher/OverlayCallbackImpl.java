@@ -44,6 +44,7 @@ public class OverlayCallbackImpl
         OnSharedPreferenceChangeListener {
 
     public static final String KEY_MINUS_ONE = "pref_minus_one";
+    public static final String KEY_WORKSPACE_LOCK = "pref_workspace_lock";
 
     private final Launcher mLauncher;
     private final LauncherClient mClient;
