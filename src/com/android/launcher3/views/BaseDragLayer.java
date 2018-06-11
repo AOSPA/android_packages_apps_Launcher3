@@ -16,6 +16,8 @@
 
 package com.android.launcher3.views;
 
+import static com.android.launcher3.Utilities.SINGLE_FRAME_MS;
+
 import android.content.Context;
 import android.graphics.Rect;
 import android.util.AttributeSet;
@@ -30,6 +32,8 @@ import com.android.launcher3.BaseActivity;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.InsettableFrameLayout;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.util.MultiValueAlpha;
+import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.launcher3.util.TouchController;
 
 import java.util.ArrayList;
@@ -43,16 +47,17 @@ public abstract class BaseDragLayer<T extends BaseDraggingActivity> extends Inse
     protected final Rect mHitRect = new Rect();
 
     protected final T mActivity;
+    private final MultiValueAlpha mMultiValueAlpha;
 
     protected TouchController[] mControllers;
     protected TouchController mActiveController;
     private TouchCompleteListener mTouchCompleteListener;
 
-    public BaseDragLayer(Context context, AttributeSet attrs) {
+    public BaseDragLayer(Context context, AttributeSet attrs, int alphaChannelCount) {
         super(context, attrs);
         mActivity = (T) BaseActivity.fromContext(context);
+        mMultiValueAlpha = new MultiValueAlpha(this, alphaChannelCount);
     }
-
 
     public boolean isEventOverView(View view, MotionEvent ev) {
         getDescendantRectRelativeToSelf(view, mHitRect);
@@ -95,7 +100,8 @@ public abstract class BaseDragLayer<T extends BaseDraggingActivity> extends Inse
     @Override
     public boolean onRequestSendAccessibilityEvent(View child, AccessibilityEvent event) {
         // Shortcuts can appear above folder
-        View topView = AbstractFloatingView.getTopOpenView(mActivity);
+        View topView = AbstractFloatingView.getTopOpenViewWithType(mActivity,
+                AbstractFloatingView.TYPE_ACCESSIBLE);
         if (topView != null) {
             if (child == topView) {
                 return super.onRequestSendAccessibilityEvent(child, event);
@@ -109,12 +115,36 @@ public abstract class BaseDragLayer<T extends BaseDraggingActivity> extends Inse
 
     @Override
     public void addChildrenForAccessibility(ArrayList<View> childrenForAccessibility) {
-        View topView = AbstractFloatingView.getTopOpenView(mActivity);
+        View topView = AbstractFloatingView.getTopOpenViewWithType(mActivity,
+                AbstractFloatingView.TYPE_ACCESSIBLE);
         if (topView != null) {
             // Only add the top view as a child for accessibility when it is open
-            childrenForAccessibility.add(topView);
+            addAccessibleChildToList(topView, childrenForAccessibility);
         } else {
             super.addChildrenForAccessibility(childrenForAccessibility);
+        }
+    }
+
+    protected void addAccessibleChildToList(View child, ArrayList<View> outList) {
+        if (child.isImportantForAccessibility()) {
+            outList.add(child);
+        } else {
+            child.addChildrenForAccessibility(outList);
+        }
+    }
+
+    @Override
+    public void onViewRemoved(View child) {
+        super.onViewRemoved(child);
+        if (child instanceof AbstractFloatingView) {
+            // Handles the case where the view is removed without being properly closed.
+            // This can happen if something goes wrong during a state change/transition.
+            postDelayed(() -> {
+                AbstractFloatingView floatingView = (AbstractFloatingView) child;
+                if (floatingView.isOpen()) {
+                    floatingView.close(false);
+                }
+            }, SINGLE_FRAME_MS);
         }
     }
 
@@ -257,6 +287,10 @@ public abstract class BaseDragLayer<T extends BaseDraggingActivity> extends Inse
     @Override
     protected LayoutParams generateLayoutParams(ViewGroup.LayoutParams p) {
         return new LayoutParams(p);
+    }
+
+    public AlphaProperty getAlphaProperty(int index) {
+        return mMultiValueAlpha.getProperty(index);
     }
 
     public static class LayoutParams extends InsettableFrameLayout.LayoutParams {

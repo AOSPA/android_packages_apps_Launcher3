@@ -17,6 +17,7 @@ package com.android.launcher3.views;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.support.animation.DynamicAnimation;
 import android.support.animation.FloatPropertyCompat;
 import android.support.animation.SpringAnimation;
 import android.support.animation.SpringForce;
@@ -24,7 +25,6 @@ import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.RecyclerView.EdgeEffectFactory;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.View;
 import android.widget.EdgeEffect;
@@ -58,6 +58,7 @@ public class SpringRelativeLayout extends RelativeLayout {
     private final SpringAnimation mSpring;
 
     private float mDampedScrollShift = 0;
+    private SpringEdgeEffect mActiveEdge;
 
     public SpringRelativeLayout(Context context) {
         this(context, null);
@@ -79,6 +80,11 @@ public class SpringRelativeLayout extends RelativeLayout {
         mSpringViews.put(id, true);
     }
 
+    public void removeSpringView(int id) {
+        mSpringViews.delete(id);
+        invalidate();
+    }
+
     @Override
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
         if (mDampedScrollShift != 0 && mSpringViews.get(child.getId())) {
@@ -90,7 +96,14 @@ public class SpringRelativeLayout extends RelativeLayout {
         return super.drawChild(canvas, child, drawingTime);
     }
 
-    private void setDampedScrollShift(float shift) {
+    private void setActiveEdge(SpringEdgeEffect edge) {
+        if (mActiveEdge != edge && mActiveEdge != null) {
+            mActiveEdge.mDistance = 0;
+        }
+        mActiveEdge = edge;
+    }
+
+    protected void setDampedScrollShift(float shift) {
         if (shift != mDampedScrollShift) {
             mDampedScrollShift = shift;
             invalidate();
@@ -101,6 +114,13 @@ public class SpringRelativeLayout extends RelativeLayout {
         mSpring.setStartVelocity(velocity);
         mSpring.setStartValue(mDampedScrollShift);
         mSpring.start();
+    }
+
+    protected void finishWithShiftAndVelocity(float shift, float velocity,
+            DynamicAnimation.OnAnimationEndListener listener) {
+        setDampedScrollShift(shift);
+        mSpring.addEndListener(listener);
+        finishScrollWithVelocity(velocity);
     }
 
     public EdgeEffectFactory createEdgeEffectFactory() {
@@ -144,6 +164,7 @@ public class SpringRelativeLayout extends RelativeLayout {
 
         @Override
         public void onPull(float deltaDistance, float displacement) {
+            setActiveEdge(this);
             mDistance += deltaDistance * (mVelocityMultiplier / 3f);
             setDampedScrollShift(mDistance * getHeight());
         }

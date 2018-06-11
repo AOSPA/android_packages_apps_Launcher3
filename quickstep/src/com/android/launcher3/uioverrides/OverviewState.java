@@ -21,9 +21,12 @@ import static com.android.launcher3.states.RotationHelper.REQUEST_ROTATE;
 
 import android.view.View;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.Workspace;
+import com.android.launcher3.allapps.DiscoveryBounce;
 import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 import com.android.quickstep.views.RecentsView;
 
@@ -32,8 +35,8 @@ import com.android.quickstep.views.RecentsView;
  */
 public class OverviewState extends LauncherState {
 
-    private static final int STATE_FLAGS = FLAG_SHOW_SCRIM | FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED
-            | FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI;
+    private static final int STATE_FLAGS = FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED
+            | FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI | FLAG_DISABLE_ACCESSIBILITY;
 
     public OverviewState(int id) {
         this(id, OVERVIEW_TRANSITION_MS, STATE_FLAGS);
@@ -45,8 +48,15 @@ public class OverviewState extends LauncherState {
 
     @Override
     public float[] getWorkspaceScaleAndTranslation(Launcher launcher) {
-        // TODO: provide a valid value
-        return new float[]{1, 0, -launcher.getDeviceProfile().hotseatBarSizePx / 2};
+        RecentsView recentsView = launcher.getOverviewPanel();
+        Workspace workspace = launcher.getWorkspace();
+        View workspacePage = workspace.getPageAt(workspace.getCurrentPage());
+        float workspacePageWidth = workspacePage != null && workspacePage.getWidth() != 0
+                ? workspacePage.getWidth() : launcher.getDeviceProfile().availableWidthPx;
+        recentsView.getTaskSize(sTempRect);
+        float scale = (float) sTempRect.width() / workspacePageWidth;
+        float parallaxFactor = 0.5f;
+        return new float[]{scale, 0, -getDefaultSwipeHeight(launcher) * parallaxFactor};
     }
 
     @Override
@@ -58,6 +68,7 @@ public class OverviewState extends LauncherState {
     public void onStateEnabled(Launcher launcher) {
         RecentsView rv = launcher.getOverviewPanel();
         rv.setOverviewStateEnabled(true);
+        AbstractFloatingView.closeAllOpenViews(launcher);
     }
 
     @Override
@@ -69,11 +80,7 @@ public class OverviewState extends LauncherState {
     @Override
     public void onStateTransitionEnd(Launcher launcher) {
         launcher.getRotationHelper().setCurrentStateRequest(REQUEST_ROTATE);
-    }
-
-    @Override
-    public View getFinalFocus(Launcher launcher) {
-        return launcher.getOverviewPanel();
+        DiscoveryBounce.showForOverviewIfNeeded(launcher);
     }
 
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
@@ -88,12 +95,17 @@ public class OverviewState extends LauncherState {
     @Override
     public int getVisibleElements(Launcher launcher) {
         if (launcher.getDeviceProfile().isVerticalBarLayout()) {
-            return DRAG_HANDLE_INDICATOR;
+            return VERTICAL_SWIPE_INDICATOR;
         } else {
-            return HOTSEAT_SEARCH_BOX | DRAG_HANDLE_INDICATOR |
+            return HOTSEAT_SEARCH_BOX | VERTICAL_SWIPE_INDICATOR |
                     (launcher.getAppsView().getFloatingHeaderView().hasVisibleContent()
                             ? ALL_APPS_HEADER_EXTRA : HOTSEAT_ICONS);
         }
+    }
+
+    @Override
+    public float getWorkspaceScrimAlpha(Launcher launcher) {
+        return 0.5f;
     }
 
     @Override

@@ -15,14 +15,14 @@
  */
 package com.android.launcher3.allapps;
 
-import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
-
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Process;
+import android.support.animation.DynamicAnimation;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.StringRes;
@@ -47,8 +47,8 @@ import com.android.launcher3.InsettableFrameLayout;
 import com.android.launcher3.ItemInfo;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.graphics.ColorScrim;
 import com.android.launcher3.keyboard.FocusedItemDecorator;
 import com.android.launcher3.userevent.nano.LauncherLogProto.Target;
 import com.android.launcher3.util.ItemInfoMatcher;
@@ -62,6 +62,10 @@ import com.android.launcher3.views.SpringRelativeLayout;
  */
 public class AllAppsContainerView extends SpringRelativeLayout implements DragSource,
         Insettable, OnDeviceProfileChangeListener {
+
+    private static final float FLING_VELOCITY_MULTIPLIER = 135f;
+    // Starts the springs after at least 55% of the animation has passed.
+    private static final float FLING_ANIMATION_THRESHOLD = 0.55f;
 
     private final Launcher mLauncher;
     private final AdapterHolder[] mAH;
@@ -111,10 +115,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
         mAllAppsStore.addUpdateListener(this::onAppsUpdated);
 
-        // Attach a scrim to be drawn behind all-apps and hotseat
-        new ColorScrim(this, Themes.getAttrColor(context, R.attr.allAppsScrimColor), DEACCEL_2)
-                .attach();
-
         addSpringView(R.id.all_apps_header);
         addSpringView(R.id.apps_list_view);
         addSpringView(R.id.all_apps_tabs_view_pager);
@@ -122,6 +122,13 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
     public AllAppsStore getAppsStore() {
         return mAllAppsStore;
+    }
+
+    @Override
+    protected void setDampedScrollShift(float shift) {
+        // Bound the shift amount to avoid content from drawing on top (Y-val) of the QSB.
+        float maxShift = getSearchView().getHeight() / 2f;
+        super.setDampedScrollShift(Utilities.boundToRange(shift, -maxShift, maxShift));
     }
 
     @Override
@@ -452,6 +459,32 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         if (mUsingTabs) {
             ((PersonalWorkSlidingTabStrip) findViewById(R.id.tabs)).highlightWorkTabIfNecessary();
         }
+    }
+
+    /**
+     * Adds an update listener to {@param animator} that adds springs to the animation.
+     */
+    public void addSpringFromFlingUpdateListener(ValueAnimator animator, float velocity) {
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                if (valueAnimator.getAnimatedFraction() >= FLING_ANIMATION_THRESHOLD) {
+                    int searchViewId = getSearchView().getId();
+                    addSpringView(searchViewId);
+
+                    finishWithShiftAndVelocity(1, velocity * FLING_VELOCITY_MULTIPLIER,
+                            new DynamicAnimation.OnAnimationEndListener() {
+                                @Override
+                                public void onAnimationEnd(DynamicAnimation animation,
+                                        boolean canceled, float value, float velocity) {
+                                    removeSpringView(searchViewId);
+                                }
+                            });
+
+                    animator.removeUpdateListener(this);
+                }
+            }
+        });
     }
 
     public class AdapterHolder {

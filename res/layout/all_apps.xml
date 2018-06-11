@@ -23,16 +23,13 @@
     android:layout_height="match_parent"
     android:clipChildren="true"
     android:clipToPadding="false"
-    android:focusable="true"
-    android:focusableInTouchMode="true"
+    android:focusable="false"
     android:saveEnabled="false" >
 
     <include layout="@layout/all_apps_rv_layout" />
 
     <include layout="@layout/all_apps_floating_header" />
 
-    <!-- Note: we are reusing/repurposing a system attribute for search layout, because of a
-     platform bug, which prevents using custom attributes in <include> tag -->
     <include
         android:id="@id/search_container_all_apps"
         layout="@layout/search_container_all_apps"/>

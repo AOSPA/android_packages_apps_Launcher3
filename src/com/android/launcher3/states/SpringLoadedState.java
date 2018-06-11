@@ -19,7 +19,6 @@ import static com.android.launcher3.LauncherAnimUtils.SPRING_LOADED_TRANSITION_M
 import static com.android.launcher3.states.RotationHelper.REQUEST_LOCK;
 
 import android.graphics.Rect;
-import android.view.View;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InstallShortcutReceiver;
@@ -33,7 +32,7 @@ import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
  */
 public class SpringLoadedState extends LauncherState {
 
-    private static final int STATE_FLAGS = FLAG_SHOW_SCRIM | FLAG_MULTI_PAGE |
+    private static final int STATE_FLAGS = FLAG_MULTI_PAGE |
             FLAG_DISABLE_ACCESSIBILITY | FLAG_DISABLE_RESTORE | FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED |
             FLAG_DISABLE_PAGE_CLIPPING | FLAG_PAGE_BACKGROUNDS | FLAG_HIDE_BACK_BUTTON;
 
@@ -86,16 +85,16 @@ public class SpringLoadedState extends LauncherState {
     }
 
     @Override
+    public float getWorkspaceScrimAlpha(Launcher launcher) {
+        return 0.3f;
+    }
+
+    @Override
     public void onStateDisabled(final Launcher launcher) {
         launcher.getWorkspace().getPageIndicator().setShouldAutoHide(true);
 
         // Re-enable any Un/InstallShortcutReceiver and now process any queued items
         InstallShortcutReceiver.disableAndFlushInstallQueue(
                 InstallShortcutReceiver.FLAG_DRAG_AND_DROP, launcher);
-    }
-
-    @Override
-    public View getFinalFocus(Launcher launcher) {
-        return null;
     }
 }

@@ -18,11 +18,12 @@ package com.android.quickstep.fallback;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Rect;
-import android.support.annotation.AnyThread;
 import android.util.AttributeSet;
 import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.R;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
@@ -36,12 +37,12 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity> {
     public FallbackRecentsView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setOverviewStateEnabled(true);
-        updateEmptyMessage();
+        getQuickScrubController().onFinishedTransitionToQuickScrub();
     }
 
     @Override
     protected void onAllTasksRemoved() {
-        mActivity.finish();
+        mActivity.startHome();
     }
 
     @Override
@@ -64,11 +65,29 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity> {
 
     @Override
     protected void getTaskSize(DeviceProfile dp, Rect outRect) {
-        LayoutUtils.calculateTaskSize(getContext(), dp, 0, outRect);
+        LayoutUtils.calculateFallbackTaskSize(getContext(), dp, outRect);
     }
 
-    @AnyThread
-    public static void getPageRect(DeviceProfile grid, Context context, Rect outRect) {
-        LayoutUtils.calculateTaskSize(context, grid, 0, outRect);
+    @Override
+    public boolean shouldUseMultiWindowTaskSizeStrategy() {
+        // Just use the activity task size for multi-window as well.
+        return false;
+    }
+
+    @Override
+    public void addTaskAccessibilityActionsExtra(AccessibilityNodeInfo info) {
+        info.addAction(
+                new AccessibilityNodeInfo.AccessibilityAction(
+                        R.string.recents_clear_all,
+                        getContext().getText(R.string.recents_clear_all)));
+    }
+
+    @Override
+    public boolean performTaskAccessibilityActionExtra(int action) {
+        if (action == R.string.recents_clear_all) {
+            dismissAllTasks();
+            return true;
+        }
+        return false;
     }
 }

@@ -18,10 +18,11 @@ package com.android.launcher3;
 import static android.view.View.IMPORTANT_FOR_ACCESSIBILITY_AUTO;
 import static android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;
 import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+
 import static com.android.launcher3.anim.Interpolators.ACCEL_2;
 import static com.android.launcher3.states.RotationHelper.REQUEST_NONE;
 
-import android.view.View;
+import android.graphics.Rect;
 import android.view.animation.Interpolator;
 
 import com.android.launcher3.states.SpringLoadedState;
@@ -50,19 +51,18 @@ public class LauncherState {
     public static final int ALL_APPS_HEADER = 1 << 2;
     public static final int ALL_APPS_HEADER_EXTRA = 1 << 3; // e.g. app predictions
     public static final int ALL_APPS_CONTENT = 1 << 4;
-    public static final int DRAG_HANDLE_INDICATOR = 1 << 5;
+    public static final int VERTICAL_SWIPE_INDICATOR = 1 << 5;
 
-    protected static final int FLAG_SHOW_SCRIM = 1 << 0;
-    protected static final int FLAG_MULTI_PAGE = 1 << 1;
-    protected static final int FLAG_DISABLE_ACCESSIBILITY = 1 << 2;
-    protected static final int FLAG_DISABLE_RESTORE = 1 << 3;
-    protected static final int FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED = 1 << 4;
-    protected static final int FLAG_DISABLE_PAGE_CLIPPING = 1 << 5;
-    protected static final int FLAG_PAGE_BACKGROUNDS = 1 << 6;
-    protected static final int FLAG_ALL_APPS_SCRIM = 1 << 7;
-    protected static final int FLAG_DISABLE_INTERACTION = 1 << 8;
-    protected static final int FLAG_OVERVIEW_UI = 1 << 9;
-    protected static final int FLAG_HIDE_BACK_BUTTON = 1 << 10;
+    protected static final int FLAG_MULTI_PAGE = 1 << 0;
+    protected static final int FLAG_DISABLE_ACCESSIBILITY = 1 << 1;
+    protected static final int FLAG_DISABLE_RESTORE = 1 << 2;
+    protected static final int FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED = 1 << 3;
+    protected static final int FLAG_DISABLE_PAGE_CLIPPING = 1 << 4;
+    protected static final int FLAG_PAGE_BACKGROUNDS = 1 << 5;
+    protected static final int FLAG_DISABLE_INTERACTION = 1 << 6;
+    protected static final int FLAG_OVERVIEW_UI = 1 << 7;
+    protected static final int FLAG_HIDE_BACK_BUTTON = 1 << 8;
+    protected static final int FLAG_HAS_SYS_UI_SCRIM = 1 << 9;
 
     protected static final PageAlphaProvider DEFAULT_ALPHA_PROVIDER =
             new PageAlphaProvider(ACCEL_2) {
@@ -77,8 +77,9 @@ public class LauncherState {
     /**
      * TODO: Create a separate class for NORMAL state.
      */
-    public static final LauncherState NORMAL = new LauncherState(0, ContainerType.WORKSPACE,
-            0, FLAG_DISABLE_RESTORE | FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED | FLAG_HIDE_BACK_BUTTON);
+    public static final LauncherState NORMAL = new LauncherState(0, ContainerType.WORKSPACE, 0,
+            FLAG_DISABLE_RESTORE | FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED | FLAG_HIDE_BACK_BUTTON |
+            FLAG_HAS_SYS_UI_SCRIM);
 
     /**
      * Various Launcher states arranged in the increasing order of UI layers
@@ -87,6 +88,8 @@ public class LauncherState {
     public static final LauncherState OVERVIEW = new OverviewState(2);
     public static final LauncherState FAST_OVERVIEW = new FastOverviewState(3);
     public static final LauncherState ALL_APPS = new AllAppsState(4);
+
+    protected static final Rect sTempRect = new Rect();
 
     public final int ordinal;
 
@@ -116,9 +119,7 @@ public class LauncherState {
      *
      * @see WorkspaceStateTransitionAnimation
      */
-    public final boolean hasScrim;
     public final boolean hasWorkspacePageBackground;
-    public final boolean hasAllAppsScrim;
 
     public final int transitionDuration;
 
@@ -149,14 +150,13 @@ public class LauncherState {
      */
     public final boolean hideBackButton;
 
+    public final boolean hasSysUiScrim;
+
     public LauncherState(int id, int containerType, int transitionDuration, int flags) {
         this.containerType = containerType;
         this.transitionDuration = transitionDuration;
 
-        this.hasScrim = (flags & FLAG_SHOW_SCRIM) != 0;
         this.hasWorkspacePageBackground = (flags & FLAG_PAGE_BACKGROUNDS) != 0;
-        this.hasAllAppsScrim = (flags & FLAG_ALL_APPS_SCRIM) != 0;
-
         this.hasMultipleVisiblePages = (flags & FLAG_MULTI_PAGE) != 0;
         this.workspaceAccessibilityFlag = (flags & FLAG_DISABLE_ACCESSIBILITY) != 0
                 ? IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
@@ -167,6 +167,7 @@ public class LauncherState {
         this.disableInteraction = (flags & FLAG_DISABLE_INTERACTION) != 0;
         this.overviewUi = (flags & FLAG_OVERVIEW_UI) != 0;
         this.hideBackButton = (flags & FLAG_HIDE_BACK_BUTTON) != 0;
+        this.hasSysUiScrim = (flags & FLAG_HAS_SYS_UI_SCRIM) != 0;
 
         this.ordinal = id;
         sAllStates[id] = this;
@@ -186,7 +187,7 @@ public class LauncherState {
      *   translationY factor where 0 is top aligned and 0.5 is centered vertically
      */
     public float[] getOverviewScaleAndTranslationYFactor(Launcher launcher) {
-        return new float[] {1.2f, 0.2f};
+        return new float[] {1.1f, 0f};
     }
 
     public void onStateEnabled(Launcher launcher) {
@@ -195,15 +196,11 @@ public class LauncherState {
 
     public void onStateDisabled(Launcher launcher) { }
 
-    public View getFinalFocus(Launcher launcher) {
-        return launcher.getWorkspace();
-    }
-
     public int getVisibleElements(Launcher launcher) {
         if (launcher.getDeviceProfile().isVerticalBarLayout()) {
-            return HOTSEAT_ICONS | DRAG_HANDLE_INDICATOR;
+            return HOTSEAT_ICONS | VERTICAL_SWIPE_INDICATOR;
         }
-        return HOTSEAT_ICONS | DRAG_HANDLE_INDICATOR | HOTSEAT_SEARCH_BOX;
+        return HOTSEAT_ICONS | HOTSEAT_SEARCH_BOX | VERTICAL_SWIPE_INDICATOR;
     }
 
     /**
@@ -213,6 +210,10 @@ public class LauncherState {
      */
     public float getVerticalProgress(Launcher launcher) {
         return 1f;
+    }
+
+    public float getWorkspaceScrimAlpha(Launcher launcher) {
+        return 0;
     }
 
     public String getDescription(Launcher launcher) {

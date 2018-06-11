@@ -3,6 +3,9 @@ package com.android.launcher3.allapps;
 import static com.android.launcher3.LauncherState.ALL_APPS_CONTENT;
 import static com.android.launcher3.LauncherState.ALL_APPS_HEADER;
 import static com.android.launcher3.LauncherState.ALL_APPS_HEADER_EXTRA;
+import static com.android.launcher3.LauncherState.OVERVIEW;
+import static com.android.launcher3.LauncherState.VERTICAL_SWIPE_INDICATOR;
+import static com.android.launcher3.anim.AnimatorSetBuilder.ANIM_OVERVIEW_SCALE;
 import static com.android.launcher3.anim.AnimatorSetBuilder.ANIM_VERTICAL_PROGRESS;
 import static com.android.launcher3.anim.Interpolators.FAST_OUT_SLOW_IN;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
@@ -27,6 +30,7 @@ import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorSetBuilder;
 import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.util.Themes;
+import com.android.launcher3.views.ScrimView;
 
 /**
  * Handles AllApps view transition.
@@ -55,6 +59,7 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
     };
 
     private AllAppsContainerView mAppsView;
+    private ScrimView mScrimView;
 
     private final Launcher mLauncher;
     private final boolean mIsDarkTheme;
@@ -99,7 +104,6 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
             mAppsView.setAlpha(1);
             mLauncher.getHotseat().setTranslationY(0);
             mLauncher.getWorkspace().getPageIndicator().setTranslationY(0);
-            mLauncher.getDragHandleIndicator().setTranslationY(0);
         }
     }
 
@@ -114,6 +118,7 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
      */
     public void setProgress(float progress) {
         mProgress = progress;
+        mScrimView.setProgress(progress);
         float shiftCurrent = progress * mShiftRange;
 
         mAppsView.setTranslationY(shiftCurrent);
@@ -122,12 +127,12 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
         if (!mIsVerticalLayout) {
             mLauncher.getHotseat().setTranslationY(hotseatTranslation);
             mLauncher.getWorkspace().getPageIndicator().setTranslationY(hotseatTranslation);
-            mLauncher.getDragHandleIndicator().setTranslationY(hotseatTranslation);
         }
 
         // Use a light system UI (dark icons) if all apps is behind at least half of the
         // status bar.
-        boolean forceChange = shiftCurrent <= mShiftRange / 4;
+        boolean forceChange = shiftCurrent - mScrimView.getDragHandleSize()
+                <= mLauncher.getDeviceProfile().getInsets().top / 2;
         if (forceChange) {
             mLauncher.getSystemUiController().updateUiState(UI_STATE_ALL_APPS, !mIsDarkTheme);
         } else {
@@ -159,13 +164,20 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
             AnimatorSetBuilder builder, AnimationConfig config) {
         float targetProgress = toState.getVerticalProgress(mLauncher);
         if (Float.compare(mProgress, targetProgress) == 0) {
-            setAlphas(toState, config.getProperSetter(builder));
+            setAlphas(toState, config.getPropertySetter(builder));
             // Fail fast
             onProgressAnimationEnd();
             return;
         }
 
-        Interpolator interpolator = config.userControlled ? LINEAR : FAST_OUT_SLOW_IN;
+        if (!config.playNonAtomicComponent()) {
+            // There is no atomic component for the all apps transition, so just return early.
+            return;
+        }
+
+        Interpolator interpolator = config.userControlled ? LINEAR : toState == OVERVIEW
+                ? builder.getInterpolator(ANIM_OVERVIEW_SCALE, FAST_OUT_SLOW_IN)
+                : FAST_OUT_SLOW_IN;
         ObjectAnimator anim =
                 ObjectAnimator.ofFloat(this, ALL_APPS_PROGRESS, mProgress, targetProgress);
         anim.setDuration(config.duration);
@@ -174,7 +186,7 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
 
         builder.play(anim);
 
-        setAlphas(toState, config.getProperSetter(builder));
+        setAlphas(toState, config.getPropertySetter(builder));
     }
 
     private void setAlphas(LauncherState toState, PropertySetter setter) {
@@ -187,6 +199,9 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
         setter.setViewAlpha(mAppsView.getContentView(), hasContent ? 1 : 0, LINEAR);
         setter.setViewAlpha(mAppsView.getScrollBar(), hasContent ? 1 : 0, LINEAR);
         mAppsView.getFloatingHeaderView().setContentVisibility(hasHeaderExtra, hasContent, setter);
+
+        setter.setInt(mScrimView, ScrimView.DRAG_HANDLE_ALPHA,
+                (visibleElements & VERTICAL_SWIPE_INDICATOR) != 0 ? 255 : 0, LINEAR);
     }
 
     public AnimatorListenerAdapter getProgressAnimatorListener() {
@@ -205,6 +220,7 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
 
     public void setupViews(AllAppsContainerView appsView) {
         mAppsView = appsView;
+        mScrimView = mLauncher.findViewById(R.id.scrim_view);
     }
 
     /**
@@ -213,6 +229,10 @@ public class AllAppsTransitionController implements StateHandler, OnDeviceProfil
     public void setScrollRangeDelta(float delta) {
         mScrollRangeDelta = delta;
         mShiftRange = mLauncher.getDeviceProfile().heightPx - mScrollRangeDelta;
+
+        if (mScrimView != null) {
+            mScrimView.reInitUi();
+        }
     }
 
     /**

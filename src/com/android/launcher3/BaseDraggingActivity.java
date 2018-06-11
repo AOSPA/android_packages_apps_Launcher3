@@ -28,13 +28,15 @@ import android.os.StrictMode;
 import android.os.UserHandle;
 import android.util.Log;
 import android.view.ActionMode;
+import android.view.Surface;
 import android.view.View;
 import android.widget.Toast;
 
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.badge.BadgeInfo;
 import com.android.launcher3.compat.LauncherAppsCompat;
-import com.android.launcher3.dynamicui.WallpaperColorInfo;
+import com.android.launcher3.uioverrides.DisplayRotationListener;
+import com.android.launcher3.uioverrides.WallpaperColorInfo;
 import com.android.launcher3.shortcuts.DeepShortcutManager;
 import com.android.launcher3.views.BaseDragLayer;
 
@@ -61,10 +63,13 @@ public abstract class BaseDraggingActivity extends BaseActivity
 
     private int mThemeRes = R.style.LauncherTheme;
 
+    private DisplayRotationListener mRotationListener;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mIsSafeModeEnabled = getPackageManager().isSafeMode();
+        mRotationListener = new DisplayRotationListener(this, this::onDeviceRotationChanged);
 
         // Update theme
         WallpaperColorInfo wallpaperColorInfo = WallpaperColorInfo.getInstance(this);
@@ -85,11 +90,11 @@ public abstract class BaseDraggingActivity extends BaseActivity
 
     protected int getThemeRes(WallpaperColorInfo wallpaperColorInfo) {
         if (wallpaperColorInfo.isDark()) {
-            return R.style.LauncherThemeDark;
-        } else if (wallpaperColorInfo.supportsDarkText()) {
-            return R.style.LauncherThemeDarkText;
+            return wallpaperColorInfo.supportsDarkText() ?
+                    R.style.LauncherThemeDark_DarKText : R.style.LauncherThemeDark;
         } else {
-            return R.style.LauncherTheme;
+            return wallpaperColorInfo.supportsDarkText() ?
+                    R.style.LauncherTheme_DarkText : R.style.LauncherTheme;
         }
     }
 
@@ -136,13 +141,12 @@ public abstract class BaseDraggingActivity extends BaseActivity
         return new Rect(pos[0], pos[1], pos[0] + v.getWidth(), pos[1] + v.getHeight());
     }
 
-    public final Bundle getActivityLaunchOptionsAsBundle(View v, boolean useDefaultLaunchOptions) {
-        ActivityOptions activityOptions = getActivityLaunchOptions(v, useDefaultLaunchOptions);
+    public final Bundle getActivityLaunchOptionsAsBundle(View v) {
+        ActivityOptions activityOptions = getActivityLaunchOptions(v);
         return activityOptions == null ? null : activityOptions.toBundle();
     }
 
-    public abstract ActivityOptions getActivityLaunchOptions(
-            View v, boolean useDefaultLaunchOptions);
+    public abstract ActivityOptions getActivityLaunchOptions(View v);
 
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
         if (mIsSafeModeEnabled && !Utilities.isSystemApp(this, intent)) {
@@ -155,7 +159,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
         boolean useLaunchAnimation = (v != null) &&
                 !intent.hasExtra(INTENT_EXTRA_IGNORE_LAUNCH_ANIMATION);
         Bundle optsBundle = useLaunchAnimation
-                ? getActivityLaunchOptionsAsBundle(v, isInMultiWindowModeCompat())
+                ? getActivityLaunchOptionsAsBundle(v)
                 : null;
 
         UserHandle user = item == null ? null : item.user;
@@ -237,11 +241,29 @@ public abstract class BaseDraggingActivity extends BaseActivity
     protected void onDestroy() {
         super.onDestroy();
         WallpaperColorInfo.getInstance(this).removeOnChangeListener(this);
+        mRotationListener.disable();
     }
 
     public <T extends BaseDraggingActivity> void setOnStartCallback(OnStartCallback<T> callback) {
         mOnStartCallback = callback;
     }
+
+    protected void onDeviceProfileInitiated() {
+        if (mDeviceProfile.isVerticalBarLayout()) {
+            mRotationListener.enable();
+            mDeviceProfile.updateIsSeascape(getWindowManager());
+        } else {
+            mRotationListener.disable();
+        }
+    }
+
+    private void onDeviceRotationChanged() {
+        if (mDeviceProfile.updateIsSeascape(getWindowManager())) {
+            reapplyUi();
+        }
+    }
+
+    protected abstract void reapplyUi();
 
     /**
      * Callback for listening for onStart

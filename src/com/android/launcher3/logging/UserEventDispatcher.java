@@ -16,8 +16,10 @@
 
 package com.android.launcher3.logging;
 
+import static com.android.launcher3.logging.LoggerUtils.newAction;
 import static com.android.launcher3.logging.LoggerUtils.newCommandAction;
 import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
+import static com.android.launcher3.logging.LoggerUtils.newControlTarget;
 import static com.android.launcher3.logging.LoggerUtils.newDropTarget;
 import static com.android.launcher3.logging.LoggerUtils.newItemTarget;
 import static com.android.launcher3.logging.LoggerUtils.newLauncherEvent;
@@ -68,7 +70,8 @@ public class UserEventDispatcher {
             FeatureFlags.IS_DOGFOOD_BUILD && Utilities.isPropertyEnabled(LogConfig.USEREVENT);
     private static final String UUID_STORAGE = "uuid";
 
-    public static UserEventDispatcher newInstance(Context context, DeviceProfile dp) {
+    public static UserEventDispatcher newInstance(Context context, DeviceProfile dp,
+            UserEventDelegate delegate) {
         SharedPreferences sharedPrefs = Utilities.getDevicePrefs(context);
         String uuidStr = sharedPrefs.getString(UUID_STORAGE, null);
         if (uuidStr == null) {
@@ -77,11 +80,20 @@ public class UserEventDispatcher {
         }
         UserEventDispatcher ued = Utilities.getOverrideObject(UserEventDispatcher.class,
                 context.getApplicationContext(), R.string.user_event_dispatcher_class);
+        ued.mDelegate = delegate;
         ued.mIsInLandscapeMode = dp.isVerticalBarLayout();
         ued.mIsInMultiWindowMode = dp.isMultiWindowMode;
         ued.mUuidStr = uuidStr;
         ued.mInstantAppResolver = InstantAppResolver.newInstance(context);
         return ued;
+    }
+
+    public static UserEventDispatcher newInstance(Context context, DeviceProfile dp) {
+        return newInstance(context, dp, null);
+    }
+
+    public interface UserEventDelegate {
+        void modifyUserEvent(LauncherEvent event);
     }
 
     /**
@@ -123,6 +135,7 @@ public class UserEventDispatcher {
         return null;
     }
 
+    private boolean mSessionStarted;
     private long mElapsedContainerMillis;
     private long mElapsedSessionMillis;
     private long mActionDurationMillis;
@@ -130,6 +143,8 @@ public class UserEventDispatcher {
     private boolean mIsInLandscapeMode;
     private String mUuidStr;
     protected InstantAppResolver mInstantAppResolver;
+    private boolean mAppOrTaskLaunch;
+    private UserEventDelegate mDelegate;
 
     //                      APP_ICON    SHORTCUT    WIDGET
     // --------------------------------------------------------------
@@ -158,12 +173,19 @@ public class UserEventDispatcher {
                 newItemTarget(v, mInstantAppResolver), newTarget(Target.Type.CONTAINER));
 
         if (fillInLogContainerData(event, v)) {
+            if (mDelegate != null) {
+                mDelegate.modifyUserEvent(event);
+            }
             fillIntentInfo(event.srcTarget[0], intent);
         }
         dispatchUserEvent(event, intent);
+        mAppOrTaskLaunch = true;
     }
 
-    public void logTaskLaunchOrDismiss(int action, int direction, ComponentKey componentKey) {
+    public void logActionTip(int actionType, int viewType) { }
+
+    public void logTaskLaunchOrDismiss(int action, int direction, int taskIndex,
+            ComponentKey componentKey) {
         LauncherEvent event = newLauncherEvent(newTouchAction(action), // TAP or SWIPE or FLING
                 newTarget(Target.Type.ITEM));
         if (action == Action.Touch.SWIPE || action == Action.Touch.FLING) {
@@ -171,8 +193,10 @@ public class UserEventDispatcher {
             event.action.dir = direction;
         }
         event.srcTarget[0].itemType = LauncherLogProto.ItemType.TASK;
+        event.srcTarget[0].pageIndex = taskIndex;
         fillComponentInfo(event.srcTarget[0], componentKey.componentName);
         dispatchUserEvent(event, null);
+        mAppOrTaskLaunch = true;
     }
 
     protected void fillIntentInfo(Target target, Intent intent) {
@@ -207,6 +231,13 @@ public class UserEventDispatcher {
 
     public void logActionCommand(int command, Target srcTarget, Target dstTarget) {
         LauncherEvent event = newLauncherEvent(newCommandAction(command), srcTarget);
+        if (command == Action.Command.STOP) {
+            if (mAppOrTaskLaunch || !mSessionStarted) {
+                mSessionStarted = false;
+                return;
+            }
+        }
+
         if (dstTarget != null) {
             event.destTarget = new Target[1];
             event.destTarget[0] = dstTarget;
@@ -243,6 +274,15 @@ public class UserEventDispatcher {
         logActionOnControl(action, controlType, controlInContainer, -1);
     }
 
+    public void logActionOnControl(int action, int controlType, int parentContainer,
+                                   int grandParentContainer){
+        LauncherEvent event = newLauncherEvent(newTouchAction(action),
+                newControlTarget(controlType),
+                newContainerTarget(parentContainer),
+                newContainerTarget(grandParentContainer));
+        dispatchUserEvent(event, null);
+    }
+
     public void logActionOnControl(int action, int controlType, @Nullable View controlInContainer,
                                    int parentContainerType) {
         final LauncherEvent event = (controlInContainer == null && parentContainerType < 0)
@@ -269,6 +309,13 @@ public class UserEventDispatcher {
         dispatchUserEvent(event, null);
     }
 
+    public void logActionBounceTip(int containerType) {
+        LauncherEvent event = newLauncherEvent(newAction(Action.Type.TIP),
+                newContainerTarget(containerType));
+        event.srcTarget[0].tipType = LauncherLogProto.TipType.BOUNCE;
+        dispatchUserEvent(event, null);
+    }
+
     public void logActionOnContainer(int action, int dir, int containerType) {
         logActionOnContainer(action, dir, containerType, 0);
     }
@@ -285,7 +332,7 @@ public class UserEventDispatcher {
      * Used primarily for swipe up and down when state changes when swipe up happens from the
      * navbar bezel, the {@param srcChildContainerType} is NAVBAR and
      * {@param srcParentContainerType} is either one of the two
-     * (1) WORKSPACE: if the launcher the foreground activity
+     * (1) WORKSPACE: if the launcher is the foreground activity
      * (2) APP: if another app was the foreground activity
      */
     public void logStateChangeAction(int action, int dir, int srcChildTargetType,
@@ -375,7 +422,8 @@ public class UserEventDispatcher {
 
     }
 
-    public final void resetElapsedSessionMillis() {
+    public final void startSession() {
+        mSessionStarted = true;
         mElapsedSessionMillis = SystemClock.uptimeMillis();
         mElapsedContainerMillis = SystemClock.uptimeMillis();
     }
@@ -385,6 +433,7 @@ public class UserEventDispatcher {
     }
 
     public void dispatchUserEvent(LauncherEvent ev, Intent intent) {
+        mAppOrTaskLaunch = false;
         ev.isInLandscapeMode = mIsInLandscapeMode;
         ev.isInMultiWindowMode = mIsInMultiWindowMode;
         ev.elapsedContainerMillis = SystemClock.uptimeMillis() - mElapsedContainerMillis;
@@ -393,7 +442,8 @@ public class UserEventDispatcher {
         if (!IS_VERBOSE) {
             return;
         }
-        String log = "action:" + LoggerUtils.getActionStr(ev.action);
+        String log = "\n-----------------------------------------------------"
+                + "\naction:" + LoggerUtils.getActionStr(ev.action);
         if (ev.srcTarget != null && ev.srcTarget.length > 0) {
             log += "\n Source " + getTargetsStr(ev.srcTarget);
         }
