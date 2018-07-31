@@ -134,6 +134,8 @@ public final class Utilities {
     @IntDef({TRANSLATE_UP, TRANSLATE_DOWN, TRANSLATE_LEFT, TRANSLATE_RIGHT})
     public @interface AdjustmentDirection{}
 
+    public static final String GSA_PACKAGE = "com.google.android.googlequicksearchbox";
+
     /**
      * Returns true if theme is dark.
      */

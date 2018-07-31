@@ -16,6 +16,7 @@
 
 package com.android.launcher3.settings;
 
+import static android.os.Process.myUserHandle;
 import static android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED;
 
 import static androidx.preference.PreferenceFragmentCompat.ARG_PREFERENCE_ROOT;
@@ -28,6 +29,7 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.LauncherApps;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Bundle;
@@ -55,6 +57,7 @@ import com.android.launcher3.BuildConfig;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherFiles;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.display.DisplayController;
 import com.android.launcher3.display.LauncherDisplayInfo;
 import com.android.launcher3.util.SafeCloseable;
@@ -85,6 +88,8 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
 
     private static final int DELAY_HIGHLIGHT_DURATION_MILLIS = 600;
     public static final String SAVE_HIGHLIGHTED_KEY = "android:preference_highlighted";
+
+    private static final String KEY_MINUS_ONE = "pref_enable_minus_one";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -308,6 +313,7 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
          * will remove that preference from the list.
          */
         protected boolean initPreference(Preference preference) {
+            LauncherApps launcherApps = getContext().getSystemService(LauncherApps.class);
             LauncherDisplayInfo info = DisplayController.INSTANCE.get(getContext()).getInfo();
             switch (preference.getKey()) {
                 case NOTIFICATION_DOTS_PREFERENCE_KEY:
@@ -337,6 +343,9 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                             }
                     );
                     return !info.isLargeScreen(info.realBounds);
+                case KEY_MINUS_ONE:
+                    return launcherApps != null &&
+                            launcherApps.isPackageEnabled(Utilities.GSA_PACKAGE, myUserHandle());
             }
             return true;
         }

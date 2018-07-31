@@ -19,12 +19,47 @@
     xmlns:launcher="http://schemas.android.com/apk/res-auto">
 
     <SwitchPreferenceCompat
+        android:key="pref_desktop_show_labels"
+        android:title="@string/desktop_show_labels"
+        android:defaultValue="true"
+        android:persistent="true" />
+
+    <SwitchPreferenceCompat
         android:defaultValue="false"
         android:key="pref_workspace_lock"
         android:persistent="true"
         android:title="@string/settings_lock_layout_title"
         android:summaryOn="@string/settings_lock_layout_summary_on"
         android:summaryOff="@string/settings_lock_layout_summary_off" />
+
+    <androidx.preference.PreferenceCategory
+        android:key="google_category"
+        android:title="@string/category_google">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="pref_enable_minus_one"
+            android:summary="@string/pref_show_google_now_summary"
+            android:title="@string/title_show_google_app" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        android:key="allapps_category"
+        android:title="@string/category_allapps">
+
+        <SwitchPreferenceCompat
+            android:key="pref_allapps_themed_icons"
+            android:title="@string/pref_themed_icons_title"
+            android:summary="@string/pref_themed_icons_summary"
+            android:defaultValue="false"
+            android:persistent="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_drawer_show_labels"
+            android:title="@string/drawer_show_labels"
+            android:defaultValue="true"
+            android:persistent="true" />
+    </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory
         android:key="icon_category"
@@ -49,30 +84,5 @@
             android:persistent="false"
             android:widgetLayout="@layout/notification_pref_warning" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_desktop_show_labels"
-            android:title="@string/desktop_show_labels"
-            android:defaultValue="true"
-            android:persistent="true" />
-
     </androidx.preference.PreferenceCategory>
-
-    <androidx.preference.PreferenceCategory
-        android:key="allapps_category"
-        android:title="@string/category_allapps">
-
-        <SwitchPreferenceCompat
-            android:key="pref_allapps_themed_icons"
-            android:title="@string/pref_themed_icons_title"
-            android:summary="@string/pref_themed_icons_summary"
-            android:defaultValue="false"
-            android:persistent="true" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_drawer_show_labels"
-            android:title="@string/drawer_show_labels"
-            android:defaultValue="true"
-            android:persistent="true" />
-    </androidx.preference.PreferenceCategory>
-
 </androidx.preference.PreferenceScreen>
