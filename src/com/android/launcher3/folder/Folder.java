@@ -40,7 +40,6 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewDebug;
-import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.AnimationUtils;
 import android.view.inputmethod.EditorInfo;
@@ -191,14 +190,9 @@ public class Folder extends AbstractFloatingView implements DragSource,
     public Folder(Context context, AttributeSet attrs) {
         super(context, attrs);
         setAlwaysDrawnWithCacheEnabled(false);
-        Resources res = getResources();
 
-        if (sDefaultFolderName == null) {
-            sDefaultFolderName = res.getString(R.string.folder_name);
-        }
-        if (sHintText == null) {
-            sHintText = res.getString(R.string.folder_hint_text);
-        }
+        setLocaleDependentFields(getResources(), false /* force */);
+
         mLauncher = Launcher.getLauncher(context);
         // We need this view to be focusable in touch mode so that when text editing of the folder
         // name is complete, we have something to focus on, thus hiding the cursor and giving
@@ -648,7 +642,7 @@ public class Folder extends AbstractFloatingView implements DragSource,
                 mFolderIcon.mBackground.animateBackgroundStroke();
                 mFolderIcon.onFolderClose(mContent.getCurrentPage());
                 if (mFolderIcon.hasBadge()) {
-                    mFolderIcon.createBadgeScaleAnimator(0f, 1f).start();
+                    mFolderIcon.animateBadgeScale(0f, 1f);
                 }
                 mFolderIcon.requestFocus();
             }
@@ -1472,5 +1466,14 @@ public class Folder extends AbstractFloatingView implements DragSource,
             }
         }
         return false;
+    }
+
+    public static void setLocaleDependentFields(Resources res, boolean force) {
+        if (sDefaultFolderName == null || force) {
+            sDefaultFolderName = res.getString(R.string.folder_name);
+        }
+        if (sHintText == null || force) {
+            sHintText = res.getString(R.string.folder_hint_text);
+        }
     }
 }

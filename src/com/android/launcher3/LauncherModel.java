@@ -31,7 +31,6 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Process;
 import android.os.UserHandle;
-import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -73,6 +72,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
+
+import androidx.annotation.Nullable;
 
 /**
  * Maintains in-memory state of the Launcher. It is expected that there should be only one
@@ -143,9 +144,10 @@ public class LauncherModel extends BroadcastReceiver
         public void bindItems(List<ItemInfo> shortcuts, boolean forceAnimateIcons);
         public void bindScreens(ArrayList<Long> orderedScreenIds);
         public void finishFirstPageBind(ViewOnDrawExecutor executor);
-        public void finishBindingItems();
+        public void finishBindingItems(int currentScreen);
         public void bindAllApplications(ArrayList<AppInfo> apps);
         public void bindAppsAddedOrUpdated(ArrayList<AppInfo> apps);
+        public void preAddApps();
         public void bindAppsAdded(ArrayList<Long> newScreens,
                                   ArrayList<ItemInfo> addNotAnimated,
                                   ArrayList<ItemInfo> addAnimated);
@@ -195,6 +197,10 @@ public class LauncherModel extends BroadcastReceiver
      * Adds the provided items to the workspace.
      */
     public void addAndBindAddedWorkspaceItems(List<Pair<ItemInfo, Object>> itemList) {
+        Callbacks callbacks = getCallback();
+        if (callbacks != null) {
+            callbacks.preAddApps();
+        }
         enqueueModelUpdateTask(new AddWorkspaceItemsTask(itemList));
     }
 
@@ -620,15 +626,12 @@ public class LauncherModel extends BroadcastReceiver
     }
 
     public void updateAndBindShortcutInfo(final ShortcutInfo si, final ShortcutInfoCompat info) {
-        updateAndBindShortcutInfo(new Provider<ShortcutInfo>() {
-            @Override
-            public ShortcutInfo get() {
-                si.updateFromDeepShortcutInfo(info, mApp.getContext());
-                LauncherIcons li = LauncherIcons.obtain(mApp.getContext());
-                li.createShortcutIcon(info).applyTo(si);
-                li.recycle();
-                return si;
-            }
+        updateAndBindShortcutInfo(() -> {
+            si.updateFromDeepShortcutInfo(info, mApp.getContext());
+            LauncherIcons li = LauncherIcons.obtain(mApp.getContext());
+            li.createShortcutIcon(info).applyTo(si);
+            li.recycle();
+            return si;
         });
     }
 

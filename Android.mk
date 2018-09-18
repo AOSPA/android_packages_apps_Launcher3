@@ -37,9 +37,8 @@ LOCAL_AAPT2_ONLY := true
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_STATIC_ANDROID_LIBRARIES := \
-    android-support-v4 \
-    android-support-v7-recyclerview \
-    android-support-dynamic-animation
+    androidx.recyclerview_recyclerview \
+    androidx.dynamicanimation_dynamicanimation
 
 LOCAL_SRC_FILES := \
     $(call all-proto-files-under, protos) \
@@ -127,7 +126,16 @@ LOCAL_USE_AAPT2 := true
 LOCAL_AAPT2_ONLY := true
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_STATIC_JAVA_LIBRARIES := libSharedSystemUI
+ifneq (,$(wildcard frameworks/base))
+  LOCAL_STATIC_JAVA_LIBRARIES := SystemUISharedLib
+  LOCAL_PRIVATE_PLATFORM_APIS := true
+else
+  LOCAL_STATIC_JAVA_LIBRARIES := libSharedSystemUI
+  LOCAL_SDK_VERSION := system_current
+  LOCAL_MIN_SDK_VERSION := 26
+endif
+LOCAL_MODULE := Launcher3QuickStepLib
+LOCAL_PRIVILEGED_MODULE := true
 LOCAL_STATIC_ANDROID_LIBRARIES := Launcher3CommonDepsLib
 
 LOCAL_SRC_FILES := \
@@ -138,10 +146,6 @@ LOCAL_SRC_FILES := \
 LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/quickstep/res
 LOCAL_PROGUARD_ENABLED := disabled
 
-LOCAL_SDK_VERSION := system_current
-LOCAL_MIN_SDK_VERSION := 26
-LOCAL_MODULE := Launcher3QuickStepLib
-LOCAL_PRIVILEGED_MODULE := true
 
 LOCAL_MANIFEST_FILE := quickstep/AndroidManifest.xml
 include $(BUILD_STATIC_JAVA_LIBRARY)
@@ -156,8 +160,12 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_STATIC_ANDROID_LIBRARIES := Launcher3QuickStepLib
 LOCAL_PROGUARD_ENABLED := disabled
 
-LOCAL_SDK_VERSION := system_current
-LOCAL_MIN_SDK_VERSION := 26
+ifneq (,$(wildcard frameworks/base))
+  LOCAL_PRIVATE_PLATFORM_APIS := true
+else
+  LOCAL_SDK_VERSION := system_current
+  LOCAL_MIN_SDK_VERSION := 26
+endif
 LOCAL_PACKAGE_NAME := Launcher3QuickStep
 LOCAL_PRIVILEGED_MODULE := true
 LOCAL_OVERRIDES_PACKAGES := Home Launcher2 Launcher3
@@ -181,7 +189,14 @@ include $(CLEAR_VARS)
 LOCAL_USE_AAPT2 := true
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_STATIC_JAVA_LIBRARIES := libSharedSystemUI
+ifneq (,$(wildcard frameworks/base))
+  LOCAL_STATIC_JAVA_LIBRARIES := SystemUISharedLib
+  LOCAL_PRIVATE_PLATFORM_APIS := true
+else
+  LOCAL_STATIC_JAVA_LIBRARIES := libSharedSystemUI
+  LOCAL_SDK_VERSION := system_current
+  LOCAL_MIN_SDK_VERSION := 26
+endif
 LOCAL_STATIC_ANDROID_LIBRARIES := Launcher3CommonDepsLib
 
 LOCAL_SRC_FILES := \
@@ -193,10 +208,9 @@ LOCAL_RESOURCE_DIR := \
     $(LOCAL_PATH)/quickstep/res \
     $(LOCAL_PATH)/go/res
 
-LOCAL_PROGUARD_ENABLED := disabled
+LOCAL_PROGUARD_FLAG_FILES := proguard.flags
+LOCAL_PROGUARD_ENABLED := full
 
-LOCAL_SDK_VERSION := system_current
-LOCAL_MIN_SDK_VERSION := 26
 LOCAL_PACKAGE_NAME := Launcher3QuickStepGo
 LOCAL_PRIVILEGED_MODULE := true
 LOCAL_OVERRIDES_PACKAGES := Home Launcher2 Launcher3 Launcher3QuickStep

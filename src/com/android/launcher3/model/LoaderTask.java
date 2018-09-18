@@ -381,24 +381,16 @@ public class LoaderTask implements Runnable {
                                     // no special handling necessary for this item
                                     c.markRestored();
                                 } else {
-                                    if (c.hasRestoreFlag(ShortcutInfo.FLAG_AUTOINSTALL_ICON)) {
-                                        // We allow auto install apps to have their intent
-                                        // updated after an install.
-                                        intent = pmHelper.getAppLaunchIntent(targetPkg, c.user);
-                                        if (intent != null) {
-                                            c.restoreFlag = 0;
-                                            c.updater().put(
-                                                    LauncherSettings.Favorites.INTENT,
-                                                    intent.toUri(0)).commit();
-                                            cn = intent.getComponent();
-                                        } else {
-                                            c.markDeleted("Unable to find a launch target");
-                                            continue;
-                                        }
+                                    // Gracefully try to find a fallback activity.
+                                    intent = pmHelper.getAppLaunchIntent(targetPkg, c.user);
+                                    if (intent != null) {
+                                        c.restoreFlag = 0;
+                                        c.updater().put(
+                                                LauncherSettings.Favorites.INTENT,
+                                                intent.toUri(0)).commit();
+                                        cn = intent.getComponent();
                                     } else {
-                                        // The app is installed but the component is no
-                                        // longer available.
-                                        c.markDeleted("Invalid component removed: " + cn);
+                                        c.markDeleted("Unable to find a launch target");
                                         continue;
                                     }
                                 }
@@ -478,15 +470,11 @@ public class LoaderTask implements Runnable {
                                     }
                                     info = new ShortcutInfo(pinnedShortcut, context);
                                     final ShortcutInfo finalInfo = info;
-                                    Provider<Bitmap> fallbackIconProvider = new Provider<Bitmap>() {
-                                        @Override
-                                        public Bitmap get() {
-                                            // If the pinned deep shortcut is no longer published,
-                                            // use the last saved icon instead of the default.
-                                            return c.loadIcon(finalInfo)
-                                                    ? finalInfo.iconBitmap : null;
-                                        }
-                                    };
+                                    // If the pinned deep shortcut is no longer published,
+                                    // use the last saved icon instead of the default.
+                                    Provider<Bitmap> fallbackIconProvider = () ->
+                                            c.loadIcon(finalInfo) ? finalInfo.iconBitmap : null;
+
                                     LauncherIcons li = LauncherIcons.obtain(context);
                                     li.createShortcutIcon(pinnedShortcut,
                                             true /* badged */, fallbackIconProvider).applyTo(info);
@@ -746,7 +734,7 @@ public class LoaderTask implements Runnable {
 
                 int numItemsInPreview = 0;
                 for (ShortcutInfo info : folder.contents) {
-                    if (info.usingLowResIcon
+                    if (info.usingLowResIcon()
                             && info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
                             && verifier.isItemInPreview(info.rank)) {
                         mIconCache.getTitleAndIcon(info, false);

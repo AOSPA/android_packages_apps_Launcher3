@@ -20,13 +20,14 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Rect;
-import android.support.annotation.AnyThread;
-import android.support.annotation.IntDef;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 
 import java.lang.annotation.Retention;
+
+import androidx.annotation.AnyThread;
+import androidx.annotation.IntDef;
 
 public class LayoutUtils {
 
@@ -109,5 +110,10 @@ public class LayoutUtils {
                 (launcherVisibleHeight - extraVerticalSpace - outHeight) / 2);
         outRect.set(Math.round(x), Math.round(y),
                 Math.round(x + outWidth), Math.round(y + outHeight));
+    }
+
+    public static int getShelfTrackingDistance(DeviceProfile dp) {
+        // Start from a third of bottom inset to provide some shelf overlap.
+        return dp.hotseatBarSizePx + dp.getInsets().bottom / 3 - dp.edgeMarginPx * 2;
     }
 }

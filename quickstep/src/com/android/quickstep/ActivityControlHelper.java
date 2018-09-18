@@ -19,10 +19,12 @@ import static android.view.View.TRANSLATION_Y;
 
 import static com.android.launcher3.LauncherAnimUtils.OVERVIEW_TRANSITION_MS;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
+import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.FAST_OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.allapps.AllAppsTransitionController.ALL_APPS_PROGRESS;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.states.RotationHelper.REQUEST_LOCK;
 import static com.android.quickstep.TouchConsumer.INTERACTION_NORMAL;
 import static com.android.quickstep.TouchConsumer.INTERACTION_QUICK_SCRUB;
 import static com.android.quickstep.views.RecentsView.CONTENT_ALPHA;
@@ -41,8 +43,6 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.support.annotation.Nullable;
-import android.support.annotation.UiThread;
 import android.view.View;
 
 import com.android.launcher3.BaseDraggingActivity;
@@ -52,10 +52,11 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
+import com.android.launcher3.TestProtocol;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DiscoveryBounce;
-import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.uioverrides.FastOverviewState;
 import com.android.launcher3.userevent.nano.LauncherLogProto;
@@ -74,6 +75,9 @@ import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
+
+import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
 
 /**
  * Utility class which abstracts out the logical differences between Launcher and RecentsActivity.
@@ -102,7 +106,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
     void onSwipeUpComplete(T activity);
 
     AnimationFactory prepareRecentsUI(T activity, boolean activityVisible,
-            Consumer<AnimatorPlaybackController> callback);
+            boolean animateActivity, Consumer<AnimatorPlaybackController> callback);
 
     ActivityInitListener createActivityInitListener(BiPredicate<T, Boolean> onInitListener);
 
@@ -133,7 +137,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
     /**
      * Must return a non-null controller is supportsLongSwipe was true.
      */
-    LongSwipeHelper getLongSwipeController(T activity, RemoteAnimationTargetSet targetSet);
+    LongSwipeHelper getLongSwipeController(T activity, int runningTaskId);
 
     /**
      * Used for containerType in {@link com.android.launcher3.logging.UserEventDispatcher}
@@ -156,6 +160,12 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
             QuickScrubController controller = activity.<RecentsView>getOverviewPanel()
                     .getQuickScrubController();
             controller.onQuickScrubStart(activityVisible && !fromState.overviewUi, this);
+
+            if (!activityVisible) {
+                // For the duration of the gesture, lock the screen orientation to ensure that we
+                // do not rotate mid-quickscrub
+                activity.getRotationHelper().setStateHandlerRequest(REQUEST_LOCK);
+            }
         }
 
         @Override
@@ -187,9 +197,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
                 int hotseatInset = dp.isSeascape() ? targetInsets.left : targetInsets.right;
                 return dp.hotseatBarSizePx + hotseatInset;
             } else {
-                int shelfHeight = dp.hotseatBarSizePx + dp.getInsets().bottom;
-                // Track slightly below the top of the shelf (between top and content).
-                return shelfHeight - dp.edgeMarginPx * 2;
+                return LayoutUtils.getShelfTrackingDistance(dp);
             }
         }
 
@@ -208,7 +216,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
 
         @Override
         public AnimationFactory prepareRecentsUI(Launcher activity, boolean activityVisible,
-                Consumer<AnimatorPlaybackController> callback) {
+                boolean animateActivity, Consumer<AnimatorPlaybackController> callback) {
             final LauncherState startState = activity.getStateManager().getState();
 
             LauncherState resetState = startState;
@@ -217,21 +225,28 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
             }
             activity.getStateManager().setRestState(resetState);
 
+            final LauncherState fromState;
             if (!activityVisible) {
                 // Since the launcher is not visible, we can safely reset the scroll position.
                 // This ensures then the next swipe up to all-apps starts from scroll 0.
                 activity.getAppsView().reset(false /* animate */);
-                activity.getStateManager().goToState(OVERVIEW, false);
+                fromState = animateActivity ? BACKGROUND_APP : OVERVIEW;
+                activity.getStateManager().goToState(fromState, false);
 
                 // Optimization, hide the all apps view to prevent layout while initializing
                 activity.getAppsView().getContentView().setVisibility(View.GONE);
+
+                AccessibilityManagerCompat.sendEventToTest(
+                        activity, TestProtocol.SWITCHED_TO_STATE_MESSAGE);
+            } else {
+                fromState = startState;
             }
 
             return new AnimationFactory() {
                 @Override
                 public void createActivityController(long transitionLength,
                         @InteractionType int interactionType) {
-                    createActivityControllerInternal(activity, activityVisible, startState,
+                    createActivityControllerInternal(activity, activityVisible, fromState,
                             transitionLength, interactionType, callback);
                 }
 
@@ -243,7 +258,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
         }
 
         private void createActivityControllerInternal(Launcher activity, boolean wasVisible,
-                LauncherState startState, long transitionLength,
+                LauncherState fromState, long transitionLength,
                 @InteractionType int interactionType,
                 Consumer<AnimatorPlaybackController> callback) {
             LauncherState endState = interactionType == INTERACTION_QUICK_SCRUB
@@ -252,31 +267,21 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
                 DeviceProfile dp = activity.getDeviceProfile();
                 long accuracy = 2 * Math.max(dp.widthPx, dp.heightPx);
                 callback.accept(activity.getStateManager()
-                        .createAnimationToNewWorkspace(startState, endState, accuracy));
+                        .createAnimationToNewWorkspace(fromState, endState, accuracy));
+                return;
+            }
+            if (fromState == endState) {
                 return;
             }
 
             AnimatorSet anim = new AnimatorSet();
-
             if (!activity.getDeviceProfile().isVerticalBarLayout()) {
                 AllAppsTransitionController controller = activity.getAllAppsController();
-                float scrollRange = Math.max(controller.getShiftRange(), 1);
-                float progressDelta = (transitionLength / scrollRange);
-
-                float endProgress = endState.getVerticalProgress(activity);
-                float startProgress = endProgress + progressDelta;
-                ObjectAnimator shiftAnim = ObjectAnimator.ofFloat(
-                        controller, ALL_APPS_PROGRESS, startProgress, endProgress);
+                ObjectAnimator shiftAnim = ObjectAnimator.ofFloat(controller, ALL_APPS_PROGRESS,
+                        fromState.getVerticalProgress(activity),
+                        endState.getVerticalProgress(activity));
                 shiftAnim.setInterpolator(LINEAR);
                 anim.play(shiftAnim);
-
-                // Since we are changing the start position of the UI, reapply the state, at the end
-                anim.addListener(new AnimationSuccessListener() {
-                    @Override
-                    public void onAnimationSuccess(Animator animator) {
-                        activity.getStateManager().reapplyState();
-                    }
-                });
             }
 
             if (interactionType == INTERACTION_NORMAL) {
@@ -285,7 +290,14 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
 
             anim.setDuration(transitionLength * 2);
             activity.getStateManager().setCurrentAnimation(anim);
-            callback.accept(AnimatorPlaybackController.wrap(anim, transitionLength * 2));
+            AnimatorPlaybackController controller =
+                    AnimatorPlaybackController.wrap(anim, transitionLength * 2);
+
+            // Since we are changing the start position of the UI, reapply the state, at the end
+            controller.setEndAction(() ->
+                activity.getStateManager().goToState(
+                        controller.getProgressFraction() > 0.5 ? endState : fromState, false));
+            callback.accept(controller);
         }
 
         /**
@@ -294,6 +306,9 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
         private void playScaleDownAnim(AnimatorSet anim, Launcher launcher) {
             RecentsView recentsView = launcher.getOverviewPanel();
             TaskView v = recentsView.getTaskViewAt(recentsView.getCurrentPage());
+            if (v == null) {
+                return;
+            }
             ClipAnimationHelper clipHelper = new ClipAnimationHelper();
             clipHelper.fromTaskThumbnailView(v.getThumbnail(), (RecentsView) v.getParent(), null);
             if (!clipHelper.getSourceRect().isEmpty() && !clipHelper.getTargetRect().isEmpty()) {
@@ -379,12 +394,11 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
         }
 
         @Override
-        public LongSwipeHelper getLongSwipeController(Launcher activity,
-                RemoteAnimationTargetSet targetSet) {
+        public LongSwipeHelper getLongSwipeController(Launcher activity, int runningTaskId) {
             if (activity.getDeviceProfile().isVerticalBarLayout()) {
                 return null;
             }
-            return new LongSwipeHelper(activity, targetSet);
+            return new LongSwipeHelper(activity, runningTaskId);
         }
 
         @Override
@@ -461,7 +475,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
 
         @Override
         public AnimationFactory prepareRecentsUI(RecentsActivity activity, boolean activityVisible,
-                Consumer<AnimatorPlaybackController> callback) {
+                boolean animateActivity, Consumer<AnimatorPlaybackController> callback) {
             if (activityVisible) {
                 return (transitionLength, interactionType) -> { };
             }
@@ -566,8 +580,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
         }
 
         @Override
-        public LongSwipeHelper getLongSwipeController(RecentsActivity activity,
-                RemoteAnimationTargetSet targetSet) {
+        public LongSwipeHelper getLongSwipeController(RecentsActivity activity, int runningTaskId) {
             return null;
         }
 

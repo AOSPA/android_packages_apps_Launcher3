@@ -14,16 +14,48 @@
 #
 
 LOCAL_PATH := $(call my-dir)
+
+#
+# Build rule for Tapl library.
+#
+include $(CLEAR_VARS)
+LOCAL_STATIC_JAVA_LIBRARIES := \
+	androidx.annotation_annotation \
+	androidx-test \
+	androidx.test.uiautomator_uiautomator \
+	libSharedSystemUI
+
+LOCAL_SRC_FILES := $(call all-java-files-under, tapl) \
+  ../quickstep/src/com/android/quickstep/SwipeUpSetting.java \
+  ../src/com/android/launcher3/TestProtocol.java
+
+LOCAL_SDK_VERSION := current
+LOCAL_MODULE := ub-launcher-aosp-tapl
+
+include $(BUILD_STATIC_JAVA_LIBRARY)
+
+#
+# Build rule for Launcher3Tests
+#
 include $(CLEAR_VARS)
 
 LOCAL_MODULE_TAGS := tests
-LOCAL_STATIC_JAVA_LIBRARIES := android-support-test ub-uiautomator mockito-target-minus-junit4
+LOCAL_STATIC_JAVA_LIBRARIES := \
+	androidx-test \
+	androidx.test.uiautomator_uiautomator \
+	mockito-target-minus-junit4
+
+ifneq (,$(wildcard frameworks/base))
+  LOCAL_PRIVATE_PLATFORM_APIS := true
+  LOCAL_STATIC_JAVA_LIBRARIES += launcher-aosp-tapl
+else
+  LOCAL_SDK_VERSION := 28
+  LOCAL_MIN_SDK_VERSION := 21
+  LOCAL_STATIC_JAVA_LIBRARIES += ub-launcher-aosp-tapl
+endif
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
 LOCAL_FULL_LIBS_MANIFEST_FILES := $(LOCAL_PATH)/AndroidManifest-common.xml
-
-LOCAL_SDK_VERSION := 28
-LOCAL_MIN_SDK_VERSION := 21
 
 LOCAL_PACKAGE_NAME := Launcher3Tests
 

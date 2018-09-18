@@ -19,6 +19,7 @@ import static com.android.launcher3.LauncherAnimUtils.OVERVIEW_TRANSITION_MS;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
 import static com.android.launcher3.states.RotationHelper.REQUEST_ROTATE;
 
+import android.graphics.Rect;
 import android.view.View;
 
 import com.android.launcher3.AbstractFloatingView;
@@ -31,11 +32,14 @@ import com.android.launcher3.allapps.DiscoveryBounce;
 import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.TaskView;
 
 /**
  * Definition for overview state
  */
 public class OverviewState extends LauncherState {
+
+    protected static final Rect sTempRect = new Rect();
 
     private static final int STATE_FLAGS = FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED
             | FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI | FLAG_DISABLE_ACCESSIBILITY;
@@ -77,7 +81,7 @@ public class OverviewState extends LauncherState {
     public void onStateDisabled(Launcher launcher) {
         RecentsView rv = launcher.getOverviewPanel();
         rv.setOverviewStateEnabled(false);
-        RecentsModel.getInstance(launcher).resetAssistCache();
+        RecentsModel.INSTANCE.get(launcher).resetAssistCache();
     }
 
     @Override
@@ -129,5 +133,15 @@ public class OverviewState extends LauncherState {
     public static float getDefaultSwipeHeight(Launcher launcher) {
         DeviceProfile dp = launcher.getDeviceProfile();
         return dp.allAppsCellHeightPx - dp.allAppsIconTextSizePx;
+    }
+
+    @Override
+    public void onBackPressed(Launcher launcher) {
+        TaskView taskView = launcher.<RecentsView>getOverviewPanel().getRunningTaskView();
+        if (taskView != null) {
+            taskView.launchTask(true);
+        } else {
+            super.onBackPressed(launcher);
+        }
     }
 }

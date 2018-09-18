@@ -22,14 +22,15 @@ import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CH
 import static com.android.launcher3.anim.Interpolators.ACCEL_2;
 import static com.android.launcher3.states.RotationHelper.REQUEST_NONE;
 
-import android.graphics.Rect;
 import android.view.animation.Interpolator;
 
 import com.android.launcher3.states.SpringLoadedState;
 import com.android.launcher3.uioverrides.AllAppsState;
+import com.android.launcher3.uioverrides.BackgroundAppState;
 import com.android.launcher3.uioverrides.FastOverviewState;
 import com.android.launcher3.uioverrides.OverviewState;
 import com.android.launcher3.uioverrides.UiFactory;
+import com.android.launcher3.userevent.nano.LauncherLogProto.Action;
 import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 
 import java.util.Arrays;
@@ -72,7 +73,7 @@ public class LauncherState {
                 }
             };
 
-    private static final LauncherState[] sAllStates = new LauncherState[5];
+    private static final LauncherState[] sAllStates = new LauncherState[6];
 
     /**
      * TODO: Create a separate class for NORMAL state.
@@ -88,8 +89,7 @@ public class LauncherState {
     public static final LauncherState OVERVIEW = new OverviewState(2);
     public static final LauncherState FAST_OVERVIEW = new FastOverviewState(3);
     public static final LauncherState ALL_APPS = new AllAppsState(4);
-
-    protected static final Rect sTempRect = new Rect();
+    public static final LauncherState BACKGROUND_APP = new BackgroundAppState(5);
 
     public final int ordinal;
 
@@ -248,6 +248,16 @@ public class LauncherState {
         if (this == NORMAL) {
             // Clear any rotation locks when going to normal state
             launcher.getRotationHelper().setCurrentStateRequest(REQUEST_NONE);
+        }
+    }
+
+    public void onBackPressed(Launcher launcher) {
+        if (this != NORMAL) {
+            LauncherStateManager lsm = launcher.getStateManager();
+            LauncherState lastState = lsm.getLastState();
+            launcher.getUserEventDispatcher().logActionCommand(Action.Command.BACK,
+                    containerType, lastState.containerType);
+            lsm.goToState(lastState);
         }
     }
 
