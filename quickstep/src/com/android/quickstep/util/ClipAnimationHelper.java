@@ -181,6 +181,8 @@ public class ClipAnimationHelper {
                 }
 
                 alpha = mTaskAlphaCallback.apply(app, alpha);
+            } else {
+                crop = null;
             }
 
             params[i] = new SurfaceParams(app.leash, alpha, mTmpMatrix, crop,
@@ -239,7 +241,7 @@ public class ClipAnimationHelper {
             updateStackBoundsToMultiWindowTaskSize(activity);
         } else {
             mSourceStackBounds.set(mHomeStackBounds);
-            mSourceInsets.set(activity.getDeviceProfile().getInsets());
+            mSourceInsets.set(ttv.getInsets());
         }
 
         TransformedRect targetRect = new TransformedRect();

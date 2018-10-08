@@ -22,14 +22,13 @@ import static org.mockito.Mockito.verify;
 
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 import android.view.LayoutInflater;
 
-import com.android.launcher3.IconCache;
+import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.WidgetPreviewLoader;
@@ -129,11 +128,10 @@ public class WidgetsListAdapterTest {
         if (num <= 0) return result;
 
         MultiHashMap<PackageItemInfo, WidgetItem> newMap = new MultiHashMap();
-        PackageManager pm = mContext.getPackageManager();
         AppWidgetManagerCompat widgetManager = AppWidgetManagerCompat.getInstance(mContext);
         for (AppWidgetProviderInfo widgetInfo : widgetManager.getAllProviders(null)) {
             WidgetItem wi = new WidgetItem(LauncherAppWidgetProviderInfo
-                    .fromProviderInfo(mContext, widgetInfo), pm, mTestProfile);
+                    .fromProviderInfo(mContext, widgetInfo), mTestProfile, mIconCache);
 
             PackageItemInfo pInfo = new PackageItemInfo(wi.componentName.getPackageName());
             pInfo.title = pInfo.packageName;
