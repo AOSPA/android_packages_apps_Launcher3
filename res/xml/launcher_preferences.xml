@@ -89,6 +89,20 @@
             android:persistent="false"
             android:widgetLayout="@layout/notification_pref_warning" />
 
+        <SwitchPreference
+            android:key="pref_desktop_labels"
+            android:title="@string/desktop_labels_title"
+            android:summary="@string/desktop_labels_summary"
+            android:defaultValue="true"
+            android:persistent="true" />
+
+        <SwitchPreference
+            android:key="pref_drawer_labels"
+            android:title="@string/drawer_labels_title"
+            android:summary="@string/drawer_labels_summary"
+            android:defaultValue="true"
+            android:persistent="true" />
+
     </androidx.preference.PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>

@@ -26,6 +26,8 @@ import static com.android.launcher3.InvariantDeviceProfile.TYPE_MULTI_DISPLAY;
 import static com.android.launcher3.InvariantDeviceProfile.TYPE_TABLET;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_DESKTOP_LABELS;
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_DRAWER_LABELS;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_DT_GESTURE;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_MINUS_ONE;
 
@@ -136,6 +138,10 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                         Settings.System.GESTURE_DOUBLE_TAP_SLEEP,
                         sharedPreferences.getBoolean(key, true) ? 1 : 0,
                         UserHandle.USER_CURRENT);
+                break;
+            case KEY_DESKTOP_LABELS:
+            case KEY_DRAWER_LABELS:
+                InvariantDeviceProfile.INSTANCE.get(this).onConfigChanged(getApplicationContext());
                 break;
             default:
                 break;
