@@ -115,7 +115,7 @@ public class AppDrawer extends SettingsActivity implements PreferenceFragment.On
             SwitchPreference allAppsShowLabel = (SwitchPreference) findPreference(Utilities.ALLAPPS_SHOW_LABEL);
             allAppsShowLabel.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
                 public boolean onPreferenceChange(Preference preference, Object newValue) {
-                    Utilities.restart(getActivity());
+                    SettingsActivity.restartNeeded = true;
                     return true;
                 }
             });
