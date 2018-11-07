@@ -40,7 +40,7 @@ LOCAL_PACKAGE_NAME := Launcher3Go
 LOCAL_PRIVILEGED_MODULE := true
 LOCAL_SYSTEM_EXT_MODULE := true
 LOCAL_OVERRIDES_PACKAGES := Home Launcher2 Launcher3 Launcher3QuickStep
-LOCAL_REQUIRED_MODULES := privapp_whitelist_com.android.launcher3
+LOCAL_REQUIRED_MODULES := privapp_whitelist_com.android.launcher3 privapp_whitelist_aospa_launcher3.xml
 
 LOCAL_FULL_LIBS_MANIFEST_FILES := \
     $(LOCAL_PATH)/AndroidManifest.xml \
@@ -75,7 +75,7 @@ LOCAL_CERTIFICATE := platform
 LOCAL_PRIVILEGED_MODULE := true
 LOCAL_SYSTEM_EXT_MODULE := true
 LOCAL_OVERRIDES_PACKAGES := Home Launcher2 Launcher3
-LOCAL_REQUIRED_MODULES := privapp_whitelist_com.android.launcher3
+LOCAL_REQUIRED_MODULES := privapp_whitelist_com.android.launcher3 privapp_whitelist_aospa_launcher3.xml
 
 LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/quickstep/res
 
@@ -129,7 +129,7 @@ LOCAL_PACKAGE_NAME := Launcher3QuickStepGo
 LOCAL_PRIVILEGED_MODULE := true
 LOCAL_SYSTEM_EXT_MODULE := true
 LOCAL_OVERRIDES_PACKAGES := Home Launcher2 Launcher3 Launcher3QuickStep Launcher3Go
-LOCAL_REQUIRED_MODULES := privapp_whitelist_com.android.launcher3
+LOCAL_REQUIRED_MODULES := privapp_whitelist_com.android.launcher3 privapp_whitelist_aospa_launcher3.xml
 
 LOCAL_FULL_LIBS_MANIFEST_FILES := \
     $(LOCAL_PATH)/go/AndroidManifest.xml \
