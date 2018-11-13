@@ -167,6 +167,11 @@ public final class Utilities {
         return getIconCount(context, HOTSEAT_ICONS, fallback);
     }
 
+    public static boolean forceLegacyIconMask(Context context) {
+        SharedPreferences prefs = getPrefs(context.getApplicationContext());
+        return prefs.getBoolean(Icons.KEY_PREF_LEGACY_ICON_MASK, false);
+    }
+
     public static float getIconSizeModifier(Context context) {
         String saved = getPrefs(context).getString(ICON_SIZE, "average");
         float offset;
