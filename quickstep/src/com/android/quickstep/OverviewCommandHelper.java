@@ -227,10 +227,10 @@ public class OverviewCommandHelper {
         public RecentsActivityCommand() {
             mHelper = getActivityControlHelper();
             mCreateTime = SystemClock.elapsedRealtime();
-            mRunningTaskId = mAM.getRunningTask().id;
+            mRunningTaskId = RecentsModel.getRunningTaskId();
 
             // Preload the plan
-            mRecentsModel.loadTasks(mRunningTaskId, null);
+            mRecentsModel.getTasks(null);
         }
 
         @Override

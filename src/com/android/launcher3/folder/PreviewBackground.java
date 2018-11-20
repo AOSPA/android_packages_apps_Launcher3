@@ -16,6 +16,9 @@
 
 package com.android.launcher3.folder;
 
+import static com.android.launcher3.folder.FolderShape.getShape;
+import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
@@ -39,8 +42,6 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.util.Themes;
 
-import androidx.core.graphics.ColorUtils;
-
 /**
  * This object represents a FolderIcon preview background. It stores drawing / measurement
  * information, handles drawing, and animation (accept state <--> rest state).
@@ -48,16 +49,6 @@ import androidx.core.graphics.ColorUtils;
 public class PreviewBackground {
 
     private static final int CONSUMPTION_ANIMATION_DURATION = 100;
-
-    private final PorterDuffXfermode mClipPorterDuffXfermode
-            = new PorterDuffXfermode(PorterDuff.Mode.DST_IN);
-    // Create a RadialGradient such that it draws a black circle and then extends with
-    // transparent. To achieve this, we keep the gradient to black for the range [0, 1) and
-    // just at the edge quickly change it to transparent.
-    private final RadialGradient mClipShader = new RadialGradient(0, 0, 1,
-            new int[] {Color.BLACK, Color.BLACK, Color.TRANSPARENT },
-            new float[] {0, 0.999f, 1},
-            Shader.TileMode.CLAMP);
 
     private final PorterDuffXfermode mShadowPorterDuffXfermode
             = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
@@ -197,7 +188,7 @@ public class PreviewBackground {
 
     public int getBgColor() {
         int alpha = (int) Math.min(MAX_BG_OPACITY, BG_OPACITY * mColorMultiplier);
-        return ColorUtils.setAlphaComponent(mBgColor, alpha);
+        return setColorAlphaBound(mBgColor, alpha);
     }
 
     public int getBadgeColor() {
@@ -208,8 +199,7 @@ public class PreviewBackground {
         mPaint.setStyle(Paint.Style.FILL);
         mPaint.setColor(getBgColor());
 
-        drawCircle(canvas, 0 /* deltaRadius */);
-
+        getShape().drawShape(canvas, getOffsetX(), getOffsetY(), getScaledRadius(), mPaint);
         drawShadow(canvas);
     }
 
@@ -244,7 +234,7 @@ public class PreviewBackground {
         mPaint.setShader(null);
         if (canvas.isHardwareAccelerated()) {
             mPaint.setXfermode(mShadowPorterDuffXfermode);
-            canvas.drawCircle(radius + offsetX, radius + offsetY, radius, mPaint);
+            getShape().drawShape(canvas, offsetX, offsetY, radius, mPaint);
             mPaint.setXfermode(null);
         }
 
@@ -284,10 +274,13 @@ public class PreviewBackground {
     }
 
     public void drawBackgroundStroke(Canvas canvas) {
-        mPaint.setColor(ColorUtils.setAlphaComponent(mBgColor, mStrokeAlpha));
+        mPaint.setColor(setColorAlphaBound(mBgColor, mStrokeAlpha));
         mPaint.setStyle(Paint.Style.STROKE);
         mPaint.setStrokeWidth(mStrokeWidth);
-        drawCircle(canvas, 1 /* deltaRadius */);
+
+        float inset = 1f;
+        getShape().drawShape(canvas,
+                getOffsetX() + inset, getOffsetY() + inset, getScaledRadius() - inset, mPaint);
     }
 
     public void drawLeaveBehind(Canvas canvas) {
@@ -296,38 +289,15 @@ public class PreviewBackground {
 
         mPaint.setStyle(Paint.Style.FILL);
         mPaint.setColor(Color.argb(160, 245, 245, 245));
-        drawCircle(canvas, 0 /* deltaRadius */);
+        getShape().drawShape(canvas, getOffsetX(), getOffsetY(), getScaledRadius(), mPaint);
 
         mScale = originalScale;
     }
 
-    private void drawCircle(Canvas canvas,float deltaRadius) {
-        float radius = getScaledRadius();
-        canvas.drawCircle(radius + getOffsetX(), radius + getOffsetY(),
-                radius - deltaRadius, mPaint);
-    }
-
     public Path getClipPath() {
         mPath.reset();
-        float r = getScaledRadius();
-        mPath.addCircle(r + getOffsetX(), r + getOffsetY(), r, Path.Direction.CW);
+        getShape().addShape(mPath, getOffsetX(), getOffsetY(), getScaledRadius());
         return mPath;
-    }
-
-    // It is the callers responsibility to save and restore the canvas layers.
-    void clipCanvasHardware(Canvas canvas) {
-        mPaint.setColor(Color.BLACK);
-        mPaint.setStyle(Paint.Style.FILL);
-        mPaint.setXfermode(mClipPorterDuffXfermode);
-
-        float radius = getScaledRadius();
-        mShaderMatrix.setScale(radius, radius);
-        mShaderMatrix.postTranslate(radius + getOffsetX(), radius + getOffsetY());
-        mClipShader.setLocalMatrix(mShaderMatrix);
-        mPaint.setShader(mClipShader);
-        canvas.drawPaint(mPaint);
-        mPaint.setXfermode(null);
-        mPaint.setShader(null);
     }
 
     private void delegateDrawing(CellLayout delegate, int cellX, int cellY) {

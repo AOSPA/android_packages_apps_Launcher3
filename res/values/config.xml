@@ -19,7 +19,7 @@
     <string name="delete_package_intent" translatable="false">#Intent;action=android.intent.action.DELETE;launchFlags=0x10800000;end</string>
 
     <!-- String representing the fragment class for settings activity.-->
-    <string name="settings_fragment_name" translatable="false">com.android.launcher3.SettingsActivity$LauncherSettingsFragment</string>
+    <string name="settings_fragment_name" translatable="false">com.android.launcher3.settings.SettingsActivity$LauncherSettingsFragment</string>
 
     <!-- Values for icon shape overrides. These should correspond to entries defined
      in icon_shape_override_paths_names -->
@@ -84,6 +84,7 @@
     <string name="icon_provider_class" translatable="false"></string>
     <string name="drawable_factory_class" translatable="false"></string>
     <string name="user_event_dispatcher_class" translatable="false"></string>
+    <string name="stats_log_manager_class" translatable="false"></string>
     <string name="app_transition_manager_class" translatable="false"></string>
     <string name="instant_app_resolver_class" translatable="false"></string>
     <string name="main_process_initializer_class" translatable="false"></string>
@@ -105,7 +106,10 @@
     <item type="id" name="view_unhighlight_background" />
     <item type="id" name="view_highlighted" />
 
-<!-- Popup items -->
+    <!-- Menu id for feature flags -->
+    <item type="id" name="menu_apply_flags" />
+
+    <!-- Popup items -->
     <integer name="config_popupOpenCloseDuration">150</integer>
     <integer name="config_popupArrowOpenCloseDuration">40</integer>
     <integer name="config_removeNotificationViewDuration">300</integer>
@@ -123,14 +127,12 @@
     <item type="id" name="action_deep_shortcuts" />
     <item type="id" name="action_shortcuts_and_notifications"/>
     <item type="id" name="action_dismiss_notification" />
+    <item type="id" name="action_remote_action_shortcut" />
 
 <!-- QSB IDs. DO not change -->
     <item type="id" name="search_container_workspace" />
-    <item type="id" name="search_container_hotseat" />
     <item type="id" name="search_container_all_apps" />
 
 <!-- Recents -->
     <item type="id" name="overview_panel"/>
-    <integer name="config_recentsMaxThumbnailCacheSize">6</integer>
-    <integer name="config_recentsMaxIconCacheSize">12</integer>
 </resources>

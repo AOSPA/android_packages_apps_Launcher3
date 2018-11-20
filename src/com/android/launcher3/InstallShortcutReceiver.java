@@ -41,6 +41,7 @@ import android.util.Pair;
 import com.android.launcher3.compat.LauncherAppsCompat;
 import com.android.launcher3.compat.UserManagerCompat;
 import com.android.launcher3.icons.BitmapInfo;
+import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.shortcuts.DeepShortcutManager;
 import com.android.launcher3.shortcuts.ShortcutInfoCompat;
@@ -457,7 +458,7 @@ public class InstallShortcutReceiver extends BroadcastReceiver {
                     .key(LAUNCH_INTENT_KEY).value(launchIntent.toUri(0))
                     .key(NAME_KEY).value(name);
                 if (icon != null) {
-                    byte[] iconByteArray = Utilities.flattenBitmap(icon);
+                    byte[] iconByteArray = GraphicsUtils.flattenBitmap(icon);
                     json = json.key(ICON_KEY).value(
                             Base64.encodeToString(
                                     iconByteArray, 0, iconByteArray.length, Base64.DEFAULT));
@@ -480,7 +481,7 @@ public class InstallShortcutReceiver extends BroadcastReceiver {
                 final LauncherAppState app = LauncherAppState.getInstance(mContext);
                 // Set default values until proper values is loaded.
                 appInfo.title = "";
-                app.getIconCache().getDefaultIcon(user).applyTo(appInfo);
+                appInfo.applyFrom(app.getIconCache().getDefaultIcon(user));
                 final ShortcutInfo si = appInfo.makeShortcut();
                 if (Looper.myLooper() == LauncherModel.getWorkerLooper()) {
                     app.getIconCache().getTitleAndIcon(si, activityInfo, false /* useLowResIcon */);
@@ -495,7 +496,7 @@ public class InstallShortcutReceiver extends BroadcastReceiver {
             } else if (shortcutInfo != null) {
                 ShortcutInfo si = new ShortcutInfo(shortcutInfo, mContext);
                 LauncherIcons li = LauncherIcons.obtain(mContext);
-                li.createShortcutIcon(shortcutInfo).applyTo(si);
+                si.applyFrom(li.createShortcutIcon(shortcutInfo));
                 li.recycle();
                 return Pair.create((ItemInfo) si, (Object) shortcutInfo);
             } else if (providerInfo != null) {
@@ -656,11 +657,11 @@ public class InstallShortcutReceiver extends BroadcastReceiver {
         if (iconInfo == null) {
             iconInfo = app.getIconCache().getDefaultIcon(info.user);
         }
-        iconInfo.applyTo(info);
+        info.applyFrom(iconInfo);
 
         info.title = Utilities.trim(name);
-        info.contentDescription = UserManagerCompat.getInstance(app.getContext())
-                .getBadgedLabelForUser(info.title, info.user);
+        info.contentDescription = app.getContext().getPackageManager()
+                .getUserBadgedLabel(info.title, info.user);
         info.intent = intent;
         return info;
     }

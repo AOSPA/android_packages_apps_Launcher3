@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.Intent.ShortcutIconResource;
 import android.content.pm.LauncherActivityInfo;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.CursorWrapper;
 import android.graphics.BitmapFactory;
@@ -41,7 +42,6 @@ import com.android.launcher3.ShortcutInfo;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.compat.LauncherAppsCompat;
-import com.android.launcher3.compat.UserManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.LauncherIcons;
@@ -64,7 +64,7 @@ public class LoaderCursor extends CursorWrapper {
     public final LongSparseArray<UserHandle> allUsers = new LongSparseArray<>();
 
     private final Context mContext;
-    private final UserManagerCompat mUserManager;
+    private final PackageManager mPM;
     private final IconCache mIconCache;
     private final InvariantDeviceProfile mIDP;
 
@@ -100,7 +100,7 @@ public class LoaderCursor extends CursorWrapper {
         mContext = app.getContext();
         mIconCache = app.getIconCache();
         mIDP = app.getInvariantDeviceProfile();
-        mUserManager = UserManagerCompat.getInstance(mContext);
+        mPM = mContext.getPackageManager();
 
         // Init column indices
         iconIndex = getColumnIndexOrThrow(LauncherSettings.Favorites.ICON);
@@ -153,7 +153,7 @@ public class LoaderCursor extends CursorWrapper {
         info.title = getTitle();
         // the fallback icon
         if (!loadIcon(info)) {
-            mIconCache.getDefaultIcon(info.user).applyTo(info);
+            info.applyFrom(mIconCache.getDefaultIcon(info.user));
         }
 
         // TODO: If there's an explicit component and we can't install that, delete it.
@@ -176,7 +176,7 @@ public class LoaderCursor extends CursorWrapper {
                 BitmapInfo iconInfo = li.createIconBitmap(info.iconResource);
                 li.recycle();
                 if (iconInfo != null) {
-                    iconInfo.applyTo(info);
+                    info.applyFrom(iconInfo);
                     return true;
                 }
             }
@@ -185,7 +185,7 @@ public class LoaderCursor extends CursorWrapper {
         // Failed to load from resource, try loading from DB.
         byte[] data = getBlob(iconIndex);
         try (LauncherIcons li = LauncherIcons.obtain(mContext)) {
-            li.createIconBitmap(BitmapFactory.decodeByteArray(data, 0, data.length)).applyTo(info);
+            info.applyFrom(li.createIconBitmap(BitmapFactory.decodeByteArray(data, 0, data.length)));
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to load icon for info " + info, e);
@@ -228,7 +228,7 @@ public class LoaderCursor extends CursorWrapper {
             throw new InvalidParameterException("Invalid restoreType " + restoreFlag);
         }
 
-        info.contentDescription = mUserManager.getBadgedLabelForUser(info.title, info.user);
+        info.contentDescription = mPM.getUserBadgedLabel(info.title, info.user);
         info.itemType = itemType;
         info.status = restoreFlag;
         return info;
@@ -284,7 +284,7 @@ public class LoaderCursor extends CursorWrapper {
             info.title = componentName.getClassName();
         }
 
-        info.contentDescription = mUserManager.getBadgedLabelForUser(info.title, info.user);
+        info.contentDescription = mPM.getUserBadgedLabel(info.title, info.user);
         return info;
     }
 

@@ -56,6 +56,7 @@ import org.junit.Rule;
 import org.junit.rules.TestRule;
 import org.junit.runners.model.Statement;
 
+import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -168,6 +169,16 @@ public abstract class AbstractLauncherUiTest {
         }
     }
 
+    protected void clearLauncherData() throws IOException {
+        if (TestHelpers.isInLauncherProcess()) {
+            LauncherSettings.Settings.call(mTargetContext.getContentResolver(),
+                    LauncherSettings.Settings.METHOD_CREATE_EMPTY_DB);
+            resetLoaderState();
+        } else {
+            mDevice.executeShellCommand("pm clear " + mDevice.getLauncherPackageName());
+        }
+    }
+
     /**
      * Scrolls the {@param container} until it finds an object matching {@param condition}.
      * @return the matching object.
@@ -261,6 +272,10 @@ public abstract class AbstractLauncherUiTest {
                 launcher -> launcher.getStateManager().getState() == state);
     }
 
+    protected void waitForResumed(String message) {
+        waitForLauncherCondition(message, launcher -> launcher.hasBeenResumed());
+    }
+
     // Cannot be used in TaplTests after injecting any gesture using Tapl because this can hide
     // flakiness.
     protected void waitForLauncherCondition(String message, Function<Launcher, Boolean> condition) {
@@ -279,11 +294,6 @@ public abstract class AbstractLauncherUiTest {
         return LauncherAppsCompat.getInstance(mTargetContext)
                 .getActivityList("com.android.settings",
                         Process.myUserHandle()).get(0);
-    }
-
-    protected LauncherActivityInfo getChromeApp() {
-        return LauncherAppsCompat.getInstance(mTargetContext)
-                .getActivityList("com.android.chrome", Process.myUserHandle()).get(0);
     }
 
     /**

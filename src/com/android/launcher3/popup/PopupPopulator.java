@@ -124,7 +124,7 @@ public class PopupPopulator {
 
     public static Runnable createUpdateRunnable(final Launcher launcher, final ItemInfo originalInfo,
             final Handler uiHandler, final PopupContainerWithArrow container,
-            final List<String> shortcutIds, final List<DeepShortcutView> shortcutViews,
+            final List<DeepShortcutView> shortcutViews,
             final List<NotificationKeyData> notificationKeys) {
         final ComponentName activity = originalInfo.getTargetComponent();
         final UserHandle user = originalInfo.user;
@@ -141,7 +141,7 @@ public class PopupPopulator {
             }
 
             List<ShortcutInfoCompat> shortcuts = DeepShortcutManager.getInstance(launcher)
-                    .queryForShortcutsContainer(activity, shortcutIds, user);
+                    .queryForShortcutsContainer(activity, user);
             String shortcutIdToDeDupe = notificationKeys.isEmpty() ? null
                     : notificationKeys.get(0).shortcutId;
             shortcuts = PopupPopulator.sortAndFilterShortcuts(shortcuts, shortcutIdToDeDupe);
@@ -150,7 +150,7 @@ public class PopupPopulator {
                 final ShortcutInfo si = new ShortcutInfo(shortcut, launcher);
                 // Use unbadged icon for the menu.
                 LauncherIcons li = LauncherIcons.obtain(launcher);
-                li.createShortcutIcon(shortcut, false /* badged */).applyTo(si);
+                si.applyFrom(li.createShortcutIcon(shortcut, false /* badged */));
                 li.recycle();
                 si.rank = i;
 

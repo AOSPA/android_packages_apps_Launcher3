@@ -17,13 +17,13 @@
 package com.android.launcher3.config;
 
 import static androidx.core.util.Preconditions.checkNotNull;
-
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.SharedPreferences;
-
+import android.provider.Settings;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Keep;
-
+import androidx.annotation.VisibleForTesting;
 import com.android.launcher3.Utilities;
 
 import java.util.ArrayList;
@@ -51,8 +51,10 @@ abstract class BaseFlags {
         throw new UnsupportedOperationException("Don't instantiate BaseFlags");
     }
 
-    public static boolean showFlagTogglerUi() {
-        return Utilities.IS_DEBUG_DEVICE;
+    public static boolean showFlagTogglerUi(Context context) {
+        return Utilities.IS_DEBUG_DEVICE &&
+                Settings.Global.getInt(context.getApplicationContext().getContentResolver(),
+                        Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) != 0;
     }
 
     public static final boolean IS_DOGFOOD_BUILD = false;
@@ -84,14 +86,22 @@ abstract class BaseFlags {
     // trying to make them fit the orientation the device is in.
     public static final boolean OVERVIEW_USE_SCREENSHOT_ORIENTATION = true;
 
+    public static final ToggleableGlobalSettingsFlag QUICK_SWITCH
+            = new ToggleableGlobalSettingsFlag("navbar_quick_switch_enabled", false,
+            "Swiping right on the nav bar while in an app switches to the previous app");
+
+    /**
+     * Feature flag to handle define config changes dynamically instead of killing the process.
+     */
+    public static final TogglableFlag APPLY_CONFIG_AT_RUNTIME = new TogglableFlag(
+            "APPLY_CONFIG_AT_RUNTIME", false, "Apply display changes dynamically");
+
     public static void initialize(Context context) {
-        // Avoid the disk read for builds without the flags UI.
-        if (showFlagTogglerUi()) {
-            SharedPreferences sharedPreferences =
-                    context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE);
+        // Avoid the disk read for user builds
+        if (Utilities.IS_DEBUG_DEVICE) {
             synchronized (sLock) {
                 for (TogglableFlag flag : sFlags) {
-                    flag.currentValue = sharedPreferences.getBoolean(flag.key, flag.defaultValue);
+                    flag.initialize(context);
                 }
             }
         } else {
@@ -118,7 +128,7 @@ abstract class BaseFlags {
         return new ArrayList<>(flagsByKey.values());
     }
 
-    public static final class TogglableFlag {
+    public static class TogglableFlag {
         private final String key;
         private final boolean defaultValue;
         private final String description;
@@ -136,8 +146,33 @@ abstract class BaseFlags {
             }
         }
 
-        String getKey() {
+        /** Set the value of this flag. This should only be used in tests. */
+        @VisibleForTesting
+        void setForTests(boolean value) {
+            currentValue = value;
+        }
+
+        @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+        public String getKey() {
             return key;
+        }
+        void initialize(Context context) {
+            currentValue = getFromStorage(context, defaultValue);
+        }
+
+        void updateStorage(Context context, boolean value) {
+            SharedPreferences.Editor editor = context.getSharedPreferences(FLAGS_PREF_NAME,
+                    Context.MODE_PRIVATE).edit();
+            if (value == defaultValue) {
+                editor.remove(key).apply();
+            } else {
+                editor.putBoolean(key, value).apply();
+            }
+        }
+
+        boolean getFromStorage(Context context, boolean defaultValue) {
+            return context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE)
+                    .getBoolean(key, defaultValue);
         }
 
         boolean getDefaultValue() {
@@ -189,4 +224,36 @@ abstract class BaseFlags {
         }
     }
 
+    /**
+     * Stores the FeatureFlag's value in Settings.Global instead of our SharedPrefs.
+     * This is useful if we want to be able to control this flag from another process.
+     */
+    public static final class ToggleableGlobalSettingsFlag extends TogglableFlag {
+        private ContentResolver contentResolver;
+
+        ToggleableGlobalSettingsFlag(String key, boolean defaultValue, String description) {
+            super(key, defaultValue, description);
+        }
+
+        @Override
+        public void initialize(Context context) {
+            contentResolver = context.getContentResolver();
+            super.initialize(context);
+        }
+
+        @Override
+        void updateStorage(Context context, boolean value) {
+            Settings.Global.putInt(contentResolver, getKey(), value ? 1 : 0);
+        }
+
+        @Override
+        boolean getFromStorage(Context context, boolean defaultValue) {
+            return Settings.Global.getInt(contentResolver, getKey(), defaultValue ? 1 : 0) == 1;
+        }
+
+        @Override
+        public boolean get() {
+            return getFromStorage(null, getDefaultValue());
+        }
+    }
 }

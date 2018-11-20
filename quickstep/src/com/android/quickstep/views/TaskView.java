@@ -17,7 +17,6 @@
 package com.android.quickstep.views;
 
 import static android.widget.Toast.LENGTH_SHORT;
-
 import static com.android.launcher3.BaseActivity.fromContext;
 import static com.android.launcher3.anim.Interpolators.FAST_OUT_SLOW_IN;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
@@ -27,9 +26,12 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.TimeInterpolator;
 import android.app.ActivityOptions;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Outline;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.AttributeSet;
@@ -42,28 +44,32 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
-import com.android.launcher3.BaseActivity;
 import com.android.launcher3.BaseDraggingActivity;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.userevent.nano.LauncherLogProto;
 import com.android.launcher3.userevent.nano.LauncherLogProto.Action.Direction;
 import com.android.launcher3.userevent.nano.LauncherLogProto.Action.Touch;
+import com.android.quickstep.RecentsModel;
+import com.android.quickstep.TaskIconCache;
+import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskSystemShortcut;
+import com.android.quickstep.TaskThumbnailCache;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.views.RecentsView.PageCallbacks;
 import com.android.quickstep.views.RecentsView.ScrollState;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.systemui.shared.recents.model.Task.TaskCallbacks;
-import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
-
 import com.android.systemui.shared.system.ActivityOptionsCompat;
+
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
  * A task in the Recents view.
  */
-public class TaskView extends FrameLayout implements TaskCallbacks, PageCallbacks {
+public class TaskView extends FrameLayout implements PageCallbacks {
 
     private static final String TAG = TaskView.class.getSimpleName();
 
@@ -80,7 +86,7 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
     /**
      * How much to scale down pages near the edge of the screen.
      */
-    private static final float EDGE_SCALE_DOWN_FACTOR = 0.03f;
+    public static final float EDGE_SCALE_DOWN_FACTOR = 0.03f;
 
     public static final long SCALE_ICON_DURATION = 120;
     private static final long DIM_ANIM_DURATION = 700;
@@ -98,7 +104,7 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
                 }
             };
 
-    private static FloatProperty<TaskView> FOCUS_TRANSITION =
+    private static final FloatProperty<TaskView> FOCUS_TRANSITION =
             new FloatProperty<TaskView>("focusTransition") {
         @Override
         public void setValue(TaskView taskView, float v) {
@@ -110,6 +116,9 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
             return taskView.mFocusTransitionProgress;
         }
     };
+
+    static final Intent SEE_TIME_IN_APP_TEMPLATE =
+            new Intent("com.android.settings.action.TIME_SPENT_IN_APP");
 
     private final OnAttachStateChangeListener mTaskMenuStateListener =
             new OnAttachStateChangeListener() {
@@ -132,9 +141,16 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
     private IconView mIconView;
     private float mCurveScale;
     private float mZoomScale;
+    private boolean mIsFullscreen;
 
     private Animator mIconAndDimAnimator;
     private float mFocusTransitionProgress = 1;
+
+    // The current background requests to load the task thumbnail and icon
+    private TaskThumbnailCache.ThumbnailLoadRequest mThumbnailLoadRequest;
+    private TaskIconCache.IconLoadRequest mIconLoadRequest;
+
+    private long mAppRemainingTimeMs = -1;
 
     public TaskView(Context context) {
         this(context, null);
@@ -151,8 +167,11 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
                 return;
             }
             launchTask(true /* animate */);
+
             fromContext(context).getUserEventDispatcher().logTaskLaunchOrDismiss(
                     Touch.TAP, Direction.NONE, getRecentsView().indexOfChild(this),
+                    TaskUtils.getLaunchComponentKeyForTask(getTask().key));
+            fromContext(context).getStatsLogManager().logTaskLaunch(getRecentsView(),
                     TaskUtils.getLaunchComponentKeyForTask(getTask().key));
         });
         setOutlineProvider(new TaskOutlineProvider(getResources()));
@@ -169,13 +188,8 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
      * Updates this task view to the given {@param task}.
      */
     public void bind(Task task) {
-        if (mTask != null) {
-            mTask.removeCallback(this);
-        }
         mTask = task;
         mSnapshotView.bind();
-        task.addCallback(this);
-        setContentDescription(task.titleDescription);
     }
 
     public Task getTask() {
@@ -188,6 +202,14 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
 
     public IconView getIconView() {
         return mIconView;
+    }
+
+    public TaskOverlayFactory.TaskOverlay getTaskOverlay() {
+        return mSnapshotView.getTaskOverlay();
+    }
+
+    private boolean hasRemainingTime() {
+        return mAppRemainingTimeMs > 0;
     }
 
     public void launchTask(boolean animate) {
@@ -228,15 +250,34 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
         }
     }
 
-    @Override
-    public void onTaskDataLoaded(Task task, ThumbnailData thumbnailData) {
-        mSnapshotView.setThumbnail(task, thumbnailData);
-        mIconView.setDrawable(task.icon);
-        mIconView.setOnClickListener(icon -> showTaskMenu());
-        mIconView.setOnLongClickListener(icon -> {
-            requestDisallowInterceptTouchEvent(true);
-            return showTaskMenu();
-        });
+    public void onTaskListVisibilityChanged(boolean visible) {
+        if (mTask == null) {
+            return;
+        }
+        if (visible) {
+            // These calls are no-ops if the data is already loaded, try and load the high
+            // resolution thumbnail if the state permits
+            RecentsModel model = RecentsModel.INSTANCE.get(getContext());
+            TaskThumbnailCache thumbnailCache = model.getThumbnailCache();
+            TaskIconCache iconCache = model.getIconCache();
+            mThumbnailLoadRequest = thumbnailCache.updateThumbnailInBackground(mTask,
+                    !thumbnailCache.getHighResLoadingState().isEnabled() /* reducedResolution */,
+                    (task) -> mSnapshotView.setThumbnail(task, task.thumbnail));
+            mIconLoadRequest = iconCache.updateIconInBackground(mTask,
+                    (task) -> {
+                        setContentDescription(task.titleDescription);
+                        setIcon(task.icon);
+                    });
+        } else {
+            if (mThumbnailLoadRequest != null) {
+                mThumbnailLoadRequest.cancel();
+            }
+            if (mIconLoadRequest != null) {
+                mIconLoadRequest.cancel();
+            }
+            mSnapshotView.setThumbnail(null, null);
+            setIcon(null);
+        }
     }
 
     private boolean showTaskMenu() {
@@ -248,16 +289,19 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
         return mMenuView != null;
     }
 
-    @Override
-    public void onTaskDataUnloaded() {
-        mSnapshotView.setThumbnail(null, null);
-        mIconView.setDrawable(null);
-        mIconView.setOnLongClickListener(null);
-    }
-
-    @Override
-    public void onTaskWindowingModeChanged() {
-        // Do nothing
+    private void setIcon(Drawable icon) {
+        if (icon != null) {
+            mIconView.setDrawable(icon);
+            mIconView.setOnClickListener(v -> showTaskMenu());
+            mIconView.setOnLongClickListener(v -> {
+                requestDisallowInterceptTouchEvent(true);
+                return showTaskMenu();
+            });
+        } else {
+            mIconView.setDrawable(null);
+            mIconView.setOnClickListener(null);
+            mIconView.setOnLongClickListener(null);
+        }
     }
 
     private void setIconAndDimTransitionProgress(float progress) {
@@ -384,11 +428,22 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
 
         final Context context = getContext();
         final BaseDraggingActivity activity = fromContext(context);
-        for (TaskSystemShortcut menuOption : TaskMenuView.MENU_OPTIONS) {
+        final List<TaskSystemShortcut> shortcuts =
+                mSnapshotView.getTaskOverlay().getEnabledShortcuts(this);
+        final int count = shortcuts.size();
+        for (int i = 0; i < count; ++i) {
+            final TaskSystemShortcut menuOption = shortcuts.get(i);
             OnClickListener onClickListener = menuOption.getOnClickListener(activity, this);
             if (onClickListener != null) {
                 info.addAction(menuOption.createAccessibilityAction(context));
             }
+        }
+
+        if (hasRemainingTime()) {
+            info.addAction(
+                    new AccessibilityNodeInfo.AccessibilityAction(
+                            R.string.accessibility_app_usage_settings,
+                            getContext().getText(R.string.accessibility_app_usage_settings)));
         }
 
         final RecentsView recentsView = getRecentsView();
@@ -407,7 +462,16 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
             return true;
         }
 
-        for (TaskSystemShortcut menuOption : TaskMenuView.MENU_OPTIONS) {
+        if (action == R.string.accessibility_app_usage_settings) {
+            openAppUsageSettings(this);
+            return true;
+        }
+
+        final List<TaskSystemShortcut> shortcuts =
+                mSnapshotView.getTaskOverlay().getEnabledShortcuts(this);
+        final int count = shortcuts.size();
+        for (int i = 0; i < count; ++i) {
+            final TaskSystemShortcut menuOption = shortcuts.get(i);
             if (menuOption.hasHandlerForAction(action)) {
                 OnClickListener onClickListener = menuOption.getOnClickListener(
                         fromContext(getContext()), this);
@@ -421,6 +485,24 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
         return super.performAccessibilityAction(action, arguments);
     }
 
+    private void openAppUsageSettings(View view) {
+        final Intent intent = new Intent(SEE_TIME_IN_APP_TEMPLATE)
+                .putExtra(Intent.EXTRA_PACKAGE_NAME,
+                        mTask.getTopComponent().getPackageName()).addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        try {
+            final Launcher launcher = Launcher.getLauncher(getContext());
+            final ActivityOptions options = ActivityOptions.makeScaleUpAnimation(view, 0, 0,
+                    view.getWidth(), view.getHeight());
+            launcher.startActivity(intent, options.toBundle());
+            launcher.getUserEventDispatcher().logActionOnControl(LauncherLogProto.Action.Touch.TAP,
+                    LauncherLogProto.ControlType.APP_USAGE_SETTINGS, this);
+        } catch (ActivityNotFoundException e) {
+            Log.e(TAG, "Failed to open app usage settings for task "
+                    + mTask.getTopComponent().getPackageName(), e);
+        }
+    }
+
     private RecentsView getRecentsView() {
         return (RecentsView) getParent();
     }
@@ -432,5 +514,19 @@ public class TaskView extends FrameLayout implements TaskCallbacks, PageCallback
         }
         Log.w(tag, msg);
         Toast.makeText(getContext(), R.string.activity_not_available, LENGTH_SHORT).show();
+    }
+
+    /**
+     * Hides the icon and shows insets when this TaskView is about to be shown fullscreen.
+     */
+    public void setFullscreen(boolean isFullscreen) {
+        mIsFullscreen = isFullscreen;
+        mIconView.setVisibility(mIsFullscreen ? INVISIBLE : VISIBLE);
+        setClipChildren(!mIsFullscreen);
+        setClipToPadding(!mIsFullscreen);
+    }
+
+    public boolean isFullscreen() {
+        return mIsFullscreen;
     }
 }
