@@ -43,6 +43,7 @@ import android.util.MutableInt;
 import com.android.launcher3.AllAppsList;
 import com.android.launcher3.AppInfo;
 import com.android.launcher3.FolderInfo;
+import com.android.launcher3.ItemInfoWithIcon;
 import com.android.launcher3.icons.ComponentWithLabel;
 import com.android.launcher3.icons.ComponentWithLabel.ComponentCachingLogic;
 import com.android.launcher3.icons.cache.IconCacheUpdateHandler;
@@ -71,6 +72,7 @@ import com.android.launcher3.shortcuts.ShortcutInfoCompat;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
+import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.LooperIdleLock;
 import com.android.launcher3.util.MultiHashMap;
 import com.android.launcher3.util.PackageManagerHelper;
@@ -292,7 +294,6 @@ public class LoaderTask implements Runnable {
             final HashMap<String, SessionInfo> installingPkgs =
                     mPackageInstaller.updateAndGetActiveSessionCache();
             mFirstScreenBroadcast = new FirstScreenBroadcast(installingPkgs);
-            mBgDataModel.workspaceScreens.addAll(LauncherModel.loadWorkspaceScreensDb(context));
 
             Map<ShortcutKey, ShortcutInfoCompat> shortcutKeyToPinnedShortcuts = new HashMap<>();
             final LoaderCursor c = new LoaderCursor(contentResolver.query(
@@ -493,12 +494,12 @@ public class LoaderTask implements Runnable {
                                     }
                                     info = new ShortcutInfo(pinnedShortcut, context);
                                     final ShortcutInfo finalInfo = info;
-                                    // If the pinned deep shortcut is no longer published,
-                                    // use the last saved icon instead of the default.
-                                    Provider<Bitmap> fallbackIconProvider = () ->
-                                            c.loadIcon(finalInfo) ? finalInfo.iconBitmap : null;
 
                                     LauncherIcons li = LauncherIcons.obtain(context);
+                                    // If the pinned deep shortcut is no longer published,
+                                    // use the last saved icon instead of the default.
+                                    Provider<ItemInfoWithIcon> fallbackIconProvider = () ->
+                                            c.loadIcon(finalInfo, li) ? finalInfo : null;
                                     info.applyFrom(li.createShortcutIcon(pinnedShortcut,
                                             true /* badged */, fallbackIconProvider));
                                     li.recycle();
@@ -671,6 +672,11 @@ public class LoaderTask implements Runnable {
                                 appWidgetInfo.spanY = c.getInt(spanYIndex);
                                 appWidgetInfo.user = c.user;
 
+                                if (appWidgetInfo.spanX <= 0 || appWidgetInfo.spanY <= 0) {
+                                    c.markDeleted("Widget has invalid size: "
+                                            + appWidgetInfo.spanX + "x" + appWidgetInfo.spanY);
+                                    continue;
+                                }
                                 if (!c.isOnWorkspaceOrHotseat()) {
                                     c.markDeleted("Widget found where container != " +
                                             "CONTAINER_DESKTOP nor CONTAINER_HOTSEAT - ignoring!");
@@ -779,21 +785,15 @@ public class LoaderTask implements Runnable {
                         new Handler(LauncherModel.getWorkerLooper()));
             }
 
-            // Remove any empty screens
-            IntArray unusedScreens = mBgDataModel.workspaceScreens.clone();
+            // Initialize the screens array. Using an InstSet ensures that the screen ids
+            // are sorted.
+            IntSet screenSet = new IntSet();
             for (ItemInfo item: mBgDataModel.itemsIdMap) {
-                int screenId = item.screenId;
-                if (item.container == LauncherSettings.Favorites.CONTAINER_DESKTOP &&
-                        unusedScreens.contains(screenId)) {
-                    unusedScreens.removeValue(screenId);
+                if (item.container == LauncherSettings.Favorites.CONTAINER_DESKTOP) {
+                    screenSet.add(item.screenId);
                 }
             }
-
-            // If there are any empty screens remove them, and update.
-            if (unusedScreens.size() != 0) {
-                mBgDataModel.workspaceScreens.removeAllValues(unusedScreens);
-                LauncherModel.updateWorkspaceScreenOrder(context, mBgDataModel.workspaceScreens);
-            }
+            mBgDataModel.workspaceScreens.addAll(screenSet.getArray());
         }
     }
 

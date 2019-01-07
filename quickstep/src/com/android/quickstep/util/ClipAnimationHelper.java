@@ -21,6 +21,7 @@ import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MOD
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_OPENING;
 
 import android.annotation.TargetApi;
+import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Matrix.ScaleToFit;
@@ -30,6 +31,8 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.os.RemoteException;
 import android.view.animation.Interpolator;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
@@ -43,14 +46,12 @@ import com.android.quickstep.views.TaskThumbnailView;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.recents.utilities.RectFEvaluator;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
-import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplier;
-import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplier.SurfaceParams;
+import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat;
+import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams;
 import com.android.systemui.shared.system.TransactionCompat;
 import com.android.systemui.shared.system.WindowManagerWrapper;
 
 import java.util.function.BiFunction;
-
-import androidx.annotation.Nullable;
 
 /**
  * Utility class to handle window clip animation
@@ -82,7 +83,13 @@ public class ClipAnimationHelper {
     private final Matrix mTmpMatrix = new Matrix();
     private final RectF mTmpRectF = new RectF();
     private final RectF mCurrentRectWithInsets = new RectF();
+    // Corner radius of windows, in pixels
+    private final float mWindowCornerRadius;
+    // Corner radius of windows when they're in overview mode.
+    private final float mTaskCornerRadius;
 
+    // Corner radius currently applied to transformed window.
+    private float mCurrentCornerRadius;
     private float mTargetScale = 1f;
     private float mOffsetScale = 1f;
     private Interpolator mInterpolator = LINEAR;
@@ -94,6 +101,11 @@ public class ClipAnimationHelper {
 
     private BiFunction<RemoteAnimationTargetCompat, Float, Float> mTaskAlphaCallback =
             (t, a1) -> a1;
+
+    public ClipAnimationHelper(Context context) {
+        mTaskCornerRadius = context.getResources().getDimension(R.dimen.task_corner_radius);
+        mWindowCornerRadius  = RecentsModel.INSTANCE.get(context).getWindowCornerRadius();
+    }
 
     private void updateSourceStack(RemoteAnimationTargetCompat target) {
         mSourceInsets.set(target.contentInsets);
@@ -139,14 +151,13 @@ public class ClipAnimationHelper {
         mBoostModeTargetLayers = isOpening ? MODE_OPENING : MODE_CLOSING;
     }
 
-    public RectF applyTransform(RemoteAnimationTargetSet targetSet, float progress,
-            @Nullable SyncRtSurfaceTransactionApplier syncTransactionApplier) {
+    public RectF applyTransform(RemoteAnimationTargetSet targetSet, TransformParams params) {
         RectF currentRect;
         mTmpRectF.set(mTargetRect);
         Utilities.scaleRectFAboutCenter(mTmpRectF, mTargetScale);
-        float offsetYProgress = mOffsetYInterpolator.getInterpolation(progress);
-        progress = mInterpolator.getInterpolation(progress);
-        currentRect =  mRectFEvaluator.evaluate(progress, mSourceRect, mTmpRectF);
+        float offsetYProgress = mOffsetYInterpolator.getInterpolation(params.progress);
+        float progress = mInterpolator.getInterpolation(params.progress);
+        currentRect = mRectFEvaluator.evaluate(progress, mSourceRect, mTmpRectF);
 
         synchronized (mTargetOffset) {
             // Stay lined up with the center of the target, since it moves for quick scrub.
@@ -161,18 +172,23 @@ public class ClipAnimationHelper {
         mClipRectF.bottom =
                 mSourceStackBounds.height() - (mSourceWindowClipInsets.bottom * progress);
 
-        SurfaceParams[] params = new SurfaceParams[targetSet.unfilteredApps.length];
+        SurfaceParams[] surfaceParams = new SurfaceParams[targetSet.unfilteredApps.length];
         for (int i = 0; i < targetSet.unfilteredApps.length; i++) {
             RemoteAnimationTargetCompat app = targetSet.unfilteredApps[i];
             mTmpMatrix.setTranslate(app.position.x, app.position.y);
             Rect crop = app.sourceContainerBounds;
             float alpha = 1f;
             int layer;
+            float cornerRadius = 0f;
+            float scale = currentRect.width() / crop.width();
             if (app.mode == targetSet.targetMode) {
                 if (app.activityType != RemoteAnimationTargetCompat.ACTIVITY_TYPE_HOME) {
                     mTmpMatrix.setRectToRect(mSourceRect, currentRect, ScaleToFit.FILL);
                     mTmpMatrix.postTranslate(app.position.x, app.position.y);
                     mClipRectF.roundOut(crop);
+                    cornerRadius = Utilities.mapRange(progress, mWindowCornerRadius,
+                            mTaskCornerRadius);
+                    mCurrentCornerRadius = cornerRadius;
                 }
 
                 if (app.isNotInRecents
@@ -186,9 +202,13 @@ public class ClipAnimationHelper {
                 crop = null;
                 layer = Integer.MAX_VALUE;
             }
-            params[i] = new SurfaceParams(app.leash, alpha, mTmpMatrix, crop, layer);
+
+            // Since radius is in Surface space, but we draw the rounded corners in screen space, we
+            // have to undo the scale.
+            surfaceParams[i] = new SurfaceParams(app.leash, alpha, mTmpMatrix, crop, layer,
+                    cornerRadius / scale);
         }
-        applyParams(syncTransactionApplier, params);
+        applySurfaceParams(params.syncTransactionApplier, surfaceParams);
         return currentRect;
     }
 
@@ -197,14 +217,14 @@ public class ClipAnimationHelper {
         return mCurrentRectWithInsets;
     }
 
-    private void applyParams(@Nullable SyncRtSurfaceTransactionApplier syncTransactionApplier,
-            SurfaceParams[] params) {
+    private void applySurfaceParams(@Nullable SyncRtSurfaceTransactionApplierCompat
+            syncTransactionApplier, SurfaceParams[] params) {
         if (syncTransactionApplier != null) {
             syncTransactionApplier.scheduleApply(params);
         } else {
             TransactionCompat t = new TransactionCompat();
             for (SurfaceParams param : params) {
-                SyncRtSurfaceTransactionApplier.applyParams(t, param);
+                SyncRtSurfaceTransactionApplierCompat.applyParams(t, param);
             }
             t.setEarlyWakeup();
             t.apply();
@@ -309,13 +329,14 @@ public class ClipAnimationHelper {
         canvas.concat(mTmpMatrix);
         canvas.translate(mTargetRect.left, mTargetRect.top);
 
+        float scale = mTargetRect.width() / mSourceRect.width();
         float insetProgress = (1 - progress);
         ttv.drawOnCanvas(canvas,
                 -mSourceWindowClipInsets.left * insetProgress,
                 -mSourceWindowClipInsets.top * insetProgress,
                 ttv.getMeasuredWidth() + mSourceWindowClipInsets.right * insetProgress,
                 ttv.getMeasuredHeight() + mSourceWindowClipInsets.bottom * insetProgress,
-                ttv.getCornerRadius() * progress);
+                Utilities.mapRange(progress, mWindowCornerRadius * scale, ttv.getCornerRadius()));
     }
 
     public RectF getTargetRect() {
@@ -325,4 +346,29 @@ public class ClipAnimationHelper {
     public RectF getSourceRect() {
         return mSourceRect;
     }
+
+    public float getCurrentCornerRadius() {
+        return mCurrentCornerRadius;
+    }
+
+    public static class TransformParams {
+        float progress;
+        SyncRtSurfaceTransactionApplierCompat syncTransactionApplier;
+
+        public TransformParams() {
+            progress = 0;
+        }
+
+        public TransformParams setProgress(float progress) {
+            this.progress = progress;
+            return this;
+        }
+
+        public TransformParams setSyncTransactionApplier(
+                SyncRtSurfaceTransactionApplierCompat applier) {
+            this.syncTransactionApplier = applier;
+            return this;
+        }
+    }
 }
+

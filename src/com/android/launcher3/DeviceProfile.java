@@ -29,7 +29,7 @@ import android.view.Surface;
 import android.view.WindowManager;
 
 import com.android.launcher3.CellLayout.ContainerType;
-import com.android.launcher3.badge.BadgeRenderer;
+import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.IconNormalizer;
 
 public class DeviceProfile {
@@ -128,8 +128,8 @@ public class DeviceProfile {
     private final Rect mHotseatPadding = new Rect();
     private boolean mIsSeascape;
 
-    // Icon badges
-    public BadgeRenderer mBadgeRenderer;
+    // Notification dots
+    public DotRenderer mDotRenderer;
 
     public DeviceProfile(Context context, InvariantDeviceProfile inv,
             Point minSize, Point maxSize,
@@ -207,11 +207,10 @@ public class DeviceProfile {
         // Add a bit of space between nav bar and hotseat in multi-window vertical bar layout.
         hotseatBarSidePaddingStartPx = isMultiWindowMode && isVerticalBarLayout()
                 ? edgeMarginPx : 0;
-        hotseatBarSizePx = isVerticalBarLayout()
-                ? Utilities.pxFromDp(inv.iconSize, dm) + hotseatBarSidePaddingStartPx
-                        + hotseatBarSidePaddingEndPx
-                : res.getDimensionPixelSize(R.dimen.dynamic_grid_hotseat_size)
-                        + hotseatBarTopPaddingPx + hotseatBarBottomPaddingPx;
+        hotseatBarSizePx = Utilities.pxFromDp(inv.iconSize, dm) + (isVerticalBarLayout()
+                ? (hotseatBarSidePaddingStartPx + hotseatBarSidePaddingEndPx)
+                : (res.getDimensionPixelSize(R.dimen.dynamic_grid_hotseat_extra_vertical_size)
+                        + hotseatBarTopPaddingPx + hotseatBarBottomPaddingPx));
 
         // Calculate all of the remaining variables.
         updateAvailableDimensions(dm, res);
@@ -233,7 +232,7 @@ public class DeviceProfile {
         updateWorkspacePadding();
 
         // This is done last, after iconSizePx is calculated above.
-        mBadgeRenderer = new BadgeRenderer(iconSizePx);
+        mDotRenderer = new DotRenderer(iconSizePx);
     }
 
     public DeviceProfile copy(Context context) {

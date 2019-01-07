@@ -165,6 +165,15 @@ public class LoaderCursor extends CursorWrapper {
      * Loads the icon from the cursor and updates the {@param info} if the icon is an app resource.
      */
     protected boolean loadIcon(ShortcutInfo info) {
+        try (LauncherIcons li = LauncherIcons.obtain(mContext)) {
+            return loadIcon(info, li);
+        }
+    }
+
+    /**
+     * Loads the icon from the cursor and updates the {@param info} if the icon is an app resource.
+     */
+    protected boolean loadIcon(ShortcutInfo info, LauncherIcons li) {
         if (itemType == LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT) {
             String packageName = getString(iconPackageIndex);
             String resourceName = getString(iconResourceIndex);
@@ -172,9 +181,7 @@ public class LoaderCursor extends CursorWrapper {
                 info.iconResource = new ShortcutIconResource();
                 info.iconResource.packageName = packageName;
                 info.iconResource.resourceName = resourceName;
-                LauncherIcons li = LauncherIcons.obtain(mContext);
                 BitmapInfo iconInfo = li.createIconBitmap(info.iconResource);
-                li.recycle();
                 if (iconInfo != null) {
                     info.applyFrom(iconInfo);
                     return true;
@@ -184,11 +191,11 @@ public class LoaderCursor extends CursorWrapper {
 
         // Failed to load from resource, try loading from DB.
         byte[] data = getBlob(iconIndex);
-        try (LauncherIcons li = LauncherIcons.obtain(mContext)) {
+        try {
             info.applyFrom(li.createIconBitmap(BitmapFactory.decodeByteArray(data, 0, data.length)));
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "Failed to load icon for info " + info, e);
+            Log.e(TAG, "Failed to decode byte array for info " + info, e);
             return false;
         }
     }
@@ -373,7 +380,7 @@ public class LoaderCursor extends CursorWrapper {
      * otherwise marks it for deletion.
      */
     public void checkAndAddItem(ItemInfo info, BgDataModel dataModel) {
-        if (checkItemPlacement(info, dataModel.workspaceScreens)) {
+        if (checkItemPlacement(info)) {
             dataModel.addItem(mContext, info, false);
         } else {
             markDeleted("Item position overlap");
@@ -383,7 +390,7 @@ public class LoaderCursor extends CursorWrapper {
     /**
      * check & update map of what's occupied; used to discard overlapping/invalid items
      */
-    protected boolean checkItemPlacement(ItemInfo item, IntArray workspaceScreens) {
+    protected boolean checkItemPlacement(ItemInfo item) {
         int containerIndex = item.screenId;
         if (item.container == LauncherSettings.Favorites.CONTAINER_HOTSEAT) {
             final GridOccupancy hotseatOccupancy =
@@ -413,12 +420,7 @@ public class LoaderCursor extends CursorWrapper {
                 occupied.put(LauncherSettings.Favorites.CONTAINER_HOTSEAT, occupancy);
                 return true;
             }
-        } else if (item.container == LauncherSettings.Favorites.CONTAINER_DESKTOP) {
-            if (!workspaceScreens.contains(item.screenId)) {
-                // The item has an invalid screen id.
-                return false;
-            }
-        } else {
+        } else if (item.container != LauncherSettings.Favorites.CONTAINER_DESKTOP) {
             // Skip further checking if it is not the hotseat or workspace container
             return true;
         }

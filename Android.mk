@@ -82,7 +82,8 @@ LOCAL_STATIC_JAVA_LIBRARIES := LauncherPluginLib
 
 LOCAL_SRC_FILES := \
     $(call all-proto-files-under, protos) \
-    $(call all-proto-files-under, proto_overrides)
+    $(call all-proto-files-under, proto_overrides) \
+    $(call all-java-files-under, src_build_config) \
 
 LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/res
 
@@ -107,7 +108,9 @@ include $(CLEAR_VARS)
 LOCAL_USE_AAPT2 := true
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_STATIC_ANDROID_LIBRARIES := Launcher3CommonDepsLib
+LOCAL_STATIC_ANDROID_LIBRARIES := \
+    Launcher3CommonDepsLib \
+    SecondaryDisplayLauncherLib
 LOCAL_SRC_FILES := \
     $(call all-java-files-under, src) \
     $(call all-java-files-under, src_shortcuts_overrides) \

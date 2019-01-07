@@ -16,14 +16,15 @@
 
 package com.android.launcher3;
 
+import static com.android.launcher3.InvariantDeviceProfile.CHANGE_FLAG_ICON_PARAMS;
 import static com.android.launcher3.util.SecureSettingsObserver.newNotificationSettingsObserver;
-import static com.android.launcher3.InvariantDeviceProfile.CHANGE_FLAG_ICON_SIZE;
 
 import android.content.ComponentName;
 import android.content.ContentProviderClient;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Handler;
 import android.util.Log;
 
 import com.android.launcher3.compat.LauncherAppsCompat;
@@ -50,7 +51,7 @@ public class LauncherAppState {
     private final IconCache mIconCache;
     private final WidgetPreviewLoader mWidgetCache;
     private final InvariantDeviceProfile mInvariantDeviceProfile;
-    private final SecureSettingsObserver mNotificationBadgingObserver;
+    private final SecureSettingsObserver mNotificationDotsObserver;
 
     public static LauncherAppState getInstance(final Context context) {
         return INSTANCE.get(context);
@@ -97,20 +98,21 @@ public class LauncherAppState {
         mContext.registerReceiver(mModel, filter);
         UserManagerCompat.getInstance(mContext).enableAndResetCache();
         mInvariantDeviceProfile.addOnChangeListener(this::onIdpChanged);
+        new Handler().post( () -> mInvariantDeviceProfile.verifyConfigChangedInBackground(context));
 
-        if (!mContext.getResources().getBoolean(R.bool.notification_badging_enabled)) {
-            mNotificationBadgingObserver = null;
+        if (!mContext.getResources().getBoolean(R.bool.notification_dots_enabled)) {
+            mNotificationDotsObserver = null;
         } else {
-            // Register an observer to rebind the notification listener when badging is re-enabled.
-            mNotificationBadgingObserver =
+            // Register an observer to rebind the notification listener when dots are re-enabled.
+            mNotificationDotsObserver =
                     newNotificationSettingsObserver(mContext, this::onNotificationSettingsChanged);
-            mNotificationBadgingObserver.register();
-            mNotificationBadgingObserver.dispatchOnChange();
+            mNotificationDotsObserver.register();
+            mNotificationDotsObserver.dispatchOnChange();
         }
     }
 
-    protected void onNotificationSettingsChanged(boolean isNotificationBadgingEnabled) {
-        if (isNotificationBadgingEnabled) {
+    protected void onNotificationSettingsChanged(boolean areNotificationDotsEnabled) {
+        if (areNotificationDotsEnabled) {
             NotificationListener.requestRebind(new ComponentName(
                     mContext, NotificationListener.class));
         }
@@ -121,7 +123,7 @@ public class LauncherAppState {
             return;
         }
 
-        if ((changeFlags & CHANGE_FLAG_ICON_SIZE) != 0) {
+        if ((changeFlags & CHANGE_FLAG_ICON_PARAMS) != 0) {
             LauncherIcons.clearPool();
             mIconCache.updateIconParams(idp.fillResIconDpi, idp.iconBitmapSize);
         }
@@ -137,8 +139,8 @@ public class LauncherAppState {
         final LauncherAppsCompat launcherApps = LauncherAppsCompat.getInstance(mContext);
         launcherApps.removeOnAppsChangedCallback(mModel);
         PackageInstallerCompat.getInstance(mContext).onStop();
-        if (mNotificationBadgingObserver != null) {
-            mNotificationBadgingObserver.unregister();
+        if (mNotificationDotsObserver != null) {
+            mNotificationDotsObserver.unregister();
         }
     }
 

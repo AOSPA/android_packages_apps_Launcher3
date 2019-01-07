@@ -29,6 +29,7 @@ import static com.android.quickstep.TouchConsumer.INTERACTION_QUICK_SCRUB;
 import static com.android.quickstep.views.RecentsView.CONTENT_ALPHA;
 import static com.android.systemui.shared.system.NavigationBarCompat.HIT_TARGET_BACK;
 import static com.android.systemui.shared.system.NavigationBarCompat.HIT_TARGET_ROTATION;
+
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
@@ -43,8 +44,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import androidx.annotation.Nullable;
-import androidx.annotation.UiThread;
+
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
@@ -76,6 +76,9 @@ import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
+
+import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
 
 /**
  * Utility class which abstracts out the logical differences between Launcher and RecentsActivity.
@@ -110,6 +113,11 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
 
     @Nullable
     T getCreatedActivity();
+
+    default boolean isResumed() {
+        BaseDraggingActivity activity = getCreatedActivity();
+        return activity != null && activity.hasBeenResumed();
+    }
 
     @UiThread
     @Nullable
@@ -185,7 +193,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
             int topMargin = context.getResources()
                     .getDimensionPixelSize(R.dimen.task_thumbnail_top_margin);
             int paddingTop = targetRect.rect.top - topMargin - dp.getInsets().top;
-            int paddingBottom = dp.availableHeightPx + dp.getInsets().top - targetRect.rect.bottom;
+            int paddingBottom = dp.heightPx - dp.getInsets().bottom - targetRect.rect.bottom;
 
             return FastOverviewState.OVERVIEW_TRANSLATION_FACTOR * (paddingBottom - paddingTop);
         }
@@ -305,9 +313,10 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
                     AnimatorPlaybackController.wrap(anim, transitionLength * 2);
 
             // Since we are changing the start position of the UI, reapply the state, at the end
-            controller.setEndAction(() ->
+            controller.setEndAction(() -> {
                 activity.getStateManager().goToState(
-                        controller.getProgressFraction() > 0.5 ? endState : fromState, false));
+                        controller.getInterpolatedProgress() > 0.5 ? endState : fromState, false);
+            });
             callback.accept(controller);
         }
 
@@ -328,7 +337,7 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
             float prevRvScale = recentsView.getScaleX();
             float targetRvScale = endState.getOverviewScaleAndTranslationYFactor(launcher)[0];
             SCALE_PROPERTY.set(recentsView, targetRvScale);
-            ClipAnimationHelper clipHelper = new ClipAnimationHelper();
+            ClipAnimationHelper clipHelper = new ClipAnimationHelper(launcher);
             clipHelper.fromTaskThumbnailView(v.getThumbnail(), (RecentsView) v.getParent(), null);
             SCALE_PROPERTY.set(recentsView, prevRvScale);
 
@@ -549,7 +558,8 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
                 public void finish() { }
 
                 @Override
-                public void update(boolean shouldFinish, boolean isLongSwipe, RectF currentRect) { }
+                public void update(boolean shouldFinish, boolean isLongSwipe, RectF currentRect,
+                        float cornerRadius) { }
             };
         }
 
@@ -627,7 +637,8 @@ public interface ActivityControlHelper<T extends BaseDraggingActivity> {
 
         void finish();
 
-        void update(boolean shouldFinish, boolean isLongSwipe, RectF currentRect);
+        void update(boolean shouldFinish, boolean isLongSwipe, RectF currentRect,
+                float cornerRadius);
     }
 
     interface ActivityInitListener {

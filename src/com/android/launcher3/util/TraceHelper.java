@@ -41,33 +41,37 @@ public class TraceHelper {
 
     public static void beginSection(String sectionName) {
         if (ENABLED) {
-            MutableLong time = sUpTimes.get(sectionName);
-            if (time == null) {
-                time = new MutableLong(isLoggable(sectionName, VERBOSE) ? 0 : -1);
-                sUpTimes.put(sectionName, time);
-            }
-            if (time.value >= 0) {
-                if (SYSTEM_TRACE) {
-                    Trace.beginSection(sectionName);
+            synchronized (sUpTimes) {
+                MutableLong time = sUpTimes.get(sectionName);
+                if (time == null) {
+                    time = new MutableLong(isLoggable(sectionName, VERBOSE) ? 0 : -1);
+                    sUpTimes.put(sectionName, time);
                 }
-                time.value = SystemClock.uptimeMillis();
+                if (time.value >= 0) {
+                    if (SYSTEM_TRACE) {
+                        Trace.beginSection(sectionName);
+                    }
+                    time.value = SystemClock.uptimeMillis();
+                }
             }
         }
     }
 
     public static void partitionSection(String sectionName, String partition) {
         if (ENABLED) {
-            MutableLong time = sUpTimes.get(sectionName);
-            if (time != null && time.value >= 0) {
+            synchronized (sUpTimes) {
+                MutableLong time = sUpTimes.get(sectionName);
+                if (time != null && time.value >= 0) {
 
-                if (SYSTEM_TRACE) {
-                    Trace.endSection();
-                    Trace.beginSection(sectionName);
+                    if (SYSTEM_TRACE) {
+                        Trace.endSection();
+                        Trace.beginSection(sectionName);
+                    }
+
+                    long now = SystemClock.uptimeMillis();
+                    Log.d(sectionName, partition + " : " + (now - time.value));
+                    time.value = now;
                 }
-
-                long now = SystemClock.uptimeMillis();
-                Log.d(sectionName, partition + " : " + (now - time.value));
-                time.value = now;
             }
         }
     }
@@ -80,12 +84,14 @@ public class TraceHelper {
 
     public static void endSection(String sectionName, String msg) {
         if (ENABLED) {
-            MutableLong time = sUpTimes.get(sectionName);
-            if (time != null && time.value >= 0) {
-                if (SYSTEM_TRACE) {
-                    Trace.endSection();
+            synchronized (sUpTimes) {
+                MutableLong time = sUpTimes.get(sectionName);
+                if (time != null && time.value >= 0) {
+                    if (SYSTEM_TRACE) {
+                        Trace.endSection();
+                    }
+                    Log.d(sectionName, msg + " : " + (SystemClock.uptimeMillis() - time.value));
                 }
-                Log.d(sectionName, msg + " : " + (SystemClock.uptimeMillis() - time.value));
             }
         }
     }

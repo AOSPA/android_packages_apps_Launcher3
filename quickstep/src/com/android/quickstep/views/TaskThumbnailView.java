@@ -17,13 +17,16 @@
 package com.android.quickstep.views;
 
 import static com.android.systemui.shared.system.WindowManagerWrapper.WINDOWING_MODE_FULLSCREEN;
+
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LightingColorFilter;
+import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
@@ -32,7 +35,7 @@ import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.util.Property;
 import android.view.View;
-import android.view.ViewGroup;
+
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
@@ -50,8 +53,8 @@ import com.android.systemui.shared.recents.model.ThumbnailData;
  */
 public class TaskThumbnailView extends View {
 
-    private static final LightingColorFilter[] sDimFilterCache = new LightingColorFilter[256];
-    private static final LightingColorFilter[] sHighlightFilterCache = new LightingColorFilter[256];
+    private final static ColorMatrix COLOR_MATRIX = new ColorMatrix();
+    private final static ColorMatrix SATURATION_COLOR_MATRIX = new ColorMatrix();
 
     public static final Property<TaskThumbnailView, Float> DIM_ALPHA =
             new FloatProperty<TaskThumbnailView>("dimAlpha") {
@@ -78,6 +81,7 @@ public class TaskThumbnailView extends View {
 
     private float mClipBottom = -1;
     private Rect mScaledInsets = new Rect();
+    private boolean mIsRotated;
 
     private Task mTask;
     private ThumbnailData mThumbnailData;
@@ -85,6 +89,7 @@ public class TaskThumbnailView extends View {
 
     private float mDimAlpha = 1f;
     private float mDimAlphaMultiplier = 1f;
+    private float mSaturation = 1f;
 
     public TaskThumbnailView(Context context) {
         this(context, null);
@@ -140,11 +145,16 @@ public class TaskThumbnailView extends View {
 
     /**
      * Sets the alpha of the dim layer on top of this view.
-     *
+     * <p>
      * If dimAlpha is 0, no dimming is applied; if dimAlpha is 1, the thumbnail will be black.
      */
     public void setDimAlpha(float dimAlpha) {
         mDimAlpha = dimAlpha;
+        updateThumbnailPaintFilter();
+    }
+
+    public void setSaturation(float saturation) {
+        mSaturation = saturation;
         updateThumbnailPaintFilter();
     }
 
@@ -179,13 +189,18 @@ public class TaskThumbnailView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if (((TaskView) getParent()).isFullscreen()) {
+        float fullscreenProgress = ((TaskView) getParent()).getFullscreenProgress();
+        if (mIsRotated) {
+            // Don't show insets in the wrong orientation.
+            fullscreenProgress = 0;
+        }
+        if (fullscreenProgress > 0) {
             // Draw the insets if we're being drawn fullscreen (we do this for quick switch).
             drawOnCanvas(canvas,
-                    -mScaledInsets.left,
-                    -mScaledInsets.top,
-                    getMeasuredWidth() + mScaledInsets.right,
-                    getMeasuredHeight() + mScaledInsets.bottom,
+                    -mScaledInsets.left * fullscreenProgress,
+                    -mScaledInsets.top * fullscreenProgress,
+                    getMeasuredWidth() + mScaledInsets.right * fullscreenProgress,
+                    getMeasuredHeight() + mScaledInsets.bottom * fullscreenProgress,
                     mCornerRadius);
         } else {
             drawOnCanvas(canvas, 0, 0, getMeasuredWidth(), getMeasuredHeight(), mCornerRadius);
@@ -221,7 +236,7 @@ public class TaskThumbnailView extends View {
     private void updateThumbnailPaintFilter() {
         int mul = (int) ((1 - mDimAlpha * mDimAlphaMultiplier) * 255);
         if (mBitmapShader != null) {
-            LightingColorFilter filter = getDimmingColorFilter(mul, mIsDarkTextTheme);
+            ColorFilter filter = getColorFilter(mul, mIsDarkTextTheme, mSaturation);
             mPaint.setColorFilter(filter);
             mBackgroundPaint.setColorFilter(filter);
         } else {
@@ -232,11 +247,11 @@ public class TaskThumbnailView extends View {
     }
 
     private void updateThumbnailMatrix() {
-        boolean rotate = false;
+        mIsRotated = false;
         mClipBottom = -1;
         if (mBitmapShader != null && mThumbnailData != null) {
             float scale = mThumbnailData.scale;
-            Rect thumbnailInsets  = mThumbnailData.insets;
+            Rect thumbnailInsets = mThumbnailData.insets;
             final float thumbnailWidth = mThumbnailData.thumbnail.getWidth() -
                     (thumbnailInsets.left + thumbnailInsets.right) * scale;
             final float thumbnailHeight = mThumbnailData.thumbnail.getHeight() -
@@ -253,12 +268,12 @@ public class TaskThumbnailView extends View {
                 final Configuration configuration =
                         getContext().getResources().getConfiguration();
                 // Rotate the screenshot if not in multi-window mode
-                rotate = FeatureFlags.OVERVIEW_USE_SCREENSHOT_ORIENTATION &&
+                mIsRotated = FeatureFlags.OVERVIEW_USE_SCREENSHOT_ORIENTATION &&
                         configuration.orientation != mThumbnailData.orientation &&
                         !mActivity.isInMultiWindowModeCompat() &&
                         mThumbnailData.windowingMode == WINDOWING_MODE_FULLSCREEN;
                 // Scale the screenshot to always fit the width of the card.
-                thumbnailScale = rotate
+                thumbnailScale = mIsRotated
                         ? getMeasuredWidth() / thumbnailHeight
                         : getMeasuredWidth() / thumbnailWidth;
             }
@@ -266,7 +281,7 @@ public class TaskThumbnailView extends View {
             mScaledInsets.set(thumbnailInsets);
             Utilities.scaleRect(mScaledInsets, thumbnailScale);
 
-            if (rotate) {
+            if (mIsRotated) {
                 int rotationDir = profile.isVerticalBarLayout() && !profile.isSeascape() ? -1 : 1;
                 mMatrix.setRotate(90 * rotationDir);
                 int newLeftInset = rotationDir == 1 ? thumbnailInsets.bottom : thumbnailInsets.top;
@@ -290,7 +305,7 @@ public class TaskThumbnailView extends View {
             mMatrix.postScale(thumbnailScale, thumbnailScale);
             mBitmapShader.setLocalMatrix(mMatrix);
 
-            float bitmapHeight = Math.max((rotate ? thumbnailWidth : thumbnailHeight)
+            float bitmapHeight = Math.max((mIsRotated ? thumbnailWidth : thumbnailHeight)
                     * thumbnailScale, 0);
             if (Math.round(bitmapHeight) < getMeasuredHeight()) {
                 mClipBottom = bitmapHeight;
@@ -298,7 +313,7 @@ public class TaskThumbnailView extends View {
             mPaint.setShader(mBitmapShader);
         }
 
-        if (rotate) {
+        if (mIsRotated) {
             // The overlay doesn't really work when the screenshot is rotated, so don't add it.
             mOverlay.reset();
         } else {
@@ -313,25 +328,34 @@ public class TaskThumbnailView extends View {
         updateThumbnailMatrix();
     }
 
-    private static LightingColorFilter getDimmingColorFilter(int intensity, boolean shouldLighten) {
+    /**
+     * @param intensity multiplier for color values. 0 - make black (white if shouldLighten), 255 -
+     *                  leave unchanged.
+     */
+    private static ColorFilter getColorFilter(int intensity, boolean shouldLighten,
+            float saturation) {
         intensity = Utilities.boundToRange(intensity, 0, 255);
-        if (intensity == 255) {
+
+        if (intensity == 255 && saturation == 1) {
             return null;
         }
-        if (shouldLighten) {
-            if (sHighlightFilterCache[intensity] == null) {
-                int colorAdd = 255 - intensity;
-                sHighlightFilterCache[intensity] = new LightingColorFilter(
-                        Color.argb(255, intensity, intensity, intensity),
-                        Color.argb(255, colorAdd, colorAdd, colorAdd));
-            }
-            return sHighlightFilterCache[intensity];
-        } else {
-            if (sDimFilterCache[intensity] == null) {
-                sDimFilterCache[intensity] = new LightingColorFilter(
-                        Color.argb(255, intensity, intensity, intensity), 0);
-            }
-            return sDimFilterCache[intensity];
+
+        final float intensityScale = intensity / 255f;
+        COLOR_MATRIX.setScale(intensityScale, intensityScale, intensityScale, 1);
+
+        if (saturation != 1) {
+            SATURATION_COLOR_MATRIX.setSaturation(saturation);
+            COLOR_MATRIX.postConcat(SATURATION_COLOR_MATRIX);
         }
+
+        if (shouldLighten) {
+            final float[] colorArray = COLOR_MATRIX.getArray();
+            final int colorAdd = 255 - intensity;
+            colorArray[4] = colorAdd;
+            colorArray[9] = colorAdd;
+            colorArray[14] = colorAdd;
+        }
+
+        return new ColorMatrixColorFilter(COLOR_MATRIX);
     }
 }

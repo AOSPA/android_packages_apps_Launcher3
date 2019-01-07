@@ -45,6 +45,9 @@ import androidx.annotation.WorkerThread;
  */
 @TargetApi(Build.VERSION_CODES.O)
 public class RecentsModel extends TaskStackChangeListener {
+
+    private static final String TAG = "RecentsModel";
+
     // We do not need any synchronization for this variable as its only written on UI thread.
     public static final MainThreadInitializedObject<RecentsModel> INSTANCE =
             new MainThreadInitializedObject<>(c -> new RecentsModel(c));
@@ -61,6 +64,9 @@ public class RecentsModel extends TaskStackChangeListener {
     private final RecentTasksList mTaskList;
     private final TaskIconCache mIconCache;
     private final TaskThumbnailCache mThumbnailCache;
+
+    private float mWindowCornerRadius = -1;
+
 
     private RecentsModel(Context context) {
         mContext = context;
@@ -92,7 +98,7 @@ public class RecentsModel extends TaskStackChangeListener {
      * @return the request id associated with this call.
      */
     public int getTasks(Consumer<ArrayList<Task>> callback) {
-        return mTaskList.getTasks(-1, false /* loadKeysOnly */, callback);
+        return mTaskList.getTasks(false /* loadKeysOnly */, callback);
     }
 
     /**
@@ -118,7 +124,7 @@ public class RecentsModel extends TaskStackChangeListener {
      *                 called on the UI thread.
      */
     public void findTaskWithId(int taskId, Consumer<Task.TaskKey> callback) {
-        mTaskList.getTasks(-1, true /* loadKeysOnly */, (tasks) -> {
+        mTaskList.getTasks(true /* loadKeysOnly */, (tasks) -> {
             for (Task task : tasks) {
                 if (task.key.id == taskId) {
                     callback.accept(task.key);
@@ -144,7 +150,7 @@ public class RecentsModel extends TaskStackChangeListener {
 
         // Keep the cache up to date with the latest thumbnails
         int runningTaskId = RecentsModel.getRunningTaskId();
-        mTaskList.getTasks(mThumbnailCache.getCacheSize(), true /* keysOnly */, (tasks) -> {
+        mTaskList.getTaskKeys(mThumbnailCache.getCacheSize(), tasks -> {
             for (Task task : tasks) {
                 if (task.key.id == runningTaskId) {
                     // Skip the running task, it's not going to have an up-to-date snapshot by the
@@ -172,6 +178,26 @@ public class RecentsModel extends TaskStackChangeListener {
 
     public ISystemUiProxy getSystemUiProxy() {
         return mSystemUiProxy;
+    }
+
+    public float getWindowCornerRadius() {
+        // The window corner radius is expressed in pixels and won't change if the
+        // display density changes. It's safe to cache the value.
+        if (mWindowCornerRadius == -1) {
+            if (mSystemUiProxy != null) {
+                try {
+                    mWindowCornerRadius = mSystemUiProxy.getWindowCornerRadius();
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Connection to ISystemUIProxy was lost, ignoring window corner "
+                            + "radius");
+                    return 0;
+                }
+            } else {
+                Log.w(TAG, "ISystemUIProxy is null, ignoring window corner radius");
+                return 0;
+            }
+        }
+        return mWindowCornerRadius;
     }
 
     public void onTrimMemory(int level) {

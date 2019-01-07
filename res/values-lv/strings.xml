@@ -39,6 +39,7 @@
     <string name="all_apps_loading_message" msgid="5813968043155271636">"Notiek lietotņu ielāde…"</string>
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"Vaicājumam “<xliff:g id="QUERY">%1$s</xliff:g>” neatbilda neviena lietotne"</string>
     <string name="all_apps_search_market_message" msgid="1366263386197059176">"Meklēt citas lietotnes"</string>
+    <string name="label_application" msgid="8531721983832654978">"Lietotne"</string>
     <string name="notifications_header" msgid="1404149926117359025">"Paziņojumi"</string>
     <string name="long_press_shortcut_to_add" msgid="4524750017792716791">"Lai atlasītu saīsni, pieskarieties un turiet to."</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="3327314059613154633">"Lai atlasītu saīsni, veiciet dubultskārienu uz tās un turiet to. Varat arī veikt pielāgotas darbības."</string>
@@ -64,10 +65,10 @@
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"Šī ir sistēmas lietotne, un to nevar atinstalēt."</string>
     <string name="folder_hint_text" msgid="6617836969016293992">"Mape bez nosaukuma"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"Lietotne <xliff:g id="APP_NAME">%1$s</xliff:g> ir atspējota"</string>
-    <plurals name="badged_app_label" formatted="false" msgid="7948068486082879291">
-      <item quantity="zero"><xliff:g id="APP_NAME_2">%1$s</xliff:g>, ir <xliff:g id="NOTIFICATION_COUNT_3">%2$d</xliff:g> paziņojumi</item>
-      <item quantity="one"><xliff:g id="APP_NAME_2">%1$s</xliff:g>, ir <xliff:g id="NOTIFICATION_COUNT_3">%2$d</xliff:g> paziņojums</item>
-      <item quantity="other"><xliff:g id="APP_NAME_2">%1$s</xliff:g>, ir <xliff:g id="NOTIFICATION_COUNT_3">%2$d</xliff:g> paziņojumi</item>
+    <plurals name="dotted_app_label" formatted="false" msgid="5194538107138265416">
+      <item quantity="zero">Lietotnē <xliff:g id="APP_NAME_2">%1$s</xliff:g> ir <xliff:g id="NOTIFICATION_COUNT_3">%2$d</xliff:g> paziņojumi</item>
+      <item quantity="one">Lietotnē <xliff:g id="APP_NAME_2">%1$s</xliff:g> ir <xliff:g id="NOTIFICATION_COUNT_3">%2$d</xliff:g> paziņojums</item>
+      <item quantity="other">Lietotnē <xliff:g id="APP_NAME_2">%1$s</xliff:g> ir <xliff:g id="NOTIFICATION_COUNT_3">%2$d</xliff:g> paziņojumi</item>
     </plurals>
     <string name="default_scroll_format" msgid="7475544710230993317">"%1$d. lapa no %2$d"</string>
     <string name="workspace_scroll_format" msgid="8458889198184077399">"Sākuma ekrāns: %1$d no %2$d"</string>
@@ -84,23 +85,15 @@
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"Atspējojis administrators"</string>
     <string name="allow_rotation_title" msgid="7728578836261442095">"Atļaut sākuma ekrāna pagriešanu"</string>
     <string name="allow_rotation_desc" msgid="8662546029078692509">"Pagriežot tālruni"</string>
-    <string name="icon_badging_title" msgid="874121399231955394">"Paziņojumu punkti"</string>
-    <string name="icon_badging_desc_on" msgid="2627952638544674079">"Ieslēgts"</string>
-    <string name="icon_badging_desc_off" msgid="5503319969924580241">"Izslēgts"</string>
+    <string name="notification_dots_title" msgid="9062440428204120317">"Paziņojumu punkti"</string>
+    <string name="notification_dots_desc_on" msgid="1679848116452218908">"Ieslēgts"</string>
+    <string name="notification_dots_desc_off" msgid="1760796511504341095">"Izslēgts"</string>
     <string name="title_missing_notification_access" msgid="7503287056163941064">"Nepieciešama piekļuve paziņojumiem"</string>
     <string name="msg_missing_notification_access" msgid="281113995110910548">"Lai tiktu rādīti paziņojumu punkti, ieslēdziet paziņojumus lietotnei <xliff:g id="NAME">%1$s</xliff:g>."</string>
     <string name="title_change_settings" msgid="1376365968844349552">"Mainīt iestatījumus"</string>
-    <string name="icon_badging_service_title" msgid="2309733118428242174">"Rādīt paziņojumu punktus"</string>
+    <string name="notification_dots_service_title" msgid="4284221181793592871">"Rādīt paziņojumu punktus"</string>
     <string name="auto_add_shortcuts_label" msgid="8222286205987725611">"Pievienot ikonu sākuma ekrānā"</string>
     <string name="auto_add_shortcuts_description" msgid="7117251166066978730">"Jaunām lietotnēm"</string>
-    <string name="icon_shape_override_label" msgid="2977264953998281004">"Mainīt ikonu formu"</string>
-    <string name="icon_shape_override_label_location" msgid="3841607380657692863">"sākuma ekrānā"</string>
-    <string name="icon_shape_system_default" msgid="1709762974822753030">"Izmantot sistēmas noklusējumu"</string>
-    <string name="icon_shape_square" msgid="633575066111622774">"Kvadrāts"</string>
-    <string name="icon_shape_squircle" msgid="5658049910802669495">"Kvadrāts ar noapaļotiem stūriem"</string>
-    <string name="icon_shape_circle" msgid="6550072265930144217">"Aplis"</string>
-    <string name="icon_shape_teardrop" msgid="4525869388200835463">"Lāse"</string>
-    <string name="icon_shape_override_progress" msgid="3461735694970239908">"Tiek piemērotas ikonu formas izmaiņas"</string>
     <string name="package_state_unknown" msgid="7592128424511031410">"Nezināma"</string>
     <string name="abandoned_clean_this" msgid="7610119707847920412">"Noņemt"</string>
     <string name="abandoned_search" msgid="891119232568284442">"Meklēt"</string>
