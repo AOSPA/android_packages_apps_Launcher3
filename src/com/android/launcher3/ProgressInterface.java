@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.compat;
+package com.android.launcher3;
 
-import android.annotation.TargetApi;
-import android.content.Context;
-import android.os.Build;
-import android.os.UserHandle;
-
-@TargetApi(Build.VERSION_CODES.M)
-public class UserManagerCompatVM extends UserManagerCompatVL {
-
-    UserManagerCompatVM(Context context) {
-        super(context);
-    }
+/**
+ * Progress is defined as a value with range [0, 1], and is specific to each implementor.
+ * It is used when there is a transition from one state of the UI to another.
+ */
+public interface ProgressInterface {
+    void setProgress(float progress);
+    float getProgress();
 }

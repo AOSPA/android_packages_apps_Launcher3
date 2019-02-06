@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.android.launcher3.util;
+package com.android.launcher3.uioverrides;
 
 /**
- * Utility class to allow lazy initialization of objects.
+ * State indicating that the Launcher is behind an app. Same as {@link OverviewState} for Go as we
+ * do not support swipe to overview or swipe to home.
  */
-public interface Provider<T> {
-
-    /**
-     * Initializes and returns the object. This may contain expensive operations not suitable
-     * to UI thread.
-     */
-    T get();
-
-    static <T> Provider<T> of (T value) {
-        return() -> value;
+public final class BackgroundAppState extends OverviewState {
+    public BackgroundAppState(int id) {
+        super(id);
     }
 }

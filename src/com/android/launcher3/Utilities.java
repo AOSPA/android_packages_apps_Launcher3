@@ -28,7 +28,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Point;
@@ -55,12 +54,9 @@ import android.view.animation.Interpolator;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.IntArray;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -98,18 +94,6 @@ public final class Utilities {
     public static final boolean ATLEAST_OREO =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
 
-    public static final boolean ATLEAST_NOUGAT_MR1 =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1;
-
-    public static final boolean ATLEAST_NOUGAT =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.N;
-
-    public static final boolean ATLEAST_MARSHMALLOW =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
-
-    public static final boolean ATLEAST_LOLLIPOP_MR1 =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1;
-
     public static final int SINGLE_FRAME_MS = 16;
 
     /**
@@ -122,9 +106,6 @@ public final class Utilities {
 
     // An intent extra to indicate the horizontal scroll of the wallpaper.
     public static final String EXTRA_WALLPAPER_OFFSET = "com.android.launcher3.WALLPAPER_OFFSET";
-
-    public static final int COLOR_EXTRACTION_JOB_ID = 1;
-    public static final int WALLPAPER_COMPAT_JOB_ID = 2;
 
     // These values are same as that in {@link AsyncTask}.
     private static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
@@ -512,19 +493,11 @@ public final class Utilities {
             // Battery saver mode no longer prevents animations.
             return false;
         }
-        PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        return powerManager.isPowerSaveMode();
+        return context.getSystemService(PowerManager.class).isPowerSaveMode();
     }
 
     public static boolean isWallpaperAllowed(Context context) {
-        if (ATLEAST_NOUGAT) {
-            try {
-                WallpaperManager wm = context.getSystemService(WallpaperManager.class);
-                return (Boolean) wm.getClass().getDeclaredMethod("isSetWallpaperAllowed")
-                        .invoke(wm);
-            } catch (Exception e) { }
-        }
-        return true;
+        return context.getSystemService(WallpaperManager.class).isSetWallpaperAllowed();
     }
 
     public static void closeSilently(Closeable c) {
@@ -539,44 +512,9 @@ public final class Utilities {
         }
     }
 
-    /**
-     * Returns true if {@param original} contains all entries defined in {@param updates} and
-     * have the same value.
-     * The comparison uses {@link Object#equals(Object)} to compare the values.
-     */
-    public static boolean containsAll(Bundle original, Bundle updates) {
-        for (String key : updates.keySet()) {
-            Object value1 = updates.get(key);
-            Object value2 = original.get(key);
-            if (value1 == null) {
-                if (value2 != null) {
-                    return false;
-                }
-            } else if (!value1.equals(value2)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** Returns whether the collection is null or empty. */
-    public static boolean isEmpty(Collection c) {
-        return c == null || c.isEmpty();
-    }
-
     public static boolean isBinderSizeError(Exception e) {
         return e.getCause() instanceof TransactionTooLargeException
                 || e.getCause() instanceof DeadObjectException;
-    }
-
-    /**
-     * Returns a HashSet with a single element. We use this instead of Collections.singleton()
-     * because HashSet ensures all operations, such as remove, are supported.
-     */
-    public static <T> HashSet<T> singletonHashSet(T elem) {
-        HashSet<T> hashSet = new HashSet<>(1);
-        hashSet.add(elem);
-        return hashSet;
     }
 
     /**
@@ -601,9 +539,5 @@ public final class Utilities {
      */
     public static String getPointString(int x, int y) {
         return String.format(Locale.ENGLISH, "%d,%d", x, y);
-    }
-
-    public interface Consumer<T> {
-        void accept(T var1);
     }
 }

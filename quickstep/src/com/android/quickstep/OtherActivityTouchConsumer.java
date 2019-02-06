@@ -24,8 +24,7 @@ import static android.view.MotionEvent.INVALID_POINTER_ID;
 
 import static com.android.launcher3.util.RaceConditionTracker.ENTER;
 import static com.android.launcher3.util.RaceConditionTracker.EXIT;
-import static com.android.systemui.shared.system.ActivityManagerWrapper
-        .CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
+import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_CLOSING;
 
 import android.annotation.TargetApi;
@@ -49,8 +48,10 @@ import android.view.ViewConfiguration;
 import android.view.WindowManager;
 
 import com.android.launcher3.MainThreadExecutor;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.RaceConditionTracker;
 import com.android.launcher3.util.TraceHelper;
+import com.android.quickstep.util.MotionPauseDetector;
 import com.android.quickstep.util.RemoteAnimationTargetSet;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.AssistDataReceiver;
@@ -66,6 +67,8 @@ import com.android.systemui.shared.system.WindowManagerWrapper;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import androidx.annotation.Nullable;
+
 /**
  * Touch consumer for handling events originating from an activity other than Launcher
  */
@@ -74,6 +77,7 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
 
     private static final long LAUNCHER_DRAW_TIMEOUT_MS = 150;
     public static final String DOWN_EVT = "OtherActivityTouchConsumer.DOWN";
+    private static final String UP_EVT = "OtherActivityTouchConsumer.UP";
 
     private final SparseArray<RecentsAnimationState> mAnimationStates = new SparseArray<>();
     private final RunningTaskInfo mRunningTask;
@@ -100,8 +104,9 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
     private Rect mStableInsets = new Rect();
 
     private VelocityTracker mVelocityTracker;
+    private MotionPauseDetector mMotionPauseDetector;
     private MotionEventQueue mEventQueue;
-    private boolean mIsGoingToHome;
+    private boolean mIsGoingToLauncher;
 
     public OtherActivityTouchConsumer(Context base, RunningTaskInfo runningTaskInfo,
             RecentsModel recentsModel, Intent homeIntent, ActivityControlHelper activityControl,
@@ -115,6 +120,7 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
         mRecentsModel = recentsModel;
         mHomeIntent = homeIntent;
         mVelocityTracker = velocityTracker;
+        mMotionPauseDetector = new MotionPauseDetector(base);
         mActivityControlHelper = activityControl;
         mMainThreadExecutor = mainThreadExecutor;
         mBackgroundThreadChoreographer = backgroundThreadChoreographer;
@@ -192,18 +198,36 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
 
                 if (mPassedInitialSlop && mInteractionHandler != null) {
                     // Move
-                    mInteractionHandler.updateDisplacement(displacement - mStartDisplacement);
+                    dispatchMotion(ev, displacement - mStartDisplacement, null);
+
+                    if (FeatureFlags.SWIPE_HOME.get()) {
+                        boolean isLandscape = isNavBarOnLeft() || isNavBarOnRight();
+                        float orthogonalDisplacement = !isLandscape
+                                ? ev.getX() - mDownPos.x
+                                : ev.getY() - mDownPos.y;
+                        mMotionPauseDetector.addPosition(displacement, orthogonalDisplacement);
+                    }
                 }
                 break;
             }
             case ACTION_CANCEL:
                 // TODO: Should be different than ACTION_UP
             case ACTION_UP: {
+                RaceConditionTracker.onEvent(UP_EVT, ENTER);
                 TraceHelper.endSection("TouchInt");
 
                 finishTouchTracking(ev);
+                RaceConditionTracker.onEvent(UP_EVT, EXIT);
                 break;
             }
+        }
+    }
+
+    private void dispatchMotion(MotionEvent ev, float displacement, @Nullable Float velocityX) {
+        mInteractionHandler.updateDisplacement(displacement);
+        boolean isLandscape = isNavBarOnLeft() || isNavBarOnRight();
+        if (!isLandscape) {
+            mInteractionHandler.dispatchMotionEventToRecentsView(ev, velocityX);
         }
     }
 
@@ -241,6 +265,7 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
         mRecentsModel.getTasks(null);
         mInteractionHandler = handler;
         handler.setGestureEndCallback(mEventQueue::reset);
+        mMotionPauseDetector.setOnMotionPauseListener(handler::onMotionPauseChanged);
 
         CountDownLatch drawWaitLock = new CountDownLatch(1);
         handler.setLauncherOnDrawCallback(() -> {
@@ -297,15 +322,17 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
      */
     private void finishTouchTracking(MotionEvent ev) {
         if (mPassedInitialSlop && mInteractionHandler != null) {
-            mInteractionHandler.updateDisplacement(getDisplacement(ev) - mStartDisplacement);
 
             mVelocityTracker.computeCurrentVelocity(1000,
                     ViewConfiguration.get(this).getScaledMaximumFlingVelocity());
-
-            float velocity = isNavBarOnRight() ? mVelocityTracker.getXVelocity(mActivePointerId)
-                    : isNavBarOnLeft() ? -mVelocityTracker.getXVelocity(mActivePointerId)
+            float velocityX = mVelocityTracker.getXVelocity(mActivePointerId);
+            float velocity = isNavBarOnRight() ? velocityX
+                    : isNavBarOnLeft() ? -velocityX
                             : mVelocityTracker.getYVelocity(mActivePointerId);
-            mInteractionHandler.onGestureEnded(velocity);
+
+            dispatchMotion(ev, getDisplacement(ev) - mStartDisplacement, velocityX);
+
+            mInteractionHandler.onGestureEnded(velocity, velocityX);
         } else {
             // Since we start touch tracking on DOWN, we may reach this state without actually
             // starting the gesture. In that case, just cleanup immediately.
@@ -326,7 +353,7 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
         if (mInteractionHandler != null) {
             final WindowTransformSwipeHandler handler = mInteractionHandler;
             mInteractionHandler = null;
-            mIsGoingToHome = handler.mIsGoingToHome;
+            mIsGoingToLauncher = handler.mIsGoingToRecents || handler.mIsGoingToHome;
             mMainThreadExecutor.execute(handler::reset);
         }
     }
@@ -376,6 +403,8 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
             // Deferred gesture, start the animation and gesture tracking once we pass the actual
             // touch slop
             startTouchTrackingForWindowAnimation(ev.getEventTime());
+        }
+        if (!mPassedInitialSlop) {
             mPassedInitialSlop = true;
             mStartDisplacement = getDisplacement(ev);
         }
@@ -404,13 +433,14 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
            mVelocityTracker.addMovement(ev);
            if (ev.getActionMasked() == ACTION_POINTER_UP) {
                mVelocityTracker.clear();
+               mMotionPauseDetector.clear();
            }
         }
     }
 
     @Override
     public boolean forceToLauncherConsumer() {
-        return mIsGoingToHome;
+        return mIsGoingToLauncher;
     }
 
     @Override
@@ -421,6 +451,7 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
 
     private class RecentsAnimationState implements RecentsAnimationListener {
 
+        private static final String ANIMATION_START_EVT = "RecentsAnimationState.onAnimationStart";
         private final int id;
 
         private RecentsAnimationControllerCompat mController;
@@ -439,11 +470,13 @@ public class OtherActivityTouchConsumer extends ContextWrapper implements TouchC
                 RecentsAnimationControllerCompat controller,
                 RemoteAnimationTargetCompat[] apps, Rect homeContentInsets,
                 Rect minimizedHomeBounds) {
+            RaceConditionTracker.onEvent(ANIMATION_START_EVT, ENTER);
             mController = controller;
             mTargets = new RemoteAnimationTargetSet(apps, MODE_CLOSING);
             mHomeContentInsets = homeContentInsets;
             mMinimizedHomeBounds = minimizedHomeBounds;
             mEventQueue.onCommand(id);
+            RaceConditionTracker.onEvent(ANIMATION_START_EVT, EXIT);
         }
 
         @Override

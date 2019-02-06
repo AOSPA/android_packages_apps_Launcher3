@@ -25,6 +25,7 @@ import static com.android.launcher3.anim.AnimatorSetBuilder.ANIM_VERTICAL_PROGRE
 import static com.android.launcher3.anim.Interpolators.ACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.config.FeatureFlags.QUICKSTEP_SPRINGS;
 
 import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
@@ -47,8 +48,6 @@ import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.TouchInteractionService;
 import com.android.quickstep.util.LayoutUtils;
-import com.android.quickstep.views.RecentsView;
-import com.android.quickstep.views.TaskView;
 
 /**
  * Touch controller for handling various state transitions in portrait UI.
@@ -67,14 +66,19 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
      */
     private static final float RECENTS_FADE_THRESHOLD = 0.88f;
 
-    private InterpolatorWrapper mAllAppsInterpolatorWrapper = new InterpolatorWrapper();
+    private final PortraitOverviewStateTouchHelper mOverviewPortraitStateTouchHelper;
+
+    private final InterpolatorWrapper mAllAppsInterpolatorWrapper = new InterpolatorWrapper();
+
+    private final boolean mAllowDragToOverview;
 
     // If true, we will finish the current animation instantly on second touch.
     private boolean mFinishFastOnSecondTouch;
 
-
-    public PortraitStatesTouchController(Launcher l) {
+    public PortraitStatesTouchController(Launcher l, boolean allowDragToOverview) {
         super(l, SwipeDetector.VERTICAL);
+        mOverviewPortraitStateTouchHelper = new PortraitOverviewStateTouchHelper(l);
+        mAllowDragToOverview = allowDragToOverview;
     }
 
     @Override
@@ -82,7 +86,7 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
         if (mCurrentAnimation != null) {
             if (mFinishFastOnSecondTouch) {
                 // TODO: Animate to finish instead.
-                mCurrentAnimation.getAnimationPlayer().end();
+                mCurrentAnimation.skipToEnd();
             }
 
             AllAppsTransitionController allAppsController = mLauncher.getAllAppsController();
@@ -98,22 +102,18 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
             }
             return false;
         }
-        RecentsView recentsView = mLauncher.getOverviewPanel();
         if (mLauncher.isInState(ALL_APPS)) {
             // In all-apps only listen if the container cannot scroll itself
             if (!mLauncher.getAppsView().shouldContainerScroll(ev)) {
                 return false;
             }
-        } else if (mLauncher.isInState(OVERVIEW) && recentsView.getChildCount() > 0) {
-            // Allow swiping up in the gap between the hotseat and overview.
-            if (ev.getY() < recentsView.getChildAt(0).getBottom()) {
+        } else if (mLauncher.isInState(OVERVIEW)) {
+            if (!mOverviewPortraitStateTouchHelper.canInterceptTouch(ev)) {
                 return false;
             }
         } else {
             // For all other states, only listen if the event originated below the hotseat height
-            DeviceProfile dp = mLauncher.getDeviceProfile();
-            int hotseatHeight = dp.hotseatBarSizePx + dp.getInsets().bottom;
-            if (ev.getY() < (mLauncher.getDragLayer().getHeight() - hotseatHeight)) {
+            if (!isTouchOverHotseat(mLauncher, ev)) {
                 return false;
             }
         }
@@ -132,7 +132,8 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
         } else if (fromState == OVERVIEW) {
             return isDragTowardPositive ? ALL_APPS : NORMAL;
         } else if (fromState == NORMAL && isDragTowardPositive) {
-            return TouchInteractionService.isConnected() ? OVERVIEW : ALL_APPS;
+            return mAllowDragToOverview && TouchInteractionService.isConnected()
+                    ? OVERVIEW : ALL_APPS;
         }
         return fromState;
     }
@@ -197,13 +198,12 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
 
         cancelPendingAnim();
 
-        RecentsView recentsView = mLauncher.getOverviewPanel();
-        TaskView taskView = recentsView.getTaskViewAt(recentsView.getNextPage());
-        if (recentsView.shouldSwipeDownLaunchApp() && mFromState == OVERVIEW && mToState == NORMAL
-                && taskView != null) {
+        if (mFromState == OVERVIEW && mToState == NORMAL
+                && mOverviewPortraitStateTouchHelper.shouldSwipeDownReturnToApp()) {
             // Reset the state manager, when changing the interaction mode
             mLauncher.getStateManager().goToState(OVERVIEW, false /* animate */);
-            mPendingAnimation = recentsView.createTaskLauncherAnimation(taskView, maxAccuracy);
+            mPendingAnimation = mOverviewPortraitStateTouchHelper
+                    .createSwipeDownToTaskAppAnimation(maxAccuracy);
             mPendingAnimation.anim.setInterpolator(Interpolators.LINEAR);
 
             Runnable onCancelRunnable = () -> {
@@ -213,7 +213,8 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
             mCurrentAnimation = AnimatorPlaybackController.wrap(mPendingAnimation.anim, maxAccuracy,
                     onCancelRunnable);
             mLauncher.getStateManager().setCurrentUserControlledAnimation(mCurrentAnimation);
-            totalShift = LayoutUtils.getShelfTrackingDistance(mLauncher.getDeviceProfile());
+            totalShift = LayoutUtils.getShelfTrackingDistance(mLauncher,
+                    mLauncher.getDeviceProfile());
         } else {
             mCurrentAnimation = mLauncher.getStateManager()
                     .createAnimationToNewWorkspace(mToState, builder, maxAccuracy, this::clearState,
@@ -245,7 +246,10 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
     private void handleFirstSwipeToOverview(final ValueAnimator animator,
             final long expectedDuration, final LauncherState targetState, final float velocity,
             final boolean isFling) {
-        if (mFromState == NORMAL && mToState == OVERVIEW && targetState == OVERVIEW) {
+        if (QUICKSTEP_SPRINGS.get() && mFromState == OVERVIEW && mToState == ALL_APPS
+                && targetState == OVERVIEW) {
+            mFinishFastOnSecondTouch = true;
+        } else  if (mFromState == NORMAL && mToState == OVERVIEW && targetState == OVERVIEW) {
             mFinishFastOnSecondTouch = true;
             if (isFling && expectedDuration != 0) {
                 // Update all apps interpolator to add a bit of overshoot starting from currFraction
@@ -266,6 +270,19 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
         if (mStartState == NORMAL && targetState == OVERVIEW) {
             RecentsModel.INSTANCE.get(mLauncher).onOverviewShown(true, TAG);
         }
+    }
+
+    /**
+     * Whether the motion event is over the hotseat.
+     *
+     * @param launcher the launcher activity
+     * @param ev the event to check
+     * @return true if the event is over the hotseat
+     */
+    static boolean isTouchOverHotseat(Launcher launcher, MotionEvent ev) {
+        DeviceProfile dp = launcher.getDeviceProfile();
+        int hotseatHeight = dp.hotseatBarSizePx + dp.getInsets().bottom;
+        return (ev.getY() >= (launcher.getDragLayer().getHeight() - hotseatHeight));
     }
 
     private static class InterpolatorWrapper implements Interpolator {

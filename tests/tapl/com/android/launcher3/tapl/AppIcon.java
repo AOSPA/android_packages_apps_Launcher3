@@ -17,6 +17,7 @@
 package com.android.launcher3.tapl;
 
 import android.graphics.Point;
+import android.view.MotionEvent;
 import android.widget.TextView;
 
 import androidx.test.uiautomator.By;
@@ -31,8 +32,8 @@ public final class AppIcon extends Launchable {
         super(launcher, icon);
     }
 
-    static BySelector getAppIconSelector(String appName) {
-        return By.clazz(TextView.class).text(appName).pkg(LauncherInstrumentation.LAUNCHER_PKG);
+    static BySelector getAppIconSelector(String appName, LauncherInstrumentation launcher) {
+        return By.clazz(TextView.class).text(appName).pkg(launcher.getLauncherPackageName());
     }
 
     /**
@@ -40,9 +41,10 @@ public final class AppIcon extends Launchable {
      */
     public AppIconMenu openMenu() {
         final Point iconCenter = mObject.getVisibleCenter();
-        mLauncher.longTap(iconCenter.x, iconCenter.y);
+        mLauncher.sendPointer(MotionEvent.ACTION_DOWN, iconCenter);
         final UiObject2 deepShortcutsContainer = mLauncher.waitForLauncherObject(
                 "deep_shortcuts_container");
+        mLauncher.sendPointer(MotionEvent.ACTION_UP, iconCenter);
         return new AppIconMenu(mLauncher, deepShortcutsContainer);
     }
 }

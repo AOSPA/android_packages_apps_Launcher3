@@ -44,10 +44,6 @@ public abstract class BaseDraggingActivity extends BaseActivity
 
     private static final String TAG = "BaseDraggingActivity";
 
-    // The Intent extra that defines whether to ignore the launch animation
-    public static final String INTENT_EXTRA_IGNORE_LAUNCH_ANIMATION =
-            "com.android.launcher3.intent.extra.shortcut.INGORE_LAUNCH_ANIMATION";
-
     // When starting an action mode, setting this tag will cause the action mode to be cancelled
     // automatically when user interacts with the launcher.
     public static final Object AUTO_CANCEL_ACTION_MODE = new Object();
@@ -158,14 +154,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
             return false;
         }
 
-        // Only launch using the new animation if the shortcut has not opted out (this is a
-        // private contract between launcher and may be ignored in the future).
-        boolean useLaunchAnimation = (v != null) &&
-                !intent.hasExtra(INTENT_EXTRA_IGNORE_LAUNCH_ANIMATION);
-        Bundle optsBundle = useLaunchAnimation
-                ? getActivityLaunchOptionsAsBundle(v)
-                : null;
-
+        Bundle optsBundle = (v != null) ? getActivityLaunchOptionsAsBundle(v) : null;
         UserHandle user = item == null ? null : item.user;
 
         // Prepare intent
@@ -174,8 +163,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
             intent.setSourceBounds(getViewBounds(v));
         }
         try {
-            boolean isShortcut = Utilities.ATLEAST_MARSHMALLOW
-                    && (item instanceof ShortcutInfo)
+            boolean isShortcut = (item instanceof ShortcutInfo)
                     && (item.itemType == Favorites.ITEM_TYPE_SHORTCUT
                     || item.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT)
                     && !((ShortcutInfo) item).isPromise();

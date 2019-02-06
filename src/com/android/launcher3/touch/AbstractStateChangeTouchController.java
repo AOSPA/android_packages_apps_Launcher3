@@ -24,6 +24,7 @@ import static com.android.launcher3.LauncherStateManager.ATOMIC_COMPONENT;
 import static com.android.launcher3.LauncherStateManager.NON_ATOMIC_COMPONENT;
 import static com.android.launcher3.Utilities.SINGLE_FRAME_MS;
 import static com.android.launcher3.anim.Interpolators.scrollInterpolatorForVelocity;
+import static com.android.launcher3.config.FeatureFlags.QUICKSTEP_SPRINGS;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -296,7 +297,7 @@ public abstract class AbstractStateChangeTouchController
      * When going between normal and overview states, see if we passed the overview threshold and
      * play the appropriate atomic animation if so.
      */
-    private void maybeUpdateAtomicAnim(LauncherState fromState, LauncherState toState,
+    protected void maybeUpdateAtomicAnim(LauncherState fromState, LauncherState toState,
             float progress) {
         if (!goingBetweenNormalAndOverview(fromState, toState)) {
             return;
@@ -428,12 +429,16 @@ public abstract class AbstractStateChangeTouchController
         maybeUpdateAtomicAnim(mFromState, targetState, targetState == mToState ? 1f : 0f);
         updateSwipeCompleteAnimation(anim, Math.max(duration, getRemainingAtomicDuration()),
                 targetState, velocity, fling);
-        mCurrentAnimation.dispatchOnStart();
-        if (fling && targetState == LauncherState.ALL_APPS) {
+        mCurrentAnimation.dispatchOnStartWithVelocity(endProgress, velocity);
+        if (fling && targetState == LauncherState.ALL_APPS && !QUICKSTEP_SPRINGS.get()) {
             mLauncher.getAppsView().addSpringFromFlingUpdateListener(anim, velocity);
         }
         anim.start();
-        mAtomicAnimAutoPlayInfo = new AutoPlayAtomicAnimationInfo(endProgress, anim.getDuration());
+        settleAtomicAnimation(endProgress, anim.getDuration());
+    }
+
+    protected void settleAtomicAnimation(float endProgress, long duration) {
+        mAtomicAnimAutoPlayInfo = new AutoPlayAtomicAnimationInfo(endProgress, duration);
         maybeAutoPlayAtomicComponentsAnim();
     }
 

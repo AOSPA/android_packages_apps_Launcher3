@@ -21,10 +21,13 @@ import static com.android.systemui.shared.system.SettingsCompat.SWIPE_UP_SETTING
 import android.app.ActivityManager;
 import android.app.Instrumentation;
 import android.app.UiAutomation;
+import android.graphics.Point;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -41,6 +44,7 @@ import com.android.quickstep.SwipeUpSetting;
 import org.junit.Assert;
 
 import java.lang.ref.WeakReference;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -83,7 +87,6 @@ public final class LauncherInstrumentation {
     private static final String APPS_RES_ID = "apps_view";
     private static final String OVERVIEW_RES_ID = "overview_panel";
     private static final String WIDGETS_RES_ID = "widgets_list_view";
-    static final String LAUNCHER_PKG = "com.google.android.apps.nexuslauncher";
     public static final int WAIT_TIME_MS = 60000;
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
 
@@ -368,6 +371,11 @@ public final class LauncherInstrumentation {
     }
 
     @NonNull
+    List<UiObject2> getObjectsInContainer(UiObject2 container, String resName) {
+        return container.findObjects(getLauncherObjectSelector(resName));
+    }
+
+    @NonNull
     UiObject2 waitForObjectInContainer(UiObject2 container, String resName) {
         final UiObject2 object = container.wait(
                 Until.findObject(getLauncherObjectSelector(resName)),
@@ -379,25 +387,24 @@ public final class LauncherInstrumentation {
 
     @NonNull
     UiObject2 waitForLauncherObject(String resName) {
-        final UiObject2 object = mDevice.wait(Until.findObject(getLauncherObjectSelector(resName)),
-                WAIT_TIME_MS);
-        assertNotNull("Can't find a launcher object; id: " + resName, object);
+        final BySelector selector = getLauncherObjectSelector(resName);
+        final UiObject2 object = mDevice.wait(Until.findObject(selector), WAIT_TIME_MS);
+        assertNotNull("Can't find a launcher object; selector: " + selector, object);
         return object;
     }
 
-    static BySelector getLauncherObjectSelector(String resName) {
-        return By.res(LAUNCHER_PKG, resName);
+    BySelector getLauncherObjectSelector(String resName) {
+        return By.res(getLauncherPackageName(), resName);
+    }
+
+    String getLauncherPackageName() {
+        return mDevice.getLauncherPackageName();
     }
 
     @NonNull
     UiDevice getDevice() {
         return mDevice;
     }
-
-    void longTap(int x, int y) {
-        mDevice.drag(x, y, x, y, 0);
-    }
-
 
     void swipe(int startX, int startY, int endX, int endY) {
         executeAndWaitForEvent(
@@ -409,5 +416,12 @@ public final class LauncherInstrumentation {
 
     void waitForIdle() {
         mDevice.waitForIdle();
+    }
+
+    void sendPointer(int action, Point point) {
+        final MotionEvent event = MotionEvent.obtain(SystemClock.uptimeMillis(),
+                SystemClock.uptimeMillis(), action, point.x, point.y, 0);
+        mInstrumentation.sendPointerSync(event);
+        event.recycle();
     }
 }

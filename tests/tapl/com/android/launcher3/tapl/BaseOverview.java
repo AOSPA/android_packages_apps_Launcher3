@@ -16,18 +16,20 @@
 
 package com.android.launcher3.tapl;
 
-import java.util.Collections;
-import java.util.List;
-
 import androidx.annotation.NonNull;
+import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.Direction;
 import androidx.test.uiautomator.UiObject2;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Common overview pane for both Launcher and fallback recents
  */
 public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     private static final int DEFAULT_FLING_SPEED = 15000;
+    private static final int FLINGS_FOR_DISMISS_LIMIT = 5;
 
     BaseOverview(LauncherInstrumentation launcher) {
         super(launcher);
@@ -50,6 +52,22 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     }
 
     /**
+     * Dismissed all tasks by scrolling to Clear-all button and pressing it.
+     */
+    public Workspace dismissAllTasks() {
+        final BySelector clearAllSelector = mLauncher.getLauncherObjectSelector("clear_all");
+        for (int i = 0;
+                i < FLINGS_FOR_DISMISS_LIMIT
+                        && verifyActiveContainer().findObject(clearAllSelector) == null;
+                ++i) {
+            flingForward();
+        }
+
+        mLauncher.getObjectInContainer(verifyActiveContainer(), clearAllSelector).click();
+        return new Workspace(mLauncher);
+    }
+
+    /**
      * Flings backward (right) and waits the fling's end.
      */
     public void flingBackward() {
@@ -69,7 +87,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     public OverviewTask getCurrentTask() {
         verifyActiveContainer();
         final List<UiObject2> taskViews = mLauncher.getDevice().findObjects(
-                LauncherInstrumentation.getLauncherObjectSelector("snapshot"));
+                mLauncher.getLauncherObjectSelector("snapshot"));
         LauncherInstrumentation.assertNotEquals("Unable to find a task", 0, taskViews.size());
 
         // taskViews contains up to 3 task views: the 'main' (having the widest visible

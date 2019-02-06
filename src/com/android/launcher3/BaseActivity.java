@@ -17,6 +17,7 @@
 package com.android.launcher3;
 
 import static com.android.launcher3.util.SystemUiController.UI_STATE_OVERVIEW;
+
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 import android.app.Activity;
@@ -25,7 +26,6 @@ import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.view.ContextThemeWrapper;
-import android.view.View.AccessibilityDelegate;
 
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.logging.StatsLogManager;
@@ -125,10 +125,6 @@ public abstract class BaseActivity extends Activity
         return mUserEventDispatcher;
     }
 
-    public boolean isInMultiWindowModeCompat() {
-        return Utilities.ATLEAST_NOUGAT && isInMultiWindowMode();
-    }
-
     public SystemUiController getSystemUiController() {
         if (mSystemUiController == null) {
             mSystemUiController = new SystemUiController(getWindow());
@@ -226,7 +222,7 @@ public abstract class BaseActivity extends Activity
     /**
      * Used to set the override visibility state, used only to handle the transition home with the
      * recents animation.
-     * @see LauncherAppTransitionManagerImpl#getWallpaperOpenRunner()
+     * @see QuickstepAppTransitionManagerImpl#getWallpaperOpenRunner()
      */
     public void addForceInvisibleFlag(@InvisibilityFlags int flag) {
         mForceInvisible |= flag;

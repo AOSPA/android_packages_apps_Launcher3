@@ -30,6 +30,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * A utility class to maintain the collection of all apps.
@@ -121,11 +123,11 @@ public class AllAppsStore {
         mIconContainers.remove(container);
     }
 
-    public void updateNotificationDots(Set<PackageUserKey> updatedDots) {
+    public void updateNotificationDots(Predicate<PackageUserKey> updatedDots) {
         updateAllIcons((child) -> {
             if (child.getTag() instanceof ItemInfo) {
                 ItemInfo info = (ItemInfo) child.getTag();
-                if (mTempKey.updateFromItemInfo(info) && updatedDots.contains(mTempKey)) {
+                if (mTempKey.updateFromItemInfo(info) && updatedDots.test(mTempKey)) {
                     child.applyDotState(info, true /* animate */);
                 }
             }
@@ -140,7 +142,7 @@ public class AllAppsStore {
         });
     }
 
-    private void updateAllIcons(IconAction action) {
+    private void updateAllIcons(Consumer<BubbleTextView> action) {
         for (int i = mIconContainers.size() - 1; i >= 0; i--) {
             ViewGroup parent = mIconContainers.get(i);
             int childCount = parent.getChildCount();
@@ -148,7 +150,7 @@ public class AllAppsStore {
             for (int j = 0; j < childCount; j++) {
                 View child = parent.getChildAt(j);
                 if (child instanceof BubbleTextView) {
-                    action.apply((BubbleTextView) child);
+                    action.accept((BubbleTextView) child);
                 }
             }
         }
@@ -156,9 +158,5 @@ public class AllAppsStore {
 
     public interface OnUpdateListener {
         void onAppsUpdated();
-    }
-
-    public interface IconAction {
-        void apply(BubbleTextView icon);
     }
 }
