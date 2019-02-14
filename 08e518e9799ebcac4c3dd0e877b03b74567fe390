@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5c13fe9f_5cbbef81",
+        "filename": "src/com/android/launcher3/Workspace.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 307,
+      "author": {
+        "id": 1000055
+      },
+      "writtenOn": "2019-02-14T02:41:15Z",
+      "side": 1,
+      "message": "Need to use reflection for this one, StatusBarManager is now hidden.",
+      "revId": "08e518e9799ebcac4c3dd0e877b03b74567fe390",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad",
+      "unresolved": false
+    }
+  ]
+}
