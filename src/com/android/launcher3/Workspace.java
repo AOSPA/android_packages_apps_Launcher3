@@ -45,10 +45,12 @@ import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Parcelable;
+import android.os.PowerManager;
 import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -94,6 +96,8 @@ import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.PendingAppWidgetHostView;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -127,6 +131,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
     private static final boolean MAP_NO_RECURSE = false;
     private static final boolean MAP_RECURSE = true;
+
+    private static final int SWIPE_THRESHOLD = 125;
 
     // The screen id used for the empty screen always present to the right.
     public static final long EXTRA_EMPTY_SCREEN_ID = -201;
@@ -247,6 +253,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     // Handles workspace state transitions
     private final WorkspaceStateTransitionAnimation mStateTransitionAnimation;
 
+    private GestureDetector mGestureListener;
+
     /**
      * Used to inflate the Workspace from XML.
      *
@@ -279,6 +287,40 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         // Disable multitouch across the workspace/all apps/customize tray
         setMotionEventSplittingEnabled(true);
         setOnTouchListener(new WorkspaceTouchListener(mLauncher, this));
+
+        final PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+
+        mGestureListener =
+                new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent event) {
+                pm.goToSleep(event.getEventTime());
+                return true;
+            }
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2,
+                    float velocityX, float velocityY) {
+                if (e1.getY() - e2.getY() > SWIPE_THRESHOLD) {
+                    mLauncher.showAppsView(true, false, false);
+                } else if (e1.getY() - e2.getY() < SWIPE_THRESHOLD) {
+                    expandNotificationsPanel();
+                }
+                return true;
+            }
+        });
+    }
+
+    // Expand the notifications panel.
+    private boolean expandNotificationsPanel() {
+        try {
+            Class.forName("android.app.StatusBarManager")
+                    .getMethod("expandNotificationsPanel")
+                    .invoke(mLauncher.getSystemService("statusbar"));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
@@ -967,6 +1009,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
+        mGestureListener.onTouchEvent(ev);
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
             mXDown = ev.getX();
             mYDown = ev.getY();
