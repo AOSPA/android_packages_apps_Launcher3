@@ -32,6 +32,7 @@ import android.animation.PropertyValuesHolder;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.annotation.SuppressLint;
+import android.app.StatusBarManager;
 import android.app.WallpaperManager;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetProviderInfo;
@@ -45,10 +46,12 @@ import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Parcelable;
+import android.os.PowerManager;
 import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -127,6 +130,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
     private static final boolean MAP_NO_RECURSE = false;
     private static final boolean MAP_RECURSE = true;
+
+    private static final int SWIPE_THRESHOLD = 125;
 
     // The screen id used for the empty screen always present to the right.
     public static final long EXTRA_EMPTY_SCREEN_ID = -201;
@@ -247,6 +252,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     // Handles workspace state transitions
     private final WorkspaceStateTransitionAnimation mStateTransitionAnimation;
 
+    private GestureDetector mGestureListener;
+
     /**
      * Used to inflate the Workspace from XML.
      *
@@ -279,6 +286,29 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         // Disable multitouch across the workspace/all apps/customize tray
         setMotionEventSplittingEnabled(true);
         setOnTouchListener(new WorkspaceTouchListener(mLauncher, this));
+
+        final PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        final StatusBarManager statusBar = (StatusBarManager) context.getSystemService(
+                Context.STATUS_BAR_SERVICE);
+        mGestureListener =
+                new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent event) {
+                pm.goToSleep(event.getEventTime());
+                return true;
+            }
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2,
+                    float velocityX, float velocityY) {
+                if (e1.getY() - e2.getY() > SWIPE_THRESHOLD) {
+                    mLauncher.showAppsView(true, false, false);
+                } else if (e1.getY() - e2.getY() < SWIPE_THRESHOLD) {
+                    statusBar.expandNotificationsPanel();
+                }
+                return true;
+            }
+        });
     }
 
     @Override
@@ -967,6 +997,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
+        mGestureListener.onTouchEvent(ev);
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
             mXDown = ev.getX();
             mYDown = ev.getY();
