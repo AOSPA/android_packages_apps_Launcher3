@@ -19,6 +19,12 @@ package com.android.quickstep;
 import static com.android.quickstep.QuickStepOnOffRule.Mode.BOTH;
 import static com.android.quickstep.QuickStepOnOffRule.Mode.OFF;
 import static com.android.quickstep.QuickStepOnOffRule.Mode.ON;
+import static com.android.systemui.shared.system.SettingsCompat.SWIPE_UP_SETTING_NAME;
+
+import static org.junit.Assert.assertTrue;
+
+import android.provider.Settings;
+import android.util.Log;
 
 import androidx.test.InstrumentationRegistry;
 
@@ -40,6 +46,8 @@ import java.util.concurrent.Executor;
  * The test should be annotated with @QuickstepOnOff.
  */
 public class QuickStepOnOffRule implements TestRule {
+
+    static final String TAG = "QuickStepOnOffRule";
 
     public enum Mode {
         ON, OFF, BOTH
@@ -68,38 +76,52 @@ public class QuickStepOnOffRule implements TestRule {
             return new Statement() {
                 @Override
                 public void evaluate() throws Throwable {
-                    try {
-                        if (mode == ON || mode == BOTH) {
-                            evaluateWithQuickstepOn();
+                    if (SwipeUpSetting.isSwipeUpSettingAvailable()) {
+                        try {
+                            if (mode == ON || mode == BOTH) {
+                                evaluateWithQuickstepOn();
+                            }
+                            if (mode == OFF || mode == BOTH) {
+                                evaluateWithQuickstepOff();
+                            }
+                        } finally {
+                            setSwipeUpSetting(null);
                         }
-                        if (mode == OFF || mode == BOTH) {
-                            evaluateWithQuickstepOff();
+                    } else {
+                        // Execute without changing the setting, if the requested mode is
+                        // compatible.
+                        final boolean swipeUpEnabledDefaultValue =
+                                SwipeUpSetting.isSwipeUpEnabledDefaultValue();
+                        if (mode == BOTH ||
+                                mode == ON && swipeUpEnabledDefaultValue ||
+                                mode == OFF && !swipeUpEnabledDefaultValue) {
+                            evaluateWithoutChangingSetting(base);
                         }
-                    } finally {
-                        overrideSwipeUpEnabled(null);
                     }
                 }
 
-                private void evaluateWithQuickstepOff() throws Throwable {
-                    overrideSwipeUpEnabled(false);
+                public void setSwipeUpSetting(String value) {
+                    Log.d(TAG, "setSwipeUpSetting: " + value);
+                    assertTrue("Couldn't change Quickstep mode",
+                            Settings.Secure.putString(
+                                    InstrumentationRegistry.getInstrumentation().getTargetContext().
+                                            getContentResolver(),
+                                    SWIPE_UP_SETTING_NAME,
+                                    value));
+                }
+
+                public void evaluateWithoutChangingSetting(Statement base) throws Throwable {
                     base.evaluate();
+                }
+
+                private void evaluateWithQuickstepOff() throws Throwable {
+                    setSwipeUpSetting("0");
+                    evaluateWithoutChangingSetting(base);
                 }
 
                 private void evaluateWithQuickstepOn() throws Throwable {
-                    overrideSwipeUpEnabled(true);
+                    setSwipeUpSetting("1");
                     base.evaluate();
-                }
-
-                private void overrideSwipeUpEnabled(Boolean swipeUpEnabledOverride)
-                        throws Throwable {
-                    mLauncher.overrideSwipeUpEnabled(swipeUpEnabledOverride);
-                    mMainThreadExecutor.execute(() -> OverviewInteractionState.INSTANCE.get(
-                            InstrumentationRegistry.getInstrumentation().getTargetContext()).
-                            notifySwipeUpSettingChanged(mLauncher.isSwipeUpEnabled()));
-                    // TODO(b/124236673): avoid using sleep().
-                    mLauncher.getDevice().waitForIdle();
-                    Thread.sleep(2000);
-                    mLauncher.getDevice().waitForIdle();
                 }
             };
         } else {
