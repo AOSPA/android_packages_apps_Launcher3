@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.launcher3.uioverrides;
+package com.android.launcher3.uioverrides.states;
 
 import static com.android.launcher3.LauncherAnimUtils.OVERVIEW_TRANSITION_MS;
 
@@ -52,7 +52,7 @@ public class BackgroundAppState extends OverviewState {
     }
 
     @Override
-    public float[] getOverviewScaleAndTranslationY(Launcher launcher) {
+    public ScaleAndTranslation getOverviewScaleAndTranslation(Launcher launcher) {
         // Initialize the recents view scale to what it would be when starting swipe up
         RecentsView recentsView = launcher.getOverviewPanel();
         recentsView.getTaskSize(sTempRect);
@@ -71,7 +71,7 @@ public class BackgroundAppState extends OverviewState {
             }
         }
         float scale = (float) appWidth / sTempRect.width();
-        return new float[] { scale, 0f };
+        return new ScaleAndTranslation(scale, 0f, 0f);
     }
 
     @Override

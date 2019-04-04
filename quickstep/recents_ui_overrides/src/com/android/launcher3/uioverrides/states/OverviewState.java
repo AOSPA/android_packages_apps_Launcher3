@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.launcher3.uioverrides;
+package com.android.launcher3.uioverrides.states;
 
 import static com.android.launcher3.LauncherAnimUtils.OVERVIEW_TRANSITION_MS;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
+import static com.android.launcher3.logging.LoggerUtils.getTargetStr;
 import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
 import static com.android.launcher3.states.RotationHelper.REQUEST_ROTATE;
 
@@ -52,11 +53,15 @@ public class OverviewState extends LauncherState {
     }
 
     protected OverviewState(int id, int transitionDuration, int stateFlags) {
-        super(id, ContainerType.TASKSWITCHER, transitionDuration, stateFlags);
+        this(id, ContainerType.TASKSWITCHER, transitionDuration, stateFlags);
+    }
+
+    protected OverviewState(int id, int logContainer, int transitionDuration, int stateFlags) {
+        super(id, logContainer, transitionDuration, stateFlags);
     }
 
     @Override
-    public float[] getWorkspaceScaleAndTranslation(Launcher launcher) {
+    public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
         RecentsView recentsView = launcher.getOverviewPanel();
         Workspace workspace = launcher.getWorkspace();
         View workspacePage = workspace.getPageAt(workspace.getCurrentPage());
@@ -65,12 +70,12 @@ public class OverviewState extends LauncherState {
         recentsView.getTaskSize(sTempRect);
         float scale = (float) sTempRect.width() / workspacePageWidth;
         float parallaxFactor = 0.5f;
-        return new float[]{scale, 0, -getDefaultSwipeHeight(launcher) * parallaxFactor};
+        return new ScaleAndTranslation(scale, 0, -getDefaultSwipeHeight(launcher) * parallaxFactor);
     }
 
     @Override
-    public float[] getOverviewScaleAndTranslationY(Launcher launcher) {
-        return new float[] {1f, 0f};
+    public ScaleAndTranslation getOverviewScaleAndTranslation(Launcher launcher) {
+        return new ScaleAndTranslation(1f, 0f, 0f);
     }
 
     @Override
@@ -92,6 +97,7 @@ public class OverviewState extends LauncherState {
         DiscoveryBounce.showForOverviewIfNeeded(launcher);
     }
 
+    @Override
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
         return new PageAlphaProvider(DEACCEL_2) {
             @Override
@@ -150,5 +156,17 @@ public class OverviewState extends LauncherState {
         } else {
             super.onBackPressed(launcher);
         }
+    }
+
+    public static OverviewState newBackgroundState(int id) {
+        return new BackgroundAppState(id);
+    }
+
+    public static OverviewState newPeekState(int id) {
+        return new OverviewPeekState(id);
+    }
+
+    public static OverviewState newSwitchState(int id) {
+        return new QuickSwitchState(id);
     }
 }

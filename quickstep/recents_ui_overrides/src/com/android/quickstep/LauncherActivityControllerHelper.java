@@ -16,7 +16,6 @@
 package com.android.quickstep;
 
 import static android.view.View.TRANSLATION_Y;
-
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -25,6 +24,7 @@ import static com.android.launcher3.allapps.AllAppsTransitionController.SPRING_D
 import static com.android.launcher3.allapps.AllAppsTransitionController.SPRING_STIFFNESS;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_3;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.quickstep.SysUINavigationMode.Mode.NO_BUTTON;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -39,16 +39,13 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Interpolator;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.UiThread;
-
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.LauncherStateManager;
+import com.android.launcher3.Workspace;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DiscoveryBounce;
 import com.android.launcher3.anim.AnimatorPlaybackController;
@@ -67,6 +64,10 @@ import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
+
 /**
  * {@link ActivityControlHelper} for the in-launcher recents.
  */
@@ -75,7 +76,8 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
     @Override
     public int getSwipeUpDestinationAndLength(DeviceProfile dp, Context context, Rect outRect) {
         LayoutUtils.calculateLauncherTaskSize(context, dp, outRect);
-        if (dp.isVerticalBarLayout()) {
+        if (dp.isVerticalBarLayout()
+                && SysUINavigationMode.INSTANCE.get(context).getMode() != NO_BUTTON) {
             Rect targetInsets = dp.getInsets();
             int hotseatInset = dp.isSeascape() ? targetInsets.left : targetInsets.right;
             return dp.hotseatBarSizePx + hotseatInset;
@@ -97,6 +99,14 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
         DiscoveryBounce.showForOverviewIfNeeded(activity);
     }
 
+    @Override
+    public void onAssistantVisibilityChanged(float visibility) {
+        Launcher launcher = getCreatedActivity();
+        if (launcher != null) {
+            launcher.setQuickSearchBarAlpha(1f - visibility);
+        }
+    }
+
     @NonNull
     @Override
     public HomeAnimationFactory prepareHomeUI(Launcher activity) {
@@ -114,8 +124,7 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
         final Rect iconLocation = new Rect();
         final FloatingIconView floatingView = workspaceView == null ? null
                 : FloatingIconView.getFloatingIconView(activity, workspaceView,
-                true /* hideOriginal */, false /* useDrawableAsIs */,
-                activity.getDeviceProfile().getAspectRatioWithInsets(), iconLocation, null);
+                true /* hideOriginal */, iconLocation, false /* isOpening */, null /* recycle */);
 
         return new HomeAnimationFactory() {
             @Nullable
@@ -305,7 +314,7 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
         // starting to line up the side pages during swipe up)
         float prevRvScale = recentsView.getScaleX();
         float prevRvTransY = recentsView.getTranslationY();
-        float targetRvScale = endState.getOverviewScaleAndTranslationY(launcher)[0];
+        float targetRvScale = endState.getOverviewScaleAndTranslation(launcher).scale;
         SCALE_PROPERTY.set(recentsView, targetRvScale);
         recentsView.setTranslationY(0);
         ClipAnimationHelper clipHelper = new ClipAnimationHelper(launcher);

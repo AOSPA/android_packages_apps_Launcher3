@@ -118,10 +118,6 @@ abstract class BaseFlags {
             "ENABLE_HINTS_IN_OVERVIEW", false,
             "Show chip hints and gleams on the overview screen");
 
-    public static final TogglableFlag ENABLE_ASSISTANT_GESTURE = new ToggleableGlobalSettingsFlag(
-            "ENABLE_ASSISTANT_GESTURE", false,
-            "Enable swipe up from the bottom right corner to start assistant");
-
     public static void initialize(Context context) {
         // Avoid the disk read for user builds
         if (Utilities.IS_DEBUG_DEVICE) {
@@ -180,7 +176,7 @@ abstract class BaseFlags {
             currentValue = getFromStorage(context, defaultValue);
         }
 
-        void updateStorage(Context context, boolean value) {
+        public void updateStorage(Context context, boolean value) {
             SharedPreferences.Editor editor = context.getSharedPreferences(FLAGS_PREF_NAME,
                     Context.MODE_PRIVATE).edit();
             if (value == defaultValue) {
@@ -272,7 +268,7 @@ abstract class BaseFlags {
         }
 
         @Override
-        void updateStorage(Context context, boolean value) {
+        public void updateStorage(Context context, boolean value) {
             if (contentResolver == null) {
                 return;
             }

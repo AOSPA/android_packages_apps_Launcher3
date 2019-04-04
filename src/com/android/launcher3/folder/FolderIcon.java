@@ -189,7 +189,17 @@ public class FolderIcon extends FrameLayout implements FolderListener {
         return icon;
     }
 
+    public void animateBgShadowAndStroke() {
+        mBackground.fadeInBackgroundShadow();
+        mBackground.animateBackgroundStroke();
+    }
+
+    public BubbleTextView getFolderName() {
+        return mFolderName;
+    }
+
     public void getPreviewBounds(Rect outBounds) {
+        mPreviewItemManager.recomputePreviewDrawingParams();
         mBackground.getBounds(outBounds);
     }
 
