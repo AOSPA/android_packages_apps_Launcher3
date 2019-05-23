@@ -18,6 +18,7 @@ package com.android.launcher3.tapl;
 
 import static com.android.launcher3.TestProtocol.BACKGROUND_APP_STATE_ORDINAL;
 import static com.android.launcher3.TestProtocol.NORMAL_STATE_ORDINAL;
+import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
 
 import android.app.ActivityManager;
 import android.app.Instrumentation;
@@ -27,6 +28,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -46,6 +48,7 @@ import androidx.annotation.Nullable;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.Configurator;
+import androidx.test.uiautomator.Direction;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
@@ -55,6 +58,7 @@ import com.android.systemui.shared.system.QuickStepContract;
 
 import org.junit.Assert;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.Deque;
@@ -70,6 +74,7 @@ public final class LauncherInstrumentation {
 
     private static final String TAG = "Tapl";
     private static final int ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME = 20;
+    private static final int GESTURE_STEP_MS = 16;
 
     // Types for launcher containers that the user is interacting with. "Background" is a
     // pseudo-container corresponding to inactive launcher covered by another app.
@@ -175,23 +180,25 @@ public final class LauncherInstrumentation {
             // Workaround, use constructed context because both the instrumentation context and the
             // app context are not constructed with resources that take overlays into account
             final Context ctx = baseContext.createPackageContext("android", 0);
-            log("Interaction mode = " + getCurrentInteractionMode(ctx));
-            if (isGesturalMode(ctx)) {
-                return NavigationModel.ZERO_BUTTON;
-            } else if (isSwipeUpMode(ctx)) {
-                return NavigationModel.TWO_BUTTON;
-            } else if (isLegacyMode(ctx)) {
-                return NavigationModel.THREE_BUTTON;
-            } else {
-                fail("Can't detect navigation mode");
+            for (int i = 0; i < 100; ++i) {
+                log("Interaction mode = " + getCurrentInteractionMode(ctx));
+                if (isGesturalMode(ctx)) {
+                    return NavigationModel.ZERO_BUTTON;
+                } else if (isSwipeUpMode(ctx)) {
+                    return NavigationModel.TWO_BUTTON;
+                } else if (isLegacyMode(ctx)) {
+                    return NavigationModel.THREE_BUTTON;
+                }
+                Thread.sleep(100);
             }
-        } catch (PackageManager.NameNotFoundException e) {
+            fail("Can't detect navigation mode");
+        } catch (Exception e) {
             fail(e.toString());
         }
         return NavigationModel.THREE_BUTTON;
     }
 
-    public static boolean needSlowGestures() {
+    public static boolean isAvd() {
         return Build.MODEL.contains("Cuttlefish");
     }
 
@@ -208,7 +215,22 @@ public final class LauncherInstrumentation {
         };
     }
 
+    private void dumpViewHierarchy() {
+        final ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try {
+            mDevice.dumpWindowHierarchy(stream);
+            stream.flush();
+            stream.close();
+            for (String line : stream.toString().split("\\r?\\n")) {
+                Log.e(TAG, line.trim());
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "error dumping XML to logcat", e);
+        }
+    }
+
     private void fail(String message) {
+        dumpViewHierarchy();
         Assert.fail("http://go/tapl : " + getContextDescription() + message);
     }
 
@@ -293,13 +315,13 @@ public final class LauncherInstrumentation {
                     } else {
                         waitUntilGone(APPS_RES_ID);
                     }
-                    // Fall through
-                }
-                case BASE_OVERVIEW: {
                     waitUntilGone(WORKSPACE_RES_ID);
                     waitUntilGone(WIDGETS_RES_ID);
 
                     return waitForLauncherObject(OVERVIEW_RES_ID);
+                }
+                case BASE_OVERVIEW: {
+                    return waitForFallbackLauncherObject(OVERVIEW_RES_ID);
                 }
                 case BACKGROUND: {
                     waitUntilGone(WORKSPACE_RES_ID);
@@ -359,23 +381,13 @@ public final class LauncherInstrumentation {
                         ? NORMAL_STATE_ORDINAL : BACKGROUND_APP_STATE_ORDINAL;
                 final Point displaySize = getRealDisplaySize();
 
-                swipe(
+                swipeToState(
                         displaySize.x / 2, displaySize.y - 1,
                         displaySize.x / 2, 0,
-                        finalState, ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME);
+                        ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME, finalState);
             }
         } else {
             log(action = "clicking home button");
-            executeAndWaitForEvent(
-                    () -> {
-                        log("LauncherInstrumentation.pressHome before clicking");
-                        waitForSystemUiObject("home").click();
-                    },
-                    event -> true,
-                    "Pressing Home didn't produce any events");
-            mDevice.waitForIdle();
-
-            // Temporarily press home twice as the first click sometimes gets ignored  (b/124239413)
             executeAndWaitForEvent(
                     () -> {
                         log("LauncherInstrumentation.pressHome before clicking");
@@ -535,8 +547,32 @@ public final class LauncherInstrumentation {
         return object;
     }
 
+    @NonNull
+    UiObject2 waitForLauncherObjectByClass(String clazz) {
+        final BySelector selector = getLauncherObjectSelectorByClass(clazz);
+        final UiObject2 object = mDevice.wait(Until.findObject(selector), WAIT_TIME_MS);
+        assertNotNull("Can't find a launcher object; selector: " + selector, object);
+        return object;
+    }
+
+    @NonNull
+    UiObject2 waitForFallbackLauncherObject(String resName) {
+        final BySelector selector = getFallbackLauncherObjectSelector(resName);
+        final UiObject2 object = mDevice.wait(Until.findObject(selector), WAIT_TIME_MS);
+        assertNotNull("Can't find a fallback launcher object; selector: " + selector, object);
+        return object;
+    }
+
     BySelector getLauncherObjectSelector(String resName) {
         return By.res(getLauncherPackageName(), resName);
+    }
+
+    BySelector getLauncherObjectSelectorByClass(String clazz) {
+        return By.pkg(getLauncherPackageName()).clazz(clazz);
+    }
+
+    BySelector getFallbackLauncherObjectSelector(String resName) {
+        return By.res(getOverviewPackageName(), resName);
     }
 
     String getLauncherPackageName() {
@@ -553,8 +589,73 @@ public final class LauncherInstrumentation {
     }
 
     void swipe(int startX, int startY, int endX, int endY, int expectedState, int steps) {
+        changeStateViaGesture(startX, startY, endX, endY, expectedState,
+                () -> mDevice.swipe(startX, startY, endX, endY, steps));
+    }
+
+    void swipeToState(int startX, int startY, int endX, int endY, int steps, int expectedState) {
+        changeStateViaGesture(startX, startY, endX, endY, expectedState,
+                () -> linearGesture(startX, startY, endX, endY, steps));
+    }
+
+    void scroll(UiObject2 container, Direction direction, float percent, Rect margins, int steps) {
+        final Rect rect = container.getVisibleBounds();
+        if (margins != null) {
+            rect.left += margins.left;
+            rect.top += margins.top;
+            rect.right -= margins.right;
+            rect.bottom -= margins.bottom;
+        }
+
+        final int startX;
+        final int startY;
+        final int endX;
+        final int endY;
+
+        switch (direction) {
+            case UP: {
+                startX = endX = rect.centerX();
+                final int vertCenter = rect.centerY();
+                final float halfGestureHeight = rect.height() * percent / 2.0f;
+                startY = (int) (vertCenter - halfGestureHeight);
+                endY = (int) (vertCenter + halfGestureHeight);
+            }
+            break;
+            case DOWN: {
+                startX = endX = rect.centerX();
+                final int vertCenter = rect.centerY();
+                final float halfGestureHeight = rect.height() * percent / 2.0f;
+                startY = (int) (vertCenter + halfGestureHeight);
+                endY = (int) (vertCenter - halfGestureHeight);
+            }
+            break;
+            default:
+                fail("Unsupported direction");
+                return;
+        }
+
+        executeAndWaitForEvent(
+                () -> linearGesture(startX, startY, endX, endY, steps),
+                event -> TestProtocol.SCROLL_FINISHED_MESSAGE.equals(event.getClassName()),
+                "Didn't receive a scroll end message: " + startX + ", " + startY
+                        + ", " + endX + ", " + endY);
+    }
+
+    // Inject a swipe gesture. Inject exactly 'steps' motion points, incrementing event time by a
+    // fixed interval each time.
+    private void linearGesture(int startX, int startY, int endX, int endY, int steps) {
+        final long downTime = SystemClock.uptimeMillis();
+        final Point start = new Point(startX, startY);
+        final Point end = new Point(endX, endY);
+        sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN, start);
+        final long endTime = movePointer(downTime, downTime, steps * GESTURE_STEP_MS, start, end);
+        sendPointer(downTime, endTime, MotionEvent.ACTION_UP, end);
+    }
+
+    private void changeStateViaGesture(int startX, int startY, int endX, int endY,
+            int expectedState, Runnable gesture) {
         final Bundle parcel = (Bundle) executeAndWaitForEvent(
-                () -> mDevice.swipe(startX, startY, endX, endY, steps),
+                gesture,
                 event -> TestProtocol.SWITCHED_TO_STATE_MESSAGE.equals(event.getClassName()),
                 "Swipe failed to receive an event for the swipe end: " + startX + ", " + startY
                         + ", " + endX + ", " + endY);
@@ -573,6 +674,10 @@ public final class LauncherInstrumentation {
 
     int getTouchSlop() {
         return ViewConfiguration.get(getContext()).getScaledTouchSlop();
+    }
+
+    public Resources getResources() {
+        return getContext().getResources();
     }
 
     private static MotionEvent getMotionEvent(long downTime, long eventTime, int action,
@@ -599,21 +704,22 @@ public final class LauncherInstrumentation {
         event.recycle();
     }
 
-    void movePointer(long downTime, long duration, Point from, Point to) {
+    long movePointer(long downTime, long startTime, long duration, Point from, Point to) {
         final Point point = new Point();
-        final long startTime = SystemClock.uptimeMillis();
-        for (; ; ) {
-            sleep(16);
+        long steps = duration / GESTURE_STEP_MS;
+        long currentTime = startTime;
+        for (long i = 0; i < steps; ++i) {
+            sleep(GESTURE_STEP_MS);
 
-            final long currentTime = SystemClock.uptimeMillis();
+            currentTime += GESTURE_STEP_MS;
             final float progress = (currentTime - startTime) / (float) duration;
-            if (progress > 1) return;
 
             point.x = from.x + (int) (progress * (to.x - from.x));
             point.y = from.y + (int) (progress * (to.y - from.y));
 
             sendPointer(downTime, currentTime, MotionEvent.ACTION_MOVE, point);
         }
+        return currentTime;
     }
 
     public static boolean isGesturalMode(Context context) {
@@ -657,10 +763,7 @@ public final class LauncherInstrumentation {
     }
 
     static void sleep(int duration) {
-        try {
-            Thread.sleep(duration);
-        } catch (InterruptedException e) {
-        }
+        SystemClock.sleep(duration);
     }
 
     int getEdgeSensitivityWidth() {

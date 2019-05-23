@@ -22,6 +22,7 @@ import com.android.launcher3.util.Preconditions;
 import com.android.quickstep.util.RecentsAnimationListenerSet;
 import com.android.quickstep.util.SwipeAnimationTargetSet;
 import com.android.quickstep.util.SwipeAnimationTargetSet.SwipeAnimationListener;
+import java.io.PrintWriter;
 
 /**
  * Utility class used to store state information shared across multiple transitions.
@@ -38,6 +39,8 @@ public class SwipeSharedState implements SwipeAnimationListener {
 
     public boolean canGestureBeContinued;
     public boolean goingToLauncher;
+    public boolean recentsAnimationFinishInterrupted;
+    public int nextRunningTaskId = -1;
 
     public SwipeSharedState(OverviewComponentObserver overviewComponentObserver) {
         mOverviewComponentObserver = overviewComponentObserver;
@@ -114,9 +117,31 @@ public class SwipeSharedState implements SwipeAnimationListener {
         }
     }
 
+    /**
+     * Called when a recents animation has finished, but was interrupted before the next task was
+     * launched. The given {@param runningTaskId} should be used as the running task for the
+     * continuing input consumer.
+     */
+    public void setRecentsAnimationFinishInterrupted(int runningTaskId) {
+        recentsAnimationFinishInterrupted = true;
+        nextRunningTaskId = runningTaskId;
+        mLastAnimationTarget = mLastAnimationTarget.cloneWithoutTargets();
+    }
+
     public void clearAllState() {
         clearListenerState();
         canGestureBeContinued = false;
+        recentsAnimationFinishInterrupted = false;
+        nextRunningTaskId = -1;
         goingToLauncher = false;
+    }
+
+    public void dump(String prefix, PrintWriter pw) {
+        pw.println(prefix + "goingToLauncher=" + goingToLauncher);
+        pw.println(prefix + "canGestureBeContinued=" + canGestureBeContinued);
+        pw.println(prefix + "recentsAnimationFinishInterrupted=" + recentsAnimationFinishInterrupted);
+        pw.println(prefix + "nextRunningTaskId=" + nextRunningTaskId);
+        pw.println(prefix + "lastAnimationCancelled=" + mLastAnimationCancelled);
+        pw.println(prefix + "lastAnimationRunning=" + mLastAnimationRunning);
     }
 }

@@ -28,8 +28,12 @@ import static com.android.launcher3.anim.Interpolators.ACCEL_2;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
 import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.util.SystemUiController.UI_STATE_OVERVIEW;
+import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
 
 import android.view.MotionEvent;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
@@ -45,8 +49,6 @@ import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 
-import androidx.annotation.Nullable;
-
 /**
  * Handles quick switching to a recent task from the home screen.
  */
@@ -55,7 +57,11 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
     private @Nullable TaskView mTaskToLaunch;
 
     public QuickSwitchTouchController(Launcher launcher) {
-        super(launcher, SwipeDetector.HORIZONTAL);
+        this(launcher, SwipeDetector.HORIZONTAL);
+    }
+
+    protected QuickSwitchTouchController(Launcher l, SwipeDetector.Direction dir) {
+        super(l, dir);
     }
 
     @Override
@@ -122,12 +128,16 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
     @Override
     protected void updateProgress(float progress) {
         super.updateProgress(progress);
-        updateFullscreenProgress(progress);
+        updateFullscreenProgress(Utilities.boundToRange(progress, 0, 1));
     }
 
     private void updateFullscreenProgress(float progress) {
         if (mTaskToLaunch != null) {
             mTaskToLaunch.setFullscreenProgress(progress);
+            int sysuiFlags = progress > UPDATE_SYSUI_FLAGS_THRESHOLD
+                    ? mTaskToLaunch.getThumbnail().getSysUiStatusNavFlags()
+                    : 0;
+            mLauncher.getSystemUiController().updateUiState(UI_STATE_OVERVIEW, sysuiFlags);
         }
     }
 

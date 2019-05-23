@@ -18,6 +18,7 @@ package com.android.launcher3.uioverrides;
 import static com.android.launcher3.LauncherState.RECENTS_CLEAR_ALL_BUTTON;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.quickstep.views.RecentsView.CONTENT_ALPHA;
+import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
 
 import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
@@ -31,6 +32,7 @@ import com.android.launcher3.LauncherState;
 import com.android.launcher3.LauncherStateManager.AnimationConfig;
 import com.android.launcher3.anim.AnimatorSetBuilder;
 import com.android.launcher3.anim.PropertySetter;
+import com.android.quickstep.hints.ProactiveHintsContainer;
 import com.android.quickstep.views.ClearAllButton;
 import com.android.quickstep.views.LauncherRecentsView;
 import com.android.quickstep.views.RecentsView;
@@ -53,8 +55,17 @@ public final class RecentsViewStateController extends
         if (state.overviewUi) {
             mRecentsView.updateEmptyMessage();
             mRecentsView.resetTaskVisuals();
+            mRecentsView.setHintVisibility(1f);
+        } else {
+            mRecentsView.setHintVisibility(0f);
+            ProactiveHintsContainer
+                    proactiveHintsContainer = mRecentsView.getProactiveHintsContainer();
+            if (proactiveHintsContainer != null) {
+                proactiveHintsContainer.removeAllViews();
+            }
         }
         setAlphas(PropertySetter.NO_ANIM_PROPERTY_SETTER, state.getVisibleElements(mLauncher));
+        mRecentsView.setFullscreenProgress(state.getOverviewFullscreenProgress());
     }
 
     @Override
@@ -64,6 +75,14 @@ public final class RecentsViewStateController extends
 
         if (!toState.overviewUi) {
             builder.addOnFinishRunnable(mRecentsView::resetTaskVisuals);
+            mRecentsView.setHintVisibility(0f);
+            builder.addOnFinishRunnable(() -> {
+                ProactiveHintsContainer
+                        proactiveHintsContainer = mRecentsView.getProactiveHintsContainer();
+                if (proactiveHintsContainer != null) {
+                    proactiveHintsContainer.removeAllViews();
+                }
+            });
         }
 
         if (toState.overviewUi) {
@@ -75,9 +94,13 @@ public final class RecentsViewStateController extends
             updateAnim.setDuration(config.duration);
             builder.play(updateAnim);
             mRecentsView.updateEmptyMessage();
+            builder.addOnFinishRunnable(() -> mRecentsView.setHintVisibility(1f));
         }
 
-        setAlphas(config.getPropertySetter(builder), toState.getVisibleElements(mLauncher));
+        PropertySetter propertySetter = config.getPropertySetter(builder);
+        setAlphas(propertySetter, toState.getVisibleElements(mLauncher));
+        float fullscreenProgress = toState.getOverviewFullscreenProgress();
+        propertySetter.setFloat(mRecentsView, FULLSCREEN_PROGRESS, fullscreenProgress, LINEAR);
     }
 
     private void setAlphas(PropertySetter propertySetter, int visibleElements) {

@@ -55,7 +55,6 @@ import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.userevent.nano.LauncherLogProto;
 import com.android.launcher3.views.FloatingIconView;
 import com.android.quickstep.SysUINavigationMode.Mode;
-import com.android.quickstep.util.ClipAnimationHelper;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
@@ -118,16 +117,15 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
         }
         final RectF iconLocation = new RectF();
         boolean canUseWorkspaceView = workspaceView != null && workspaceView.isAttachedToWindow();
-        final FloatingIconView floatingView = canUseWorkspaceView
-                ? FloatingIconView.getFloatingIconView(activity, workspaceView,
-                true /* hideOriginal */, iconLocation, false /* isOpening */, null /* recycle */)
+        FloatingIconView floatingIconView = canUseWorkspaceView
+                ? recentsView.getFloatingIconView(activity, workspaceView, iconLocation)
                 : null;
 
         return new HomeAnimationFactory() {
             @Nullable
             @Override
             public View getFloatingView() {
-                return floatingView;
+                return floatingIconView;
             }
 
             @NonNull
@@ -186,6 +184,12 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
             @Override
             public void createActivityController(long transitionLength) {
                 createActivityControllerInternal(activity, fromState, transitionLength, callback);
+                // Creating the activity controller animation sometimes reapplies the launcher state
+                // (because we set the animation as the current state animation), so we reapply the
+                // attached state here as well to ensure recents is shown/hidden appropriately.
+                if (SysUINavigationMode.getMode(activity) == Mode.NO_BUTTON) {
+                    setRecentsAttachedToAppWindow(mIsAttachedToWindow, false);
+                }
             }
 
             @Override
@@ -267,12 +271,12 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
                     endState.getVerticalProgress(activity));
             anim.play(shiftAnim);
         }
-        playScaleDownAnim(anim, activity, endState);
+        playScaleDownAnim(anim, activity, fromState, endState);
 
         anim.setDuration(transitionLength * 2);
-        activity.getStateManager().setCurrentAnimation(anim);
         AnimatorPlaybackController controller =
                 AnimatorPlaybackController.wrap(anim, transitionLength * 2);
+        activity.getStateManager().setCurrentUserControlledAnimation(controller);
 
         // Since we are changing the start position of the UI, reapply the state, at the end
         controller.setEndAction(() -> {
@@ -293,7 +297,7 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
     /**
      * Scale down recents from the center task being full screen to being in overview.
      */
-    private void playScaleDownAnim(AnimatorSet anim, Launcher launcher,
+    private void playScaleDownAnim(AnimatorSet anim, Launcher launcher, LauncherState fromState,
             LauncherState endState) {
         RecentsView recentsView = launcher.getOverviewPanel();
         TaskView v = recentsView.getTaskViewAt(recentsView.getCurrentPage());
@@ -301,34 +305,23 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
             return;
         }
 
-        // Setup the clip animation helper source/target rects in the final transformed state
-        // of the recents view (a scale/translationY may be applied prior to this animation
-        // starting to line up the side pages during swipe up)
-        float prevRvScale = recentsView.getScaleX();
-        float prevRvTransY = recentsView.getTranslationY();
-        float targetRvScale = endState.getOverviewScaleAndTranslation(launcher).scale;
-        SCALE_PROPERTY.set(recentsView, targetRvScale);
-        recentsView.setTranslationY(0);
-        ClipAnimationHelper clipHelper = new ClipAnimationHelper(launcher);
-        float tmpCurveScale = v.getCurveScale();
-        v.setCurveScale(1f);
-        clipHelper.fromTaskThumbnailView(v.getThumbnail(), (RecentsView) v.getParent(), null);
-        v.setCurveScale(tmpCurveScale);
-        SCALE_PROPERTY.set(recentsView, prevRvScale);
-        recentsView.setTranslationY(prevRvTransY);
+        LauncherState.ScaleAndTranslation fromScaleAndTranslation
+                = fromState.getOverviewScaleAndTranslation(launcher);
+        LauncherState.ScaleAndTranslation endScaleAndTranslation
+                = endState.getOverviewScaleAndTranslation(launcher);
+        float fromFullscreenProgress = fromState.getOverviewFullscreenProgress();
+        float endFullscreenProgress = endState.getOverviewFullscreenProgress();
 
-        if (!clipHelper.getSourceRect().isEmpty() && !clipHelper.getTargetRect().isEmpty()) {
-            float fromScale = clipHelper.getSourceRect().width()
-                    / clipHelper.getTargetRect().width();
-            float fromTranslationY = clipHelper.getSourceRect().centerY()
-                    - clipHelper.getTargetRect().centerY();
-            Animator scale = ObjectAnimator.ofFloat(recentsView, SCALE_PROPERTY, fromScale, 1);
-            Animator translateY = ObjectAnimator.ofFloat(recentsView, TRANSLATION_Y,
-                    fromTranslationY, 0);
-            scale.setInterpolator(LINEAR);
-            translateY.setInterpolator(LINEAR);
-            anim.playTogether(scale, translateY);
-        }
+        Animator scale = ObjectAnimator.ofFloat(recentsView, SCALE_PROPERTY,
+                fromScaleAndTranslation.scale, endScaleAndTranslation.scale);
+        Animator translateY = ObjectAnimator.ofFloat(recentsView, TRANSLATION_Y,
+                fromScaleAndTranslation.translationY, endScaleAndTranslation.translationY);
+        Animator applyFullscreenProgress = ObjectAnimator.ofFloat(recentsView,
+                RecentsView.FULLSCREEN_PROGRESS, fromFullscreenProgress, endFullscreenProgress);
+        scale.setInterpolator(LINEAR);
+        translateY.setInterpolator(LINEAR);
+        applyFullscreenProgress.setInterpolator(LINEAR);
+        anim.playTogether(scale, translateY, applyFullscreenProgress);
     }
 
     @Override

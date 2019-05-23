@@ -32,6 +32,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Outline;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
@@ -102,19 +103,6 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
     private static final List<Rect> SYSTEM_GESTURE_EXCLUSION_RECT =
             Collections.singletonList(new Rect());
 
-    public static final Property<TaskView, Float> ZOOM_SCALE =
-            new FloatProperty<TaskView>("zoomScale") {
-                @Override
-                public void setValue(TaskView taskView, float v) {
-                    taskView.setZoomScale(v);
-                }
-
-                @Override
-                public Float get(TaskView taskView) {
-                    return taskView.mZoomScale;
-                }
-            };
-
     public static final FloatProperty<TaskView> FULLSCREEN_PROGRESS =
             new FloatProperty<TaskView>("fullscreenProgress") {
                 @Override
@@ -164,9 +152,8 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
     private IconView mIconView;
     private DigitalWellBeingToast mDigitalWellBeingToast;
     private float mCurveScale;
-    private float mZoomScale;
     private float mFullscreenProgress;
-    private final Rect mCurrentDrawnInsets = new Rect();
+    private final FullscreenDrawParams mCurrentFullscreenParams;
     private final float mCornerRadius;
     private final float mWindowCornerRadius;
     private final BaseDraggingActivity mActivity;
@@ -214,7 +201,8 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
         });
         mCornerRadius = TaskCornerRadius.get(context);
         mWindowCornerRadius = QuickStepContract.getWindowCornerRadius(context.getResources());
-        mOutlineProvider = new TaskOutlineProvider(getResources(), mCornerRadius);
+        mCurrentFullscreenParams = new FullscreenDrawParams(mCornerRadius);
+        mOutlineProvider = new TaskOutlineProvider(getResources(), mCurrentFullscreenParams);
         setOutlineProvider(mOutlineProvider);
     }
 
@@ -457,7 +445,6 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
 
     private void resetViewTransforms() {
         setCurveScale(1);
-        setZoomScale(1);
         setTranslationX(0f);
         setTranslationY(0f);
         setTranslationZ(0);
@@ -473,7 +460,12 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
     @Override
     public void onRecycle() {
         resetViewTransforms();
-        setFullscreenProgress(0);
+        // Clear any references to the thumbnail (it will be re-read either from the cache or the
+        // system on next bind)
+        mSnapshotView.setThumbnail(mTask, null);
+        if (mTask != null) {
+            mTask.thumbnail = null;
+        }
     }
 
     @Override
@@ -520,13 +512,8 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
         return mCurveScale;
     }
 
-    public void setZoomScale(float adjacentScale) {
-        mZoomScale = adjacentScale;
-        onScaleChanged();
-    }
-
     private void onScaleChanged() {
-        float scale = mCurveScale * mZoomScale;
+        float scale = mCurveScale;
         setScaleX(scale);
         setScaleY(scale);
     }
@@ -540,26 +527,26 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
     private static final class TaskOutlineProvider extends ViewOutlineProvider {
 
         private final int mMarginTop;
-        private final Rect mInsets = new Rect();
-        private float mRadius;
+        private FullscreenDrawParams mFullscreenParams;
 
-        TaskOutlineProvider(Resources res, float radius) {
+        TaskOutlineProvider(Resources res, FullscreenDrawParams fullscreenParams) {
             mMarginTop = res.getDimensionPixelSize(R.dimen.task_thumbnail_top_margin);
-            mRadius = radius;
+            mFullscreenParams = fullscreenParams;
         }
 
-        public void setCurrentDrawnInsetsAndRadius(Rect insets, float radius) {
-            mInsets.set(insets);
-            mRadius = radius;
+        public void setFullscreenParams(FullscreenDrawParams params) {
+            mFullscreenParams = params;
         }
 
         @Override
         public void getOutline(View view, Outline outline) {
-            outline.setRoundRect(-mInsets.left,
-                    mMarginTop - mInsets.top,
-                    view.getWidth() + mInsets.right,
-                    view.getHeight() + mInsets.bottom,
-                    mRadius);
+            RectF insets = mFullscreenParams.mCurrentDrawnInsets;
+            float scale = mFullscreenParams.mScale;
+            outline.setRoundRect(0,
+                    (int) (mMarginTop * scale),
+                    (int) ((insets.left + view.getWidth() + insets.right) * scale),
+                    (int) ((insets.top + view.getHeight() + insets.bottom) * scale),
+                    mFullscreenParams.mCurrentDrawnCornerRadius);
         }
     }
 
@@ -658,17 +645,25 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
 
         TaskThumbnailView thumbnail = getThumbnail();
         boolean isMultiWindowMode = mActivity.getDeviceProfile().isMultiWindowMode;
-        Rect insets = thumbnail.getInsetsToDrawInFullscreen(isMultiWindowMode);
-        mCurrentDrawnInsets.set((int) (insets.left * mFullscreenProgress),
-                (int) (insets.top * mFullscreenProgress),
-                (int) (insets.right * mFullscreenProgress),
-                (int) (insets.bottom * mFullscreenProgress));
+        RectF insets = thumbnail.getInsetsToDrawInFullscreen(isMultiWindowMode);
+        float currentInsetsLeft = insets.left * mFullscreenProgress;
+        float currentInsetsRight = insets.right * mFullscreenProgress;
+        mCurrentFullscreenParams.setInsets(currentInsetsLeft,
+                insets.top * mFullscreenProgress,
+                currentInsetsRight,
+                insets.bottom * mFullscreenProgress);
         float fullscreenCornerRadius = isMultiWindowMode ? 0 : mWindowCornerRadius;
-        float cornerRadius = Utilities.mapRange(mFullscreenProgress, mCornerRadius,
-                fullscreenCornerRadius) / getRecentsView().getScaleX();
+        mCurrentFullscreenParams.setCornerRadius(Utilities.mapRange(mFullscreenProgress,
+                mCornerRadius, fullscreenCornerRadius) / getRecentsView().getScaleX());
+        // We scaled the thumbnail to fit the content (excluding insets) within task view width.
+        // Now that we are drawing left/right insets again, we need to scale down to fit them.
+        if (getWidth() > 0) {
+            mCurrentFullscreenParams.setScale(getWidth()
+                    / (getWidth() + currentInsetsLeft + currentInsetsRight));
+        }
 
-        thumbnail.setCurrentDrawnInsetsAndRadius(mCurrentDrawnInsets, cornerRadius);
-        mOutlineProvider.setCurrentDrawnInsetsAndRadius(mCurrentDrawnInsets, cornerRadius);
+        thumbnail.setFullscreenParams(mCurrentFullscreenParams);
+        mOutlineProvider.setFullscreenParams(mCurrentFullscreenParams);
         invalidateOutline();
     }
 
@@ -685,5 +680,31 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
             return true;
         }
         return mShowScreenshot;
+    }
+
+    /**
+     * We update and subsequently draw these in {@link #setFullscreenProgress(float)}.
+     */
+    static class FullscreenDrawParams {
+        RectF mCurrentDrawnInsets = new RectF();
+        float mCurrentDrawnCornerRadius;
+        /** The current scale we apply to the thumbnail to adjust for new left/right insets. */
+        float mScale = 1;
+
+        public FullscreenDrawParams(float cornerRadius) {
+            setCornerRadius(cornerRadius);
+        }
+
+        public void setInsets(float left, float top, float right, float bottom) {
+            mCurrentDrawnInsets.set(left, top, right, bottom);
+        }
+
+        public void setCornerRadius(float cornerRadius) {
+            mCurrentDrawnCornerRadius = cornerRadius;
+        }
+
+        public void setScale(float scale) {
+            mScale = scale;
+        }
     }
 }

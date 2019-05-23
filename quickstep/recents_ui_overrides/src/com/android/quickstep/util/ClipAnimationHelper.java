@@ -35,12 +35,14 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskThumbnailView;
+import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.recents.utilities.RectFEvaluator;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
@@ -280,6 +282,28 @@ public class ClipAnimationHelper {
         }
     }
 
+    /**
+     * Compute scale and translation y such that the specified task view fills the screen.
+     */
+    public ClipAnimationHelper updateForFullscreenOverview(TaskView v) {
+        TaskThumbnailView thumbnailView = v.getThumbnail();
+        RecentsView recentsView = v.getRecentsView();
+        fromTaskThumbnailView(thumbnailView, recentsView);
+        Rect taskSize = new Rect();
+        recentsView.getTaskSize(taskSize);
+        updateTargetRect(taskSize);
+        return this;
+    }
+
+    /**
+     * @return The source rect's scale and translation relative to the target rect.
+     */
+    public LauncherState.ScaleAndTranslation getScaleAndTranslation() {
+        float scale = mSourceRect.width() / mTargetRect.width();
+        float translationY = mSourceRect.centerY() - mSourceRect.top - mTargetRect.centerY();
+        return new LauncherState.ScaleAndTranslation(scale, 0, translationY);
+    }
+
     private void updateStackBoundsToMultiWindowTaskSize(BaseDraggingActivity activity) {
         ISystemUiProxy sysUiProxy = RecentsModel.INSTANCE.get(activity).getSystemUiProxy();
         if (sysUiProxy != null) {
@@ -315,33 +339,8 @@ public class ClipAnimationHelper {
         mSourceStackBounds.offset(left, insets.top + fullDp.availableHeightPx - taskHeight);
     }
 
-    public void drawForProgress(TaskThumbnailView ttv, Canvas canvas, float progress) {
-        RectF currentRect =  mRectFEvaluator.evaluate(progress, mSourceRect, mTargetRect);
-        canvas.translate(mSourceStackBounds.left - mHomeStackBounds.left,
-                mSourceStackBounds.top - mHomeStackBounds.top);
-        mTmpMatrix.setRectToRect(mTargetRect, currentRect, ScaleToFit.FILL);
-
-        canvas.concat(mTmpMatrix);
-        canvas.translate(mTargetRect.left, mTargetRect.top);
-
-        float scale = mTargetRect.width() / mSourceRect.width();
-        float insetProgress = (1 - progress);
-        float windowCornerRadius = mUseRoundedCornersOnWindows
-                ? mWindowCornerRadius : 0;
-        ttv.drawOnCanvas(canvas,
-                -mSourceWindowClipInsets.left * insetProgress,
-                -mSourceWindowClipInsets.top * insetProgress,
-                ttv.getMeasuredWidth() + mSourceWindowClipInsets.right * insetProgress,
-                ttv.getMeasuredHeight() + mSourceWindowClipInsets.bottom * insetProgress,
-                Utilities.mapRange(progress, windowCornerRadius * scale, ttv.getCornerRadius()));
-    }
-
     public RectF getTargetRect() {
         return mTargetRect;
-    }
-
-    public RectF getSourceRect() {
-        return mSourceRect;
     }
 
     public float getCurrentCornerRadius() {

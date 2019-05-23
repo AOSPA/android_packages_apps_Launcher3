@@ -17,26 +17,25 @@ package com.android.launcher3.ui.widget;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
 
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.content.Intent;
 import android.graphics.Color;
+import android.view.View;
+
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
-import android.view.View;
 
 import com.android.launcher3.ItemInfo;
 import com.android.launcher3.LauncherAppWidgetInfo;
 import com.android.launcher3.LauncherSettings.Favorites;
-import com.android.launcher3.R;
-import com.android.launcher3.WorkspaceItemInfo;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace.ItemOperator;
+import com.android.launcher3.WorkspaceItemInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.testcomponent.AppWidgetNoConfig;
 import com.android.launcher3.testcomponent.AppWidgetWithConfig;
@@ -49,7 +48,6 @@ import com.android.launcher3.util.rule.ShellCommandRule;
 import com.android.launcher3.widget.WidgetCell;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -80,7 +78,7 @@ public class RequestPinItemTest extends AbstractLauncherUiTest {
     @Test
     public void testEmpty() throws Throwable { /* needed while the broken tests are being fixed */ }
 
-    @Test @Ignore // b/131116593
+    @Test
     public void testPinWidgetNoConfig() throws Throwable {
         runTest("pinWidgetNoConfig", true, new ItemOperator() {
             @Override
@@ -93,7 +91,7 @@ public class RequestPinItemTest extends AbstractLauncherUiTest {
         });
     }
 
-        @Test @Ignore // b/131116593
+        @Test
     public void testPinWidgetNoConfig_customPreview() throws Throwable {
         // Command to set custom preview
         Intent command =  RequestPinItemActivity.getCommandIntent(
@@ -111,7 +109,7 @@ public class RequestPinItemTest extends AbstractLauncherUiTest {
         }, command);
     }
 
-    @Test @Ignore // b/131116593
+    @Test
     public void testPinWidgetWithConfig() throws Throwable {
         runTest("pinWidgetWithConfig", true, new ItemOperator() {
             @Override
@@ -124,7 +122,7 @@ public class RequestPinItemTest extends AbstractLauncherUiTest {
         });
     }
 
-    @Test @Ignore // b/131116593
+    @Test
     public void testPinShortcut() throws Throwable {
         // Command to set the shortcut id
         Intent command = RequestPinItemActivity.getCommandIntent(
@@ -181,8 +179,9 @@ public class RequestPinItemTest extends AbstractLauncherUiTest {
 
         // Accept confirmation:
         BlockingBroadcastReceiver resultReceiver = new BlockingBroadcastReceiver(mCallbackAction);
-        mDevice.wait(Until.findObject(By.text(mTargetContext.getString(
-                R.string.place_automatically).toUpperCase())), DEFAULT_UI_TIMEOUT).click();
+        mDevice.wait(Until.findObject(
+                By.text(mLauncher.isAvd() ? "ADD AUTOMATICALLY" : "Add automatically")),
+                DEFAULT_UI_TIMEOUT).click();
         Intent result = resultReceiver.blockingGetIntent();
         assertNotNull(result);
         mAppWidgetId = result.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
