@@ -210,8 +210,7 @@ public class DragView extends View implements LauncherStateManager.StateListener
             return;
         }
         // Load the adaptive icon on a background thread and add the view in ui thread.
-        final Looper workerLooper = LauncherModel.getWorkerLooper();
-        new Handler(workerLooper).postAtFrontOfQueue(new Runnable() {
+        new Handler(LauncherModel.getWorkerLooper()).postAtFrontOfQueue(new Runnable() {
             @Override
             public void run() {
                 Object[] outObj = new Object[1];
