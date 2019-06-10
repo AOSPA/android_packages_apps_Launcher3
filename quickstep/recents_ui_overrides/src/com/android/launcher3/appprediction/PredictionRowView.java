@@ -28,7 +28,6 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.util.IntProperty;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
@@ -115,8 +114,6 @@ public class PredictionRowView extends LinearLayout implements
     private final AnimatedFloat mOverviewScrollFactor =
             new AnimatedFloat(this::updateTranslationAndAlpha);
 
-    private View mLoadingProgress;
-
     private boolean mPredictionsEnabled = false;
 
     public PredictionRowView(@NonNull Context context) {
@@ -165,14 +162,6 @@ public class PredictionRowView extends LinearLayout implements
 
     public void setup(FloatingHeaderView parent, FloatingHeaderRow[] rows, boolean tabsHidden) {
         mParent = parent;
-        setPredictionsEnabled(mPredictionUiStateManager.arePredictionsEnabled());
-    }
-
-    private void setPredictionsEnabled(boolean predictionsEnabled) {
-        if (predictionsEnabled != mPredictionsEnabled) {
-            mPredictionsEnabled = predictionsEnabled;
-            updateVisibility();
-        }
     }
 
     private void updateVisibility() {
@@ -205,7 +194,7 @@ public class PredictionRowView extends LinearLayout implements
 
     @Override
     public boolean hasVisibleContent() {
-        return mPredictionUiStateManager.arePredictionsEnabled();
+        return mPredictionsEnabled;
     }
 
     /**
@@ -224,8 +213,7 @@ public class PredictionRowView extends LinearLayout implements
      * If the number of predicted apps is the same as the previous list of predicted apps,
      * we can optimize by swapping them in place.
      */
-    public void setPredictedApps(boolean predictionsEnabled, List<ComponentKeyMapper> apps) {
-        setPredictionsEnabled(predictionsEnabled);
+    public void setPredictedApps(List<ComponentKeyMapper> apps) {
         mPredictedAppComponents.clear();
         mPredictedAppComponents.addAll(apps);
 
@@ -241,14 +229,6 @@ public class PredictionRowView extends LinearLayout implements
     }
 
     private void applyPredictionApps() {
-        if (mLoadingProgress != null) {
-            removeView(mLoadingProgress);
-        }
-        if (!mPredictionsEnabled) {
-            mParent.onHeightUpdated();
-            return;
-        }
-
         if (getChildCount() != mNumPredictedAppsPerRow) {
             while (getChildCount() > mNumPredictedAppsPerRow) {
                 removeViewAt(0);
@@ -289,16 +269,12 @@ public class PredictionRowView extends LinearLayout implements
             }
         }
 
-        if (predictionCount == 0) {
-            if (mLoadingProgress == null) {
-                mLoadingProgress = LayoutInflater.from(getContext())
-                        .inflate(R.layout.prediction_load_progress, this, false);
-            }
-            addView(mLoadingProgress);
-        } else {
-            mLoadingProgress = null;
+        boolean predictionsEnabled = predictionCount > 0;
+        if (predictionsEnabled != mPredictionsEnabled) {
+            mPredictionsEnabled = predictionsEnabled;
+            mLauncher.reapplyUi();
+            updateVisibility();
         }
-
         mParent.onHeightUpdated();
     }
 
@@ -342,11 +318,8 @@ public class PredictionRowView extends LinearLayout implements
     public void setTextAlpha(int alpha) {
         mIconCurrentTextAlpha = alpha;
         int iconColor = setColorAlphaBound(mIconTextColor, mIconCurrentTextAlpha);
-
-        if (mLoadingProgress == null) {
-            for (int i = 0; i < getChildCount(); i++) {
-                ((BubbleTextView) getChildAt(i)).setTextColor(iconColor);
-            }
+        for (int i = 0; i < getChildCount(); i++) {
+            ((BubbleTextView) getChildAt(i)).setTextColor(iconColor);
         }
     }
 

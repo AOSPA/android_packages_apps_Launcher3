@@ -27,6 +27,7 @@ import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.IBinder;
+import android.util.Log;
 import android.view.DragEvent;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
@@ -41,6 +42,7 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.WorkspaceItemInfo;
 import com.android.launcher3.accessibility.DragViewStateAnnouncer;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.TouchController;
@@ -472,8 +474,8 @@ public class DragController implements DragDriver.EventListener, TouchController
     }
 
     private void handleMoveEvent(int x, int y) {
-        if (com.android.launcher3.TestProtocol.sDebugTracing) {
-            android.util.Log.d(com.android.launcher3.TestProtocol.NO_DRAG_TAG,
+        if (TestProtocol.sDebugTracing) {
+            android.util.Log.d(TestProtocol.NO_DRAG_TAG,
                     "handleMoveEvent 1");
         }
         mDragObject.dragView.move(x, y);
@@ -490,10 +492,20 @@ public class DragController implements DragDriver.EventListener, TouchController
         mLastTouch[0] = x;
         mLastTouch[1] = y;
 
+        if (TestProtocol.sDebugTracing) {
+           Log.d(TestProtocol.NO_DRAG_TAG,
+                    "handleMoveEvent Conditions " +
+                            mIsInPreDrag + ", " +
+                            (mIsInPreDrag && mOptions.preDragCondition != null) + ", " +
+                            (mIsInPreDrag && mOptions.preDragCondition != null
+                                    && mOptions.preDragCondition.shouldStartDrag(
+                                    mDistanceSinceScroll)));
+        }
+
         if (mIsInPreDrag && mOptions.preDragCondition != null
                 && mOptions.preDragCondition.shouldStartDrag(mDistanceSinceScroll)) {
-            if (com.android.launcher3.TestProtocol.sDebugTracing) {
-                android.util.Log.d(com.android.launcher3.TestProtocol.NO_DRAG_TAG,
+            if (TestProtocol.sDebugTracing) {
+                android.util.Log.d(TestProtocol.NO_DRAG_TAG,
                         "handleMoveEvent 2");
             }
             callOnDragStart();
@@ -533,8 +545,8 @@ public class DragController implements DragDriver.EventListener, TouchController
      * Call this from a drag source view.
      */
     public boolean onControllerTouchEvent(MotionEvent ev) {
-        if (com.android.launcher3.TestProtocol.sDebugTracing) {
-            android.util.Log.d(com.android.launcher3.TestProtocol.NO_DRAG_TAG,
+        if (TestProtocol.sDebugTracing) {
+            android.util.Log.d(TestProtocol.NO_DRAG_TAG,
                     "onControllerTouchEvent");
         }
         if (mDragDriver == null || mOptions == null || mOptions.isAccessibleDrag) {

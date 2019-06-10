@@ -63,13 +63,18 @@ public class RotationHelper implements OnSharedPreferenceChangeListener {
      */
     private int mStateHandlerRequest = REQUEST_NONE;
     /**
+     * Rotation request made by an app transition
+     */
+    private int mCurrentTransitionRequest = REQUEST_NONE;
+    /**
      * Rotation request made by a Launcher State
      */
     private int mCurrentStateRequest = REQUEST_NONE;
 
     // This is used to defer setting rotation flags until the activity is being created
     private boolean mInitialized;
-    public boolean mDestroyed;
+    private boolean mDestroyed;
+    private boolean mRotationHasDifferentUI;
 
     private int mLastActivityFlags = -1;
 
@@ -88,18 +93,26 @@ public class RotationHelper implements OnSharedPreferenceChangeListener {
         }
     }
 
-    public boolean homeScreenCanRotate() {
-        return mIgnoreAutoRotateSettings || mAutoRotateEnabled
-                || mStateHandlerRequest != REQUEST_NONE;
+    public void setRotationHadDifferentUI(boolean rotationHasDifferentUI) {
+        mRotationHasDifferentUI = rotationHasDifferentUI;
     }
 
-    private void updateRotationAnimation() {
+    public boolean homeScreenCanRotate() {
+        return mRotationHasDifferentUI || mIgnoreAutoRotateSettings || mAutoRotateEnabled
+                || mStateHandlerRequest != REQUEST_NONE
+                || mLauncher.getDeviceProfile().isMultiWindowMode;
+    }
+
+    public void updateRotationAnimation() {
         if (FeatureFlags.FAKE_LANDSCAPE_UI.get()) {
             WindowManager.LayoutParams lp = mLauncher.getWindow().getAttributes();
+            int oldAnim = lp.rotationAnimation;
             lp.rotationAnimation = homeScreenCanRotate()
                     ? WindowManager.LayoutParams.ROTATION_ANIMATION_ROTATE
                     : WindowManager.LayoutParams.ROTATION_ANIMATION_SEAMLESS;
-            mLauncher.getWindow().setAttributes(lp);
+            if (oldAnim != lp.rotationAnimation) {
+                mLauncher.getWindow().setAttributes(lp);
+            }
         }
     }
 
@@ -119,6 +132,14 @@ public class RotationHelper implements OnSharedPreferenceChangeListener {
     public void setStateHandlerRequest(int request) {
         if (mStateHandlerRequest != request) {
             mStateHandlerRequest = request;
+            updateRotationAnimation();
+            notifyChange();
+        }
+    }
+
+    public void setCurrentTransitionRequest(int request) {
+        if (mCurrentTransitionRequest != request) {
+            mCurrentTransitionRequest = request;
             notifyChange();
         }
     }
@@ -162,6 +183,9 @@ public class RotationHelper implements OnSharedPreferenceChangeListener {
         final int activityFlags;
         if (mStateHandlerRequest != REQUEST_NONE) {
             activityFlags = mStateHandlerRequest == REQUEST_LOCK ?
+                    SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
+        } else if (mCurrentTransitionRequest != REQUEST_NONE) {
+            activityFlags = mCurrentTransitionRequest == REQUEST_LOCK ?
                     SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
         } else if (mCurrentStateRequest == REQUEST_LOCK) {
             activityFlags = SCREEN_ORIENTATION_LOCKED;

@@ -13,16 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.quickstep.hints;
+package com.android.quickstep;
 
-public final class UiHintListenerConstants {
+import android.app.Activity;
+import android.os.Bundle;
 
-    private UiHintListenerConstants() {}
+/**
+ * Empty activity to start a recents transition
+ */
+public class LockScreenRecentsActivity extends Activity {
 
-    // Operations
-    public static final int ON_HINTS_RETURNED_CODE = 5;
-
-    // Keys
-    public static final String SESSION_ID_KEY = "session_id";
-    public static final String HINTS_KEY = "hints";
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        finish();
+    }
 }

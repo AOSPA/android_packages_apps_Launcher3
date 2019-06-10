@@ -21,7 +21,6 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.userevent.nano.LauncherLogProto;
-import com.android.quickstep.util.ClipAnimationHelper;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
@@ -32,7 +31,8 @@ import com.android.quickstep.views.TaskView;
 public class BackgroundAppState extends OverviewState {
 
     private static final int STATE_FLAGS =
-            FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI | FLAG_DISABLE_ACCESSIBILITY;
+            FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI | FLAG_DISABLE_ACCESSIBILITY
+                    | FLAG_DISABLE_INTERACTION;
 
     public BackgroundAppState(int id) {
         this(id, LauncherLogProto.ContainerType.TASKSWITCHER);
@@ -44,8 +44,6 @@ public class BackgroundAppState extends OverviewState {
 
     @Override
     public void onStateEnabled(Launcher launcher) {
-        RecentsView rv = launcher.getOverviewPanel();
-        rv.setOverviewStateEnabled(true);
         AbstractFloatingView.closeAllOpenViews(launcher, false);
     }
 

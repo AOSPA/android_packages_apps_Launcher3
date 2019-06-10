@@ -24,7 +24,6 @@ import android.app.prediction.AppPredictor;
 import android.app.prediction.AppTarget;
 import android.content.ComponentName;
 import android.content.Context;
-import android.os.Handler;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 
 import com.android.launcher3.AppInfo;
@@ -63,7 +62,6 @@ public class PredictionUiStateManager implements OnGlobalLayoutListener, ItemInf
         OnIDPChangeListener, OnUpdateListener {
 
     public static final String LAST_PREDICTION_ENABLED_STATE = "last_prediction_enabled_state";
-    private static final long INITIAL_CALLBACK_WAIT_TIMEOUT_MS = 5000;
 
     // TODO (b/129421797): Update the client constants
     public enum Client {
@@ -110,13 +108,8 @@ public class PredictionUiStateManager implements OnGlobalLayoutListener, ItemInf
         for (int i = 0; i < mPredictionServicePredictions.length; i++) {
             mPredictionServicePredictions[i] = Collections.emptyList();
         }
-
         mGettingValidPredictionResults = Utilities.getDevicePrefs(context)
                 .getBoolean(LAST_PREDICTION_ENABLED_STATE, true);
-        if (mGettingValidPredictionResults) {
-            new Handler().postDelayed(
-                    this::updatePredictionStateAfterCallback, INITIAL_CALLBACK_WAIT_TIMEOUT_MS);
-        }
 
         // Call this last
         mCurrentState = parseLastState();
@@ -184,16 +177,10 @@ public class PredictionUiStateManager implements OnGlobalLayoutListener, ItemInf
     }
 
     private void applyState(PredictionState state) {
-        boolean wasEnabled = mCurrentState.isEnabled;
         mCurrentState = state;
         if (mAppsView != null) {
             mAppsView.getFloatingHeaderView().findFixedRowByType(PredictionRowView.class)
-                    .setPredictedApps(mCurrentState.isEnabled, mCurrentState.apps);
-
-            if (wasEnabled != mCurrentState.isEnabled) {
-                // Reapply state as the State UI might have changed.
-                Launcher.getLauncher(mAppsView.getContext()).getStateManager().reapplyState(true);
-            }
+                    .setPredictedApps(mCurrentState.apps);
         }
     }
 
@@ -291,10 +278,6 @@ public class PredictionUiStateManager implements OnGlobalLayoutListener, ItemInf
     @Override
     public void onAppsUpdated() {
         dispatchOnChange(false);
-    }
-
-    public boolean arePredictionsEnabled() {
-        return mCurrentState.isEnabled;
     }
 
     private boolean canApplyPredictions(PredictionState newState) {
