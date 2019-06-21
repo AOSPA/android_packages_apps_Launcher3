@@ -80,6 +80,7 @@ import android.widget.Toast;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DiscoveryBounce;
 import com.android.launcher3.anim.PropertyListBuilder;
@@ -460,13 +461,18 @@ public class Launcher extends BaseDraggingActivity implements LauncherExterns,
     private void onIdpChanged(InvariantDeviceProfile idp) {
         mUserEventDispatcher = null;
 
+        DeviceProfile oldWallpaperProfile = getWallpaperDeviceProfile();
         initDeviceProfile(idp);
         dispatchDeviceProfileChanged();
         reapplyUi();
         mDragLayer.recreateControllers();
 
-        // TODO: We can probably avoid rebind when only screen size changed.
-        rebindModel();
+        // Calling onSaveInstanceState ensures that static cache used by listWidgets is
+        // initialized properly.
+        onSaveInstanceState(new Bundle());
+        if (oldWallpaperProfile != getWallpaperDeviceProfile()) {
+            rebindModel();
+        }
     }
 
     public void onAssistantVisibilityChanged(float visibility) {
@@ -888,7 +894,6 @@ public class Launcher extends BaseDraggingActivity implements LauncherExterns,
             mLauncherCallbacks.onStart();
         }
         mAppWidgetHost.setListenIfResumed(true);
-        NotificationListener.setNotificationsChangedListener(mPopupDataProvider);
         RaceConditionTracker.onEvent(ON_START_EVT, EXIT);
     }
 
@@ -907,6 +912,9 @@ public class Launcher extends BaseDraggingActivity implements LauncherExterns,
 
             // Refresh shortcuts if the permission changed.
             mModel.refreshShortcutsIfRequired();
+
+            // Set the notification listener and fetch updated notifications when we resume
+            NotificationListener.setNotificationsChangedListener(mPopupDataProvider);
 
             DiscoveryBounce.showForHomeIfNeeded(this);
 
@@ -1345,19 +1353,6 @@ public class Launcher extends BaseDraggingActivity implements LauncherExterns,
 
         if (isActionMain) {
             if (!internalStateHandled) {
-                // Note: There should be at most one log per method call. This is enforced
-                // implicitly by using if-else statements.
-                UserEventDispatcher ued = getUserEventDispatcher();
-                AbstractFloatingView topOpenView = AbstractFloatingView.getTopOpenView(this);
-                if (topOpenView != null) {
-                    topOpenView.logActionCommand(Action.Command.HOME_INTENT);
-                } else if (alreadyOnHome) {
-                    Target target = newContainerTarget(mStateManager.getState().containerType);
-                    target.pageIndex = mWorkspace.getCurrentPage();
-                    ued.logActionCommand(Action.Command.HOME_INTENT, target,
-                            newContainerTarget(ContainerType.WORKSPACE));
-                }
-
                 // In all these cases, only animate if we're already on home
                 AbstractFloatingView.closeAllOpenViews(this, isStarted());
 
@@ -1376,6 +1371,13 @@ public class Launcher extends BaseDraggingActivity implements LauncherExterns,
                     mWorkspace.post(mWorkspace::moveToDefaultScreen);
                 }
             }
+
+            // Handle HOME_INTENT
+            UserEventDispatcher ued = getUserEventDispatcher();
+            Target target = newContainerTarget(mStateManager.getState().containerType);
+            target.pageIndex = mWorkspace.getCurrentPage();
+            ued.logActionCommand(Action.Command.HOME_INTENT, target,
+                    newContainerTarget(ContainerType.WORKSPACE));
 
             final View v = getWindow().peekDecorView();
             if (v != null && v.getWindowToken() != null) {
@@ -2241,8 +2243,9 @@ public class Launcher extends BaseDraggingActivity implements LauncherExterns,
         }
         mPendingExecutor = executor;
         if (!isInState(ALL_APPS)) {
-            mAppsView.getAppsStore().setDeferUpdates(true);
-            mPendingExecutor.execute(() -> mAppsView.getAppsStore().setDeferUpdates(false));
+            mAppsView.getAppsStore().enableDeferUpdates(AllAppsStore.DEFER_UPDATES_NEXT_DRAW);
+            mPendingExecutor.execute(() -> mAppsView.getAppsStore().disableDeferUpdates(
+                    AllAppsStore.DEFER_UPDATES_NEXT_DRAW));
         }
 
         executor.attachTo(this);
