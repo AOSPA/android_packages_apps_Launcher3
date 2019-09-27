@@ -44,6 +44,8 @@ import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
 
+import com.android.launcher3.Utilities;
+
 /**
  * Helper class to handle touch on empty space in workspace and show options popup on long press
  */
@@ -73,14 +75,17 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
 
     private final GestureDetector mGestureDetector;
 
+    private final Context mContext;
+
     public WorkspaceTouchListener(Launcher launcher, Workspace workspace) {
         mLauncher = launcher;
         mWorkspace = workspace;
+        mContext = workspace.getContext();
         // Use twice the touch slop as we are looking for long press which is more
         // likely to cause movement.
         mTouchSlop = 2 * ViewConfiguration.get(launcher).getScaledTouchSlop();
-        mPm = (PowerManager) workspace.getContext().getSystemService(Context.POWER_SERVICE);
-        mGestureDetector = new GestureDetector(workspace.getContext(), this);
+        mPm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+        mGestureDetector = new GestureDetector(mContext, this);
     }
 
     @Override
@@ -188,7 +193,8 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
 
     @Override
     public boolean onDoubleTap(MotionEvent event) {
-        mPm.goToSleep(event.getEventTime());
+        if (Utilities.isDoubleTapGestureEnabled(mContext))
+            mPm.goToSleep(event.getEventTime());
         return true;
     }
 }
