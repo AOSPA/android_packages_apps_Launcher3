@@ -29,4 +29,8 @@
     <string name="msg_minus_one_on_right">When you swipe right from main Home screen</string>
     <string name="pref_show_google_now_summary" translatable="false">@string/msg_minus_one_on_left</string>
 
+    <!-- Gestures -->
+    <string name="pref_dt_gesture_title">Double tap gesture</string>
+    <string name="pref_dt_gesture_summary">Double tap on empty space for power-off</string>
+
 </resources>
