@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,23 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.config;
+package com.android.launcher3.uioverrides;
 
 import android.content.Context;
 
-/**
- * Defines a set of flags used to control various launcher behaviors
- */
-public final class FeatureFlags extends BaseFlags {
-    private FeatureFlags() {
-        // Prevent instantiation
+import com.android.launcher3.config.FeatureFlags.BaseTogglableFlag;
+
+public class TogglableFlag extends BaseTogglableFlag {
+
+    public TogglableFlag(String key, boolean defaultValue, String description) {
+        super(key, defaultValue, description);
     }
+
+    @Override
+    public boolean getOverridenDefaultValue(boolean value) {
+        return value;
+    }
+
+    @Override
+    public void addChangeListener(Context context, Runnable r) { }
 }

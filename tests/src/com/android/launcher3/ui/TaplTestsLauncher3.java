@@ -24,6 +24,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import android.util.Log;
+
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 
@@ -34,9 +36,9 @@ import com.android.launcher3.tapl.AllApps;
 import com.android.launcher3.tapl.AppIcon;
 import com.android.launcher3.tapl.AppIconMenu;
 import com.android.launcher3.tapl.AppIconMenuItem;
-import com.android.launcher3.tapl.TestHelpers;
 import com.android.launcher3.tapl.Widgets;
 import com.android.launcher3.tapl.Workspace;
+import com.android.launcher3.util.rule.TestStabilityRule.Stability;
 import com.android.launcher3.views.OptionsPopupView;
 import com.android.launcher3.widget.WidgetsFullSheet;
 import com.android.launcher3.widget.WidgetsRecyclerView;
@@ -190,7 +192,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 launcher -> assertTrue("ensureScrollable didn't make workspace scrollable",
                         isWorkspaceScrollable(launcher)));
         assertNotNull("ensureScrollable didn't add Chrome app",
-                workspace.tryGetWorkspaceAppIcon("Chrome"));
+                workspace.getWorkspaceAppIcon("Chrome"));
 
         // Test flinging workspace.
         workspace.flingBackward();
@@ -206,7 +208,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         assertTrue("Launcher internal state is not Home", isInState(LauncherState.NORMAL));
 
         // Test starting a workspace app.
-        final AppIcon app = workspace.tryGetWorkspaceAppIcon("Chrome");
+        final AppIcon app = workspace.getWorkspaceAppIcon("Chrome");
         assertNotNull("No Chrome app in workspace", app);
     }
 
@@ -342,5 +344,11 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     public static String getAppPackageName() {
         return getInstrumentation().getContext().getPackageName();
+    }
+
+    @Test
+    @Stability
+    public void testTestStabilityAttribute() {
+        Log.d("TestStabilityRule", "Hello world!");
     }
 }

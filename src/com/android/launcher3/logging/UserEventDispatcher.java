@@ -187,6 +187,14 @@ public class UserEventDispatcher implements ResourceBasedOverride {
                 dstContainerType >=0 ? newContainerTarget(dstContainerType) : null);
     }
 
+    public void logActionCommand(int command, int srcContainerType, int dstContainerType,
+                                 int pageIndex) {
+        Target srcTarget = newContainerTarget(srcContainerType);
+        srcTarget.pageIndex = pageIndex;
+        logActionCommand(command, srcTarget,
+                dstContainerType >=0 ? newContainerTarget(dstContainerType) : null);
+    }
+
     public void logActionCommand(int command, Target srcTarget, Target dstTarget) {
         LauncherEvent event = newLauncherEvent(newCommandAction(command), srcTarget);
         if (command == Action.Command.STOP) {
@@ -419,10 +427,16 @@ public class UserEventDispatcher implements ResourceBasedOverride {
         mAppOrTaskLaunch = false;
         ev.elapsedContainerMillis = SystemClock.uptimeMillis() - mElapsedContainerMillis;
         ev.elapsedSessionMillis = SystemClock.uptimeMillis() - mElapsedSessionMillis;
-
         if (!IS_VERBOSE) {
             return;
         }
+        Log.d(TAG, generateLog(ev));
+    }
+
+    /**
+     * Returns a human-readable log for given user event.
+     */
+    public static String generateLog(LauncherEvent ev) {
         String log = "\n-----------------------------------------------------"
                 + "\naction:" + LoggerUtils.getActionStr(ev.action);
         if (ev.srcTarget != null && ev.srcTarget.length > 0) {
@@ -437,8 +451,7 @@ public class UserEventDispatcher implements ResourceBasedOverride {
                 ev.elapsedSessionMillis,
                 ev.actionDurationMillis);
         log += "\n\n";
-        Log.d(TAG, log);
-        return;
+        return log;
     }
 
     private static String getTargetsStr(Target[] targets) {

@@ -18,19 +18,16 @@ package com.android.launcher3.config;
 
 import static androidx.core.util.Preconditions.checkNotNull;
 
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.ContentObserver;
-import android.os.Handler;
-import android.os.Looper;
-import android.provider.Settings;
 
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Keep;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.launcher3.BuildConfig;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.uioverrides.TogglableFlag;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,11 +38,9 @@ import java.util.TreeMap;
  * Defines a set of flags used to control various launcher behaviors.
  *
  * <p>All the flags should be defined here with appropriate default values.
- *
- * <p>This class is kept package-private to prevent direct access.
  */
 @Keep
-abstract class BaseFlags {
+public final class FeatureFlags {
 
     private static final Object sLock = new Object();
     @GuardedBy("sLock")
@@ -53,44 +48,47 @@ abstract class BaseFlags {
 
     static final String FLAGS_PREF_NAME = "featureFlags";
 
-    BaseFlags() {
-        throw new UnsupportedOperationException("Don't instantiate BaseFlags");
-    }
+    private FeatureFlags() { }
 
     public static boolean showFlagTogglerUi(Context context) {
         return Utilities.IS_DEBUG_DEVICE && Utilities.isDevelopersOptionsEnabled(context);
     }
 
-    public static final boolean IS_DOGFOOD_BUILD = false;
+    public static final boolean IS_DOGFOOD_BUILD = BuildConfig.DEBUG;
 
-    // When enabled the promise icon is visible in all apps while installation an app.
-    public static final boolean LAUNCHER3_PROMISE_APPS_IN_ALL_APPS = false;
-
-    // Enable moving the QSB on the 0th screen of the workspace
+    /**
+     * Enable moving the QSB on the 0th screen of the workspace. This is not a configuration feature
+     * and should be modified at a project level.
+     */
     public static final boolean QSB_ON_FIRST_SCREEN = true;
 
-    public static final TogglableFlag EXAMPLE_FLAG = new TogglableFlag("EXAMPLE_FLAG", true,
-            "An example flag that doesn't do anything. Useful for testing");
-
-    //Feature flag to enable pulling down navigation shade from workspace.
-    public static final boolean PULL_DOWN_STATUS_BAR = true;
-
-    // When true, custom widgets are loaded using CustomWidgetParser.
-    public static final boolean ENABLE_CUSTOM_WIDGETS = false;
-
-    // Features to control Launcher3Go behavior
-    public static final boolean GO_DISABLE_WIDGETS = false;
-
-    // When enabled shows a work profile tab in all apps
-    public static final boolean ALL_APPS_TABS_ENABLED = true;
-
-    // When true, overview shows screenshots in the orientation they were taken rather than
-    // trying to make them fit the orientation the device is in.
-    public static final boolean OVERVIEW_USE_SCREENSHOT_ORIENTATION = true;
 
     /**
      * Feature flag to handle define config changes dynamically instead of killing the process.
+     *
+     *
+     * To add a new flag that can be toggled through the flags UI:
+     *
+     * 1. Declare a new ToggleableFlag below. Give it a unique key (e.g. "QSB_ON_FIRST_SCREEN"),
+     *    and set a default value for the flag. This will be the default value on Debug builds.
+     *
+     * 2. Add your flag to mTogglableFlags.
+     *
+     * 3. Create a getter method (an 'is' method) for the flag by copying an existing one.
+     *
+     * 4. Create a getter method with the same name in the release flags copy of FeatureFlags.java.
+     *    This should returns a constant (true/false). This will be the value of the flag used on
+     *    release builds.
      */
+    // When enabled the promise icon is visible in all apps while installation an app.
+    public static final TogglableFlag PROMISE_APPS_IN_ALL_APPS = new TogglableFlag(
+            "PROMISE_APPS_IN_ALL_APPS", false, "Add promise icon in all-apps");
+
+    // When enabled a promise icon is added to the home screen when install session is active.
+    public static final TogglableFlag PROMISE_APPS_NEW_INSTALLS =
+            new TogglableFlag("PROMISE_APPS_NEW_INSTALLS", true,
+                    "Adds a promise icon to the home screen for new install sessions.");
+
     public static final TogglableFlag APPLY_CONFIG_AT_RUNTIME = new TogglableFlag(
             "APPLY_CONFIG_AT_RUNTIME", true, "Apply display changes dynamically");
 
@@ -112,11 +110,19 @@ abstract class BaseFlags {
             "FAKE_LANDSCAPE_UI", false,
             "Rotate launcher UI instead of using transposed layout");
 
+    public static final TogglableFlag APP_SEARCH_IMPROVEMENTS = new TogglableFlag(
+            "APP_SEARCH_IMPROVEMENTS", false,
+            "Adds localized title and keyword search and ranking");
+
+    public static final TogglableFlag ENABLE_PREDICTION_DISMISS = new TogglableFlag(
+            "ENABLE_PREDICTION_DISMISS", false, "Allow option to dimiss apps from predicted list");
+
+
     public static void initialize(Context context) {
         // Avoid the disk read for user builds
         if (Utilities.IS_DEBUG_DEVICE) {
             synchronized (sLock) {
-                for (TogglableFlag flag : sFlags) {
+                for (BaseTogglableFlag flag : sFlags) {
                     flag.initialize(context);
                 }
             }
@@ -126,33 +132,36 @@ abstract class BaseFlags {
     static List<TogglableFlag> getTogglableFlags() {
         // By Java Language Spec 12.4.2
         // https://docs.oracle.com/javase/specs/jls/se7/html/jls-12.html#jls-12.4.2, the
-        // TogglableFlag instances on BaseFlags will be created before those on the FeatureFlags
+        // TogglableFlag instances on FeatureFlags will be created before those on the FeatureFlags
         // subclass. This code handles flags that are redeclared in FeatureFlags, ensuring the
         // FeatureFlags one takes priority.
         SortedMap<String, TogglableFlag> flagsByKey = new TreeMap<>();
         synchronized (sLock) {
             for (TogglableFlag flag : sFlags) {
-                flagsByKey.put(flag.key, flag);
+                flagsByKey.put(flag.getKey(), flag);
             }
         }
         return new ArrayList<>(flagsByKey.values());
     }
 
-    public static class TogglableFlag {
+    public static abstract class BaseTogglableFlag {
         private final String key;
+        // should be value that is hardcoded in client side.
+        // Comparatively, getDefaultValue() can be overridden.
         private final boolean defaultValue;
         private final String description;
         private boolean currentValue;
 
-        TogglableFlag(
+        public BaseTogglableFlag(
                 String key,
                 boolean defaultValue,
                 String description) {
             this.key = checkNotNull(key);
             this.currentValue = this.defaultValue = defaultValue;
             this.description = checkNotNull(description);
+
             synchronized (sLock) {
-                sFlags.add(this);
+                sFlags.add((TogglableFlag)this);
             }
         }
 
@@ -162,18 +171,22 @@ abstract class BaseFlags {
             currentValue = value;
         }
 
-        @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
         public String getKey() {
             return key;
         }
-        void initialize(Context context) {
-            currentValue = getFromStorage(context, defaultValue);
+
+        protected void initialize(Context context) {
+            currentValue = getFromStorage(context, getDefaultValue());
         }
+
+        protected abstract boolean getOverridenDefaultValue(boolean value);
+
+        protected abstract void addChangeListener(Context context, Runnable r);
 
         public void updateStorage(Context context, boolean value) {
             SharedPreferences.Editor editor = context.getSharedPreferences(FLAGS_PREF_NAME,
                     Context.MODE_PRIVATE).edit();
-            if (value == defaultValue) {
+            if (value == getDefaultValue()) {
                 editor.remove(key).apply();
             } else {
                 editor.putBoolean(key, value).apply();
@@ -182,11 +195,11 @@ abstract class BaseFlags {
 
         boolean getFromStorage(Context context, boolean defaultValue) {
             return context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE)
-                    .getBoolean(key, defaultValue);
+                    .getBoolean(key, getDefaultValue());
         }
 
         boolean getDefaultValue() {
-            return defaultValue;
+            return getOverridenDefaultValue(defaultValue);
         }
 
         /** Returns the value of the flag at process start, including any overrides present. */
@@ -203,6 +216,8 @@ abstract class BaseFlags {
             return "TogglableFlag{"
                     + "key=" + key + ", "
                     + "defaultValue=" + defaultValue + ", "
+                    + "overriddenDefaultValue=" + getOverridenDefaultValue(defaultValue) + ", "
+                    + "currentValue=" + currentValue + ", "
                     + "description=" + description
                     + "}";
         }
@@ -213,9 +228,9 @@ abstract class BaseFlags {
                 return true;
             }
             if (o instanceof TogglableFlag) {
-                TogglableFlag that = (TogglableFlag) o;
+                BaseTogglableFlag that = (BaseTogglableFlag) o;
                 return (this.key.equals(that.getKey()))
-                        && (this.defaultValue == that.getDefaultValue())
+                        && (this.getDefaultValue() == that.getDefaultValue())
                         && (this.description.equals(that.getDescription()));
             }
             return false;
@@ -227,54 +242,10 @@ abstract class BaseFlags {
             h$ *= 1000003;
             h$ ^= key.hashCode();
             h$ *= 1000003;
-            h$ ^= defaultValue ? 1231 : 1237;
+            h$ ^= getDefaultValue() ? 1231 : 1237;
             h$ *= 1000003;
             h$ ^= description.hashCode();
             return h$;
-        }
-    }
-
-    /**
-     * Stores the FeatureFlag's value in Settings.Global instead of our SharedPrefs.
-     * This is useful if we want to be able to control this flag from another process.
-     */
-    public static final class ToggleableGlobalSettingsFlag extends TogglableFlag {
-        private ContentResolver contentResolver;
-
-        ToggleableGlobalSettingsFlag(String key, boolean defaultValue, String description) {
-            super(key, defaultValue, description);
-        }
-
-        @Override
-        public void initialize(Context context) {
-            contentResolver = context.getContentResolver();
-            contentResolver.registerContentObserver(Settings.Global.getUriFor(getKey()), true,
-                    new ContentObserver(new Handler(Looper.getMainLooper())) {
-                        @Override
-                        public void onChange(boolean selfChange) {
-                            superInitialize(context);
-                    }});
-            superInitialize(context);
-        }
-
-        private void superInitialize(Context context) {
-            super.initialize(context);
-        }
-
-        @Override
-        public void updateStorage(Context context, boolean value) {
-            if (contentResolver == null) {
-                return;
-            }
-            Settings.Global.putInt(contentResolver, getKey(), value ? 1 : 0);
-        }
-
-        @Override
-        boolean getFromStorage(Context context, boolean defaultValue) {
-            if (contentResolver == null) {
-                return defaultValue;
-            }
-            return Settings.Global.getInt(contentResolver, getKey(), defaultValue ? 1 : 0) == 1;
         }
     }
 }

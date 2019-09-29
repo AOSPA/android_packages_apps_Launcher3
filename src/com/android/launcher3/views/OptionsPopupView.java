@@ -18,10 +18,8 @@ package com.android.launcher3.views;
 import static com.android.launcher3.Utilities.EXTRA_WALLPAPER_FLAVOR;
 import static com.android.launcher3.Utilities.EXTRA_WALLPAPER_OFFSET;
 
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ResolveInfo;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.text.TextUtils;
@@ -33,10 +31,13 @@ import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
+
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.userevent.nano.LauncherLogProto.Action;
@@ -46,7 +47,6 @@ import com.android.launcher3.widget.WidgetsFullSheet;
 import java.util.ArrayList;
 import java.util.List;
 
-import androidx.annotation.VisibleForTesting;
 
 /**
  * Popup shown on long pressing an empty space in launcher
@@ -158,7 +158,7 @@ public class OptionsPopupView extends ArrowPopup
                 R.drawable.ic_palette : R.drawable.ic_wallpaper;
         options.add(new OptionItem(resString, resDrawable,
                 ControlType.WALLPAPER_BUTTON, OptionsPopupView::startWallpaperPicker));
-        if (!FeatureFlags.GO_DISABLE_WIDGETS) {
+        if (!WidgetsModel.GO_DISABLE_WIDGETS) {
             options.add(new OptionItem(R.string.widget_button_text, R.drawable.ic_widget,
                     ControlType.WIDGETS_BUTTON, OptionsPopupView::onWidgetsClicked));
         }
@@ -169,16 +169,17 @@ public class OptionsPopupView extends ArrowPopup
     }
 
     public static boolean onWidgetsClicked(View view) {
-        return openWidgets(Launcher.getLauncher(view.getContext()));
+        return openWidgets(Launcher.getLauncher(view.getContext())) != null;
     }
 
-    public static boolean openWidgets(Launcher launcher) {
+    /** Returns WidgetsFullSheet that was opened, or null if nothing was opened. */
+    @Nullable
+    public static WidgetsFullSheet openWidgets(Launcher launcher) {
         if (launcher.getPackageManager().isSafeMode()) {
             Toast.makeText(launcher, R.string.safemode_widget_error, Toast.LENGTH_SHORT).show();
-            return false;
+            return null;
         } else {
-            WidgetsFullSheet.show(launcher, true /* animated */);
-            return true;
+            return WidgetsFullSheet.show(launcher, true /* animated */);
         }
     }
 

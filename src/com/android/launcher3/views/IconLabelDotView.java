@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.android.launcher3;
-
-import android.content.SharedPreferences;
+package com.android.launcher3.views;
 
 /**
- * This interface defines the set of methods that the Launcher activity exposes. Methods
- * here should be safe to call from classes outside of com.android.launcher3.*
+ * A view that has an icon, label, and notification dot.
  */
-public interface LauncherExterns {
-
-    boolean setLauncherCallbacks(LauncherCallbacks callbacks);
-
-    SharedPreferences getSharedPrefs();
-
-    void setLauncherOverlay(Launcher.LauncherOverlay overlay);
+public interface IconLabelDotView {
+    void setIconVisible(boolean visible);
+    void setForceHideDot(boolean hide);
 }

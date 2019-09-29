@@ -40,7 +40,6 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.os.UserHandle;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Interpolator;
@@ -58,7 +57,6 @@ import com.android.launcher3.LauncherStateManager;
 import com.android.launcher3.allapps.DiscoveryBounce;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.AnimatorSetBuilder;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.uioverrides.states.OverviewState;
 import com.android.launcher3.userevent.nano.LauncherLogProto;
 import com.android.launcher3.views.FloatingIconView;
@@ -68,6 +66,7 @@ import com.android.quickstep.util.StaggeredWorkspaceAnim;
 import com.android.quickstep.views.LauncherRecentsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
+import com.android.systemui.plugins.shared.LauncherOverlayManager;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.function.BiPredicate;
@@ -202,9 +201,6 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
         // This ensures then the next swipe up to all-apps starts from scroll 0.
         activity.getAppsView().reset(false /* animate */);
 
-        // Optimization, hide the all apps view to prevent layout while initializing
-        activity.getAppsView().getContentView().setVisibility(View.GONE);
-
         return new AnimationFactory() {
             private ShelfAnimState mShelfState;
             private boolean mIsAttachedToWindow;
@@ -273,7 +269,7 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
                         INDEX_RECENTS_FADE_ANIM, attached ? 1 : 0);
 
                 int runningTaskIndex = recentsView.getRunningTaskIndex();
-                if (runningTaskIndex == 0) {
+                if (runningTaskIndex == recentsView.getTaskViewStartIndex()) {
                     // If we are on the first task (we haven't quick switched), translate recents in
                     // from the side. Calculate the start translation based on current scale/scroll.
                     float currScale = recentsView.getScaleX();
@@ -356,8 +352,7 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
     private void playScaleDownAnim(AnimatorSet anim, Launcher launcher, LauncherState fromState,
             LauncherState endState) {
         RecentsView recentsView = launcher.getOverviewPanel();
-        TaskView v = recentsView.getTaskViewAt(recentsView.getCurrentPage());
-        if (v == null) {
+        if (recentsView.getCurrentPageTaskView() == null) {
             return;
         }
 
@@ -385,7 +380,7 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
             // recents as a whole needs to translate further to keep up with the app window.
             TaskView runningTaskView = recentsView.getRunningTaskView();
             if (runningTaskView == null) {
-                runningTaskView = recentsView.getTaskViewAt(recentsView.getCurrentPage());
+                runningTaskView = recentsView.getCurrentPageTaskView();
             }
             TimeInterpolator oldInterpolator = translateY.getInterpolator();
             Rect fallbackInsets = launcher.getDeviceProfile().getInsets();
@@ -483,5 +478,19 @@ public final class LauncherActivityControllerHelper implements ActivityControlHe
     @Override
     public void onLaunchTaskSuccess(Launcher launcher) {
         launcher.getStateManager().moveToRestState();
+    }
+
+    @Override
+    public void closeOverlay() {
+        Launcher launcher = getCreatedActivity();
+        if (launcher == null) {
+            return;
+        }
+        LauncherOverlayManager om = launcher.getOverlayManager();
+        if (!launcher.isStarted() || launcher.isForceInvisible()) {
+            om.hideOverlay(false /* animate */);
+        } else {
+            om.hideOverlay(150);
+        }
     }
 }
