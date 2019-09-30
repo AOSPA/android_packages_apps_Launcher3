@@ -43,7 +43,7 @@
         attributes and intent filters the same
         -->
         <activity
-            android:name="com.android.launcher3.uioverrides.QuickstepLauncher"
+            android:name="co.aospa.launcher.ParanoidLauncher"
             android:launchMode="singleTask"
             android:clearTaskOnLaunch="true"
             android:stateNotNeeded="true"
