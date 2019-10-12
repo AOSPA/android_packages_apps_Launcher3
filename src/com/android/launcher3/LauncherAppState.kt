@@ -37,6 +37,7 @@ constructor(
 ) {
 
     companion object {
+        @JvmField var needsRestart: Boolean = false
 
         @JvmField var INSTANCE = DaggerSingletonObject { it.launcherAppState }
 
@@ -44,5 +45,11 @@ constructor(
 
         /** Shorthand for [.getInvariantDeviceProfile] */
         @JvmStatic fun getIDP(context: Context) = InvariantDeviceProfile.INSTANCE[context]
+
+        /** Marks that the launcher needs to be restarted */
+        @JvmStatic fun setNeedsRestart() { needsRestart = true }
+
+        /** Restarts the launcher if [.setNeedsRestart] was called */
+        @JvmStatic fun checkIfRestartNeeded(context: Context) { if (needsRestart) Utilities.restart(context) }
     }
 }
