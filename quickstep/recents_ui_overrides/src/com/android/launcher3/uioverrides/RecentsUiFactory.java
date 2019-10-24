@@ -18,10 +18,13 @@ package com.android.launcher3.uioverrides;
 
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.quickstep.SysUINavigationMode.Mode.NO_BUTTON;
 
 import android.content.Context;
 import android.graphics.Rect;
+import android.os.RemoteException;
+import android.util.Log;
 import android.view.Gravity;
 
 import com.android.launcher3.DeviceProfile;
@@ -42,11 +45,12 @@ import com.android.launcher3.uioverrides.touchcontrollers.TransposedQuickSwitchT
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.launcher3.util.UiThreadHelper.AsyncCommand;
+import com.android.quickstep.RecentsModel;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.TouchInteractionService;
+import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.views.RecentsView;
-import com.android.systemui.shared.system.WindowManagerWrapper;
 
 import java.util.ArrayList;
 
@@ -55,9 +59,16 @@ import java.util.ArrayList;
  */
 public abstract class RecentsUiFactory {
 
+    private static final String TAG = RecentsUiFactory.class.getSimpleName();
+
     public static final boolean GO_LOW_RAM_RECENTS_ENABLED = false;
-    private static final AsyncCommand SET_SHELF_HEIGHT_CMD = (visible, height) ->
-            WindowManagerWrapper.getInstance().setShelfHeight(visible != 0, height);
+
+    /**
+     * Reusable command for applying the shelf height on the background thread.
+     */
+    public static final AsyncCommand SET_SHELF_HEIGHT = (context, arg1, arg2) -> {
+        SystemUiProxy.INSTANCE.get(context).setShelfHeight(arg1 != 0, arg2);
+    };
 
     public static RotationMode ROTATION_LANDSCAPE = new RotationMode(-90) {
         @Override
@@ -180,11 +191,15 @@ public abstract class RecentsUiFactory {
         return new RecentsViewStateController(launcher);
     }
 
-    /**
-     * Clears the swipe shared state for the current swipe gesture.
-     */
-    public static void clearSwipeSharedState(boolean finishAnimation) {
-        TouchInteractionService.getSwipeSharedState().clearAllState(finishAnimation);
+    /** Clears the swipe shared state for the current swipe gesture. */
+    public static void clearSwipeSharedState(Launcher launcher, boolean finishAnimation) {
+        if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+            launcher.<RecentsView>getOverviewPanel().switchToScreenshot(
+                    () -> TouchInteractionService.getSwipeSharedState().clearAllState(
+                            finishAnimation));
+        } else {
+            TouchInteractionService.getSwipeSharedState().clearAllState(finishAnimation);
+        }
     }
 
     /**
@@ -197,9 +212,8 @@ public abstract class RecentsUiFactory {
         DeviceProfile profile = launcher.getDeviceProfile();
         boolean visible = (state == NORMAL || state == OVERVIEW) && launcher.isUserActive()
                 && !profile.isVerticalBarLayout();
-        UiThreadHelper.runAsyncCommand(launcher, SET_SHELF_HEIGHT_CMD,
-                visible ? 1 : 0, profile.hotseatBarSizePx);
-
+        UiThreadHelper.runAsyncCommand(launcher, SET_SHELF_HEIGHT, visible ? 1 : 0,
+                profile.hotseatBarSizePx);
         if (state == NORMAL) {
             launcher.<RecentsView>getOverviewPanel().setSwipeDownShouldLaunchApp(false);
         }

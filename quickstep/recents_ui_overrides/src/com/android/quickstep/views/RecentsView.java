@@ -17,7 +17,6 @@
 package com.android.quickstep.views;
 
 import static androidx.dynamicanimation.animation.DynamicAnimation.MIN_VISIBLE_CHANGE_PIXELS;
-
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
 import static com.android.launcher3.InvariantDeviceProfile.CHANGE_FLAG_ICON_PARAMS;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
@@ -102,12 +101,14 @@ import com.android.launcher3.util.OverScroller;
 import com.android.launcher3.util.PendingAnimation;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.ViewPool;
-import com.android.quickstep.RecentsAnimationWrapper;
+import com.android.quickstep.RecentsAnimationController;
+import com.android.quickstep.RecentsAnimationTargets;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.RecentsModel.TaskThumbnailChangeListener;
 import com.android.quickstep.TaskThumbnailCache;
 import com.android.quickstep.TaskUtils;
-import com.android.quickstep.util.ClipAnimationHelper;
+import com.android.quickstep.ViewUtils;
+import com.android.quickstep.util.AppWindowAnimationHelper;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -155,8 +156,9 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
                 }
             };
 
-    protected RecentsAnimationWrapper mRecentsAnimationWrapper;
-    protected ClipAnimationHelper mClipAnimationHelper;
+    protected RecentsAnimationController mRecentsAnimationController;
+    protected RecentsAnimationTargets mRecentsAnimationTargets;
+    protected AppWindowAnimationHelper mAppWindowAnimationHelper;
     protected SyncRtSurfaceTransactionApplierCompat mSyncTransactionApplier;
     protected int mTaskWidth;
     protected int mTaskHeight;
@@ -176,7 +178,7 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
     private final ClearAllButton mClearAllButton;
     private final Rect mClearAllButtonDeadZoneRect = new Rect();
     private final Rect mTaskViewDeadZoneRect = new Rect();
-    protected final ClipAnimationHelper mTempClipAnimationHelper;
+    protected final AppWindowAnimationHelper mTempAppWindowAnimationHelper;
 
     private final ScrollState mScrollState = new ScrollState();
     // Keeps track of the previously known visible tasks for purposes of loading/unloading task data
@@ -187,7 +189,7 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
     private final ViewPool<TaskView> mTaskViewPool;
 
     private boolean mDwbToastShown;
-    private boolean mDisallowScrollToClearAll;
+    protected boolean mDisallowScrollToClearAll;
     private boolean mOverlayEnabled;
     private boolean mFreezeViewVisibility;
 
@@ -272,7 +274,7 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
 
     // Only valid until the launcher state changes to NORMAL
     protected int mRunningTaskId = -1;
-    private boolean mRunningTaskTileHidden;
+    protected boolean mRunningTaskTileHidden;
     private Task mTmpRunningTask;
 
     private boolean mRunningTaskIconScaledDown = false;
@@ -289,7 +291,7 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
     private LayoutTransition mLayoutTransition;
 
     @ViewDebug.ExportedProperty(category = "launcher")
-    private float mContentAlpha = 1;
+    protected float mContentAlpha = 1;
     @ViewDebug.ExportedProperty(category = "launcher")
     protected float mFullscreenProgress = 0;
 
@@ -327,7 +329,7 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         mActivity = (T) BaseActivity.fromContext(context);
         mModel = RecentsModel.INSTANCE.get(context);
         mIdp = InvariantDeviceProfile.INSTANCE.get(context);
-        mTempClipAnimationHelper = new ClipAnimationHelper(context);
+        mTempAppWindowAnimationHelper = new AppWindowAnimationHelper(context);
 
         mClearAllButton = (ClearAllButton) LayoutInflater.from(context)
                 .inflate(R.layout.overview_clear_all_button, this, false);
@@ -380,12 +382,21 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         return null;
     }
 
-    public TaskView updateThumbnail(int taskId, ThumbnailData thumbnailData) {
+    /**
+     * Update the thumbnail of the task.
+     * @param refreshNow Refresh immediately if it's true.
+     */
+    public TaskView updateThumbnail(int taskId, ThumbnailData thumbnailData, boolean refreshNow) {
         TaskView taskView = getTaskView(taskId);
         if (taskView != null) {
-            taskView.getThumbnail().setThumbnail(taskView.getTask(), thumbnailData);
+            taskView.getThumbnail().setThumbnail(taskView.getTask(), thumbnailData, refreshNow);
         }
         return taskView;
+    }
+
+    /** See {@link #updateThumbnail(int, ThumbnailData, boolean)} */
+    public TaskView updateThumbnail(int taskId, ThumbnailData thumbnailData) {
+        return updateThumbnail(taskId, thumbnailData, true /* refreshNow */);
     }
 
     @Override
@@ -573,11 +584,14 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
             taskView.bind(task);
         }
 
-        TaskView runningTaskView = getRunningTaskView();
-        if (runningTaskView != null) {
-            setCurrentPage(indexOfChild(runningTaskView));
-        } else if (getTaskViewCount() > 0) {
-            setCurrentPage(indexOfChild(getTaskViewAt(0)));
+        if (mNextPage == INVALID_PAGE) {
+            // Set the current page to the running task, but not if settling on new task.
+            TaskView runningTaskView = getRunningTaskView();
+            if (runningTaskView != null) {
+                setCurrentPage(indexOfChild(runningTaskView));
+            } else if (getTaskViewCount() > 0) {
+                setCurrentPage(indexOfChild(getTaskViewAt(0)));
+            }
         }
 
         if (mIgnoreResetTaskId != -1 && getTaskView(mIgnoreResetTaskId) != ignoreResetTaskView) {
@@ -795,8 +809,9 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         mIgnoreResetTaskId = -1;
         mTaskListChangeId = -1;
 
-        mRecentsAnimationWrapper = null;
-        mClipAnimationHelper = null;
+        mRecentsAnimationController = null;
+        mRecentsAnimationTargets = null;
+        mAppWindowAnimationHelper = null;
 
         unloadVisibleTaskData();
         setCurrentPage(0);
@@ -859,7 +874,9 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         setEnableFreeScroll(true);
         setEnableDrawingLiveTile(true);
         setOnScrollChangeListener(null);
-        setRunningTaskViewShowScreenshot(true);
+        if (!ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+            setRunningTaskViewShowScreenshot(true);
+        }
         setRunningTaskHidden(false);
         animateUpRunningTaskIconScale();
     }
@@ -1505,14 +1522,14 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
      * to the right.
      */
     public AnimatorSet createAdjacentPageAnimForTaskLaunch(
-            TaskView tv, ClipAnimationHelper clipAnimationHelper) {
+            TaskView tv, AppWindowAnimationHelper appWindowAnimationHelper) {
         AnimatorSet anim = new AnimatorSet();
 
         int taskIndex = indexOfChild(tv);
         int centerTaskIndex = getCurrentPage();
         boolean launchingCenterTask = taskIndex == centerTaskIndex;
 
-        LauncherState.ScaleAndTranslation toScaleAndTranslation = clipAnimationHelper
+        LauncherState.ScaleAndTranslation toScaleAndTranslation = appWindowAnimationHelper
                 .getScaleAndTranslation();
         float toScale = toScaleAndTranslation.scale;
         float toTranslationY = toScaleAndTranslation.translationY;
@@ -1572,10 +1589,10 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
             }
         });
 
-        ClipAnimationHelper clipAnimationHelper = new ClipAnimationHelper(mActivity);
-        clipAnimationHelper.fromTaskThumbnailView(tv.getThumbnail(), this);
-        clipAnimationHelper.prepareAnimation(mActivity.getDeviceProfile(), true /* isOpening */);
-        AnimatorSet anim = createAdjacentPageAnimForTaskLaunch(tv, clipAnimationHelper);
+        AppWindowAnimationHelper appWindowAnimationHelper = new AppWindowAnimationHelper(mActivity);
+        appWindowAnimationHelper.fromTaskThumbnailView(tv.getThumbnail(), this);
+        appWindowAnimationHelper.prepareAnimation(mActivity.getDeviceProfile(), true /* isOpening */);
+        AnimatorSet anim = createAdjacentPageAnimForTaskLaunch(tv, appWindowAnimationHelper);
         anim.play(progressAnim);
         anim.setDuration(duration);
 
@@ -1678,12 +1695,16 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
 
     public void redrawLiveTile(boolean mightNeedToRefill) { }
 
-    public void setRecentsAnimationWrapper(RecentsAnimationWrapper recentsAnimationWrapper) {
-        mRecentsAnimationWrapper = recentsAnimationWrapper;
+    // TODO: To be removed in a follow up CL
+    public void setRecentsAnimationTargets(RecentsAnimationController recentsAnimationController,
+            RecentsAnimationTargets recentsAnimationTargets) {
+        mRecentsAnimationController = recentsAnimationController;
+        mRecentsAnimationTargets = recentsAnimationTargets;
     }
 
-    public void setClipAnimationHelper(ClipAnimationHelper clipAnimationHelper) {
-        mClipAnimationHelper = clipAnimationHelper;
+    // TODO: To be removed in a follow up CL
+    public void setAppWindowAnimationHelper(AppWindowAnimationHelper appWindowAnimationHelper) {
+        mAppWindowAnimationHelper = appWindowAnimationHelper;
     }
 
     public void setLiveTileOverlay(LiveTileOverlay liveTileOverlay) {
@@ -1697,14 +1718,14 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
     }
 
     public void finishRecentsAnimation(boolean toRecents, Runnable onFinishComplete) {
-        if (mRecentsAnimationWrapper == null) {
+        if (mRecentsAnimationController == null) {
             if (onFinishComplete != null) {
                 onFinishComplete.run();
             }
             return;
         }
 
-        mRecentsAnimationWrapper.finish(toRecents, onFinishComplete);
+        mRecentsAnimationController.finish(toRecents, onFinishComplete);
     }
 
     public void setDisallowScrollToClearAll(boolean disallowScrollToClearAll) {
@@ -1791,8 +1812,17 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         }
     }
 
-    public ClipAnimationHelper getTempClipAnimationHelper() {
-        return mTempClipAnimationHelper;
+    public AppWindowAnimationHelper getClipAnimationHelper() {
+        return mAppWindowAnimationHelper;
+    }
+
+    public AppWindowAnimationHelper getTempAppWindowAnimationHelper() {
+        return mTempAppWindowAnimationHelper;
+    }
+
+    public AppWindowAnimationHelper.TransformParams getLiveTileParams(
+            boolean mightNeedToRefill) {
+        return null;
     }
 
     private void updateEnabledOverlays() {
@@ -1818,5 +1848,42 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
     public int getRightGestureMargin() {
         final WindowInsets insets = getRootWindowInsets();
         return Math.max(insets.getSystemGestureInsets().right, insets.getSystemWindowInsetRight());
+    }
+
+
+    /** If it's in the live tile mode, switch the running task into screenshot mode. */
+    public void switchToScreenshot(Runnable onFinishRunnable) {
+        TaskView taskView = getRunningTaskView();
+        if (taskView == null) {
+            if (onFinishRunnable != null) {
+                onFinishRunnable.run();
+            }
+            return;
+        }
+
+        taskView.setShowScreenshot(true);
+        taskView.getThumbnail().refresh();
+        ViewUtils.postDraw(taskView, onFinishRunnable);
+    }
+
+    @Override
+    public void addView(View child, int index) {
+        super.addView(child, index);
+        if (isExtraCardView(child, index)) {
+            mTaskViewStartIndex++;
+        }
+    }
+
+    @Override
+    public void removeView(View view) {
+        if (isExtraCardView(view, indexOfChild(view))) {
+            mTaskViewStartIndex--;
+        }
+        super.removeView(view);
+    }
+
+    private boolean isExtraCardView(View view, int index) {
+        return !(view instanceof TaskView) && !(view instanceof ClearAllButton)
+                && index <= mTaskViewStartIndex;
     }
 }
