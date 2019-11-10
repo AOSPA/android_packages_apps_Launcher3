@@ -1088,7 +1088,9 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         if (mFreeScroll) {
             setCurrentPage(getNextPage());
         } else if (wasFreeScroll) {
-            snapToPage(getNextPage());
+            if (getScrollForPage(getNextPage()) != getScrollX()) {
+                snapToPage(getNextPage());
+            }
         }
     }
 
@@ -1548,7 +1550,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             snapToPage(getNextPage() - 1);
             return true;
         }
-        return false;
+        return onOverscroll(-getMeasuredWidth());
     }
 
     public boolean scrollRight() {
@@ -1556,7 +1558,15 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             snapToPage(getNextPage() + 1);
             return true;
         }
-        return false;
+        return onOverscroll(getMeasuredWidth());
+    }
+
+    protected boolean onOverscroll(int amount) {
+        if (!mAllowOverScroll) return false;
+        onScrollInteractionBegin();
+        overScroll(amount);
+        onScrollInteractionEnd();
+        return true;
     }
 
     @Override
@@ -1576,8 +1586,9 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
         final boolean pagesFlipped = isPageOrderFlipped();
-        info.setScrollable(getPageCount() > 1);
-        if (getCurrentPage() < getPageCount() - 1) {
+        int offset = (mAllowOverScroll ? 0 : 1);
+        info.setScrollable(getPageCount() > offset);
+        if (getCurrentPage() < getPageCount() - offset) {
             info.addAction(pagesFlipped ?
                 AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD
                 : AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD);
@@ -1585,7 +1596,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                 AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_LEFT
                 : AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_RIGHT);
         }
-        if (getCurrentPage() > 0) {
+        if (getCurrentPage() >= offset) {
             info.addAction(pagesFlipped ?
                 AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD
                 : AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD);
@@ -1593,7 +1604,6 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                 AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_RIGHT
                 : AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_LEFT);
         }
-
         // Accessibility-wise, PagedView doesn't support long click, so disabling it.
         // Besides disabling the accessibility long-click, this also prevents this view from getting
         // accessibility focus.
@@ -1612,7 +1622,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     @Override
     public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
         super.onInitializeAccessibilityEvent(event);
-        event.setScrollable(getPageCount() > 1);
+        event.setScrollable(mAllowOverScroll || getPageCount() > 1);
     }
 
     @Override
