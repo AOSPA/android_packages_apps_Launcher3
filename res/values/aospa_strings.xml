@@ -69,6 +69,9 @@
 
     <!-- Recents -->
     <string name="action_lens">Lens</string>
+    
+    <!-- Preference default value -->
+    <string name="pref_value_default" translatable="false">Default</string>
 
     <!-- Hotseat searchbar -->
     <string name="label_search">Search</string>

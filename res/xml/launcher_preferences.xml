@@ -32,6 +32,13 @@
         launcher:logIdOn="615"
         launcher:logIdOff="616" />
 
+    <com.android.launcher3.settings.preference.ReloadingListPreference
+        android:key="pref_icon_pack"
+        android:title="@string/app_info_icon_pack"
+        android:summary="@string/placeholder_string"
+        android:defaultValue=""
+        android:persistent="true" />
+
     <SwitchPreference
         android:defaultValue="false"
         android:key="pref_workspace_lock"
