@@ -83,4 +83,7 @@
     <string name="smartspace_pref_title">At a Glance</string>
     <string name="smartspace_pref_summary">Show smartspace at the top of home screen</string>
 
+    <!-- Preference default value -->
+    <string name="pref_value_default" translatable="false">Default</string>
+
 </resources>
