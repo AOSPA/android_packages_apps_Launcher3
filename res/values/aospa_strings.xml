@@ -84,4 +84,7 @@
     <!-- Show top shadow -->
     <string name="show_top_shadow">Show top shadow</string>
 
+    <!-- Preference default value -->
+    <string name="pref_value_default" translatable="false">Default</string>
+
 </resources>
