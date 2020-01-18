@@ -22,7 +22,6 @@ import static android.content.pm.PackageManager.MATCH_ALL;
 import static android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS;
 
 import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
-import static com.android.launcher3.testing.TestProtocol.BACKGROUND_APP_STATE_ORDINAL;
 import static com.android.launcher3.testing.TestProtocol.NORMAL_STATE_ORDINAL;
 
 import android.app.ActivityManager;
@@ -78,6 +77,8 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * The main tapl object. The only object that can be explicitly constructed by the using code. It
@@ -129,6 +130,7 @@ public final class LauncherInstrumentation {
     private static final String APPS_RES_ID = "apps_view";
     private static final String OVERVIEW_RES_ID = "overview_panel";
     private static final String WIDGETS_RES_ID = "widgets_list_view";
+    private static final String CONTEXT_MENU_RES_ID = "deep_shortcuts_container";
     public static final int WAIT_TIME_MS = 10000;
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
 
@@ -306,12 +308,22 @@ public final class LauncherInstrumentation {
         }
     }
 
+    private String getVisiblePackages() {
+        return mDevice.findObjects(By.textStartsWith(""))
+                .stream()
+                .map(object -> object.getApplicationPackage())
+                .distinct()
+                .filter(pkg -> !"com.android.systemui".equals(pkg))
+                .collect(Collectors.joining(", "));
+    }
+
     private String getVisibleStateMessage() {
+        if (hasLauncherObject(CONTEXT_MENU_RES_ID)) return "Context Menu";
         if (hasLauncherObject(WIDGETS_RES_ID)) return "Widgets";
         if (hasLauncherObject(OVERVIEW_RES_ID)) return "Overview";
         if (hasLauncherObject(WORKSPACE_RES_ID)) return "Workspace";
         if (hasLauncherObject(APPS_RES_ID)) return "AllApps";
-        return "Background";
+        return "Background (" + getVisiblePackages() + ")";
     }
 
     public void setSystemHealthSupplier(Function<Long, String> supplier) {
@@ -426,12 +438,6 @@ public final class LauncherInstrumentation {
         assertEquals("Unexpected display rotation",
                 mExpectedRotation, mDevice.getDisplayRotation());
 
-        // b/136278866
-        for (int i = 0; i != 100; ++i) {
-            if (getNavigationModeMismatchError() == null) break;
-            sleep(100);
-        }
-
         final String error = getNavigationModeMismatchError();
         assertTrue(error, error == null);
         log("verifyContainerType: " + containerType);
@@ -510,15 +516,17 @@ public final class LauncherInstrumentation {
     }
 
     Parcelable executeAndWaitForEvent(Runnable command,
-            UiAutomation.AccessibilityEventFilter eventFilter, String message) {
+            UiAutomation.AccessibilityEventFilter eventFilter, Supplier<String> message) {
         try {
             final AccessibilityEvent event =
                     mInstrumentation.getUiAutomation().executeAndWaitForEvent(
                             command, eventFilter, WAIT_TIME_MS);
             assertNotNull("executeAndWaitForEvent returned null (this can't happen)", event);
-            return event.getParcelableData();
+            final Parcelable parcelableData = event.getParcelableData();
+            event.recycle();
+            return parcelableData;
         } catch (TimeoutException e) {
-            fail(message);
+            fail(message.get());
             return null;
         }
     }
@@ -540,7 +548,7 @@ public final class LauncherInstrumentation {
 
             final Point displaySize = getRealDisplaySize();
 
-            if (hasLauncherObject("deep_shortcuts_container")) {
+            if (hasLauncherObject(CONTEXT_MENU_RES_ID)) {
                 linearGesture(
                         displaySize.x / 2, displaySize.y - 1,
                         displaySize.x / 2, 0,
@@ -548,35 +556,37 @@ public final class LauncherInstrumentation {
                         false);
                 try (LauncherInstrumentation.Closable c = addContextLayer(
                         "Swiped up from context menu to home")) {
-                    waitUntilGone("deep_shortcuts_container");
+                    waitUntilGone(CONTEXT_MENU_RES_ID);
                 }
             }
             if (hasLauncherObject(WORKSPACE_RES_ID)) {
                 log(action = "already at home");
             } else {
-                log("Hierarchy before swiping up to home");
+                log("Hierarchy before swiping up to home:");
                 dumpViewHierarchy();
                 log(action = "swiping up to home from " + getVisibleStateMessage());
-                final int finalState = mDevice.hasObject(By.pkg(getLauncherPackageName()))
-                        ? NORMAL_STATE_ORDINAL : BACKGROUND_APP_STATE_ORDINAL;
 
                 try (LauncherInstrumentation.Closable c = addContextLayer(action)) {
                     swipeToState(
                             displaySize.x / 2, displaySize.y - 1,
                             displaySize.x / 2, 0,
-                            ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME, finalState);
+                            ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME, NORMAL_STATE_ORDINAL);
                 }
             }
         } else {
-            log(action = "clicking home button");
-            executeAndWaitForEvent(
-                    () -> {
-                        log("LauncherInstrumentation.pressHome before clicking");
-                        waitForSystemUiObject("home").click();
-                    },
-                    event -> true,
-                    "Pressing Home didn't produce any events");
-            mDevice.waitForIdle();
+            log("Hierarchy before clicking home:");
+            dumpViewHierarchy();
+            log(action = "clicking home button from " + getVisibleStateMessage());
+            try (LauncherInstrumentation.Closable c = addContextLayer(action)) {
+                mDevice.waitForIdle();
+                runToState(
+                        () -> waitForSystemUiObject("home").click(),
+                        NORMAL_STATE_ORDINAL,
+                        !hasLauncherObject(WORKSPACE_RES_ID)
+                                && (hasLauncherObject(APPS_RES_ID)
+                                || hasLauncherObject(OVERVIEW_RES_ID)));
+                mDevice.waitForIdle();
+            }
         }
         try (LauncherInstrumentation.Closable c = addContextLayer(
                 "performed action to switch to Home - " + action)) {
@@ -770,14 +780,46 @@ public final class LauncherInstrumentation {
         return mDevice;
     }
 
+    private static String eventListToString(List<Integer> actualEvents) {
+        if (actualEvents.isEmpty()) return "no events";
+
+        return "["
+                + actualEvents.stream()
+                .map(state -> TestProtocol.stateOrdinalToString(state))
+                .collect(Collectors.joining(", "))
+                + "]";
+    }
+
+    void runToState(Runnable command, int expectedState, boolean requireEvent) {
+        if (requireEvent) {
+            runToState(command, expectedState);
+        } else {
+            command.run();
+        }
+    }
+
+    void runToState(Runnable command, int expectedState) {
+        final List<Integer> actualEvents = new ArrayList<>();
+        executeAndWaitForEvent(
+                command,
+                event -> isSwitchToStateEvent(event, expectedState, actualEvents),
+                () -> "Failed to receive an event for the state change: expected "
+                        + TestProtocol.stateOrdinalToString(expectedState)
+                        + ", actual: " + eventListToString(actualEvents));
+    }
+
+    private boolean isSwitchToStateEvent(
+            AccessibilityEvent event, int expectedState, List<Integer> actualEvents) {
+        if (!TestProtocol.SWITCHED_TO_STATE_MESSAGE.equals(event.getClassName())) return false;
+
+        final Bundle parcel = (Bundle) event.getParcelableData();
+        final int actualState = parcel.getInt(TestProtocol.STATE_FIELD);
+        actualEvents.add(actualState);
+        return actualState == expectedState;
+    }
+
     void swipeToState(int startX, int startY, int endX, int endY, int steps, int expectedState) {
-        final Bundle parcel = (Bundle) executeAndWaitForEvent(
-                () -> linearGesture(startX, startY, endX, endY, steps, false),
-                event -> TestProtocol.SWITCHED_TO_STATE_MESSAGE.equals(event.getClassName()),
-                "Swipe failed to receive an event for the swipe end");
-        assertEquals("Swipe switched launcher to a wrong state;",
-                TestProtocol.stateOrdinalToString(expectedState),
-                TestProtocol.stateOrdinalToString(parcel.getInt(TestProtocol.STATE_FIELD)));
+        runToState(() -> linearGesture(startX, startY, endX, endY, steps, false), expectedState);
     }
 
     int getBottomGestureSize() {
@@ -863,7 +905,7 @@ public final class LauncherInstrumentation {
         executeAndWaitForEvent(
                 () -> linearGesture(startX, startY, endX, endY, steps, slowDown),
                 event -> TestProtocol.SCROLL_FINISHED_MESSAGE.equals(event.getClassName()),
-                "Didn't receive a scroll end message: " + startX + ", " + startY
+                () -> "Didn't receive a scroll end message: " + startX + ", " + startY
                         + ", " + endX + ", " + endY);
     }
 

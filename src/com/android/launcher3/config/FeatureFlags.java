@@ -95,7 +95,7 @@ public final class FeatureFlags {
             "ENABLE_QUICKSTEP_LIVE_TILE", false, "Enable live tile in Quickstep overview");
 
     public static final TogglableFlag ENABLE_HINTS_IN_OVERVIEW = new TogglableFlag(
-            "ENABLE_HINTS_IN_OVERVIEW", true,
+            "ENABLE_HINTS_IN_OVERVIEW", false,
             "Show chip hints and gleams on the overview screen");
 
     public static final TogglableFlag FAKE_LANDSCAPE_UI = new TogglableFlag(
@@ -125,6 +125,13 @@ public final class FeatureFlags {
 
     public static final TogglableFlag ENABLE_DEEP_SHORTCUT_ICON_CACHE = new TogglableFlag(
             "ENABLE_DEEP_SHORTCUT_ICON_CACHE", true, "R/W deep shortcut in IconCache");
+
+    public static final TogglableFlag ENABLE_LAUNCHER_PREVIEW_IN_GRID_PICKER = new TogglableFlag(
+            "ENABLE_LAUNCHER_PREVIEW_IN_GRID_PICKER", false,
+            "Show launcher preview in grid picker");
+
+    public static final TogglableFlag ENABLE_OVERVIEW_ACTIONS = new TogglableFlag(
+            "ENABLE_OVERVIEW_ACTIONS", false, "Show app actions in Overview");
 
     public static void initialize(Context context) {
         // Avoid the disk read for user builds

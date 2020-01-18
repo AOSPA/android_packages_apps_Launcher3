@@ -544,7 +544,7 @@ public class LauncherSwipeHandler<T extends BaseDraggingActivity>
 
         if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
             if (mRecentsAnimationTargets != null) {
-                LiveTileOverlay.getInstance().update(
+                LiveTileOverlay.INSTANCE.update(
                         mAppWindowAnimationHelper.getCurrentRectWithInsets(),
                         mAppWindowAnimationHelper.getCurrentCornerRadius());
             }
@@ -610,10 +610,12 @@ public class LauncherSwipeHandler<T extends BaseDraggingActivity>
 
     @Override
     public void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {
-        super.onRecentsAnimationCanceled(thumbnailData);
+        ActiveGestureLog.INSTANCE.addLog("cancelRecentsAnimation");
         mActivityInitListener.unregister();
         mStateCallback.setStateOnUiThread(STATE_GESTURE_CANCELLED | STATE_HANDLER_INVALIDATED);
-        ActiveGestureLog.INSTANCE.addLog("cancelRecentsAnimation");
+
+        // Defer clearing the controller and the targets until after we've updated the state
+        super.onRecentsAnimationCanceled(thumbnailData);
     }
 
     @Override
@@ -829,7 +831,7 @@ public class LauncherSwipeHandler<T extends BaseDraggingActivity>
             setShelfState(ShelfAnimState.CANCEL, LINEAR, 0);
             duration = Math.max(MIN_OVERSHOOT_DURATION, duration);
         } else if (endTarget == RECENTS) {
-            LiveTileOverlay.getInstance().startIconAnimation();
+            LiveTileOverlay.INSTANCE.startIconAnimation();
             if (mRecentsView != null) {
                 int nearestPage = mRecentsView.getPageNearestToCenterOfScreen();
                 if (mRecentsView.getNextPage() != nearestPage) {
@@ -1231,13 +1233,13 @@ public class LauncherSwipeHandler<T extends BaseDraggingActivity>
     }
 
     private void addLiveTileOverlay() {
-        if (LiveTileOverlay.getInstance().attach(mActivity.getRootView().getOverlay())) {
+        if (LiveTileOverlay.INSTANCE.attach(mActivity.getRootView().getOverlay())) {
             mRecentsView.setLiveTileOverlayAttached(true);
         }
     }
 
     private void removeLiveTileOverlay() {
-        LiveTileOverlay.getInstance().detach(mActivity.getRootView().getOverlay());
+        LiveTileOverlay.INSTANCE.detach(mActivity.getRootView().getOverlay());
         mRecentsView.setLiveTileOverlayAttached(false);
     }
 

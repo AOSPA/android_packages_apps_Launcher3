@@ -73,8 +73,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
         mRotationListener = new DisplayRotationListener(this, this::onDeviceRotationChanged);
 
         // Update theme
-        WallpaperColorInfo wallpaperColorInfo = WallpaperColorInfo.getInstance(this);
-        wallpaperColorInfo.addOnChangeListener(this);
+        WallpaperColorInfo.INSTANCE.get(this).addOnChangeListener(this);
         int themeRes = Themes.getActivityThemeRes(this);
         if (themeRes != mThemeRes) {
             mThemeRes = themeRes;
@@ -175,8 +174,8 @@ public abstract class BaseDraggingActivity extends BaseActivity
                 AppLaunchTracker.INSTANCE.get(this).onStartApp(intent.getComponent(), user,
                         sourceContainer);
             }
-            getUserEventDispatcher().logAppLaunch(v, intent);
-            getStatsLogManager().logAppLaunch(v, intent);
+            getUserEventDispatcher().logAppLaunch(v, intent, user);
+            getStatsLogManager().logAppLaunch(v, intent, user);
             return true;
         } catch (NullPointerException|ActivityNotFoundException|SecurityException e) {
             Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
@@ -234,7 +233,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        WallpaperColorInfo.getInstance(this).removeOnChangeListener(this);
+        WallpaperColorInfo.INSTANCE.get(this).removeOnChangeListener(this);
         mRotationListener.disable();
     }
 

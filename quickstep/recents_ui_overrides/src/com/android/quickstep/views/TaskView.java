@@ -47,11 +47,14 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.Interpolators;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.UserEventDispatcher;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.userevent.nano.LauncherLogProto;
@@ -64,6 +67,7 @@ import com.android.quickstep.TaskIconCache;
 import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskThumbnailCache;
 import com.android.quickstep.TaskUtils;
+import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.util.TaskCornerRadius;
 import com.android.quickstep.views.RecentsView.PageCallbacks;
 import com.android.quickstep.views.RecentsView.ScrollState;
@@ -159,6 +163,8 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
     private final float mWindowCornerRadius;
     private final BaseDraggingActivity mActivity;
 
+    @Nullable private View mActionsView;
+
     private ObjectAnimator mIconAndDimAnimator;
     private float mIconScaleAnimStartProgress = 0;
     private float mFocusTransitionProgress = 1;
@@ -223,6 +229,21 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
         super.onFinishInflate();
         mSnapshotView = findViewById(R.id.snapshot);
         mIconView = findViewById(R.id.icon);
+
+        TaskView.LayoutParams thumbnailParams = (LayoutParams) mSnapshotView.getLayoutParams();
+        thumbnailParams.bottomMargin = LayoutUtils.thumbnailBottomMargin(getResources());
+        mSnapshotView.setLayoutParams(thumbnailParams);
+
+
+        if (FeatureFlags.ENABLE_OVERVIEW_ACTIONS.get()) {
+            mActionsView = mSnapshotView.getTaskOverlay().getActionsView();
+            if (mActionsView != null) {
+                TaskView.LayoutParams params = new TaskView.LayoutParams(LayoutParams.MATCH_PARENT,
+                        getResources().getDimensionPixelSize(R.dimen.overview_actions_height),
+                        Gravity.BOTTOM);
+                addView(mActionsView, params);
+            }
+        }
     }
 
     public TaskMenuView getMenuView() {
@@ -421,6 +442,10 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
                 .getInterpolation(progress);
         mIconView.setScaleX(scale);
         mIconView.setScaleY(scale);
+
+        if (mActionsView != null) {
+            mActionsView.setAlpha(scale);
+        }
 
         mFooterVerticalOffset = 1.0f - scale;
         for (FooterWrapper footer : mFooters) {
@@ -626,7 +651,7 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
 
         TaskOutlineProvider(Resources res, FullscreenDrawParams fullscreenParams) {
             mMarginTop = res.getDimensionPixelSize(R.dimen.task_thumbnail_top_margin);
-            mMarginBottom = res.getDimensionPixelSize(R.dimen.task_thumbnail_bottom_margin);
+            mMarginBottom = LayoutUtils.thumbnailBottomMargin(res);
             mFullscreenParams = fullscreenParams;
         }
 
@@ -783,6 +808,7 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
 
     /**
      * Hides the icon and shows insets when this TaskView is about to be shown fullscreen.
+     *
      * @param progress: 0 = show icon and no insets; 1 = don't show icon and show full insets.
      */
     public void setFullscreenProgress(float progress) {
@@ -793,6 +819,9 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
         mFullscreenProgress = progress;
         boolean isFullscreen = mFullscreenProgress > 0;
         mIconView.setVisibility(progress < 1 ? VISIBLE : INVISIBLE);
+        if (mActionsView != null) {
+            mActionsView.setVisibility(progress < 1 ? VISIBLE : INVISIBLE);
+        }
         setClipChildren(!isFullscreen);
         setClipToPadding(!isFullscreen);
 
@@ -873,4 +902,5 @@ public class TaskView extends FrameLayout implements PageCallbacks, Reusable {
             mScale = scale;
         }
     }
+
 }
