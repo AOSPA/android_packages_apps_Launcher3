@@ -85,7 +85,10 @@ public final class FeatureFlags {
             "APPLY_CONFIG_AT_RUNTIME", true, "Apply display changes dynamically");
 
     public static final TogglableFlag QUICKSTEP_SPRINGS = new TogglableFlag("QUICKSTEP_SPRINGS",
-            false, "Enable springs for quickstep animations");
+            true, "Enable springs for quickstep animations");
+
+    public static final TogglableFlag UNSTABLE_SPRINGS = new TogglableFlag("UNSTABLE_SPRINGS",
+            false, "Enable unstable springs for quickstep animations");
 
     public static final TogglableFlag ADAPTIVE_ICON_WINDOW_ANIM = new TogglableFlag(
             "ADAPTIVE_ICON_WINDOW_ANIM", true,
@@ -114,7 +117,7 @@ public final class FeatureFlags {
             "ENABLE_PREDICTION_DISMISS", false, "Allow option to dimiss apps from predicted list");
 
     public static final TogglableFlag ENABLE_QUICK_CAPTURE_GESTURE = new TogglableFlag(
-            "ENABLE_QUICK_CAPTURE_GESTURE", false, "Swipe from right to left to quick capture");
+            "ENABLE_QUICK_CAPTURE_GESTURE", true, "Swipe from right to left to quick capture");
 
     public static final TogglableFlag ASSISTANT_GIVES_LAUNCHER_FOCUS = new TogglableFlag(
             "ASSISTANT_GIVES_LAUNCHER_FOCUS", false,
@@ -132,6 +135,10 @@ public final class FeatureFlags {
 
     public static final TogglableFlag ENABLE_OVERVIEW_ACTIONS = new TogglableFlag(
             "ENABLE_OVERVIEW_ACTIONS", false, "Show app actions in Overview");
+
+    public static final TogglableFlag ENABLE_DATABASE_RESTORE = new TogglableFlag(
+            "ENABLE_DATABASE_RESTORE", true,
+            "Enable database restore when new restore session is created");
 
     public static void initialize(Context context) {
         // Avoid the disk read for user builds

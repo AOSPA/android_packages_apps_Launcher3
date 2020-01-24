@@ -44,7 +44,7 @@ public class ExtendedEditText extends EditText {
      * Implemented by listeners of the back key.
      */
     public interface OnBackKeyListener {
-        public boolean onBackKey();
+        boolean onBackKey();
     }
 
     private OnBackKeyListener mBackKeyListener;
@@ -108,6 +108,7 @@ public class ExtendedEditText extends EditText {
     @Override
     public void onCommitCompletion(CompletionInfo text) {
         setText(text.getText());
+        setSelection(text.getText().length());
     }
 
     /**

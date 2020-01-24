@@ -16,6 +16,7 @@
 
 package com.android.launcher3.util;
 
+import static android.content.pm.PackageInstaller.SessionInfo;
 import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
 
 import android.app.AppOpsManager;
@@ -43,6 +44,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 
 import com.android.launcher3.AppInfo;
 import com.android.launcher3.ItemInfo;
@@ -331,5 +334,29 @@ public class PackageManagerHelper {
             return extras == null || extras.keySet().isEmpty();
         }
         return false;
+    }
+
+    /**
+     * Returns true if Launcher has the permission to access shortcuts.
+     * @see LauncherApps#hasShortcutHostPermission()
+     */
+    public static boolean hasShortcutsPermission(Context context) {
+        try {
+            return context.getSystemService(LauncherApps.class).hasShortcutHostPermission();
+        } catch (SecurityException | IllegalStateException e) {
+            Log.e(TAG, "Failed to make shortcut manager call", e);
+        }
+        return false;
+    }
+
+    /**
+     * Returns the created time in millis of given session info. Returns 0 if not available.
+     */
+    public static long getSessionCreatedTimeInMillis(@NonNull final SessionInfo info) {
+        try {
+            return (long) SessionInfo.class.getDeclaredMethod("getCreatedMillis").invoke(info);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }
