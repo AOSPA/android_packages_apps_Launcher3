@@ -29,7 +29,6 @@ import android.util.Log;
 import android.view.MotionEvent;
 
 import com.android.launcher3.util.MainThreadInitializedObject;
-import com.android.quickstep.util.SharedApiCompat;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 
 /**
@@ -278,7 +277,7 @@ public class SystemUiProxy implements ISystemUiProxy {
             mLastShelfVisible = visible;
             mLastShelfHeight = shelfHeight;
             try {
-                SharedApiCompat.setShelfHeight(mSystemUiProxy, visible, shelfHeight);
+                mSystemUiProxy.setShelfHeight(visible, shelfHeight);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call setShelfHeight visible: " + visible
                         + " height: " + shelfHeight, e);
@@ -293,6 +292,17 @@ public class SystemUiProxy implements ISystemUiProxy {
                 mSystemUiProxy.handleImageAsScreenshot(bitmap, rect, insets, i);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call handleImageAsScreenshot", e);
+            }
+        }
+    }
+
+    @Override
+    public void setSplitScreenMinimized(boolean minimized) {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.setSplitScreenMinimized(minimized);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call stopScreenPinning", e);
             }
         }
     }
