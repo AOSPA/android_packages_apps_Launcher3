@@ -17,6 +17,7 @@
 package com.android.quickstep.views;
 
 import static androidx.dynamicanimation.animation.DynamicAnimation.MIN_VISIBLE_CHANGE_PIXELS;
+
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
 import static com.android.launcher3.InvariantDeviceProfile.CHANGE_FLAG_ICON_PARAMS;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
@@ -75,6 +76,7 @@ import android.view.ViewDebug;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.animation.Interpolator;
 import android.widget.ListView;
 
 import androidx.annotation.Nullable;
@@ -91,6 +93,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PropertyListBuilder;
 import com.android.launcher3.anim.SpringObjectAnimator;
+import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.graphics.RotationMode;
 import com.android.launcher3.userevent.nano.LauncherLogProto;
@@ -105,11 +108,13 @@ import com.android.quickstep.RecentsAnimationController;
 import com.android.quickstep.RecentsAnimationTargets;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.RecentsModel.TaskVisualsChangeListener;
+import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskThumbnailCache;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.ViewUtils;
 import com.android.quickstep.util.AppWindowAnimationHelper;
 import com.android.quickstep.util.LayoutUtils;
+import com.android.systemui.shared.recents.IPinnedStackAnimationListener;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -261,7 +266,10 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
                 }
             });
         }
+    };
 
+    private final IPinnedStackAnimationListener mIPinnedStackAnimationListener =
+            new IPinnedStackAnimationListener.Stub() {
         @Override
         public void onPinnedStackAnimationStarted() {
             // Needed for activities that auto-enter PiP, which will not trigger a remote
@@ -443,6 +451,8 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         mSyncTransactionApplier = new SyncRtSurfaceTransactionApplierCompat(this);
         RecentsModel.INSTANCE.get(getContext()).addThumbnailChangeListener(this);
         mIdp.addOnChangeListener(this);
+        SystemUiProxy.INSTANCE.get(getContext()).setPinnedStackAnimationListener(
+                mIPinnedStackAnimationListener);
     }
 
     @Override
@@ -455,6 +465,7 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         mSyncTransactionApplier = null;
         RecentsModel.INSTANCE.get(getContext()).removeThumbnailChangeListener(this);
         mIdp.removeOnChangeListener(this);
+        SystemUiProxy.INSTANCE.get(getContext()).setPinnedStackAnimationListener(null);
     }
 
     @Override
@@ -971,6 +982,10 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         TaskView runningTask = getRunningTaskView();
         if (runningTask != null) {
             runningTask.setStableAlpha(isHidden ? 0 : mContentAlpha);
+            if (!isHidden) {
+                AccessibilityManagerCompat.sendCustomAccessibilityEvent(runningTask,
+                        AccessibilityEvent.TYPE_VIEW_FOCUSED, null);
+            }
         }
     }
 
@@ -1593,7 +1608,8 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         return anim;
     }
 
-    public PendingAnimation createTaskLauncherAnimation(TaskView tv, long duration) {
+    public PendingAnimation createTaskLaunchAnimation(
+            TaskView tv, long duration, Interpolator interpolator) {
         if (FeatureFlags.IS_STUDIO_BUILD && mPendingAnimation != null) {
             throw new IllegalStateException("Another pending animation is still running");
         }
@@ -1606,7 +1622,6 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         int targetSysUiFlags = tv.getThumbnail().getSysUiStatusNavFlags();
         final boolean[] passedOverviewThreshold = new boolean[] {false};
         ValueAnimator progressAnim = ValueAnimator.ofFloat(0, 1);
-        progressAnim.setInterpolator(LINEAR);
         progressAnim.addUpdateListener(animator -> {
             // Once we pass a certain threshold, update the sysui flags to match the target
             // tasks' flags
@@ -1632,7 +1647,7 @@ public abstract class RecentsView<T extends BaseActivity> extends PagedView impl
         appWindowAnimationHelper.prepareAnimation(mActivity.getDeviceProfile(), true /* isOpening */);
         AnimatorSet anim = createAdjacentPageAnimForTaskLaunch(tv, appWindowAnimationHelper);
         anim.play(progressAnim);
-        anim.setDuration(duration);
+        anim.setDuration(duration).setInterpolator(interpolator);
 
         Consumer<Boolean> onTaskLaunchFinish = this::onTaskLaunched;
 
