@@ -347,6 +347,28 @@ public class SystemUiProxy implements ISystemUiProxy {
     }
 
     @Override
+    public void startOneHandedMode() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.startOneHandedMode();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call startOneHandedMode", e);
+            }
+        }
+    }
+
+    @Override
+    public void stopOneHandedMode() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.stopOneHandedMode();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call stopOneHandedMode", e);
+            }
+        }
+    }
+
+    @Override
     public void handleImageBundleAsScreenshot(Bundle screenImageBundle, Rect locationInScreen,
             Insets visibleInsets, Task.TaskKey task) {
         if (mSystemUiProxy != null) {
@@ -355,6 +377,17 @@ public class SystemUiProxy implements ISystemUiProxy {
                         visibleInsets, task);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call handleImageBundleAsScreenshot");
+            }
+        }
+    }
+
+    @Override
+    public void expandNotificationPanel() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.expandNotificationPanel();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call expandNotificationPanel", e);
             }
         }
     }
