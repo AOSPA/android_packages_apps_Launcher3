@@ -58,6 +58,7 @@ import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.R;
+import com.android.launcher3.ResourceUtils;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.UserEventDispatcher;
@@ -75,6 +76,7 @@ import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
 import com.android.quickstep.inputconsumers.AssistantInputConsumer;
 import com.android.quickstep.inputconsumers.DeviceLockedInputConsumer;
+import com.android.quickstep.inputconsumers.OneHandedModeInputConsumer;
 import com.android.quickstep.inputconsumers.OtherActivityInputConsumer;
 import com.android.quickstep.inputconsumers.OverscrollInputConsumer;
 import com.android.quickstep.inputconsumers.OverviewInputConsumer;
@@ -297,6 +299,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         mAM = ActivityManagerWrapper.getInstance();
         mDeviceState = new RecentsAnimationDeviceState(this);
         mDeviceState.addNavigationModeChangedCallback(this::onNavigationModeChanged);
+        mDeviceState.addOneHandedModeChangedCallback(this::onOneHandedModeOverlayChanged);
         mDeviceState.runOnUserUnlocked(this::onUserUnlocked);
         ProtoTracer.INSTANCE.get(this).add(this);
 
@@ -335,6 +338,13 @@ public class TouchInteractionService extends Service implements PluginListener<O
     private void onNavigationModeChanged(SysUINavigationMode.Mode mode) {
         initInputMonitor();
         resetHomeBounceSeenOnQuickstepEnabledFirstTime();
+    }
+
+    /**
+     * Called when the one handed mode overlay package changes, to recreate touch region.
+     */
+    private void onOneHandedModeOverlayChanged(int newGesturalHeight) {
+        initInputMonitor();
     }
 
     @UiThread
@@ -502,6 +512,11 @@ public class TouchInteractionService extends Service implements PluginListener<O
                 } else {
                     mUncheckedConsumer = InputConsumer.NO_OP;
                 }
+            } else if (mDeviceState.canTriggerOneHandedAction(event)
+                    && !mDeviceState.isOneHandedModeActive()) {
+                // Consume gesture event for triggering one handed feature.
+                mUncheckedConsumer = new OneHandedModeInputConsumer(this, mDeviceState,
+                        InputConsumer.NO_OP, mInputMonitorCompat);
             } else {
                 mUncheckedConsumer = InputConsumer.NO_OP;
             }
@@ -626,6 +641,11 @@ public class TouchInteractionService extends Service implements PluginListener<O
                 base = new ScreenPinnedInputConsumer(this, newGestureState);
             }
 
+            if (mDeviceState.canTriggerOneHandedAction(event)) {
+                base = new OneHandedModeInputConsumer(this, mDeviceState, base,
+                        mInputMonitorCompat);
+            }
+
             if (mDeviceState.isAccessibilityMenuAvailable()) {
                 base = new AccessibilityInputConsumer(this, mDeviceState, base,
                         mInputMonitorCompat);
@@ -633,6 +653,11 @@ public class TouchInteractionService extends Service implements PluginListener<O
         } else {
             if (mDeviceState.isScreenPinningActive()) {
                 base = mResetGestureInputConsumer;
+            }
+
+            if (mDeviceState.canTriggerOneHandedAction(event)) {
+                base = new OneHandedModeInputConsumer(this, mDeviceState, base,
+                        mInputMonitorCompat);
             }
         }
         return base;
@@ -801,6 +826,13 @@ public class TouchInteractionService extends Service implements PluginListener<O
         }
         if (mOverviewComponentObserver.canHandleConfigChanges(activity.getComponentName(),
                 activity.getResources().getConfiguration().diff(newConfig))) {
+            // Since navBar gestural height are different between portrait and landscape,
+            // can handle orientation changes and refresh navigation gestural region through
+            // onOneHandedModeChanged()
+            int newGesturalHeight = ResourceUtils.getNavbarSize(
+                    ResourceUtils.NAVBAR_BOTTOM_GESTURE_SIZE,
+                    getApplicationContext().getResources());
+            mDeviceState.onOneHandedModeChanged(newGesturalHeight);
             return;
         }
 
