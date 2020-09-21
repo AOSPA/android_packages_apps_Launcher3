@@ -26,12 +26,10 @@ import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 
 import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.hybridhotseat.HotseatPredictionController;
 import com.android.launcher3.model.WellbeingModel;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.proxy.ProxyActivityStarter;
@@ -40,17 +38,14 @@ import com.android.launcher3.statehandlers.BackButtonAlphaHandler;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.uioverrides.RecentsViewStateController;
-import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.SysUINavigationMode.NavigationModeChangeListener;
 import com.android.quickstep.SystemUiProxy;
-import com.android.quickstep.util.QuickstepOnboardingPrefs;
 import com.android.quickstep.util.RemoteAnimationProvider;
 import com.android.quickstep.util.RemoteFadeOutAnimationListener;
-import com.android.quickstep.util.ShelfPeekAnim;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -73,10 +68,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
             (context, arg1, arg2) -> SystemUiProxy.INSTANCE.get(context).setBackButtonAlpha(
                     Float.intBitsToFloat(arg1), arg2 != 0);
 
-    private final ShelfPeekAnim mShelfPeekAnim = new ShelfPeekAnim(this);
-
     private OverviewActionsView mActionsView;
-    protected HotseatPredictionController mHotseatPredictionController;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,6 +100,13 @@ public abstract class BaseQuickstepLauncher extends Launcher
         // overview
         RecentsModel.INSTANCE.get(this).getThumbnailCache()
                 .getHighResLoadingState().setVisible(true);
+    }
+
+    @Override
+    protected void handleGestureContract(Intent intent) {
+        if (FeatureFlags.SEPARATE_RECENTS_ACTIVITY.get()) {
+            super.handleGestureContract(intent);
+        }
     }
 
     @Override
@@ -189,7 +188,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
     }
 
     private boolean isOverviewActionsEnabled() {
-        return FeatureFlags.ENABLE_OVERVIEW_ACTIONS.get() && removeShelfFromOverview(this);
+        return removeShelfFromOverview(this);
     }
 
     public <T extends OverviewActionsView> T getActionsView() {
@@ -215,11 +214,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     public DepthController getDepthController() {
         return mDepthController;
-    }
-
-    @Override
-    protected OnboardingPrefs createOnboardingPrefs(SharedPreferences sharedPrefs) {
-        return new QuickstepOnboardingPrefs(this, sharedPrefs);
     }
 
     @Override
@@ -308,17 +302,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
     public Stream<SystemShortcut.Factory> getSupportedShortcuts() {
         return Stream.concat(super.getSupportedShortcuts(),
                 Stream.of(WellbeingModel.SHORTCUT_FACTORY));
-    }
-
-    public ShelfPeekAnim getShelfPeekAnim() {
-        return mShelfPeekAnim;
-    }
-
-    /**
-     * Returns Prediction controller for hybrid hotseat
-     */
-    public HotseatPredictionController getHotseatPredictionController() {
-        return mHotseatPredictionController;
     }
 
     public void setHintUserWillBeActive() {

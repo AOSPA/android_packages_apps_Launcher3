@@ -20,7 +20,7 @@ import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
 
-import static com.android.launcher3.util.DefaultDisplay.getSingleFrameMs;
+import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 
 import android.annotation.TargetApi;
 import android.app.WallpaperInfo;
@@ -292,9 +292,6 @@ public abstract class BaseDragLayer<T extends Context & ActivityContext>
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
-            Log.d(TestProtocol.NO_SCROLL_END_WIDGETS, "BaseDragLayer: " + ev);
-        }
         switch (ev.getAction()) {
             case ACTION_DOWN: {
                 if ((mTouchDispatchState & TOUCH_DISPATCHING_TO_VIEW_IN_PROGRESS) != 0) {
@@ -605,13 +602,13 @@ public abstract class BaseDragLayer<T extends Context & ActivityContext>
      */
     private boolean computeAllowSysuiScrims(@Nullable WallpaperInfo newWallpaperInfo) {
         if (newWallpaperInfo == null) {
-            // New wallpaper is static, not live. Thus, blacklist isn't applicable.
+            // Static wallpapers need scrim unless determined otherwise by wallpaperColors.
             return true;
         }
         ComponentName newWallpaper = newWallpaperInfo.getComponent();
         for (String wallpaperWithoutScrim : mWallpapersWithoutSysuiScrims) {
             if (newWallpaper.equals(ComponentName.unflattenFromString(wallpaperWithoutScrim))) {
-                // New wallpaper is blacklisted from showing a scrim.
+                // New wallpaper does not need a scrim.
                 return false;
             }
         }

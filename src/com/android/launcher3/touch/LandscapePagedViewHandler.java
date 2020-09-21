@@ -72,6 +72,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
         out.halfPageSize = view.getNormalChildHeight() / 2;
         out.halfScreenSize = view.getMeasuredHeight() / 2;
         out.screenCenter = insets.top + view.getPaddingTop() + out.scroll + out.halfPageSize;
+        out.pageParentScale = view.getScaleY();
     }
 
     @Override
@@ -104,6 +105,11 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     @Override
     public <T> void set(T target, Float2DAction<T> action, float param) {
         action.call(target, 0, param);
+    }
+
+    @Override
+    public <T> void setSecondary(T target, Float2DAction<T> action, float param) {
+        action.call(target, param, 0);
     }
 
     @Override
@@ -147,8 +153,9 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public void setPrimaryAndResetSecondaryTranslate(View view, float translation) {
-        view.setTranslationX(0);
+    public void setPrimaryAndResetSecondaryTranslate(
+            View view, float translation, float defaultTranslationX, float defaultTranslationY) {
+        view.setTranslationX(defaultTranslationX);
         view.setTranslationY(translation);
     }
 
@@ -214,7 +221,11 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskDismissDirectionFactor() {
+    public int getPrimaryTranslationDirectionFactor() {
+        return -1;
+    }
+
+    public int getSecondaryTranslationDirectionFactor() {
         return 1;
     }
 
@@ -239,7 +250,8 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskMenuLayoutOrientation(LinearLayout taskMenuLayout) {
+    public int getTaskMenuLayoutOrientation(boolean canRecentsActivityRotate,
+        LinearLayout taskMenuLayout) {
         return LinearLayout.HORIZONTAL;
     }
 

@@ -53,6 +53,7 @@ import com.android.launcher3.logger.LauncherAtom.SettingsContainer;
 import com.android.launcher3.logger.LauncherAtom.ShortcutsContainer;
 import com.android.launcher3.logger.LauncherAtom.TaskSwitcherContainer;
 import com.android.launcher3.model.ModelWriter;
+import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.util.ContentWriter;
 
 import java.util.Optional;
@@ -257,12 +258,6 @@ public class ItemInfo {
     }
 
     /**
-     * Can be overridden by inherited classes to fill in {@link LauncherAtom.ItemInfo}
-     */
-    public void setItemBuilder(LauncherAtom.ItemInfo.Builder builder) {
-    }
-
-    /**
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
      */
     public LauncherAtom.ItemInfo buildProto() {
@@ -285,6 +280,13 @@ public class ItemInfo {
                                 .orElse(LauncherAtom.Application.newBuilder()));
                 break;
             case ITEM_TYPE_DEEP_SHORTCUT:
+                itemBuilder
+                        .setShortcut(nullableComponent
+                                .map(component -> LauncherAtom.Shortcut.newBuilder()
+                                        .setShortcutName(component.flattenToShortString())
+                                        .setShortcutId(ShortcutKey.fromItemInfo(this).getId()))
+                                .orElse(LauncherAtom.Shortcut.newBuilder()));
+                break;
             case ITEM_TYPE_SHORTCUT:
                 itemBuilder
                         .setShortcut(nullableComponent

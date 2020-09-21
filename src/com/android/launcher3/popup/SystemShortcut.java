@@ -99,7 +99,7 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
         final List<WidgetItem> widgets =
                 launcher.getPopupDataProvider().getWidgetsForPackageUser(new PackageUserKey(
                         itemInfo.getTargetComponent().getPackageName(), itemInfo.user));
-        if (widgets == null) {
+        if (widgets.isEmpty()) {
             return null;
         }
         return new Widgets(launcher, itemInfo);
@@ -174,7 +174,7 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
         public void onClick(View view) {
             Intent intent = new PackageManagerHelper(view.getContext()).getMarketIntent(
                     mItemInfo.getTargetComponent().getPackageName());
-            mTarget.startActivitySafely(view, intent, mItemInfo, null);
+            mTarget.startActivitySafely(view, intent, mItemInfo);
             AbstractFloatingView.closeAllOpenViews(mTarget);
         }
     }

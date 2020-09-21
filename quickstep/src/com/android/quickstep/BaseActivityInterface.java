@@ -15,12 +15,10 @@
  */
 package com.android.quickstep;
 
-import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.anim.Interpolators.ACCEL_2;
 import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_OVERVIEW_ACTIONS;
-import static com.android.quickstep.BaseSwipeUpHandlerV2.RECENTS_ATTACH_DURATION;
+import static com.android.quickstep.AbsSwipeUpHandler.RECENTS_ATTACH_DURATION;
 import static com.android.quickstep.SysUINavigationMode.getMode;
 import static com.android.quickstep.SysUINavigationMode.hideShelfInTwoButtonLandscape;
 import static com.android.quickstep.SysUINavigationMode.removeShelfFromOverview;
@@ -28,6 +26,8 @@ import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_REC
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_TRANSLATE_X_ANIM;
 import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_OFFSET;
 import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
+import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
+import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
 
 import android.animation.Animator;
 import android.annotation.TargetApi;
@@ -36,7 +36,6 @@ import android.content.res.Resources;
 import android.graphics.Rect;
 import android.os.Build;
 import android.view.MotionEvent;
-import android.view.animation.Interpolator;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
@@ -52,7 +51,7 @@ import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.util.ActivityInitListener;
-import com.android.quickstep.util.ShelfPeekAnim;
+import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.SplitScreenBounds;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -106,7 +105,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public abstract void onAssistantVisibilityChanged(float visibility);
 
     public abstract AnimationFactory prepareRecentsUI(RecentsAnimationDeviceState deviceState,
-            boolean activityVisible, Consumer<AnimatorPlaybackController> callback);
+            boolean activityVisible, Consumer<AnimatorControllerWithResistance> callback);
 
     public abstract ActivityInitListener createActivityInitListener(
             Predicate<Boolean> onInitListener);
@@ -150,7 +149,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         return deviceState.isInDeferredGestureRegion(ev);
     }
 
-    public abstract void onExitOverview(RecentsAnimationDeviceState deviceState,
+    public abstract void onExitOverview(RotationTouchHelper deviceState,
             Runnable exitRunnable);
 
     /**
@@ -297,9 +296,6 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
         default void onTransitionCancelled() { }
 
-        default void setShelfState(ShelfPeekAnim.ShelfAnimState animState,
-                Interpolator interpolator, long duration) { }
-
         /**
          * @param attached Whether to show RecentsView alongside the app window. If false, recents
          *                 will be hidden by some property we can animate, e.g. alpha.
@@ -312,11 +308,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
         protected final ACTIVITY_TYPE mActivity;
         private final STATE_TYPE mStartState;
-        private final Consumer<AnimatorPlaybackController> mCallback;
+        private final Consumer<AnimatorControllerWithResistance> mCallback;
 
         private boolean mIsAttachedToWindow;
 
-        DefaultAnimationFactory(Consumer<AnimatorPlaybackController> callback) {
+        DefaultAnimationFactory(Consumer<AnimatorControllerWithResistance> callback) {
             mCallback = callback;
 
             mActivity = getCreatedActivity();
@@ -344,7 +340,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             controller.setEndAction(() -> mActivity.getStateManager().goToState(
                     controller.getInterpolatedProgress() > 0.5 ? mOverviewState : mBackgroundState,
                     false));
-            mCallback.accept(controller);
+
+            RecentsView recentsView = mActivity.getOverviewPanel();
+            AnimatorControllerWithResistance controllerWithResistance =
+                    AnimatorControllerWithResistance.createForRecents(controller, mActivity,
+                            recentsView.getPagedViewOrientedState(), mActivity.getDeviceProfile(),
+                            recentsView, RECENTS_SCALE_PROPERTY, recentsView,
+                            TASK_SECONDARY_TRANSLATION);
+            mCallback.accept(controllerWithResistance);
 
             // Creating the activity controller animation sometimes reapplies the launcher state
             // (because we set the animation as the current state animation), so we reapply the
@@ -393,13 +396,13 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         protected void createBackgroundToOverviewAnim(ACTIVITY_TYPE activity, PendingAnimation pa) {
             //  Scale down recents from being full screen to being in overview.
             RecentsView recentsView = activity.getOverviewPanel();
-            pa.addFloat(recentsView, SCALE_PROPERTY,
+            pa.addFloat(recentsView, RECENTS_SCALE_PROPERTY,
                     recentsView.getMaxScaleForFullScreen(), 1, LINEAR);
             pa.addFloat(recentsView, FULLSCREEN_PROGRESS, 1, 0, LINEAR);
         }
     }
 
     protected static boolean showOverviewActions(Context context) {
-        return ENABLE_OVERVIEW_ACTIONS.get() && removeShelfFromOverview(context);
+        return removeShelfFromOverview(context);
     }
 }

@@ -16,6 +16,7 @@
 
 package com.android.launcher3;
 
+import static android.animation.ValueAnimator.areAnimatorsEnabled;
 import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
 import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
 
@@ -35,8 +36,6 @@ import android.widget.LinearLayout;
 import androidx.annotation.IntDef;
 
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.launcher3.userevent.nano.LauncherLogProto.Action;
-import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
@@ -62,7 +61,8 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
             TYPE_ALL_APPS_EDU,
 
             TYPE_TASK_MENU,
-            TYPE_OPTIONS_POPUP
+            TYPE_OPTIONS_POPUP,
+            TYPE_ICON_SURFACE
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface FloatingViewType {}
@@ -80,16 +80,18 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     // Popups related to quickstep UI
     public static final int TYPE_TASK_MENU = 1 << 10;
     public static final int TYPE_OPTIONS_POPUP = 1 << 11;
+    public static final int TYPE_ICON_SURFACE = 1 << 12;
 
     public static final int TYPE_ALL = TYPE_FOLDER | TYPE_ACTION_POPUP
             | TYPE_WIDGETS_BOTTOM_SHEET | TYPE_WIDGET_RESIZE_FRAME | TYPE_WIDGETS_FULL_SHEET
             | TYPE_ON_BOARD_POPUP | TYPE_DISCOVERY_BOUNCE | TYPE_TASK_MENU
-            | TYPE_OPTIONS_POPUP | TYPE_SNACKBAR | TYPE_LISTENER | TYPE_ALL_APPS_EDU;
+            | TYPE_OPTIONS_POPUP | TYPE_SNACKBAR | TYPE_LISTENER | TYPE_ALL_APPS_EDU
+            | TYPE_ICON_SURFACE;
 
     // Type of popups which should be kept open during launcher rebind
     public static final int TYPE_REBIND_SAFE = TYPE_WIDGETS_FULL_SHEET
             | TYPE_WIDGETS_BOTTOM_SHEET | TYPE_ON_BOARD_POPUP | TYPE_DISCOVERY_BOUNCE
-            | TYPE_ALL_APPS_EDU;
+            | TYPE_ALL_APPS_EDU | TYPE_ICON_SURFACE;
 
     // Usually we show the back button when a floating view is open. Instead, hide for these types.
     public static final int TYPE_HIDE_BACK_BUTTON = TYPE_ON_BOARD_POPUP | TYPE_DISCOVERY_BOUNCE
@@ -123,10 +125,9 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     }
 
     public final void close(boolean animate) {
-        animate &= Utilities.areAnimationsEnabled(getContext());
+        animate &= areAnimatorsEnabled();
         if (mIsOpen) {
-            BaseActivity.fromContext(getContext()).getUserEventDispatcher()
-                    .resetElapsedContainerMillis("container closed");
+            // Add to WW logging
         }
         handleClose(animate);
         mIsOpen = false;
@@ -141,12 +142,6 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
     public void addHintCloseAnim(
             float distanceToMove, Interpolator interpolator, PendingAnimation target) { }
 
-    public abstract void logActionCommand(int command);
-
-    public int getLogContainerType() {
-        return ContainerType.DEFAULT_CONTAINERTYPE;
-    }
-
     public final boolean isOpen() {
         return mIsOpen;
     }
@@ -155,7 +150,6 @@ public abstract class AbstractFloatingView extends LinearLayout implements Touch
 
     /** @return Whether the back is consumed. If false, Launcher will handle the back as well. */
     public boolean onBackPressed() {
-        logActionCommand(Action.Command.BACK);
         close(true);
         return true;
     }
