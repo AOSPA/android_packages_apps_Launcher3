@@ -16,6 +16,16 @@
 
 LOCAL_PATH := $(call my-dir)
 
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := libGoogleFeed
+LOCAL_MODULE_CLASS := JAVA_LIBRARIES
+LOCAL_SRC_FILES := libs/libGoogleFeed.jar
+LOCAL_UNINSTALLABLE_MODULE := true
+LOCAL_SDK_VERSION := 28
+
+include $(BUILD_PREBUILT)
+
 #
 # Build rule for Launcher3 dependencies lib.
 #
@@ -32,7 +42,8 @@ LOCAL_STATIC_ANDROID_LIBRARIES := \
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
     LauncherPluginLib \
-    launcher_log_protos_lite
+    launcher_log_protos_lite \
+    libGoogleFeed
 
 LOCAL_SRC_FILES := \
     $(call all-proto-files-under, protos) \
