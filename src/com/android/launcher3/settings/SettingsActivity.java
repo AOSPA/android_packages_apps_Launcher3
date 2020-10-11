@@ -26,6 +26,8 @@ import static com.android.launcher3.InvariantDeviceProfile.TYPE_MULTI_DISPLAY;
 import static com.android.launcher3.InvariantDeviceProfile.TYPE_TABLET;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_MINUS_ONE;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -57,6 +59,7 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherFiles;
 import com.android.launcher3.R;
 import com.android.launcher3.states.RotationHelper;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SettingsCache;
 import com.android.settingslib.collapsingtoolbar.CollapsingToolbarBaseActivity;
@@ -170,6 +173,8 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
         private String mHighLightKey;
 
         private boolean mPreferenceHighlighted = false;
+
+        private Preference mShowGoogleAppPref;
 
         @Override
         public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -302,6 +307,10 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                     // Initialize the UI once
                     preference.setDefaultValue(RotationHelper.getAllowRotationDefaultValue(info));
                     return true;
+                case KEY_MINUS_ONE:
+                    mShowGoogleAppPref = preference;
+                    preference.setEnabled(Utilities.isGSAEnabled(getContext()));
+                    return true;
                 case DEVELOPER_OPTIONS_KEY:
                     if (IS_STUDIO_BUILD) {
                         preference.setOrder(0);
@@ -343,6 +352,10 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                     getView().postDelayed(highlighter, DELAY_HIGHLIGHT_DURATION_MILLIS);
                     mPreferenceHighlighted = true;
                 }
+            }
+
+            if (mShowGoogleAppPref != null) {
+                mShowGoogleAppPref.setEnabled(Utilities.isGSAEnabled(getContext()));
             }
 
             if (mRestartOnResume) {

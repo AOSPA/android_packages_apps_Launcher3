@@ -11,7 +11,14 @@
     <!-- Folder titles -->
     <string name="google_folder_title" translatable="false">Google</string>
 
+    <!-- Google Now -->
+    <string name="google_feed_title">Swipe to access Google feed</string>
+    <string name="google_feed_summary" translatable="false">@string/google_feed_right_summary</string>
+    <string name="google_feed_left_summary">From home screen, swipe left to open Google feed</string>
+    <string name="google_feed_right_summary">From home screen, swipe right to open Google feed</string>
+
     <!-- Settings categories -->
+    <string name="category_google">Google</string>
     <string name="category_icon">Icons</string>
 
 </resources>
