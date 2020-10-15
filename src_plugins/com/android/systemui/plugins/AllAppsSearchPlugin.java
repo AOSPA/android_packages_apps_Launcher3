@@ -16,35 +16,44 @@
 
 package com.android.systemui.plugins;
 
-import android.app.Activity;
-import android.view.ViewGroup;
-import android.widget.EditText;
-
 import com.android.systemui.plugins.annotations.ProvidesInterface;
+import com.android.systemui.plugins.shared.SearchTarget;
+import com.android.systemui.plugins.shared.SearchTargetEvent;
+
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
- * Implement this plugin interface to replace the all apps recycler view of the all apps drawer.
+ * Implement this plugin interface to fetch search result data from the plugin side.
  */
 @ProvidesInterface(action = AllAppsSearchPlugin.ACTION, version = AllAppsSearchPlugin.VERSION)
 public interface AllAppsSearchPlugin extends Plugin {
     String ACTION = "com.android.systemui.action.PLUGIN_ALL_APPS_SEARCH_ACTIONS";
-    int VERSION = 3;
+    int VERSION = 5;
 
-    /** Following are the order that these methods should be called. */
-    void setup(ViewGroup parent, Activity activity, float allAppsContainerHeight);
 
     /**
-     * When drag starts, pass window inset related fields and the progress to indicate
-     * whether user is swiping down or swiping up
+     * Send signal when user enters all apps.
      */
-    void onDragStart(float progress);
+    void startAllAppsSession();
 
-    /** progress is between [0, 1] 1: down, 0: up */
-    void setProgress(float progress);
+    /**
+     * Send signal when user starts typing.
+     */
+    void startedSearchSession();
 
-    /** Called when container animation stops, so that plugin can perform cleanups */
-    void onAnimationEnd(float progress);
+    /**
+     * Send over the query and get the search results.
+     */
+    void performSearch(String query, Consumer<List<SearchTarget>> results);
 
-    /** pass over the search box object */
-    void setEditText(EditText editText);
+    /**
+     * Send over search target interaction events to Plugin
+     */
+    void notifySearchTargetEvent(SearchTargetEvent event);
+
+    /**
+     * Send signal when user exits all apps.
+     */
+    void endAllAppsSession();
 }

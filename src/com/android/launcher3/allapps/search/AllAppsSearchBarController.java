@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.allapps.search;
 
+import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -27,12 +28,17 @@ import android.widget.TextView.OnEditorActionListener;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.ExtendedEditText;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.model.AppLaunchTracker;
-import com.android.launcher3.util.ComponentKey;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
+import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItemWithPayload;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.PackageManagerHelper;
+import com.android.systemui.plugins.AllAppsSearchPlugin;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * An interface to a search box that AllApps can command.
@@ -51,12 +57,13 @@ public class AllAppsSearchBarController
     public void setVisibility(int visibility) {
         mInput.setVisibility(visibility);
     }
+
     /**
      * Sets the references to the apps model and the search result callback.
      */
     public final void initialize(
             SearchAlgorithm searchAlgorithm, ExtendedEditText input,
-            BaseDraggingActivity launcher, Callbacks cb) {
+            BaseDraggingActivity launcher, Callbacks cb, Consumer<List<Bundle>> secondaryCb) {
         mCb = cb;
         mLauncher = launcher;
 
@@ -69,8 +76,11 @@ public class AllAppsSearchBarController
     }
 
     @Override
-    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-        // Do nothing
+    public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+        if (mSearchAlgorithm instanceof PluginWrapper) {
+            ((PluginWrapper) mSearchAlgorithm).runOnPluginIfConnected(
+                    AllAppsSearchPlugin::startedSearchSession);
+        }
     }
 
     @Override
@@ -101,6 +111,15 @@ public class AllAppsSearchBarController
 
     @Override
     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+        if (FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                // selectFocusedView should return SearchTargetEvent that is passed onto onClick
+                if (Launcher.getLauncher(mLauncher).getAppsView().selectFocusedView(v)) {
+                    return true;
+                }
+            }
+        }
+
         // Skip if it's not the right action
         if (actionId != EditorInfo.IME_ACTION_SEARCH) {
             return false;
@@ -112,8 +131,8 @@ public class AllAppsSearchBarController
             return false;
         }
         return mLauncher.startActivitySafely(v,
-                PackageManagerHelper.getMarketSearchIntent(mLauncher, query), null,
-                AppLaunchTracker.CONTAINER_SEARCH);
+                PackageManagerHelper.getMarketSearchIntent(mLauncher, query), null
+        );
     }
 
     @Override
@@ -158,16 +177,26 @@ public class AllAppsSearchBarController
     }
 
     /**
+     * A wrapper setup for running essential calls to plugin from search controller
+     */
+    public interface PluginWrapper {
+        /**
+         * executes call if plugin is connected
+         */
+        void runOnPluginIfConnected(Consumer<AllAppsSearchPlugin> plugin);
+    }
+
+    /**
      * Callback for getting search results.
      */
     public interface Callbacks {
 
         /**
-         * Called when the search is complete.
+         * Called when the search from primary source is complete.
          *
-         * @param apps sorted list of matching components or null if in case of failure.
+         * @param items sorted list of search result adapter items.
          */
-        void onSearchResult(String query, ArrayList<ComponentKey> apps);
+        void onSearchResult(String query, ArrayList<AllAppsGridAdapter.AdapterItem> items);
 
         /**
          * Called when the search results should be cleared.
@@ -175,4 +204,15 @@ public class AllAppsSearchBarController
         void clearSearchResult();
     }
 
+    /**
+     * An interface for supporting dynamic search results
+     *
+     * @param <T> Type of payload
+     */
+    public interface PayloadResultHandler<T> {
+        /**
+         * Updates View using Adapter's payload
+         */
+        void applyAdapterInfo(AdapterItemWithPayload<T> adapterItemWithPayload);
+    }
 }

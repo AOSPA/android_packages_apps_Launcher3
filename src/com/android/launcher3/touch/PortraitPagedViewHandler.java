@@ -70,6 +70,7 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
         out.halfPageSize = view.getNormalChildWidth() / 2;
         out.halfScreenSize = view.getMeasuredWidth() / 2;
         out.screenCenter = insets.left + view.getPaddingLeft() + out.scroll + out.halfPageSize;
+        out.pageParentScale = view.getScaleX();
     }
 
     @Override
@@ -101,6 +102,11 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     @Override
     public <T> void set(T target, Float2DAction<T> action, float param) {
         action.call(target, param, 0);
+    }
+
+    @Override
+    public <T> void setSecondary(T target, Float2DAction<T> action, float param) {
+        action.call(target, 0, param);
     }
 
     @Override
@@ -144,9 +150,10 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public void setPrimaryAndResetSecondaryTranslate(View view, float translation) {
+    public void setPrimaryAndResetSecondaryTranslate(
+            View view, float translation, float defaultTranslationX, float defaultTranslationY) {
         view.setTranslationX(translation);
-        view.setTranslationY(0);
+        view.setTranslationY(defaultTranslationY);
     }
 
     @Override
@@ -211,7 +218,11 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskDismissDirectionFactor() {
+    public int getPrimaryTranslationDirectionFactor() {
+        return 1;
+    }
+
+    public int getSecondaryTranslationDirectionFactor() {
         return -1;
     }
 
@@ -237,8 +248,9 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskMenuLayoutOrientation(LinearLayout taskMenuLayout) {
-        return taskMenuLayout.getOrientation();
+    public int getTaskMenuLayoutOrientation(boolean canRecentsActivityRotate,
+        LinearLayout taskMenuLayout) {
+        return canRecentsActivityRotate ? taskMenuLayout.getOrientation() : LinearLayout.VERTICAL;
     }
 
     @Override

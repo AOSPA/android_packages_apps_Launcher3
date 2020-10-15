@@ -45,7 +45,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
-import android.annotation.TargetApi;
 import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -55,10 +54,10 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Trace;
 import android.util.Pair;
 import android.view.View;
 
@@ -94,7 +93,6 @@ import com.android.systemui.shared.system.WindowManagerWrapper;
  * {@link LauncherAppTransitionManager} with Quickstep-specific app transitions for launching from
  * home and/or all-apps.  Not used for 3p launchers.
  */
-@TargetApi(Build.VERSION_CODES.O)
 @SuppressWarnings("unused")
 public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTransitionManager
         implements OnDeviceProfileChangeListener {
@@ -140,6 +138,7 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
 
     // Progress = 0: All apps is fully pulled up, Progress = 1: All apps is fully pulled down.
     public static final float ALL_APPS_PROGRESS_OFF_SCREEN = 1.3059858f;
+    public static final String TRANSITION_OPEN_LAUNCHER = "transition:OpenLauncher";
 
     protected final BaseQuickstepLauncher mLauncher;
 
@@ -860,6 +859,21 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
                 // is initialized.
                 if (launcherIsATargetWithMode(appTargets, MODE_OPENING)
                         || mLauncher.isForceInvisible()) {
+                    if (Trace.isEnabled()) {
+                        anim.addListener(new AnimatorListenerAdapter() {
+                            @Override
+                            public void onAnimationStart(Animator animation) {
+                                Trace.beginAsyncSection(TRANSITION_OPEN_LAUNCHER, 0);
+                                super.onAnimationStart(animation);
+                            }
+
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                super.onAnimationEnd(animation);
+                                Trace.endAsyncSection(TRANSITION_OPEN_LAUNCHER, 0);
+                            }
+                        });
+                    }
                     // Only register the content animation for cancellation when state changes
                     mLauncher.getStateManager().setCurrentAnimation(anim);
 
@@ -894,6 +908,9 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
      */
     private class AppLaunchAnimationRunner implements WrappedAnimationRunnerImpl {
 
+        private static final String TRANSITION_LAUNCH_FROM_RECENTS = "transition:LaunchFromRecents";
+        private static final String TRANSITION_LAUNCH_FROM_ICON = "transition:LaunchFromIcon";
+
         private final Handler mHandler;
         private final View mV;
 
@@ -916,12 +933,33 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
             boolean launcherClosing =
                     launcherIsATargetWithMode(appTargets, MODE_CLOSING);
 
-            if (isLaunchingFromRecents(mV, appTargets)) {
+            final boolean launchingFromRecents = isLaunchingFromRecents(mV, appTargets);
+            if (launchingFromRecents) {
                 composeRecentsLaunchAnimator(anim, mV, appTargets, wallpaperTargets,
                         launcherClosing);
             } else {
                 composeIconLaunchAnimator(anim, mV, appTargets, wallpaperTargets,
                         launcherClosing);
+            }
+
+            if (Trace.isEnabled()) {
+                final String section =
+                        launchingFromRecents
+                                ? TRANSITION_LAUNCH_FROM_RECENTS : TRANSITION_LAUNCH_FROM_ICON;
+
+                anim.addListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationStart(Animator animation) {
+                        Trace.beginAsyncSection(section, 0);
+                        super.onAnimationStart(animation);
+                    }
+
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        Trace.endAsyncSection(section, 0);
+                    }
+                });
             }
 
             if (launcherClosing) {

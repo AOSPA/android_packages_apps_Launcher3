@@ -36,6 +36,7 @@ import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.SessionCommitReceiver;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.LooperExecutor;
@@ -167,7 +168,7 @@ public class InstallSessionHelper {
      * Attempt to restore workspace layout if the session is triggered due to device restore.
      */
     public boolean restoreDbIfApplicable(@NonNull final SessionInfo info) {
-        if (!Utilities.ATLEAST_OREO || !FeatureFlags.ENABLE_DATABASE_RESTORE.get()) {
+        if (!FeatureFlags.ENABLE_DATABASE_RESTORE.get()) {
             return false;
         }
         if (isRestore(info)) {
@@ -203,7 +204,7 @@ public class InstallSessionHelper {
      * - A promise icon for the session has not already been created
      */
     void tryQueuePromiseAppIcon(PackageInstaller.SessionInfo sessionInfo) {
-        if (Utilities.ATLEAST_OREO && FeatureFlags.PROMISE_APPS_NEW_INSTALLS.get()
+        if (FeatureFlags.PROMISE_APPS_NEW_INSTALLS.get()
                 && SessionCommitReceiver.isEnabled(mAppContext)
                 && verify(sessionInfo) != null
                 && sessionInfo.getInstallReason() == PackageManager.INSTALL_REASON_USER
@@ -212,7 +213,9 @@ public class InstallSessionHelper {
                 && !mPromiseIconIds.contains(sessionInfo.getSessionId())
                 && new PackageManagerHelper(mAppContext).getApplicationInfo(
                         sessionInfo.getAppPackageName(), getUserHandle(sessionInfo), 0) == null) {
-            SessionCommitReceiver.queuePromiseAppIconAddition(mAppContext, sessionInfo);
+            ItemInstallQueue.INSTANCE.get(mAppContext)
+                    .queueItem(sessionInfo.getAppPackageName(), getUserHandle(sessionInfo));
+
             mPromiseIconIds.add(sessionInfo.getSessionId());
             updatePromiseIconPrefs();
         }

@@ -92,7 +92,11 @@ public final class FeatureFlags {
 
     // Keep as DeviceFlag to allow remote disable in emergency.
     public static final BooleanFlag ENABLE_SUGGESTED_ACTIONS_OVERVIEW = new DeviceFlag(
-            "ENABLE_SUGGESTED_ACTIONS_OVERVIEW", false, "Show chip hints on the overview screen");
+            "ENABLE_SUGGESTED_ACTIONS_OVERVIEW", true, "Show chip hints on the overview screen");
+
+
+    public static final BooleanFlag ENABLE_DEVICE_SEARCH = getDebugFlag(
+            "ENABLE_DEVICE_SEARCH", false, "Allows on device search in all apps");
 
     public static final BooleanFlag FOLDER_NAME_SUGGEST = new DeviceFlag(
             "FOLDER_NAME_SUGGEST", true,
@@ -138,16 +142,15 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_LAUNCHER_PREVIEW_IN_GRID_PICKER = getDebugFlag(
             "ENABLE_LAUNCHER_PREVIEW_IN_GRID_PICKER", true, "Show launcher preview in grid picker");
 
-    public static final BooleanFlag ENABLE_OVERVIEW_ACTIONS = getDebugFlag(
-            "ENABLE_OVERVIEW_ACTIONS", true, "Show app actions instead of the shelf in Overview."
-            + " As part of this decoupling, also distinguish swipe up from nav bar vs above it.");
-
     // Keep as DeviceFlag for remote disable in emergency.
     public static final BooleanFlag ENABLE_OVERVIEW_SELECTIONS = new DeviceFlag(
             "ENABLE_OVERVIEW_SELECTIONS", true, "Show Select Mode button in Overview Actions");
 
     public static final BooleanFlag ENABLE_OVERVIEW_SHARE = getDebugFlag(
             "ENABLE_OVERVIEW_SHARE", false, "Show Share button in Overview Actions");
+
+    public static final BooleanFlag ENABLE_OVERVIEW_CONTENT_PUSH = getDebugFlag(
+            "ENABLE_OVERVIEW_CONTENT_PUSH", false, "Show Content Push button in Overview Actions");
 
     public static final BooleanFlag ENABLE_DATABASE_RESTORE = getDebugFlag(
             "ENABLE_DATABASE_RESTORE", true,
@@ -157,9 +160,9 @@ public final class FeatureFlags {
             "ENABLE_UNIVERSAL_SMARTSPACE", false,
             "Replace Smartspace with a version rendered by System UI.");
 
-    public static final BooleanFlag ENABLE_LSQ_VELOCITY_PROVIDER = getDebugFlag(
-            "ENABLE_LSQ_VELOCITY_PROVIDER", true,
-            "Use Least Square algorithm for motion pause detection.");
+    public static final BooleanFlag ENABLE_SYSTEM_VELOCITY_PROVIDER = getDebugFlag(
+            "ENABLE_SYSTEM_VELOCITY_PROVIDER", true,
+            "Use system VelocityTracker's algorithm for motion pause detection.");
 
     public static final BooleanFlag ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS =
             getDebugFlag(
@@ -174,8 +177,9 @@ public final class FeatureFlags {
             "SEPARATE_RECENTS_ACTIVITY", false,
             "Uses a separate recents activity instead of using the integrated recents+Launcher UI");
 
-    public static final BooleanFlag USER_EVENT_DISPATCHER = new DeviceFlag(
-            "USER_EVENT_DISPATCHER", true, "User event dispatcher collects logs.");
+    public static final BooleanFlag ENABLE_MINIMAL_DEVICE = new DeviceFlag(
+            "ENABLE_MINIMAL_DEVICE", false,
+            "Allow user to toggle minimal device mode in launcher.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

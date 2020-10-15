@@ -24,16 +24,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.LauncherApps;
 import android.content.pm.ShortcutInfo;
-import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.Log;
 
-import com.android.launcher3.InstallShortcutReceiver;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings.Favorites;
-import com.android.launcher3.SessionCommitReceiver;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.IconCache;
@@ -108,11 +104,6 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                         appsList.removePackage(packages[i], mUser);
                     }
                     appsList.addPackage(context, packages[i], mUser);
-
-                    // Automatically add homescreen icon for work profile apps for below O device.
-                    if (!Utilities.ATLEAST_OREO && !Process.myUserHandle().equals(mUser)) {
-                        SessionCommitReceiver.queueAppIconAddition(context, packages[i], mUser);
-                    }
                 }
                 flagOp = FlagOp.removeFlag(WorkspaceItemInfo.FLAG_DISABLED_NOT_AVAILABLE);
                 break;
@@ -328,10 +319,11 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
             deleteAndBindComponentsRemoved(removeMatch);
 
             // Remove any queued items from the install queue
-            InstallShortcutReceiver.removeFromInstallQueue(context, removedPackages, mUser);
+            ItemInstallQueue.INSTANCE.get(context)
+                    .removeFromInstallQueue(removedPackages, mUser);
         }
 
-        if (Utilities.ATLEAST_OREO && mOp == OP_ADD) {
+        if (mOp == OP_ADD) {
             // Load widgets for the new package. Changes due to app updates are handled through
             // AppWidgetHost events, this is just to initialize the long-press options.
             for (int i = 0; i < N; i++) {

@@ -26,7 +26,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_COMPONENTS;
 import static com.android.launcher3.states.StateAnimationConfig.PLAY_ATOMIC_OVERVIEW_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.PLAY_NON_ATOMIC;
-import static com.android.launcher3.util.DefaultDisplay.getSingleFrameMs;
+import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -37,6 +37,8 @@ import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 
+import androidx.core.os.BuildCompat;
+
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAnimUtils;
 import com.android.launcher3.LauncherState;
@@ -44,6 +46,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.states.StateAnimationConfig;
@@ -265,8 +268,10 @@ public abstract class AbstractStateChangeTouchController
         mCanBlockFling = mFromState == NORMAL;
         mFlingBlockCheck.unblockFling();
         // Must be called after all the animation controllers have been paused
-        if (mToState == ALL_APPS || mToState == NORMAL) {
-            mLauncher.getAllAppsController().onDragStart(mToState == ALL_APPS);
+        if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && BuildCompat.isAtLeastR()
+                && (mToState == ALL_APPS || mToState == NORMAL)) {
+            mLauncher.getAllAppsController().getInsetController().onDragStart(
+                    mToState == ALL_APPS ? 0 : 1);
         }
     }
 
@@ -508,15 +513,7 @@ public abstract class AbstractStateChangeTouchController
         if (mAtomicAnim == null) {
             return 0;
         }
-        if (Utilities.ATLEAST_OREO) {
-            return mAtomicAnim.getTotalDuration() - mAtomicAnim.getCurrentPlayTime();
-        } else {
-            long remainingDuration = 0;
-            for (Animator anim : mAtomicAnim.getChildAnimations()) {
-                remainingDuration = Math.max(remainingDuration, anim.getDuration());
-            }
-            return remainingDuration;
-        }
+        return mAtomicAnim.getTotalDuration() - mAtomicAnim.getCurrentPlayTime();
     }
 
     protected void updateSwipeCompleteAnimation(ValueAnimator animator, long expectedDuration,

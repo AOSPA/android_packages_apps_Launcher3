@@ -15,13 +15,12 @@
  */
 package com.android.launcher3.secondarydisplay;
 
-import static com.android.launcher3.model.AppLaunchTracker.CONTAINER_ALL_APPS;
-
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.ActivityOptions;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Display;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewAnimationUtils;
@@ -170,7 +169,9 @@ public class SecondaryDisplayLauncher extends BaseDraggingActivity
 
     @Override
     public ActivityOptions getActivityLaunchOptions(View v) {
-        return null;
+        final Display display = getWindow().getDecorView().getDisplay();
+        return display != null ? ActivityOptions.makeBasic().setLaunchDisplayId(
+                       display.getDisplayId()) : null;
     }
 
     @Override
@@ -194,9 +195,6 @@ public class SecondaryDisplayLauncher extends BaseDraggingActivity
 
     @Override
     public void bindItems(List<ItemInfo> shortcuts, boolean forceAnimateIcons) { }
-
-    @Override
-    public void bindPredictedItems(List<AppInfo> appInfos, IntArray ranks) { }
 
     @Override
     public void bindScreens(IntArray orderedScreenIds) { }
@@ -224,7 +222,7 @@ public class SecondaryDisplayLauncher extends BaseDraggingActivity
     }
 
     @Override
-    public void bindWorkspaceItemsChanged(ArrayList<WorkspaceItemInfo> updated) { }
+    public void bindWorkspaceItemsChanged(List<WorkspaceItemInfo> updated) { }
 
     @Override
     public void bindWidgetsRestored(ArrayList<LauncherAppWidgetInfo> widgets) { }
@@ -327,7 +325,7 @@ public class SecondaryDisplayLauncher extends BaseDraggingActivity
             if (intent == null) {
                 throw new IllegalArgumentException("Input must have a valid intent");
             }
-            startActivitySafely(v, intent, item, CONTAINER_ALL_APPS);
+            startActivitySafely(v, intent, item);
         }
     }
 }
