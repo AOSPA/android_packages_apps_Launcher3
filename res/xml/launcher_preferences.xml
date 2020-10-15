@@ -45,12 +45,6 @@
         android:persistent="true" />
 
     <SwitchPreference
-        android:key="pref_grid_options"
-        android:title="Enable grid options"
-        android:defaultValue="false"
-        android:persistent="true" />
-
-    <SwitchPreference
         android:defaultValue="true"
         android:key="pref_enable_minus_one"
         android:summary="@string/pref_show_google_now_summary"
