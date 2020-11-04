@@ -56,6 +56,14 @@
             android:summary="@string/google_feed_summary"
             android:defaultValue="true" />
 
+        <Preference
+            android:key="pref_suggestions"
+            android:title="@string/suggestion_screen_title"
+            android:summary="@string/suggestion_screen_summary"
+            android:persistent="false" >
+            <intent android:action="android.settings.ACTION_CONTENT_SUGGESTIONS_SETTINGS" />
+        </Preference>
+
     </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory

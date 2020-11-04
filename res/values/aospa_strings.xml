@@ -25,6 +25,10 @@
     <string name="category_google">Google</string>
     <string name="category_icon">Icons</string>
 
+    <!-- Suggestions -->
+    <string name="suggestion_screen_title">Suggestions</string>
+    <string name="suggestion_screen_summary">For All Apps &amp; Home screen suggestions</string>
+
     <!-- Widget categories -->
     <string name="widget_category_weather">Weather</string>
 
