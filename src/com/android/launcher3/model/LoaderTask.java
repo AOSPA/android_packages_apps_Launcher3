@@ -41,6 +41,7 @@ import android.content.pm.PackageInstaller.SessionInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.text.TextUtils;
@@ -49,6 +50,7 @@ import android.util.LongSparseArray;
 import android.util.TimingLogger;
 
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.Utilities;
@@ -129,6 +131,7 @@ public class LoaderTask implements Runnable {
 
     private final Set<PackageUserKey> mPendingPackages = new HashSet<>();
     private boolean mItemsDeleted = false;
+    private String mDbName;
 
     public LoaderTask(LauncherAppState app, AllAppsList bgAllAppsList, BgDataModel dataModel,
             ModelDelegate modelDelegate, LoaderResults results) {
@@ -273,12 +276,20 @@ public class LoaderTask implements Runnable {
             if (FeatureFlags.FOLDER_NAME_SUGGEST.get()) {
                 loadFolderNames();
             }
-            sanitizeData();
+
+            // Sanitize data re-syncs widgets/shortcuts based on the workspace loaded from db.
+            // sanitizeData should not be invoked if the workspace is loaded from a db different
+            // from the main db as defined in the invariant device profile.
+            // (e.g. both grid preview and minimal device mode uses a different db)
+            if (mApp.getInvariantDeviceProfile().dbFile.equals(mDbName)) {
+                sanitizeData();
+            }
 
             verifyNotStopped();
             updateHandler.finish();
             logger.addSplit("finish icon update");
 
+            mModelDelegate.modelLoadComplete();
             transaction.commit();
         } catch (CancellationException e) {
             // Loader stopped, ignore
@@ -306,6 +317,7 @@ public class LoaderTask implements Runnable {
         final PackageManagerHelper pmHelper = new PackageManagerHelper(context);
         final boolean isSafeMode = pmHelper.isSafeMode();
         final boolean isSdCardReady = Utilities.isBootCompleted();
+        final WidgetManagerHelper widgetHelper = new WidgetManagerHelper(context);
 
         boolean clearDb = false;
         try {
@@ -347,7 +359,9 @@ public class LoaderTask implements Runnable {
             final LoaderCursor c = new LoaderCursor(
                     contentResolver.query(contentUri, null, selection, null, null), contentUri,
                     mApp, mUserManagerState);
-
+            final Bundle extras = c.getExtras();
+            mDbName = extras == null
+                    ? null : extras.getString(LauncherSettings.Settings.EXTRA_DB_NAME);
             try {
                 final int appWidgetIdIndex = c.getColumnIndexOrThrow(
                         LauncherSettings.Favorites.APPWIDGET_ID);
@@ -391,6 +405,7 @@ public class LoaderTask implements Runnable {
 
                 WorkspaceItemInfo info;
                 LauncherAppWidgetInfo appWidgetInfo;
+                LauncherAppWidgetProviderInfo widgetProviderInfo;
                 Intent intent;
                 String targetPkg;
 
@@ -718,6 +733,19 @@ public class LoaderTask implements Runnable {
                                 if (appWidgetInfo.spanX <= 0 || appWidgetInfo.spanY <= 0) {
                                     c.markDeleted("Widget has invalid size: "
                                             + appWidgetInfo.spanX + "x" + appWidgetInfo.spanY);
+                                    continue;
+                                }
+                                widgetProviderInfo =
+                                        widgetHelper.getLauncherAppWidgetInfo(appWidgetId);
+                                if (widgetProviderInfo != null
+                                        && (appWidgetInfo.spanX < widgetProviderInfo.minSpanX
+                                        || appWidgetInfo.spanY < widgetProviderInfo.minSpanY)) {
+                                    // This can happen when display size changes.
+                                    c.markDeleted("Widget removed, min sizes not met: "
+                                            + "span=" + appWidgetInfo.spanX + "x"
+                                            + appWidgetInfo.spanY + " minSpan="
+                                            + widgetProviderInfo.minSpanX + "x"
+                                            + widgetProviderInfo.minSpanY);
                                     continue;
                                 }
                                 if (!c.isOnWorkspaceOrHotseat()) {

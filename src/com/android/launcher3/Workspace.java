@@ -85,7 +85,6 @@ import com.android.launcher3.icons.BitmapRenderer;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
-import com.android.launcher3.logging.UserEventDispatcher;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -97,8 +96,6 @@ import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.WorkspaceTouchListener;
-import com.android.launcher3.userevent.nano.LauncherLogProto.Action;
-import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSparseArrayMap;
@@ -141,6 +138,10 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     private static final int ADJACENT_SCREEN_DROP_DURATION = 300;
 
     public static final int DEFAULT_PAGE = 0;
+
+    private static final int DEFAULT_SMARTSPACE_HEIGHT = 1;
+
+    private static final int EXPANDED_SMARTSPACE_HEIGHT = 2;
 
     private LayoutTransition mLayoutTransition;
     @Thunk final WallpaperManager mWallpaperManager;
@@ -510,7 +511,10 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                     .inflate(R.layout.search_container_workspace, firstPage, false);
         }
 
-        CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(), 1);
+        int cellVSpan = FeatureFlags.EXPANDED_SMARTSPACE.get()
+                ? EXPANDED_SMARTSPACE_HEIGHT : DEFAULT_SMARTSPACE_HEIGHT;
+        CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, firstPage.getCountX(),
+                cellVSpan);
         lp.canReorder = false;
         if (!firstPage.addViewToCellLayout(qsb, 0, R.id.search_container_workspace, lp, true)) {
             Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
@@ -1004,8 +1008,6 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     public void onOverlayScrollChanged(float scroll) {
         if (Float.compare(scroll, 1f) == 0) {
             if (!mOverlayShown) {
-                mLauncher.getUserEventDispatcher().logActionOnContainer(Action.Touch.SWIPE,
-                        Action.Direction.LEFT, ContainerType.WORKSPACE, 0);
                 mLauncher.getStatsLogManager().logger()
                         .withSrcState(LAUNCHER_STATE_HOME)
                         .withDstState(LAUNCHER_STATE_HOME)
@@ -1020,20 +1022,16 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
             // Not announcing the overlay page for accessibility since it announces itself.
         } else if (Float.compare(scroll, 0f) == 0) {
             if (mOverlayShown) {
-                UserEventDispatcher ued = mLauncher.getUserEventDispatcher();
-                if (!ued.isPreviousHomeGesture()) {
-                    mLauncher.getUserEventDispatcher().logActionOnContainer(Action.Touch.SWIPE,
-                        Action.Direction.RIGHT, ContainerType.WORKSPACE, -1);
-                    mLauncher.getStatsLogManager().logger()
-                            .withSrcState(LAUNCHER_STATE_HOME)
-                            .withDstState(LAUNCHER_STATE_HOME)
-                            .withContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
-                                    .setWorkspace(
-                                            LauncherAtom.WorkspaceContainer.newBuilder()
-                                                    .setPageIndex(-1))
-                                    .build())
-                            .log(LAUNCHER_SWIPERIGHT);
-                }
+                // TODO: this is logged unnecessarily on home gesture.
+                mLauncher.getStatsLogManager().logger()
+                        .withSrcState(LAUNCHER_STATE_HOME)
+                        .withDstState(LAUNCHER_STATE_HOME)
+                        .withContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
+                                .setWorkspace(
+                                        LauncherAtom.WorkspaceContainer.newBuilder()
+                                                .setPageIndex(-1))
+                                .build())
+                        .log(LAUNCHER_SWIPERIGHT);
             } else if (Float.compare(mOverlayTranslation, 0f) != 0) {
                 // When arriving to 0 overscroll from non-zero overscroll, announce page for
                 // accessibility since default announcements were disabled while in overscroll
@@ -1124,12 +1122,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     protected void notifyPageSwitchListener(int prevPage) {
         super.notifyPageSwitchListener(prevPage);
         if (prevPage != mCurrentPage) {
-            int swipeDirection = (prevPage < mCurrentPage)
-                    ? Action.Direction.RIGHT : Action.Direction.LEFT;
             StatsLogManager.EventEnum event = (prevPage < mCurrentPage)
                     ? LAUNCHER_SWIPERIGHT : LAUNCHER_SWIPELEFT;
-            mLauncher.getUserEventDispatcher().logActionOnContainer(Action.Touch.SWIPE,
-                    swipeDirection, ContainerType.WORKSPACE, prevPage);
             mLauncher.getStatsLogManager().logger()
                     .withSrcState(LAUNCHER_STATE_HOME)
                     .withDstState(LAUNCHER_STATE_HOME)
@@ -1173,13 +1167,6 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
     public void computeScrollWithoutInvalidation() {
         computeScrollHelper(false);
-    }
-
-    @Override
-    protected void determineScrollingStart(MotionEvent ev, float touchSlopScale) {
-        if (!isSwitchingState()) {
-            super.determineScrollingStart(ev, touchSlopScale);
-        }
     }
 
     @Override
@@ -2098,40 +2085,40 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         mLastReorderY = -1;
     }
 
-   /*
-    *
-    * Convert the 2D coordinate xy from the parent View's coordinate space to this CellLayout's
-    * coordinate space. The argument xy is modified with the return result.
-    */
-   private void mapPointFromSelfToChild(View v, float[] xy) {
-       xy[0] = xy[0] - v.getLeft();
-       xy[1] = xy[1] - v.getTop();
-   }
+    /*
+     *
+     * Convert the 2D coordinate xy from the parent View's coordinate space to this CellLayout's
+     * coordinate space. The argument xy is modified with the return result.
+     */
+    private void mapPointFromSelfToChild(View v, float[] xy) {
+        xy[0] = xy[0] - v.getLeft();
+        xy[1] = xy[1] - v.getTop();
+    }
 
-   boolean isPointInSelfOverHotseat(int x, int y) {
-       mTempFXY[0] = x;
-       mTempFXY[1] = y;
-       mLauncher.getDragLayer().getDescendantCoordRelativeToSelf(this, mTempFXY, true);
-       View hotseat = mLauncher.getHotseat();
-       return mTempFXY[0] >= hotseat.getLeft() &&
-               mTempFXY[0] <= hotseat.getRight() &&
-               mTempFXY[1] >= hotseat.getTop() &&
-               mTempFXY[1] <= hotseat.getBottom();
-   }
+    boolean isPointInSelfOverHotseat(int x, int y) {
+        mTempFXY[0] = x;
+        mTempFXY[1] = y;
+        mLauncher.getDragLayer().getDescendantCoordRelativeToSelf(this, mTempFXY, true);
+        View hotseat = mLauncher.getHotseat();
+        return mTempFXY[0] >= hotseat.getLeft()
+                && mTempFXY[0] <= hotseat.getRight()
+                && mTempFXY[1] >= hotseat.getTop()
+                && mTempFXY[1] <= hotseat.getBottom();
+    }
 
     /**
      * Updates the point in {@param xy} to point to the co-ordinate space of {@param layout}
      * @param layout either hotseat of a page in workspace
      * @param xy the point location in workspace co-ordinate space
      */
-   private void mapPointFromDropLayout(CellLayout layout, float[] xy) {
-       if (mLauncher.isHotseatLayout(layout)) {
-           mLauncher.getDragLayer().getDescendantCoordRelativeToSelf(this, xy, true);
-           mLauncher.getDragLayer().mapCoordInSelfToDescendant(layout, xy);
-       } else {
-           mapPointFromSelfToChild(layout, xy);
-       }
-   }
+    private void mapPointFromDropLayout(CellLayout layout, float[] xy) {
+        if (mLauncher.isHotseatLayout(layout)) {
+            mLauncher.getDragLayer().getDescendantCoordRelativeToSelf(this, xy, true);
+            mLauncher.getDragLayer().mapCoordInSelfToDescendant(layout, xy);
+        } else {
+            mapPointFromSelfToChild(layout, xy);
+        }
+    }
 
     private boolean isDragWidget(DragObject d) {
         return (d.dragInfo instanceof LauncherAppWidgetInfo ||
@@ -2413,9 +2400,9 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
             spanY = mDragInfo.spanY;
         }
 
-        final int container = mLauncher.isHotseatLayout(cellLayout) ?
-                LauncherSettings.Favorites.CONTAINER_HOTSEAT :
-                    LauncherSettings.Favorites.CONTAINER_DESKTOP;
+        final int container = mLauncher.isHotseatLayout(cellLayout)
+                ? LauncherSettings.Favorites.CONTAINER_HOTSEAT
+                : LauncherSettings.Favorites.CONTAINER_DESKTOP;
         final int screenId = getIdForScreen(cellLayout);
         if (!mLauncher.isHotseatLayout(cellLayout)
                 && screenId != getScreenIdForPageIndex(mCurrentPage)
