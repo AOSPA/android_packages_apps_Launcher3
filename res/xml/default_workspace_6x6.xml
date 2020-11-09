@@ -76,15 +76,6 @@
         launcher:spanX="5"
         launcher:spanY="1" />
 
-    <appwidget
-        launcher:packageName="com.android.deskclock"
-        launcher:className="com.android.alarmclock.DigitalAppWidgetProvider"
-        launcher:screen="0"
-        launcher:x="0"
-        launcher:y="1"
-        launcher:spanX="5"
-        launcher:spanY="2" />
-
     <!-- Google Folder -->
     <!-- Google, Gmail, Maps, YouTube, Drive, YouTube Music, Play Movies, Duo, Photos -->
     <folder
@@ -129,15 +120,6 @@
         launcher:className="com.android.vending.AssetBrowserActivity"/>
 
     <!-- Screen 1 -->
-    <appwidget
-        launcher:packageName="org.lineageos.eleven"
-        launcher:className="org.lineageos.eleven.appwidgets.AppWidgetLarge"
-        launcher:screen="1"
-        launcher:x="0"
-        launcher:y="0"
-        launcher:spanX="6"
-        launcher:spanY="2" />
-
     <resolve
         launcher:screen="1"
         launcher:x="0"
@@ -154,12 +136,6 @@
         <favorite launcher:uri="#Intent;type=images/*;end" />
     </resolve>
 
-    <favorite
-        launcher:packageName="org.lineageos.eleven"
-        launcher:className="org.lineageos.eleven.ui.activities.HomeActivity"
-        launcher:screen="1"
-        launcher:x="2"
-        launcher:y="-1" />
 
     <favorite
         launcher:packageName="com.android.settings"
