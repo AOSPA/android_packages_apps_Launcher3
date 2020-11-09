@@ -124,13 +124,6 @@
     </resolve>
 
     <favorite
-        launcher:packageName="org.lineageos.eleven"
-        launcher:className="org.lineageos.eleven.ui.activities.HomeActivity"
-        launcher:screen="1"
-        launcher:x="2"
-        launcher:y="-1" />
-
-    <favorite
         launcher:packageName="com.android.settings"
         launcher:className="com.android.settings.Settings"
         launcher:screen="1"
