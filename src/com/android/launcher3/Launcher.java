@@ -1829,7 +1829,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 mTouchInProgress = true;
                 break;
             case MotionEvent.ACTION_UP:
-                mLastTouchUpTime = ev.getEventTime();
+                mLastTouchUpTime = SystemClock.uptimeMillis();
                 // Follow through
             case MotionEvent.ACTION_CANCEL:
                 mTouchInProgress = false;
@@ -2330,7 +2330,9 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             if (item.restoreStatus == LauncherAppWidgetInfo.RESTORE_COMPLETED) {
                 // Verify that we own the widget
                 if (appWidgetInfo == null) {
-                    FileLog.e(TAG, "Removing invalid widget: id=" + item.appWidgetId);
+                    FileLog.e(TAG, "Removing invalid widget: id=" + item.appWidgetId
+                            + ",title=" + item.title
+                            + ",providerName=" + item.providerName.toShortString());
                     getModelWriter().deleteWidgetInfo(item, getAppWidgetHost());
                     return null;
                 }
