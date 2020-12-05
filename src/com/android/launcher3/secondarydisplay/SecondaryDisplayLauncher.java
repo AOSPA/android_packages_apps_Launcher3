@@ -20,7 +20,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.app.ActivityOptions;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.Display;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewAnimationUtils;
@@ -39,6 +38,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.PromiseAppInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
@@ -169,9 +169,7 @@ public class SecondaryDisplayLauncher extends BaseDraggingActivity
 
     @Override
     public ActivityOptions getActivityLaunchOptions(View v) {
-        final Display display = getWindow().getDecorView().getDisplay();
-        return display != null ? ActivityOptions.makeBasic().setLaunchDisplayId(
-                       display.getDisplayId()) : null;
+        return null;
     }
 
     @Override
@@ -296,6 +294,7 @@ public class SecondaryDisplayLauncher extends BaseDraggingActivity
     @Override
     public void bindAllApplications(AppInfo[] apps, int flags) {
         mAppsView.getAppsStore().setApps(apps, flags);
+        PopupContainerWithArrow.dismissInvalidPopup(this);
     }
 
     public PopupDataProvider getPopupDataProvider() {
