@@ -30,27 +30,33 @@ import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.accessibility.AccessibilityEventCompat;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import androidx.core.view.accessibility.AccessibilityRecordCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.slice.widget.SliceView;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.R;
-import com.android.launcher3.allapps.AlphabeticalAppsList.AdapterItem;
-import com.android.launcher3.model.AppLaunchTracker;
+import com.android.launcher3.allapps.search.AllAppsSearchBarController.SearchTargetHandler;
+import com.android.launcher3.allapps.search.SearchSectionInfo;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.views.SearchSliceWrapper;
+import com.android.systemui.plugins.shared.SearchTarget;
 
 import java.util.List;
 
 /**
  * The grid view adapter of all the apps.
  */
-public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.ViewHolder> {
+public class AllAppsGridAdapter extends
+        RecyclerView.Adapter<AllAppsGridAdapter.ViewHolder> {
 
     public static final String TAG = "AppsGridAdapter";
 
@@ -67,9 +73,29 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
     // A divider that separates the apps list and the search market button
     public static final int VIEW_TYPE_ALL_APPS_DIVIDER = 1 << 4;
 
+    public static final int VIEW_TYPE_SEARCH_CORPUS_TITLE = 1 << 5;
+
+    public static final int VIEW_TYPE_SEARCH_HERO_APP = 1 << 6;
+
+    public static final int VIEW_TYPE_SEARCH_ROW_WITH_BUTTON = 1 << 7;
+
+    public static final int VIEW_TYPE_SEARCH_ROW = 1 << 8;
+
+    public static final int VIEW_TYPE_SEARCH_SLICE = 1 << 9;
+
+    public static final int VIEW_TYPE_SEARCH_ICON_ROW = 1 << 10;
+
+    public static final int VIEW_TYPE_SEARCH_PEOPLE = 1 << 11;
+
+    public static final int VIEW_TYPE_SEARCH_THUMBNAIL = 1 << 12;
+
+    public static final int VIEW_TYPE_SEARCH_SUGGEST = 1 << 13;
+
+    public static final int VIEW_TYPE_SEARCH_ICON = 1 << 14;
+
     // Common view type masks
     public static final int VIEW_TYPE_MASK_DIVIDER = VIEW_TYPE_ALL_APPS_DIVIDER;
-    public static final int VIEW_TYPE_MASK_ICON = VIEW_TYPE_ICON;
+    public static final int VIEW_TYPE_MASK_ICON = VIEW_TYPE_ICON | VIEW_TYPE_SEARCH_ICON;
 
     /**
      * ViewHolder for each icon.
@@ -78,6 +104,105 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
 
         public ViewHolder(View v) {
             super(v);
+        }
+    }
+
+    /**
+     * Info about a particular adapter item (can be either section or app)
+     */
+    public static class AdapterItem {
+        /** Common properties */
+        // The index of this adapter item in the list
+        public int position;
+        // The type of this item
+        public int viewType;
+
+        /** App-only properties */
+        // The section name of this app.  Note that there can be multiple items with different
+        // sectionNames in the same section
+        public String sectionName = null;
+        // The row that this item shows up on
+        public int rowIndex;
+        // The index of this app in the row
+        public int rowAppIndex;
+        // The associated AppInfo for the app
+        public AppInfo appInfo = null;
+        // The index of this app not including sections
+        public int appIndex = -1;
+        // Search section associated to result
+        public SearchSectionInfo searchSectionInfo = null;
+
+        /**
+         * Factory method for AppIcon AdapterItem
+         */
+        public static AdapterItem asApp(int pos, String sectionName, AppInfo appInfo,
+                int appIndex) {
+            AdapterItem item = new AdapterItem();
+            item.viewType = VIEW_TYPE_ICON;
+            item.position = pos;
+            item.sectionName = sectionName;
+            item.appInfo = appInfo;
+            item.appIndex = appIndex;
+            return item;
+        }
+
+        /**
+         * Factory method for empty search results view
+         */
+        public static AdapterItem asEmptySearch(int pos) {
+            AdapterItem item = new AdapterItem();
+            item.viewType = VIEW_TYPE_EMPTY_SEARCH;
+            item.position = pos;
+            return item;
+        }
+
+        /**
+         * Factory method for a dividerView in AllAppsSearch
+         */
+        public static AdapterItem asAllAppsDivider(int pos) {
+            AdapterItem item = new AdapterItem();
+            item.viewType = VIEW_TYPE_ALL_APPS_DIVIDER;
+            item.position = pos;
+            return item;
+        }
+
+        /**
+         * Factory method for a market search button
+         */
+        public static AdapterItem asMarketSearch(int pos) {
+            AdapterItem item = new AdapterItem();
+            item.viewType = VIEW_TYPE_SEARCH_MARKET;
+            item.position = pos;
+            return item;
+        }
+
+        boolean isCountedForAccessibility() {
+            return viewType == VIEW_TYPE_ICON
+                    || viewType == VIEW_TYPE_SEARCH_HERO_APP
+                    || viewType == VIEW_TYPE_SEARCH_ROW_WITH_BUTTON
+                    || viewType == VIEW_TYPE_SEARCH_SLICE
+                    || viewType == VIEW_TYPE_SEARCH_ROW
+                    || viewType == VIEW_TYPE_SEARCH_PEOPLE
+                    || viewType == VIEW_TYPE_SEARCH_THUMBNAIL
+                    || viewType == VIEW_TYPE_SEARCH_ICON_ROW
+                    || viewType == VIEW_TYPE_SEARCH_ICON
+                    || viewType == VIEW_TYPE_SEARCH_SUGGEST;
+        }
+    }
+
+    /**
+     * Extension of AdapterItem that contains an extra payload specific to item
+     */
+    public static class SearchAdapterItem extends AdapterItem {
+        private SearchTarget mSearchTarget;
+
+        public SearchAdapterItem(SearchTarget searchTarget, int type) {
+            mSearchTarget = searchTarget;
+            viewType = type;
+        }
+
+        public SearchTarget getSearchTarget() {
+            return mSearchTarget;
         }
     }
 
@@ -161,14 +286,20 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
 
         @Override
         public int getSpanSize(int position) {
-            if (isIconViewType(mApps.getAdapterItems().get(position).viewType)) {
-                return 1;
+            int viewType = mApps.getAdapterItems().get(position).viewType;
+            if (isIconViewType(viewType)) {
+                return 1 * SPAN_MULTIPLIER;
+            } else if (viewType == VIEW_TYPE_SEARCH_THUMBNAIL) {
+                return mAppsPerRow;
             } else {
                 // Section breaks span the full width
-                return mAppsPerRow;
+                return mAppsPerRow * SPAN_MULTIPLIER;
             }
         }
     }
+
+    // multiplier to support adapter item column count that is not mAppsPerRow.
+    public static final int SPAN_MULTIPLIER = 3;
 
     private final BaseDraggingActivity mLauncher;
     private final LayoutInflater mLayoutInflater;
@@ -206,7 +337,7 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
 
     public void setAppsPerRow(int appsPerRow) {
         mAppsPerRow = appsPerRow;
-        mGridLayoutMgr.setSpanCount(mAppsPerRow);
+        mGridLayoutMgr.setSpanCount(mAppsPerRow * SPAN_MULTIPLIER);
     }
 
     /**
@@ -255,11 +386,10 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
             case VIEW_TYPE_ICON:
                 BubbleTextView icon = (BubbleTextView) mLayoutInflater.inflate(
                         R.layout.all_apps_icon, parent, false);
-                icon.setOnClickListener(mOnIconClickListener);
-                icon.setOnLongClickListener(mOnIconLongClickListener);
                 icon.setLongPressTimeoutFactor(1f);
                 icon.setOnFocusChangeListener(mIconFocusListener);
-
+                icon.setOnClickListener(mOnIconClickListener);
+                icon.setOnLongClickListener(mOnIconLongClickListener);
                 // Ensure the all apps icon height matches the workspace icons in portrait mode.
                 icon.getLayoutParams().height = mLauncher.getDeviceProfile().allAppsCellHeightPx;
                 return new ViewHolder(icon);
@@ -270,11 +400,41 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
                 View searchMarketView = mLayoutInflater.inflate(R.layout.all_apps_search_market,
                         parent, false);
                 searchMarketView.setOnClickListener(v -> mLauncher.startActivitySafely(
-                        v, mMarketSearchIntent, null, AppLaunchTracker.CONTAINER_SEARCH));
+                        v, mMarketSearchIntent, null));
                 return new ViewHolder(searchMarketView);
             case VIEW_TYPE_ALL_APPS_DIVIDER:
                 return new ViewHolder(mLayoutInflater.inflate(
                         R.layout.all_apps_divider, parent, false));
+            case VIEW_TYPE_SEARCH_ICON:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_icon, parent, false));
+            case VIEW_TYPE_SEARCH_CORPUS_TITLE:
+                return new ViewHolder(
+                        mLayoutInflater.inflate(R.layout.search_section_title, parent, false));
+            case VIEW_TYPE_SEARCH_HERO_APP:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_hero_app, parent, false));
+            case VIEW_TYPE_SEARCH_ROW_WITH_BUTTON:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_play_item, parent, false));
+            case VIEW_TYPE_SEARCH_ROW:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_settings_row, parent, false));
+            case VIEW_TYPE_SEARCH_SLICE:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_slice, parent, false));
+            case VIEW_TYPE_SEARCH_ICON_ROW:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_icon_row, parent, false));
+            case VIEW_TYPE_SEARCH_PEOPLE:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_people_item, parent, false));
+            case VIEW_TYPE_SEARCH_THUMBNAIL:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_thumbnail, parent, false));
+            case VIEW_TYPE_SEARCH_SUGGEST:
+                return new ViewHolder(mLayoutInflater.inflate(
+                        R.layout.search_result_suggest, parent, false));
             default:
                 throw new RuntimeException("Unexpected view type");
         }
@@ -282,9 +442,14 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int position) {
+        if (FeatureFlags.ENABLE_DEVICE_SEARCH.get()
+                && holder.itemView instanceof AllAppsSectionDecorator.SelfDecoratingView) {
+            ((AllAppsSectionDecorator.SelfDecoratingView) holder.itemView).removeDecoration();
+        }
         switch (holder.getItemViewType()) {
             case VIEW_TYPE_ICON:
-                AppInfo info = mApps.getAdapterItems().get(position).appInfo;
+                AdapterItem adapterItem = mApps.getAdapterItems().get(position);
+                AppInfo info = adapterItem.appInfo;
                 BubbleTextView icon = (BubbleTextView) holder.itemView;
                 icon.reset();
                 icon.applyFromApplicationInfo(info);
@@ -303,9 +468,47 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
                     searchView.setVisibility(View.GONE);
                 }
                 break;
+            case VIEW_TYPE_SEARCH_SLICE:
+                SliceView sliceView = (SliceView) holder.itemView;
+                SearchAdapterItem slicePayload = (SearchAdapterItem) mApps.getAdapterItems().get(
+                        position);
+                SearchTarget searchTarget = slicePayload.getSearchTarget();
+                sliceView.setTag(new SearchSliceWrapper(mLauncher, sliceView, searchTarget));
+
+                break;
+            case VIEW_TYPE_SEARCH_CORPUS_TITLE:
+            case VIEW_TYPE_SEARCH_ROW_WITH_BUTTON:
+            case VIEW_TYPE_SEARCH_HERO_APP:
+            case VIEW_TYPE_SEARCH_ROW:
+            case VIEW_TYPE_SEARCH_ICON:
+            case VIEW_TYPE_SEARCH_ICON_ROW:
+            case VIEW_TYPE_SEARCH_PEOPLE:
+            case VIEW_TYPE_SEARCH_THUMBNAIL:
+            case VIEW_TYPE_SEARCH_SUGGEST:
+                SearchAdapterItem item =
+                        (SearchAdapterItem) mApps.getAdapterItems().get(position);
+                SearchTargetHandler payloadResultView = (SearchTargetHandler) holder.itemView;
+                payloadResultView.applySearchTarget(item.getSearchTarget());
+                break;
             case VIEW_TYPE_ALL_APPS_DIVIDER:
                 // nothing to do
                 break;
+        }
+    }
+
+    @Override
+    public void onViewRecycled(@NonNull ViewHolder holder) {
+        super.onViewRecycled(holder);
+        if (!FeatureFlags.ENABLE_DEVICE_SEARCH.get()) return;
+        if (holder.itemView instanceof AllAppsSectionDecorator.SelfDecoratingView) {
+            ((AllAppsSectionDecorator.SelfDecoratingView) holder.itemView).removeDecoration();
+        }
+        if (holder.itemView instanceof SliceView) {
+            SliceView sliceView = (SliceView) holder.itemView;
+            if (sliceView.getTag() instanceof SearchSliceWrapper) {
+                ((SearchSliceWrapper) sliceView.getTag()).destroy();
+            }
+            sliceView.setTag(null);
         }
     }
 
@@ -322,8 +525,7 @@ public class AllAppsGridAdapter extends RecyclerView.Adapter<AllAppsGridAdapter.
 
     @Override
     public int getItemViewType(int position) {
-        AlphabeticalAppsList.AdapterItem item = mApps.getAdapterItems().get(position);
+        AdapterItem item = mApps.getAdapterItems().get(position);
         return item.viewType;
     }
-
 }

@@ -33,7 +33,6 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.icons.IconProvider;
 import com.android.launcher3.icons.LauncherIcons;
-import com.android.launcher3.model.PredictionModel;
 import com.android.launcher3.notification.NotificationListener;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.InstallSessionTracker;
@@ -58,7 +57,6 @@ public class LauncherAppState {
     private final IconCache mIconCache;
     private final WidgetPreviewLoader mWidgetCache;
     private final InvariantDeviceProfile mInvariantDeviceProfile;
-    private final PredictionModel mPredictionModel;
 
     private SecureSettingsObserver mNotificationDotsObserver;
     private InstallSessionTracker mInstallSessionTracker;
@@ -107,17 +105,13 @@ public class LauncherAppState {
         new Handler().post( () -> mInvariantDeviceProfile.verifyConfigChangedInBackground(context));
 
         mInstallSessionTracker = InstallSessionHelper.INSTANCE.get(context)
-                .registerInstallTracker(mModel, MODEL_EXECUTOR);
+                .registerInstallTracker(mModel);
 
-        if (!mContext.getResources().getBoolean(R.bool.notification_dots_enabled)) {
-            mNotificationDotsObserver = null;
-        } else {
-            // Register an observer to rebind the notification listener when dots are re-enabled.
-            mNotificationDotsObserver =
-                    newNotificationSettingsObserver(mContext, this::onNotificationSettingsChanged);
-            mNotificationDotsObserver.register();
-            mNotificationDotsObserver.dispatchOnChange();
-        }
+        // Register an observer to rebind the notification listener when dots are re-enabled.
+        mNotificationDotsObserver =
+                newNotificationSettingsObserver(mContext, this::onNotificationSettingsChanged);
+        mNotificationDotsObserver.register();
+        mNotificationDotsObserver.dispatchOnChange();
     }
 
     public LauncherAppState(Context context, @Nullable String iconCacheFileName) {
@@ -128,8 +122,7 @@ public class LauncherAppState {
         mInvariantDeviceProfile = InvariantDeviceProfile.INSTANCE.get(context);
         mIconCache = new IconCache(mContext, mInvariantDeviceProfile, iconCacheFileName);
         mWidgetCache = new WidgetPreviewLoader(mContext, mIconCache);
-        mModel = new LauncherModel(this, mIconCache, AppFilter.newInstance(mContext));
-        mPredictionModel = PredictionModel.newInstance(mContext);
+        mModel = new LauncherModel(context, this, mIconCache, new AppFilter(mContext));
     }
 
     protected void onNotificationSettingsChanged(boolean areNotificationDotsEnabled) {
@@ -157,6 +150,7 @@ public class LauncherAppState {
      * Call from Application.onTerminate(), which is not guaranteed to ever be called.
      */
     public void onTerminate() {
+        mModel.destroy();
         if (mModelChangeReceiver != null) {
             mContext.unregisterReceiver(mModelChangeReceiver);
         }
@@ -183,10 +177,6 @@ public class LauncherAppState {
 
     public LauncherModel getModel() {
         return mModel;
-    }
-
-    public PredictionModel getPredictionModel() {
-        return mPredictionModel;
     }
 
     public WidgetPreviewLoader getWidgetCache() {

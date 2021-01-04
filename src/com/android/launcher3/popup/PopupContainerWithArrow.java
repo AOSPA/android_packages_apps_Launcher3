@@ -19,13 +19,8 @@ package com.android.launcher3.popup;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_SHORTCUTS;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.Utilities.squaredTouchSlop;
-import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
-import static com.android.launcher3.notification.NotificationMainView.NOTIFICATION_ITEM_INFO;
 import static com.android.launcher3.popup.PopupPopulator.MAX_SHORTCUTS;
 import static com.android.launcher3.popup.PopupPopulator.MAX_SHORTCUTS_IF_NOTIFICATIONS;
-import static com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
-import static com.android.launcher3.userevent.nano.LauncherLogProto.ItemType;
-import static com.android.launcher3.userevent.nano.LauncherLogProto.Target;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
 import android.animation.AnimatorSet;
@@ -52,7 +47,6 @@ import com.android.launcher3.DropTarget;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.accessibility.ShortcutMenuAccessibilityDelegate;
 import com.android.launcher3.dot.DotInfo;
@@ -148,17 +142,6 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
         return (type & TYPE_ACTION_POPUP) != 0;
     }
 
-    @Override
-    public void logActionCommand(int command) {
-        mLauncher.getUserEventDispatcher().logActionCommand(
-                command, mOriginalIcon, getLogContainerType());
-    }
-
-    @Override
-    public int getLogContainerType() {
-        return ContainerType.DEEPSHORTCUTS;
-    }
-
     public OnClickListener getItemClickListener() {
         return (view) -> {
             mLauncher.getItemOnClickListener().onClick(view);
@@ -175,8 +158,7 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
         if (ev.getAction() == MotionEvent.ACTION_DOWN) {
             BaseDragLayer dl = getPopupContainer();
             if (!dl.isEventOverView(this, ev)) {
-                mLauncher.getUserEventDispatcher().logActionTapOutside(
-                        newContainerTarget(ContainerType.DEEPSHORTCUTS));
+                // TODO: add WW log if want to log if tap closed deep shortcut container.
                 close(true);
 
                 // We let touches on the original icon go through so that users can launch
@@ -400,9 +382,7 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
         } else if (view instanceof ImageView) {
             // Only the system shortcut icon shows on a gray background header.
             info.setIconAndContentDescriptionFor((ImageView) view);
-            if (Utilities.ATLEAST_OREO) {
-                view.setTooltipText(view.getContentDescription());
-            }
+            view.setTooltipText(view.getContentDescription());
         }
         view.setTag(info);
         view.setOnClickListener(info);
@@ -452,7 +432,9 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
                     // Make sure we keep the original icon hidden while it is being dragged.
                     mOriginalIcon.setVisibility(INVISIBLE);
                 } else {
-                    mLauncher.getUserEventDispatcher().logDeepShortcutsOpen(mOriginalIcon);
+                    // TODO: add WW logging if want to add logging for long press on popup
+                    //  container.
+                    //  mLauncher.getUserEventDispatcher().logDeepShortcutsOpen(mOriginalIcon);
                     if (!mIsAboveIcon) {
                         // Show the icon but keep the text hidden.
                         mOriginalIcon.setVisibility(VISIBLE);
@@ -496,18 +478,6 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
                 }
             }
         }
-    }
-
-    @Override
-    public void fillInLogContainerData(ItemInfo childInfo, Target child,
-            ArrayList<Target> parents) {
-        if (childInfo == NOTIFICATION_ITEM_INFO) {
-            child.itemType = ItemType.NOTIFICATION;
-        } else {
-            child.itemType = ItemType.DEEPSHORTCUT;
-            child.rank = childInfo.rank;
-        }
-        parents.add(newContainerTarget(ContainerType.DEEPSHORTCUTS));
     }
 
     @Override

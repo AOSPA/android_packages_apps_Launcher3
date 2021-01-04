@@ -16,10 +16,11 @@
 
 package com.android.launcher3.dragndrop;
 
-import static com.android.launcher3.logging.LoggerUtils.newCommandAction;
-import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
-import static com.android.launcher3.logging.LoggerUtils.newItemTarget;
-import static com.android.launcher3.logging.LoggerUtils.newLauncherEvent;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ADD_EXTERNAL_ITEM_BACK;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ADD_EXTERNAL_ITEM_CANCELLED;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ADD_EXTERNAL_ITEM_DRAGGED;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ADD_EXTERNAL_ITEM_PLACED_AUTOMATICALLY;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ADD_EXTERNAL_ITEM_START;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
 import android.annotation.TargetApi;
@@ -43,18 +44,17 @@ import android.view.View.OnLongClickListener;
 import android.view.View.OnTouchListener;
 
 import com.android.launcher3.BaseActivity;
-import com.android.launcher3.InstallShortcutReceiver;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherAppWidgetHost;
 import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.R;
+import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.model.WidgetItem;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.PinRequestHelper;
-import com.android.launcher3.userevent.nano.LauncherLogProto.Action;
-import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
-import com.android.launcher3.util.InstantAppResolver;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
@@ -87,7 +87,6 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
     private Bundle mWidgetOptions;
 
     private boolean mFinishOnPause = false;
-    private InstantAppResolver mInstantAppResolver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,7 +100,6 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
 
         mApp = LauncherAppState.getInstance(this);
         mIdp = mApp.getInvariantDeviceProfile();
-        mInstantAppResolver = InstantAppResolver.newInstance(this);
 
         // Use the application context to get the device profile, as in multiwindow-mode, the
         // confirmation activity might be rotated.
@@ -125,7 +123,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
         // savedInstanceState is null when the activity is created the first time (i.e., avoids
         // duplicate logging during rotation)
         if (savedInstanceState == null) {
-            logCommand(Action.Command.ENTRY);
+            logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_START);
         }
     }
 
@@ -178,6 +176,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
         startActivity(homeIntent,
                 ActivityOptions.makeCustomAnimation(this, 0, android.R.anim.fade_out)
                         .toBundle());
+        logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_DRAGGED);
         mFinishOnPause = true;
         return false;
     }
@@ -240,7 +239,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
      * Called when the cancel button is clicked.
      */
     public void onCancelClick(View v) {
-        logCommand(Action.Command.CANCEL);
+        logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_CANCELLED);
         finish();
     }
 
@@ -249,8 +248,8 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
      */
     public void onPlaceAutomaticallyClick(View v) {
         if (mRequest.getRequestType() == PinItemRequest.REQUEST_TYPE_SHORTCUT) {
-            InstallShortcutReceiver.queueShortcut(mRequest.getShortcutInfo(), this);
-            logCommand(Action.Command.CONFIRM);
+            ItemInstallQueue.INSTANCE.get(this).queueItem(mRequest.getShortcutInfo());
+            logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_PLACED_AUTOMATICALLY);
             mRequest.accept();
             finish();
             return;
@@ -270,16 +269,17 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
     }
 
     private void acceptWidget(int widgetId) {
-        InstallShortcutReceiver.queueWidget(mRequest.getAppWidgetProviderInfo(this), widgetId, this);
+        ItemInstallQueue.INSTANCE.get(this)
+                .queueItem(mRequest.getAppWidgetProviderInfo(this), widgetId);
         mWidgetOptions.putInt(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         mRequest.accept(mWidgetOptions);
-        logCommand(Action.Command.CONFIRM);
+        logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_PLACED_AUTOMATICALLY);
         finish();
     }
 
     @Override
     public void onBackPressed() {
-        logCommand(Action.Command.BACK);
+        logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_BACK);
         super.onBackPressed();
     }
 
@@ -319,10 +319,9 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
         throw new UnsupportedOperationException();
     }
 
-    private void logCommand(int command) {
-        getUserEventDispatcher().dispatchUserEvent(newLauncherEvent(
-                newCommandAction(command),
-                newItemTarget(mWidgetCell.getWidgetView(), mInstantAppResolver),
-                newContainerTarget(ContainerType.PINITEM)), null);
+    private void logCommand(StatsLogManager.EventEnum command) {
+        getStatsLogManager().logger()
+                .withItemInfo((ItemInfo) mWidgetCell.getWidgetView().getTag())
+                .log(command);
     }
 }

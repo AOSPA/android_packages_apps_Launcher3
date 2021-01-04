@@ -37,19 +37,15 @@ import com.android.launcher3.Launcher.OnResumeCallback;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.logging.FileLog;
-import com.android.launcher3.logging.LoggerUtils;
 import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.model.AppLaunchTracker;
+import com.android.launcher3.logging.StatsLogManager.StatsLogger;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
-import com.android.launcher3.userevent.nano.LauncherLogProto.ControlType;
-import com.android.launcher3.userevent.nano.LauncherLogProto.Target;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.Themes;
 
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 
 /**
  * Drop target which provides a secondary option for an item.
@@ -136,19 +132,6 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
     }
 
     @Override
-    public Target getDropTargetForLogging() {
-        Target t = LoggerUtils.newTarget(Target.Type.CONTROL);
-        if (mCurrentAccessibilityAction == UNINSTALL) {
-            t.controlType = ControlType.UNINSTALL_TARGET;
-        } else if (mCurrentAccessibilityAction == DISMISS_PREDICTION) {
-            t.controlType = ControlType.DISMISS_PREDICTION;
-        } else {
-            t.controlType = ControlType.SETTINGS_BUTTON;
-        }
-        return t;
-    }
-
-    @Override
     protected boolean supportsDrop(ItemInfo info) {
         return supportsAccessibilityDrop(info, getViewUnderDrag(info));
     }
@@ -218,13 +201,16 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
     public void onDrop(DragObject d, DragOptions options) {
         // Defer onComplete
         d.dragSource = new DeferredOnComplete(d.dragSource, getContext());
+
         super.onDrop(d, options);
+        StatsLogger logger = mStatsLogManager.logger().withInstanceId(d.logInstanceId);
+        if (d.originalDragInfo != null) {
+            logger.withItemInfo(d.originalDragInfo);
+        }
         if (mCurrentAccessibilityAction == UNINSTALL) {
-            mStatsLogManager.logger().withInstanceId(d.logInstanceId)
-                    .log(LAUNCHER_ITEM_DROPPED_ON_UNINSTALL);
+            logger.log(LAUNCHER_ITEM_DROPPED_ON_UNINSTALL);
         } else if (mCurrentAccessibilityAction == DISMISS_PREDICTION) {
-            mStatsLogManager.logger().withInstanceId(d.logInstanceId)
-                    .log(LAUNCHER_ITEM_DROPPED_ON_DONT_SUGGEST);
+            logger.log(LAUNCHER_ITEM_DROPPED_ON_DONT_SUGGEST);
         }
     }
 
@@ -283,8 +269,7 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
             return null;
         }
         if (mCurrentAccessibilityAction == DISMISS_PREDICTION) {
-            AppLaunchTracker.INSTANCE.get(getContext()).onDismissApp(info.getTargetComponent(),
-                    info.user, AppLaunchTracker.CONTAINER_PREDICTIONS);
+            // We sent the log event, nothing else left to do
             return null;
         }
         // else: mCurrentAccessibilityAction == UNINSTALL
@@ -335,12 +320,6 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
         public void onDropCompleted(View target, DragObject d,
                 boolean success) {
             mDragObject = d;
-        }
-
-        @Override
-        public void fillInLogContainerData(ItemInfo childInfo, Target child,
-                ArrayList<Target> parents) {
-            mOriginal.fillInLogContainerData(childInfo, child, parents);
         }
 
         @Override

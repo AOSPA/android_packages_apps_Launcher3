@@ -17,13 +17,13 @@
 package com.android.launcher3.folder;
 
 import static android.text.TextUtils.isEmpty;
+import static android.view.WindowInsetsAnimation.Callback.DISPATCH_MODE_STOP;
 
 import static com.android.launcher3.LauncherAnimUtils.SPRING_LOADED_EXIT_DELAY;
-import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 import static com.android.launcher3.config.FeatureFlags.ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS;
-import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_CONVERTED_TO_ICON;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_LABEL_UPDATED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ITEM_DROP_COMPLETED;
 
@@ -34,8 +34,10 @@ import android.annotation.SuppressLint;
 import android.appwidget.AppWidgetHostView;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Insets;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.os.Build;
 import android.text.InputType;
 import android.text.Selection;
 import android.text.TextUtils;
@@ -47,10 +49,16 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewDebug;
+import android.view.WindowInsets;
+import android.view.WindowInsetsAnimation;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.AnimationUtils;
 import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Alarm;
@@ -86,7 +94,6 @@ import com.android.launcher3.model.data.FolderInfo.FolderListener;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pageindicators.PageIndicatorDots;
-import com.android.launcher3.userevent.nano.LauncherLogProto;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ClipPathView;
@@ -208,6 +215,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     private StatsLogManager mStatsLogManager;
 
+    @Nullable private FolderWindowInsetsAnimationCallback mFolderWindowInsetsAnimationCallback;
+
     /**
      * Used to inflate the Workspace from XML.
      *
@@ -252,6 +261,13 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         int measureSpec = MeasureSpec.UNSPECIFIED;
         mFooter.measure(measureSpec, measureSpec);
         mFooterHeight = mFooter.getMeasuredHeight();
+
+        if (Utilities.ATLEAST_R) {
+            mFolderWindowInsetsAnimationCallback =
+                    new FolderWindowInsetsAnimationCallback(DISPATCH_MODE_STOP, this);
+
+            setWindowInsetsAnimationCallback(mFolderWindowInsetsAnimationCallback);
+        }
     }
 
     public boolean onLongClick(View v) {
@@ -371,6 +387,26 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             return true;
         }
         return false;
+    }
+
+    @Override
+    public WindowInsets onApplyWindowInsets(WindowInsets windowInsets) {
+        if (Utilities.ATLEAST_R) {
+            this.setTranslationY(0);
+
+            if (windowInsets.isVisible(WindowInsets.Type.ime())) {
+                Insets keyboardInsets = windowInsets.getInsets(WindowInsets.Type.ime());
+                int folderHeightFromBottom = getHeightFromBottom();
+
+                if (keyboardInsets.bottom > folderHeightFromBottom) {
+                    // Translate this folder above the keyboard, then add the folder name's padding
+                    this.setTranslationY(folderHeightFromBottom - keyboardInsets.bottom
+                            - mFolderName.getPaddingBottom());
+                }
+            }
+        }
+
+        return windowInsets;
     }
 
     public FolderIcon getFolderIcon() {
@@ -561,15 +597,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
      * is played.
      */
     private void animateOpen(List<WorkspaceItemInfo> items, int pageNo) {
-        animateOpen(items, pageNo, false);
-    }
-
-    /**
-     * Opens the user folder described by the specified tag. The opening of the folder
-     * is animated relative to the specified View. If the View is null, no animation
-     * is played.
-     */
-    private void animateOpen(List<WorkspaceItemInfo> items, int pageNo, boolean skipUserEventLog) {
         Folder openFolder = getOpen(mLauncher);
         if (openFolder != null && openFolder != this) {
             // Close any open folder before opening a folder.
@@ -618,14 +645,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             public void onAnimationEnd(Animator animation) {
                 mState = STATE_OPEN;
                 announceAccessibilityChanges();
-
-                if (!skipUserEventLog) {
-                    mLauncher.getUserEventDispatcher().logActionOnItem(
-                            LauncherLogProto.Action.Touch.TAP,
-                            LauncherLogProto.Action.Direction.NONE,
-                            LauncherLogProto.ItemType.FOLDER_ICON, mInfo.cellX, mInfo.cellY);
-                }
-
 
                 mContent.setFocusOnFirstChild();
             }
@@ -720,11 +739,17 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         a.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
+                if (Utilities.ATLEAST_R) {
+                    setWindowInsetsAnimationCallback(null);
+                }
                 mIsAnimatingClosed = true;
             }
 
             @Override
             public void onAnimationEnd(Animator animation) {
+                if (Utilities.ATLEAST_R && mFolderWindowInsetsAnimationCallback != null) {
+                    setWindowInsetsAnimationCallback(mFolderWindowInsetsAnimationCallback);
+                }
                 closeComplete(true);
                 announceAccessibilityChanges();
                 mIsAnimatingClosed = false;
@@ -741,7 +766,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     @Override
     protected View getAccessibilityInitialFocusView() {
-        return mContent.getFirstItem();
+        View firstItem = mContent.getFirstItem();
+        return firstItem != null ? firstItem : super.getAccessibilityInitialFocusView();
     }
 
     private void closeComplete(boolean wasAnimated) {
@@ -1134,6 +1160,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
      * Rearranges the children based on their rank.
      */
     public void rearrangeChildren() {
+        if (!mContent.areViewsBound()) {
+            return;
+        }
         mContent.arrangeChildren(getIconsInReadingOrder());
         mItemsInvalidated = true;
     }
@@ -1179,7 +1208,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
                         newIcon.requestFocus();
                     }
                     if (finalItem != null) {
-                        mLauncher.folderConvertedToItem(mFolderIcon.getFolder(), finalItem);
+                        mStatsLogManager.logger().withItemInfo(finalItem)
+                                .log(LAUNCHER_FOLDER_CONVERTED_TO_ICON);
                     }
                 }
             }
@@ -1464,7 +1494,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
                 }
 
                 statsLogger.log(LAUNCHER_FOLDER_LABEL_UPDATED);
-                logFolderLabelState(mFromLabelState, toLabelState);
                 mFolderName.dispatchBackKey();
             }
         }
@@ -1475,27 +1504,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         getHitRect(outRect);
         outRect.left -= mScrollAreaOffset;
         outRect.right += mScrollAreaOffset;
-    }
-
-    @Override
-    public void fillInLogContainerData(ItemInfo childInfo, LauncherLogProto.Target child,
-            ArrayList<LauncherLogProto.Target> targets) {
-        child.gridX = childInfo.cellX;
-        child.gridY = childInfo.cellY;
-        child.pageIndex = mContent.getCurrentPage();
-
-        LauncherLogProto.Target target = newContainerTarget(LauncherLogProto.ContainerType.FOLDER);
-        target.pageIndex = mInfo.screenId;
-        target.gridX = mInfo.cellX;
-        target.gridY = mInfo.cellY;
-        targets.add(target);
-
-        // continue to parent
-        if (mInfo.container == CONTAINER_HOTSEAT) {
-            mLauncher.getHotseat().fillInLogContainerData(mInfo, target, targets);
-        } else {
-            mLauncher.getWorkspace().fillInLogContainerData(mInfo, target, targets);
-        }
     }
 
     private class OnScrollHintListener implements OnAlarmListener {
@@ -1585,17 +1593,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         return getOpenView(launcher, TYPE_FOLDER);
     }
 
-    @Override
-    public void logActionCommand(int command) {
-        mLauncher.getUserEventDispatcher().logActionCommand(
-                command, getFolderIcon(), getLogContainerType());
-    }
-
-    @Override
-    public int getLogContainerType() {
-        return LauncherLogProto.ContainerType.FOLDER;
-    }
-
     /**
      * Navigation bar back key or hardware input back key has been issued.
      */
@@ -1627,8 +1624,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
                         return true;
                     }
                 } else {
-                    mLauncher.getUserEventDispatcher().logActionTapOutside(
-                            newContainerTarget(LauncherLogProto.ContainerType.FOLDER));
+                    // TODO: add ww log if need to gather tap outside to close folder
                     close(true);
                     return true;
                 }
@@ -1663,14 +1659,63 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         return mContent;
     }
 
-    /**
-     * Logs current folder label info.
-     *
-     * @deprecated This method is only used for log validation and soon will be removed.
-     */
-    @Deprecated
-    public void logFolderLabelState(FromState fromState, ToState toState) {
-        mLauncher.getUserEventDispatcher()
-                .logLauncherEvent(mInfo.getFolderLabelStateLauncherEvent(fromState, toState));
+    /** Returns the height of the current folder's bottom edge from the bottom of the screen. */
+    private int getHeightFromBottom() {
+        DragLayer.LayoutParams layoutParams = (DragLayer.LayoutParams) getLayoutParams();
+        int folderBottomPx = layoutParams.y + layoutParams.height;
+        int windowBottomPx = mLauncher.getDeviceProfile().heightPx;
+
+        return windowBottomPx - folderBottomPx;
+    }
+
+    /** Callback that animates a folder sliding up above the ime. */
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    private static class FolderWindowInsetsAnimationCallback
+            extends WindowInsetsAnimation.Callback {
+
+        private final Folder mFolder;
+        float mFolderTranslationStart;
+        float mFolderTranslationEnd;
+
+        FolderWindowInsetsAnimationCallback(int dispatchMode, Folder folder) {
+            super(dispatchMode);
+
+            mFolder = folder;
+        }
+
+        @Override
+        public void onPrepare(@NonNull WindowInsetsAnimation animation) {
+            mFolderTranslationStart = mFolder.getTranslationY();
+        }
+
+        @NonNull
+        @Override
+        public WindowInsetsAnimation.Bounds onStart(
+                @NonNull WindowInsetsAnimation animation,
+                @NonNull WindowInsetsAnimation.Bounds bounds) {
+            mFolderTranslationEnd = mFolder.getTranslationY();
+
+            mFolder.setTranslationY(mFolderTranslationStart);
+
+            return super.onStart(animation, bounds);
+        }
+
+        @NonNull
+        @Override
+        public WindowInsets onProgress(@NonNull WindowInsets windowInsets,
+                @NonNull List<WindowInsetsAnimation> list) {
+            if (list.size() == 0) {
+                mFolder.setTranslationY(0);
+
+                return windowInsets;
+            }
+            float progress = list.get(0).getInterpolatedFraction();
+
+            mFolder.setTranslationY(
+                    Utilities.mapRange(progress, mFolderTranslationStart, mFolderTranslationEnd));
+
+            return windowInsets;
+        }
+
     }
 }

@@ -15,7 +15,8 @@
  */
 package com.android.launcher3.allapps;
 
-import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
+import static com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
+import static com.android.launcher3.allapps.AllAppsGridAdapter.SearchAdapterItem;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCUT_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_CHANGE_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_ENABLED;
@@ -42,6 +43,7 @@ import android.view.WindowInsets;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
+import androidx.core.os.BuildCompat;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -55,19 +57,18 @@ import com.android.launcher3.Insettable;
 import com.android.launcher3.InsettableFrameLayout;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.allapps.search.SearchEventTracker;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.keyboard.FocusedItemDecorator;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
-import com.android.launcher3.userevent.nano.LauncherLogProto.Target;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 import com.android.launcher3.views.SpringRelativeLayout;
-
-import java.util.ArrayList;
+import com.android.systemui.plugins.shared.SearchTarget;
 
 /**
  * The all apps view container.
@@ -107,7 +108,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
     private final MultiValueAlpha mMultiValueAlpha;
 
-    Rect mInsets = new Rect();
+    private Rect mInsets = new Rect();
 
     public AllAppsContainerView(Context context) {
         this(context, null);
@@ -203,6 +204,17 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         mAH[AdapterHolder.WORK].applyPadding();
     }
 
+    private void hideInput() {
+        if (!BuildCompat.isAtLeastR() || !FeatureFlags.ENABLE_DEVICE_SEARCH.get()) return;
+
+        WindowInsets insets = getRootWindowInsets();
+        if (insets == null) return;
+
+        if (insets.isVisible(WindowInsets.Type.ime())) {
+            getWindowInsetsController().hide(WindowInsets.Type.ime());
+        }
+    }
+
     /**
      * Returns whether the view itself will handle the touch event or not.
      */
@@ -218,9 +230,14 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         }
         if (rv.getScrollbar().getThumbOffsetY() >= 0 &&
                 mLauncher.getDragLayer().isEventOverView(rv.getScrollbar(), ev)) {
+            hideInput();
             return false;
         }
-        return rv.shouldContainerScroll(ev, mLauncher.getDragLayer());
+        boolean shouldScroll = rv.shouldContainerScroll(ev, mLauncher.getDragLayer());
+        if (shouldScroll) {
+            hideInput();
+        }
+        return shouldScroll;
     }
 
     @Override
@@ -332,13 +349,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
     @Override
     public void onDropCompleted(View target, DragObject d, boolean success) {
-    }
-
-    @Override
-    public void fillInLogContainerData(ItemInfo childInfo, Target child,
-            ArrayList<Target> parents) {
-        parents.add(newContainerTarget(
-                getApps().hasFilter() ? ContainerType.SEARCHRESULT : ContainerType.ALLAPPS));
     }
 
     @Override
@@ -486,7 +496,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         if (mWorkModeSwitch != null) {
             mWorkModeSwitch.setWorkTabVisible(pos == AdapterHolder.WORK
                     && mAllAppsStore.hasModelFlag(
-                            FLAG_HAS_SHORTCUT_PERMISSION | FLAG_QUIET_MODE_CHANGE_PERMISSION));
+                    FLAG_HAS_SHORTCUT_PERMISSION | FLAG_QUIET_MODE_CHANGE_PERMISSION));
         }
     }
 
@@ -526,6 +536,38 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         return mViewPager == null ? getActiveRecyclerView() : mViewPager;
     }
 
+    /**
+     * Handles selection on focused view and returns success
+     */
+    public boolean selectFocusedView(View v) {
+        ItemInfo headerItem = getHighlightedItemFromHeader();
+        if (headerItem != null) {
+            return mLauncher.startActivitySafely(v, headerItem.getIntent(), headerItem);
+        }
+        AdapterItem focusedItem = getActiveRecyclerView().getApps().getFocusedChild();
+        if (focusedItem instanceof SearchAdapterItem) {
+            SearchTarget searchTarget = ((SearchAdapterItem) focusedItem).getSearchTarget();
+            SearchEventTracker.INSTANCE.get(getContext()).quickSelect(searchTarget);
+        }
+        if (focusedItem.appInfo != null) {
+            ItemInfo itemInfo = focusedItem.appInfo;
+            return mLauncher.startActivitySafely(v, itemInfo.getIntent(), itemInfo);
+        }
+        return false;
+    }
+
+    /**
+     * Returns the ItemInfo of a focused view inside {@link FloatingHeaderView}
+     */
+    public ItemInfo getHighlightedItemFromHeader() {
+        View view = getFloatingHeaderView().getFocusedChild();
+        if (view != null && view.getTag() instanceof ItemInfo) {
+            return ((ItemInfo) view.getTag());
+        }
+
+        return null;
+    }
+
     public RecyclerViewFastScroller getScrollBar() {
         AllAppsRecyclerView rv = getActiveRecyclerView();
         return rv == null ? null : rv.getScrollbar();
@@ -538,6 +580,10 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         int padding = mHeader.getMaxTranslation();
         for (int i = 0; i < mAH.length; i++) {
             mAH[i].padding.top = padding;
+            if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && mUsingTabs) {
+                //add extra space between tabs and recycler view
+                mAH[i].padding.top += mLauncher.getDeviceProfile().edgeMarginPx;
+            }
             mAH[i].applyPadding();
         }
     }
@@ -652,6 +698,10 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             applyVerticalFadingEdgeEnabled(verticalFadingEdge);
             applyPadding();
             setupOverlay();
+            if (FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
+                recyclerView.addItemDecoration(new AllAppsSectionDecorator(
+                        AllAppsContainerView.this));
+            }
         }
 
         void setupOverlay() {

@@ -19,13 +19,12 @@ import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.UNSPECIFIED;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 
-import static com.android.launcher3.logging.LoggerUtils.newContainerTarget;
-
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
@@ -38,10 +37,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.AllAppsGridAdapter.AppsGridLayoutManager;
-import com.android.launcher3.logging.StatsLogUtils.LogContainerProvider;
-import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
-import com.android.launcher3.userevent.nano.LauncherLogProto.Target;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 
 import java.util.ArrayList;
@@ -50,7 +45,9 @@ import java.util.List;
 /**
  * A RecyclerView with custom fast scroll support for the all apps view.
  */
-public class AllAppsRecyclerView extends BaseRecyclerView implements LogContainerProvider {
+public class AllAppsRecyclerView extends BaseRecyclerView {
+    private static final String TAG = "AllAppsContainerView";
+    private static final boolean DEBUG = true;
 
     private AlphabeticalAppsList mApps;
     private final int mNumAppsPerRow;
@@ -107,6 +104,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView implements LogContaine
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_ALL_APPS_DIVIDER, 1);
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_SEARCH_MARKET, 1);
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_ICON, approxRows * mNumAppsPerRow);
+        pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_SEARCH_CORPUS_TITLE, 1);
 
         mViewHeights.clear();
         mViewHeights.put(AllAppsGridAdapter.VIEW_TYPE_ICON, grid.allAppsCellHeightPx);
@@ -136,7 +134,9 @@ public class AllAppsRecyclerView extends BaseRecyclerView implements LogContaine
         if (mEmptySearchBackground != null && mEmptySearchBackground.getAlpha() > 0) {
             mEmptySearchBackground.draw(c);
         }
-
+        if (DEBUG) {
+            Log.d(TAG, "onDraw at = " + System.currentTimeMillis());
+        }
         super.onDraw(c);
     }
 
@@ -173,13 +173,6 @@ public class AllAppsRecyclerView extends BaseRecyclerView implements LogContaine
             getOverlay().remove(v);
         }
         mAutoSizedOverlays.clear();
-    }
-
-    @Override
-    public void fillInLogContainerData(ItemInfo childInfo, Target child,
-            ArrayList<Target> parents) {
-        parents.add(newContainerTarget(
-                getApps().hasFilter() ? ContainerType.SEARCHRESULT : ContainerType.ALLAPPS));
     }
 
     public void onSearchResultsChanged() {
@@ -277,7 +270,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView implements LogContaine
         if (mApps == null) {
             return;
         }
-        List<AlphabeticalAppsList.AdapterItem> items = mApps.getAdapterItems();
+        List<AllAppsGridAdapter.AdapterItem> items = mApps.getAdapterItems();
 
         // Skip early if there are no items or we haven't been measured
         if (items.isEmpty() || mNumAppsPerRow == 0) {
@@ -351,7 +344,7 @@ public class AllAppsRecyclerView extends BaseRecyclerView implements LogContaine
     @Override
     public int getCurrentScrollY() {
         // Return early if there are no items or we haven't been measured
-        List<AlphabeticalAppsList.AdapterItem> items = mApps.getAdapterItems();
+        List<AllAppsGridAdapter.AdapterItem> items = mApps.getAdapterItems();
         if (items.isEmpty() || mNumAppsPerRow == 0 || getChildCount() == 0) {
             return -1;
         }
@@ -367,14 +360,14 @@ public class AllAppsRecyclerView extends BaseRecyclerView implements LogContaine
     }
 
     public int getCurrentScrollY(int position, int offset) {
-        List<AlphabeticalAppsList.AdapterItem> items = mApps.getAdapterItems();
-        AlphabeticalAppsList.AdapterItem posItem = position < items.size() ?
-                items.get(position) : null;
+        List<AllAppsGridAdapter.AdapterItem> items = mApps.getAdapterItems();
+        AllAppsGridAdapter.AdapterItem posItem = position < items.size()
+                ? items.get(position) : null;
         int y = mCachedScrollPositions.get(position, -1);
         if (y < 0) {
             y = 0;
             for (int i = 0; i < position; i++) {
-                AlphabeticalAppsList.AdapterItem item = items.get(i);
+                AllAppsGridAdapter.AdapterItem item = items.get(i);
                 if (AllAppsGridAdapter.isIconViewType(item.viewType)) {
                     // Break once we reach the desired row
                     if (posItem != null && posItem.viewType == item.viewType &&

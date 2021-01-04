@@ -42,12 +42,12 @@ import com.android.launcher3.util.OverScroller;
 public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     @Override
-    public int getPrimaryValue(int x, int y) {
+    public <T> T getPrimaryValue(T x, T y) {
         return y;
     }
 
     @Override
-    public int getSecondaryValue(int x, int y) {
+    public <T> T getSecondaryValue(T x, T y) {
         return x;
     }
 
@@ -107,6 +107,11 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
+    public <T> void setSecondary(T target, Float2DAction<T> action, float param) {
+        action.call(target, param, 0);
+    }
+
+    @Override
     public float getPrimaryDirection(MotionEvent event, int pointerIndex) {
         return event.getY(pointerIndex);
     }
@@ -147,8 +152,9 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public void setPrimaryAndResetSecondaryTranslate(View view, float translation) {
-        view.setTranslationX(0);
+    public void setPrimaryAndResetSecondaryTranslate(
+            View view, float translation, float defaultTranslationX, float defaultTranslationY) {
+        view.setTranslationX(defaultTranslationX);
         view.setTranslationY(translation);
     }
 
@@ -214,7 +220,11 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskDismissDirectionFactor() {
+    public int getPrimaryTranslationDirectionFactor() {
+        return -1;
+    }
+
+    public int getSecondaryTranslationDirectionFactor() {
         return 1;
     }
 
@@ -239,7 +249,8 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskMenuLayoutOrientation(LinearLayout taskMenuLayout) {
+    public int getTaskMenuLayoutOrientation(boolean canRecentsActivityRotate,
+        LinearLayout taskMenuLayout) {
         return LinearLayout.HORIZONTAL;
     }
 

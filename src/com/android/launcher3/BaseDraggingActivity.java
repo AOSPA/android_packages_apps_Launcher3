@@ -17,7 +17,7 @@
 package com.android.launcher3;
 
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
-import static com.android.launcher3.util.DefaultDisplay.CHANGE_ROTATION;
+import static com.android.launcher3.util.DisplayController.DisplayHolder.CHANGE_ROTATION;
 
 import android.app.ActivityOptions;
 import android.content.ActivityNotFoundException;
@@ -42,17 +42,17 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.Launcher.OnResumeCallback;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
-import com.android.launcher3.model.AppLaunchTracker;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.uioverrides.WallpaperColorInfo;
-import com.android.launcher3.util.DefaultDisplay;
-import com.android.launcher3.util.DefaultDisplay.DisplayInfoChangeListener;
-import com.android.launcher3.util.DefaultDisplay.Info;
+import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
+import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.TraceHelper;
@@ -82,9 +82,9 @@ public abstract class BaseDraggingActivity extends BaseActivity
         super.onCreate(savedInstanceState);
 
 
-        mIsSafeModeEnabled = TraceHelper.whitelistIpcs("isSafeMode",
+        mIsSafeModeEnabled = TraceHelper.allowIpcs("isSafeMode",
                 () -> getPackageManager().isSafeMode());
-        DefaultDisplay.INSTANCE.get(this).addChangeListener(this);
+        DisplayController.getDefaultDisplay(this).addChangeListener(this);
 
         // Update theme
         WallpaperColorInfo.INSTANCE.get(this).addOnChangeListener(this);
@@ -108,8 +108,18 @@ public abstract class BaseDraggingActivity extends BaseActivity
 
     private void updateTheme() {
         if (mThemeRes != Themes.getActivityThemeRes(this)) {
-            recreate();
+            // Workaround (b/162812884): The system currently doesn't allow recreating an activity
+            // when it is not resumed, in such a case defer recreation until it is possible
+            if (hasBeenResumed()) {
+                recreate();
+            } else {
+                addOnResumeCallback(this::recreate);
+            }
         }
+    }
+
+    protected void addOnResumeCallback(OnResumeCallback callback) {
+        // To be overridden
     }
 
     @Override
@@ -154,8 +164,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
 
     public abstract ActivityOptions getActivityLaunchOptions(View v);
 
-    public boolean startActivitySafely(View v, Intent intent, @Nullable ItemInfo item,
-            @Nullable String sourceContainer) {
+    public boolean startActivitySafely(View v, Intent intent, @Nullable ItemInfo item) {
         if (mIsSafeModeEnabled && !PackageManagerHelper.isSystemApp(this, intent)) {
             Toast.makeText(this, R.string.safemode_shortcut_error, Toast.LENGTH_SHORT).show();
             return false;
@@ -176,19 +185,14 @@ public abstract class BaseDraggingActivity extends BaseActivity
                     && !((WorkspaceItemInfo) item).isPromise();
             if (isShortcut) {
                 // Shortcuts need some special checks due to legacy reasons.
-                startShortcutIntentSafely(intent, optsBundle, item, sourceContainer);
+                startShortcutIntentSafely(intent, optsBundle, item);
             } else if (user == null || user.equals(Process.myUserHandle())) {
                 // Could be launching some bookkeeping activity
                 startActivity(intent, optsBundle);
-                AppLaunchTracker.INSTANCE.get(this).onStartApp(intent.getComponent(),
-                        Process.myUserHandle(), sourceContainer);
             } else {
                 getSystemService(LauncherApps.class).startMainActivity(
                         intent.getComponent(), user, intent.getSourceBounds(), optsBundle);
-                AppLaunchTracker.INSTANCE.get(this).onStartApp(intent.getComponent(), user,
-                        sourceContainer);
             }
-            getUserEventDispatcher().logAppLaunch(v, intent, user);
             if (item != null) {
                 InstanceId instanceId = new InstanceIdSequence().newInstanceId();
                 logAppLaunch(item, instanceId);
@@ -206,8 +210,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
                 .log(LAUNCHER_APP_LAUNCH_TAP);
     }
 
-    private void startShortcutIntentSafely(Intent intent, Bundle optsBundle, ItemInfo info,
-            @Nullable String sourceContainer) {
+    private void startShortcutIntentSafely(Intent intent, Bundle optsBundle, ItemInfo info) {
         try {
             StrictMode.VmPolicy oldPolicy = StrictMode.getVmPolicy();
             try {
@@ -221,8 +224,6 @@ public abstract class BaseDraggingActivity extends BaseActivity
                     String id = ((WorkspaceItemInfo) info).getDeepShortcutId();
                     String packageName = intent.getPackage();
                     startShortcut(packageName, id, intent.getSourceBounds(), optsBundle, info.user);
-                    AppLaunchTracker.INSTANCE.get(this).onStartShortcut(packageName, id, info.user,
-                            sourceContainer);
                 } else {
                     // Could be launching some bookkeeping activity
                     startActivity(intent, optsBundle);
@@ -255,7 +256,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
     protected void onDestroy() {
         super.onDestroy();
         WallpaperColorInfo.INSTANCE.get(this).removeOnChangeListener(this);
-        DefaultDisplay.INSTANCE.get(this).removeChangeListener(this);
+        DisplayController.getDefaultDisplay(this).removeChangeListener(this);
     }
 
     public void runOnceOnStart(Runnable action) {

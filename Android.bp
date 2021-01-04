@@ -19,6 +19,7 @@ android_library {
         "androidx.test.runner",
         "androidx.test.rules",
         "androidx.test.uiautomator_uiautomator",
+        "androidx.preference_preference",
         "SystemUISharedLib",
     ],
     srcs: [
@@ -35,14 +36,12 @@ java_library_static {
     name: "launcher_log_protos_lite",
     srcs: [
         "protos/*.proto",
-        "proto_overrides/*.proto",
     ],
     sdk_version: "current",
     proto: {
         type: "lite",
         local_include_dirs:[
             "protos",
-            "proto_overrides",
         ],
     },
     static_libs: ["libprotobuf-java-lite"],

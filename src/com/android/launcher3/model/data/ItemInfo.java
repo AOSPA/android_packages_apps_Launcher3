@@ -32,6 +32,7 @@ import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SH
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_TASK;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.CONTAINER_NOT_SET;
+import static com.android.launcher3.shortcuts.ShortcutKey.EXTRA_SHORTCUT_ID;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -50,6 +51,7 @@ import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import com.android.launcher3.logger.LauncherAtom.PredictionContainer;
 import com.android.launcher3.logger.LauncherAtom.SearchResultContainer;
 import com.android.launcher3.logger.LauncherAtom.SettingsContainer;
+import com.android.launcher3.logger.LauncherAtom.Shortcut;
 import com.android.launcher3.logger.LauncherAtom.ShortcutsContainer;
 import com.android.launcher3.logger.LauncherAtom.TaskSwitcherContainer;
 import com.android.launcher3.model.ModelWriter;
@@ -257,12 +259,6 @@ public class ItemInfo {
     }
 
     /**
-     * Can be overridden by inherited classes to fill in {@link LauncherAtom.ItemInfo}
-     */
-    public void setItemBuilder(LauncherAtom.ItemInfo.Builder builder) {
-    }
-
-    /**
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
      */
     public LauncherAtom.ItemInfo buildProto() {
@@ -285,6 +281,18 @@ public class ItemInfo {
                                 .orElse(LauncherAtom.Application.newBuilder()));
                 break;
             case ITEM_TYPE_DEEP_SHORTCUT:
+                itemBuilder
+                        .setShortcut(nullableComponent
+                                .map(component -> {
+                                    Shortcut.Builder lsb = Shortcut.newBuilder()
+                                            .setShortcutName(component.flattenToShortString());
+                                    Optional.ofNullable(getIntent())
+                                            .map(i -> i.getStringExtra(EXTRA_SHORTCUT_ID))
+                                            .ifPresent(lsb::setShortcutId);
+                                    return lsb;
+                                })
+                                .orElse(LauncherAtom.Shortcut.newBuilder()));
+                break;
             case ITEM_TYPE_SHORTCUT:
                 itemBuilder
                         .setShortcut(nullableComponent

@@ -40,12 +40,12 @@ import com.android.launcher3.util.OverScroller;
 public class PortraitPagedViewHandler implements PagedOrientationHandler {
 
     @Override
-    public int getPrimaryValue(int x, int y) {
+    public <T> T getPrimaryValue(T x, T y) {
         return x;
     }
 
     @Override
-    public int getSecondaryValue(int x, int y) {
+    public <T> T getSecondaryValue(T x, T y) {
         return y;
     }
 
@@ -104,6 +104,11 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
+    public <T> void setSecondary(T target, Float2DAction<T> action, float param) {
+        action.call(target, 0, param);
+    }
+
+    @Override
     public float getPrimaryDirection(MotionEvent event, int pointerIndex) {
         return event.getX(pointerIndex);
     }
@@ -144,9 +149,10 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public void setPrimaryAndResetSecondaryTranslate(View view, float translation) {
+    public void setPrimaryAndResetSecondaryTranslate(
+            View view, float translation, float defaultTranslationX, float defaultTranslationY) {
         view.setTranslationX(translation);
-        view.setTranslationY(0);
+        view.setTranslationY(defaultTranslationY);
     }
 
     @Override
@@ -211,7 +217,11 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskDismissDirectionFactor() {
+    public int getPrimaryTranslationDirectionFactor() {
+        return 1;
+    }
+
+    public int getSecondaryTranslationDirectionFactor() {
         return -1;
     }
 
@@ -237,8 +247,9 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getTaskMenuLayoutOrientation(LinearLayout taskMenuLayout) {
-        return taskMenuLayout.getOrientation();
+    public int getTaskMenuLayoutOrientation(boolean canRecentsActivityRotate,
+        LinearLayout taskMenuLayout) {
+        return canRecentsActivityRotate ? taskMenuLayout.getOrientation() : LinearLayout.VERTICAL;
     }
 
     @Override

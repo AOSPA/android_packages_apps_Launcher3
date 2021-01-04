@@ -19,19 +19,20 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
 import static com.android.launcher3.AbstractFloatingView.TYPE_HIDE_BACK_BUTTON;
 import static com.android.launcher3.LauncherState.FLAG_HIDE_BACK_BUTTON;
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.SysUINavigationMode.removeShelfFromOverview;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 
 import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
+import android.app.ActivityOptions;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.view.View;
 
 import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.hybridhotseat.HotseatPredictionController;
 import com.android.launcher3.model.WellbeingModel;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.proxy.ProxyActivityStarter;
@@ -40,20 +41,20 @@ import com.android.launcher3.statehandlers.BackButtonAlphaHandler;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.uioverrides.RecentsViewStateController;
-import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.SysUINavigationMode.NavigationModeChangeListener;
 import com.android.quickstep.SystemUiProxy;
-import com.android.quickstep.util.QuickstepOnboardingPrefs;
+import com.android.quickstep.TaskUtils;
 import com.android.quickstep.util.RemoteAnimationProvider;
 import com.android.quickstep.util.RemoteFadeOutAnimationListener;
-import com.android.quickstep.util.ShelfPeekAnim;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.shared.system.ActivityOptionsCompat;
+import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.stream.Stream;
@@ -73,10 +74,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
             (context, arg1, arg2) -> SystemUiProxy.INSTANCE.get(context).setBackButtonAlpha(
                     Float.intBitsToFloat(arg1), arg2 != 0);
 
-    private final ShelfPeekAnim mShelfPeekAnim = new ShelfPeekAnim(this);
-
     private OverviewActionsView mActionsView;
-    protected HotseatPredictionController mHotseatPredictionController;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,6 +109,13 @@ public abstract class BaseQuickstepLauncher extends Launcher
     }
 
     @Override
+    protected void handleGestureContract(Intent intent) {
+        if (FeatureFlags.SEPARATE_RECENTS_ACTIVITY.get()) {
+            super.handleGestureContract(intent);
+        }
+    }
+
+    @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
         RecentsModel.INSTANCE.get(this).onTrimMemory(level);
@@ -119,7 +124,8 @@ public abstract class BaseQuickstepLauncher extends Launcher
     @Override
     protected void onUiChangedWhileSleeping() {
         // Remove the snapshot because the content view may have obvious changes.
-        ActivityManagerWrapper.getInstance().invalidateHomeTaskSnapshot(this);
+        UI_HELPER_EXECUTOR.execute(
+                () -> ActivityManagerWrapper.getInstance().invalidateHomeTaskSnapshot(this));
     }
 
     @Override
@@ -189,7 +195,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
     }
 
     private boolean isOverviewActionsEnabled() {
-        return FeatureFlags.ENABLE_OVERVIEW_ACTIONS.get() && removeShelfFromOverview(this);
+        return removeShelfFromOverview(this);
     }
 
     public <T extends OverviewActionsView> T getActionsView() {
@@ -199,8 +205,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
     @Override
     protected void closeOpenViews(boolean animate) {
         super.closeOpenViews(animate);
-        ActivityManagerWrapper.getInstance()
-                .closeSystemWindows(CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY);
+        TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY);
     }
 
     @Override
@@ -215,11 +220,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     public DepthController getDepthController() {
         return mDepthController;
-    }
-
-    @Override
-    protected OnboardingPrefs createOnboardingPrefs(SharedPreferences sharedPrefs) {
-        return new QuickstepOnboardingPrefs(this, sharedPrefs);
     }
 
     @Override
@@ -310,18 +310,22 @@ public abstract class BaseQuickstepLauncher extends Launcher
                 Stream.of(WellbeingModel.SHORTCUT_FACTORY));
     }
 
-    public ShelfPeekAnim getShelfPeekAnim() {
-        return mShelfPeekAnim;
-    }
-
-    /**
-     * Returns Prediction controller for hybrid hotseat
-     */
-    public HotseatPredictionController getHotseatPredictionController() {
-        return mHotseatPredictionController;
+    @Override
+    public ActivityOptions getActivityLaunchOptions(View v) {
+        ActivityOptions activityOptions = super.getActivityLaunchOptions(v);
+        if (activityOptions != null && mLastTouchUpTime > 0) {
+            ActivityOptionsCompat.setLauncherSourceInfo(activityOptions, mLastTouchUpTime);
+        }
+        return activityOptions;
     }
 
     public void setHintUserWillBeActive() {
         addActivityFlags(ACTIVITY_STATE_USER_WILL_BE_ACTIVE);
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        InteractionJankMonitorWrapper.init(getWindow().getDecorView());
     }
 }

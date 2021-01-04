@@ -24,7 +24,6 @@ import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.anim.Interpolators.ACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_OVERVIEW_ACTIONS;
 import static com.android.launcher3.config.FeatureFlags.UNSTABLE_SPRINGS;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_FADE;
@@ -49,8 +48,6 @@ import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.touch.AbstractStateChangeTouchController;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
 import com.android.launcher3.uioverrides.states.OverviewState;
-import com.android.launcher3.userevent.nano.LauncherLogProto.Action.Touch;
-import com.android.launcher3.userevent.nano.LauncherLogProto.ContainerType;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TouchInteractionService;
 import com.android.quickstep.util.LayoutUtils;
@@ -90,13 +87,16 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
 
     @Override
     protected boolean canInterceptTouch(MotionEvent ev) {
+        // If we are swiping to all apps instead of overview, allow it from anywhere.
+        boolean interceptAnywhere = mLauncher.isInState(NORMAL) && !mAllowDragToOverview;
         if (mCurrentAnimation != null) {
             if (mFinishFastOnSecondTouch) {
                 mCurrentAnimation.getAnimationPlayer().end();
             }
 
             AllAppsTransitionController allAppsController = mLauncher.getAllAppsController();
-            if (ev.getY() >= allAppsController.getShiftRange() * allAppsController.getProgress()) {
+            if (ev.getY() >= allAppsController.getShiftRange() * allAppsController.getProgress()
+                    || interceptAnywhere) {
                 // If we are already animating from a previous state, we can intercept as long as
                 // the touch is below the current all apps progress (to allow for double swipe).
                 return true;
@@ -118,9 +118,7 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
                 return false;
             }
         } else {
-            // If we are swiping to all apps instead of overview, allow it from anywhere.
-            boolean interceptAnywhere = mLauncher.isInState(NORMAL) && !mAllowDragToOverview;
-            // For all other states, only listen if the event originated below the hotseat height
+            // For non-normal states, only listen if the event originated below the hotseat height
             if (!interceptAnywhere && !isTouchOverHotseat(mLauncher, ev)) {
                 return false;
             }
@@ -142,6 +140,10 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
                 Log.d(TestProtocol.OVERIEW_NOT_ALLAPPS,
                         "PortraitStatesTouchController.getTargetState 1");
             }
+            if (removeShelfFromOverview(mLauncher)) {
+                // Don't allow swiping down to overview.
+                return NORMAL;
+            }
             return TouchInteractionService.isConnected() ?
                     mLauncher.getStateManager().getLastState() : NORMAL;
         } else if (fromState == OVERVIEW) {
@@ -150,7 +152,7 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
                         "PortraitStatesTouchController.getTargetState 2");
             }
             LauncherState positiveDragTarget = ALL_APPS;
-            if (ENABLE_OVERVIEW_ACTIONS.get() && removeShelfFromOverview(mLauncher)) {
+            if (removeShelfFromOverview(mLauncher)) {
                 // Don't allow swiping up to all apps.
                 positiveDragTarget = OVERVIEW;
             }
@@ -166,11 +168,6 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
                     ? OVERVIEW : ALL_APPS;
         }
         return fromState;
-    }
-
-    @Override
-    protected int getLogContainerTypeForNormalState(MotionEvent ev) {
-        return isTouchOverHotseat(mLauncher, ev) ? ContainerType.HOTSEAT : ContainerType.WORKSPACE;
     }
 
     private StateAnimationConfig getNormalToOverviewAnimation() {
@@ -245,7 +242,7 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
 
         final StateAnimationConfig config = totalShift == 0 ? new StateAnimationConfig()
                 : getConfigForStates(mFromState, mToState);
-        config.animFlags = updateAnimComponentsOnReinit(animFlags);
+        config.animFlags = animFlags;
         config.duration = maxAccuracy;
 
         cancelPendingAnim();
@@ -279,17 +276,9 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
         return 1 / totalShift;
     }
 
-    /**
-     * Give subclasses the chance to update the animation when we re-initialize towards a new state.
-     */
-    @AnimationFlags
-    protected int updateAnimComponentsOnReinit(@AnimationFlags int animComponents) {
-        return animComponents;
-    }
-
     private void cancelPendingAnim() {
         if (mPendingAnimation != null) {
-            mPendingAnimation.finish(false, Touch.SWIPE);
+            mPendingAnimation.finish(false);
             mPendingAnimation = null;
         }
     }
@@ -324,8 +313,8 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
     }
 
     @Override
-    protected void onSwipeInteractionCompleted(LauncherState targetState, int logAction) {
-        super.onSwipeInteractionCompleted(targetState, logAction);
+    protected void onSwipeInteractionCompleted(LauncherState targetState) {
+        super.onSwipeInteractionCompleted(targetState);
         if (mStartState == NORMAL && targetState == OVERVIEW) {
             SystemUiProxy.INSTANCE.get(mLauncher).onOverviewShown(true, TAG);
         }

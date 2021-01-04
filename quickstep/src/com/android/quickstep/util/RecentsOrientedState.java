@@ -23,7 +23,7 @@ import static android.view.Surface.ROTATION_180;
 import static android.view.Surface.ROTATION_270;
 import static android.view.Surface.ROTATION_90;
 
-import static com.android.launcher3.logging.LoggerUtils.extractObjectNameAndAddress;
+import static com.android.launcher3.Utilities.newContentObserver;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.SysUINavigationMode.Mode.TWO_BUTTONS;
@@ -33,7 +33,6 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.Matrix;
@@ -48,7 +47,6 @@ import android.view.Surface;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
@@ -58,7 +56,6 @@ import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.BaseActivityInterface;
 import com.android.quickstep.SysUINavigationMode;
-import com.android.systemui.shared.system.ConfigurationCompat;
 
 import java.lang.annotation.Retention;
 import java.util.function.IntConsumer;
@@ -74,14 +71,12 @@ import java.util.function.IntConsumer;
 public final class RecentsOrientedState implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String TAG = "RecentsOrientedState";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
+    private static final String DELIMITER_DOT = "\\.";
 
-    private ContentObserver mSystemAutoRotateObserver = new ContentObserver(new Handler()) {
-        @Override
-        public void onChange(boolean selfChange) {
-            updateAutoRotateSetting();
-        }
-    };
+    private ContentObserver mSystemAutoRotateObserver =
+            newContentObserver(new Handler(), t -> updateAutoRotateSetting());
+
     @Retention(SOURCE)
     @IntDef({ROTATION_0, ROTATION_90, ROTATION_180, ROTATION_270})
     public @interface SurfaceRotation {}
@@ -91,6 +86,7 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
     private @SurfaceRotation int mTouchRotation = ROTATION_0;
     private @SurfaceRotation int mDisplayRotation = ROTATION_0;
     private @SurfaceRotation int mRecentsActivityRotation = ROTATION_0;
+    private @SurfaceRotation int mRecentsRotation = ROTATION_0 - 1;
 
     // Launcher activity supports multiple orientation, but fallback activity does not
     private static final int FLAG_MULTIPLE_ORIENTATION_SUPPORTED_BY_ACTIVITY = 1 << 0;
@@ -133,8 +129,6 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
     private int mFlags;
     private int mPreviousRotation = ROTATION_0;
 
-    @Nullable private Configuration mActivityConfiguration;
-
     /**
      * @param rotationChangeListener Callback for receiving rotation events when rotation watcher
      *                              is enabled
@@ -170,11 +164,11 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
     }
 
     /**
-     * Sets the configuration for the recents activity, which could affect the activity's rotation
+     * Sets the rotation for the recents activity, which could affect the appearance of task view.
      * @see #update(int, int)
      */
-    public boolean setActivityConfiguration(Configuration activityConfiguration) {
-        mActivityConfiguration = activityConfiguration;
+    public boolean setRecentsRotation(@SurfaceRotation int recentsRotation) {
+        mRecentsRotation = recentsRotation;
         return update(mTouchRotation, mDisplayRotation);
     }
 
@@ -231,9 +225,7 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
     @SurfaceRotation
     private int inferRecentsActivityRotation(@SurfaceRotation int displayRotation) {
         if (isRecentsActivityRotationAllowed()) {
-            return mActivityConfiguration == null
-                    ? displayRotation
-                    : ConfigurationCompat.getWindowConfigurationRotation(mActivityConfiguration);
+            return mRecentsRotation < ROTATION_0 ? displayRotation : mRecentsRotation;
         } else {
             return ROTATION_0;
         }
@@ -539,5 +531,15 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
                 || mRecentsActivityRotation == ROTATION_270)
                 ? idp.landscapeProfile
                 : idp.portraitProfile;
+    }
+
+    /**
+     * String conversion for only the helpful parts of {@link Object#toString()} method
+     * @param stringToExtract "foo.bar.baz.MyObject@1234"
+     * @return "MyObject@1234"
+     */
+    private static String extractObjectNameAndAddress(String stringToExtract) {
+        int index = stringToExtract.lastIndexOf(DELIMITER_DOT);
+        return index >= 0 ? stringToExtract.substring(index) : "";
     }
 }

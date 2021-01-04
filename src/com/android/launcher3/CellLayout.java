@@ -16,6 +16,8 @@
 
 package com.android.launcher3;
 
+import static android.animation.ValueAnimator.areAnimatorsEnabled;
+
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_5;
 
 import android.animation.Animator;
@@ -321,11 +323,8 @@ public class CellLayout extends ViewGroup {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (mTouchHelper != null
-                || (mInterceptTouchListener != null && mInterceptTouchListener.onTouch(this, ev))) {
-            return true;
-        }
-        return false;
+        return mTouchHelper != null
+                || (mInterceptTouchListener != null && mInterceptTouchListener.onTouch(this, ev));
     }
 
     public void enableHardwareLayer(boolean hasLayer) {
@@ -2009,7 +2008,7 @@ public class CellLayout extends ViewGroup {
             // Animations are disabled in power save mode, causing the repeated animation to jump
             // spastically between beginning and end states. Since this looks bad, we don't repeat
             // the animation in power save mode.
-            if (Utilities.areAnimationsEnabled(getContext())) {
+            if (areAnimatorsEnabled()) {
                 va.setRepeatMode(ValueAnimator.REVERSE);
                 va.setRepeatCount(ValueAnimator.INFINITE);
             }

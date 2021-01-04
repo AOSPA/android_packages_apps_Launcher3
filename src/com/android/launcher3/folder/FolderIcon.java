@@ -129,6 +129,8 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
     private float mDotScale;
     private Animator mDotScaleAnim;
 
+    private Rect mTouchArea = new Rect();
+
     private final PointF mTranslationForReorderBounce = new PointF(0, 0);
     private final PointF mTranslationForReorderPreview = new PointF(0, 0);
     private float mScaleForReorderBounce = 1f;
@@ -476,7 +478,6 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
                 // event is assumed to be folder creation on the server side.
                 .withEditText(newTitle.toString())
                 .log(LAUNCHER_FOLDER_AUTO_LABELED);
-        mFolder.logFolderLabelState(fromState, ToState.TO_SUGGESTION0);
     }
 
 
@@ -711,12 +712,26 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN
+                && shouldIgnoreTouchDown(event.getX(), event.getY())) {
+            return false;
+        }
+
         // Call the superclass onTouchEvent first, because sometimes it changes the state to
         // isPressed() on an ACTION_UP
         super.onTouchEvent(event);
         mLongPressHelper.onTouchEvent(event);
         // Keep receiving the rest of the events
         return true;
+    }
+
+    /**
+     * Returns true if the touch down at the provided position be ignored
+     */
+    protected boolean shouldIgnoreTouchDown(float x, float y) {
+        mTouchArea.set(getPaddingLeft(), getPaddingTop(), getWidth() - getPaddingRight(),
+                getHeight() - getPaddingBottom());
+        return !mTouchArea.contains((int) x, (int) y);
     }
 
     @Override

@@ -45,7 +45,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
-import android.annotation.TargetApi;
 import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -55,10 +54,10 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Trace;
 import android.util.Pair;
 import android.view.View;
 
@@ -67,6 +66,7 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.allapps.AllAppsTransitionController;
+import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.shortcuts.DeepShortcutView;
@@ -82,6 +82,7 @@ import com.android.quickstep.util.StaggeredWorkspaceAnim;
 import com.android.quickstep.util.SurfaceTransactionApplier;
 import com.android.systemui.shared.system.ActivityCompat;
 import com.android.systemui.shared.system.ActivityOptionsCompat;
+import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.RemoteAnimationAdapterCompat;
 import com.android.systemui.shared.system.RemoteAnimationDefinitionCompat;
@@ -94,7 +95,6 @@ import com.android.systemui.shared.system.WindowManagerWrapper;
  * {@link LauncherAppTransitionManager} with Quickstep-specific app transitions for launching from
  * home and/or all-apps.  Not used for 3p launchers.
  */
-@TargetApi(Build.VERSION_CODES.O)
 @SuppressWarnings("unused")
 public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTransitionManager
         implements OnDeviceProfileChangeListener {
@@ -140,6 +140,7 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
 
     // Progress = 0: All apps is fully pulled up, Progress = 1: All apps is fully pulled down.
     public static final float ALL_APPS_PROGRESS_OFF_SCREEN = 1.3059858f;
+    public static final String TRANSITION_OPEN_LAUNCHER = "transition:OpenLauncher";
 
     protected final BaseQuickstepLauncher mLauncher;
 
@@ -152,6 +153,7 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
     private final float mContentTransY;
     private final float mWorkspaceTransY;
     private final float mClosingWindowTransY;
+    private final float mMaxShadowRadius;
 
     private DeviceProfile mDeviceProfile;
 
@@ -185,6 +187,7 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
         mContentTransY = res.getDimensionPixelSize(R.dimen.content_trans_y);
         mWorkspaceTransY = res.getDimensionPixelSize(R.dimen.workspace_trans_y);
         mClosingWindowTransY = res.getDimensionPixelSize(R.dimen.closing_window_trans_y);
+        mMaxShadowRadius = res.getDimensionPixelSize(R.dimen.max_shadow_radius);
 
         mLauncher.addOnDeviceProfileChangeListener(this);
     }
@@ -537,6 +540,8 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
                     EXAGGERATED_EASE);
             FloatProp mWindowRadius = new FloatProp(initialWindowRadius, windowRadius, 0,
                     RADIUS_DURATION, EXAGGERATED_EASE);
+            FloatProp mShadowRadius = new FloatProp(0, mMaxShadowRadius, 0,
+                    APP_LAUNCH_DURATION, EXAGGERATED_EASE);
 
             @Override
             public void onUpdate(float percent) {
@@ -599,7 +604,8 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
                         builder.withMatrix(matrix)
                                 .withWindowCrop(crop)
                                 .withAlpha(1f - mIconAlpha.value)
-                                .withCornerRadius(mWindowRadius.value);
+                                .withCornerRadius(mWindowRadius.value)
+                                .withShadowRadius(mShadowRadius.value);
                     } else {
                         tmpPos.set(target.position.x, target.position.y);
                         if (target.localBounds != null) {
@@ -751,6 +757,8 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
             FloatProp mDy = new FloatProp(0, mClosingWindowTransY, 0, duration, DEACCEL_1_7);
             FloatProp mScale = new FloatProp(1f, 1f, 0, duration, DEACCEL_1_7);
             FloatProp mAlpha = new FloatProp(1f, 0f, 25, 125, LINEAR);
+            FloatProp mShadowRadius = new FloatProp(mMaxShadowRadius, 0, 0, duration,
+                    DEACCEL_1_7);
 
             @Override
             public void onUpdate(float percent) {
@@ -772,7 +780,8 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
                         matrix.postTranslate(tmpPos.x, tmpPos.y);
                         builder.withMatrix(matrix)
                                 .withAlpha(mAlpha.value)
-                                .withCornerRadius(windowCornerRadius);
+                                .withCornerRadius(windowCornerRadius)
+                                .withShadowRadius(mShadowRadius.value);
                     } else {
                         matrix.setTranslate(tmpPos.x, tmpPos.y);
                         builder.withMatrix(matrix)
@@ -794,6 +803,34 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
     private boolean hasControlRemoteAppTransitionPermission() {
         return mLauncher.checkSelfPermission(CONTROL_REMOTE_APP_TRANSITION_PERMISSION)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void addCujInstrumentation(Animator anim, int cuj, String transition) {
+        anim.addListener(new AnimationSuccessListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                Trace.beginAsyncSection(transition, 0);
+                InteractionJankMonitorWrapper.begin(cuj);
+                super.onAnimationStart(animation);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                super.onAnimationCancel(animation);
+                InteractionJankMonitorWrapper.cancel(cuj);
+            }
+
+            @Override
+            public void onAnimationSuccess(Animator animator) {
+                InteractionJankMonitorWrapper.end(cuj);
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                Trace.endAsyncSection(TRANSITION_OPEN_LAUNCHER, 0);
+            }
+        });
     }
 
     /**
@@ -860,6 +897,9 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
                 // is initialized.
                 if (launcherIsATargetWithMode(appTargets, MODE_OPENING)
                         || mLauncher.isForceInvisible()) {
+                    addCujInstrumentation(
+                            anim, InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME,
+                            TRANSITION_OPEN_LAUNCHER);
                     // Only register the content animation for cancellation when state changes
                     mLauncher.getStateManager().setCurrentAnimation(anim);
 
@@ -894,6 +934,9 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
      */
     private class AppLaunchAnimationRunner implements WrappedAnimationRunnerImpl {
 
+        private static final String TRANSITION_LAUNCH_FROM_RECENTS = "transition:LaunchFromRecents";
+        private static final String TRANSITION_LAUNCH_FROM_ICON = "transition:LaunchFromIcon";
+
         private final Handler mHandler;
         private final View mV;
 
@@ -916,13 +959,21 @@ public abstract class QuickstepAppTransitionManagerImpl extends LauncherAppTrans
             boolean launcherClosing =
                     launcherIsATargetWithMode(appTargets, MODE_CLOSING);
 
-            if (isLaunchingFromRecents(mV, appTargets)) {
+            final boolean launchingFromRecents = isLaunchingFromRecents(mV, appTargets);
+            if (launchingFromRecents) {
                 composeRecentsLaunchAnimator(anim, mV, appTargets, wallpaperTargets,
                         launcherClosing);
             } else {
                 composeIconLaunchAnimator(anim, mV, appTargets, wallpaperTargets,
                         launcherClosing);
             }
+
+            addCujInstrumentation(anim,
+                    launchingFromRecents
+                            ? InteractionJankMonitorWrapper.CUJ_APP_LAUNCH_FROM_RECENTS
+                            : InteractionJankMonitorWrapper.CUJ_APP_LAUNCH_FROM_ICON,
+                    launchingFromRecents
+                            ? TRANSITION_LAUNCH_FROM_RECENTS : TRANSITION_LAUNCH_FROM_ICON);
 
             if (launcherClosing) {
                 anim.addListener(mForceInvisibleListener);

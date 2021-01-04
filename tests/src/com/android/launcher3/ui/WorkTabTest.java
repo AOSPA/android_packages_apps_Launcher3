@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.util.Log;
 import android.widget.TextView;
 
 import androidx.test.filters.LargeTest;
@@ -34,6 +35,7 @@ import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsPagedView;
 import com.android.launcher3.allapps.WorkModeSwitch;
 import com.android.launcher3.dragndrop.DragLayer;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.views.WorkEduView;
 
 import org.junit.After;
@@ -53,7 +55,9 @@ public class WorkTabTest extends AbstractLauncherUiTest {
     private static final int WORK_PAGE = AllAppsContainerView.AdapterHolder.WORK;
 
     @Before
-    public void createWorkProfile() throws Exception {
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
         String output =
                 mDevice.executeShellCommand(
                         "pm create-user --profileOf 0 --managed TestProfile");
@@ -132,6 +136,11 @@ public class WorkTabTest extends AbstractLauncherUiTest {
                     l.getResources().getString(R.string.work_profile_edu_personal_apps));
             workEduView.findViewById(R.id.proceed).callOnClick();
         });
+
+        executeOnLauncher(launcher -> Log.d(TestProtocol.WORK_PROFILE_REMOVED,
+                "work profile status (" + mProfileUserId + ") :"
+                        + launcher.getAppsView().isWorkTabVisible()));
+
         // verify work edu is seen next
         waitForLauncherCondition("Launcher did not show the next edu screen", l ->
                 ((AllAppsPagedView) l.getAppsView().getContentView()).getCurrentPage() == WORK_PAGE

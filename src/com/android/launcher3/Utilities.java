@@ -18,7 +18,6 @@ package com.android.launcher3;
 
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ICON_BADGED;
 
-import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.app.Person;
@@ -26,6 +25,7 @@ import android.app.WallpaperManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
@@ -34,6 +34,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ShortcutInfo;
 import android.content.res.Resources;
+import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -44,11 +45,11 @@ import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.InsetDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.DeadObjectException;
 import android.os.Handler;
 import android.os.Message;
-import android.os.PowerManager;
 import android.os.TransactionTooLargeException;
 import android.provider.Settings;
 import android.text.Spannable;
@@ -65,7 +66,6 @@ import android.view.animation.Interpolator;
 
 import androidx.core.os.BuildCompat;
 
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.FolderAdaptiveIcon;
 import com.android.launcher3.graphics.GridOptionsProvider;
 import com.android.launcher3.graphics.TintedDrawableSpan;
@@ -85,6 +85,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -113,12 +114,6 @@ public final class Utilities {
     public static final boolean ATLEAST_P =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.P;
 
-    public static final boolean ATLEAST_OREO_MR1 =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1;
-
-    public static final boolean ATLEAST_OREO =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
-
     /**
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
      */
@@ -140,6 +135,10 @@ public final class Utilities {
     // An intent extra to indicate the horizontal scroll of the wallpaper.
     public static final String EXTRA_WALLPAPER_OFFSET = "com.android.launcher3.WALLPAPER_OFFSET";
     public static final String EXTRA_WALLPAPER_FLAVOR = "com.android.launcher3.WALLPAPER_FLAVOR";
+
+    // An intent extra to indicate the launch source by launcher.
+    public static final String EXTRA_WALLPAPER_LAUNCH_SOURCE =
+            "com.android.wallpaper.LAUNCH_SOURCE";
 
     public static boolean IS_RUNNING_IN_TEST_HARNESS =
                     ActivityManager.isRunningInTestHarness();
@@ -494,21 +493,6 @@ public final class Utilities {
                 LauncherFiles.DEVICE_PREFERENCES_KEY, Context.MODE_PRIVATE);
     }
 
-    /**
-     * @return {@link SharedPreferences} that backs {@link FeatureFlags}
-     */
-    public static SharedPreferences getFeatureFlagsPrefs(Context context) {
-        // Use application context for shared preferences, so that we use a single cached instance
-        return context.getApplicationContext().getSharedPreferences(
-            FeatureFlags.FLAGS_PREF_NAME, Context.MODE_PRIVATE);
-    }
-
-    public static boolean areAnimationsEnabled(Context context) {
-        return ATLEAST_OREO
-                ? ValueAnimator.areAnimatorsEnabled()
-                : !context.getSystemService(PowerManager.class).isPowerSaveMode();
-    }
-
     public static boolean isWallpaperAllowed(Context context) {
         return context.getSystemService(WallpaperManager.class).isSetWallpaperAllowed();
     }
@@ -663,6 +647,14 @@ public final class Utilities {
         }
     }
 
+    /**
+     * @return true is the extra is either null or is of type {@param type}
+     */
+    public static boolean isValidExtraType(Intent intent, String key, Class type) {
+        Object extra = intent.getParcelableExtra(key);
+        return extra == null || type.isInstance(extra);
+    }
+
     public static float squaredHypot(float x, float y) {
         return x * x + y * y;
     }
@@ -670,6 +662,18 @@ public final class Utilities {
     public static float squaredTouchSlop(Context context) {
         float slop = ViewConfiguration.get(context).getScaledTouchSlop();
         return slop * slop;
+    }
+
+    /**
+     * Helper method to create a content provider
+     */
+    public static ContentObserver newContentObserver(Handler handler, Consumer<Uri> command) {
+        return new ContentObserver(handler) {
+            @Override
+            public void onChange(boolean selfChange, Uri uri) {
+                command.accept(uri);
+            }
+        };
     }
 
     private static class FixedSizeEmptyDrawable extends ColorDrawable {

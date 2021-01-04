@@ -16,7 +16,7 @@
 package com.android.launcher3;
 
 import static com.android.launcher3.Utilities.postAsyncCallback;
-import static com.android.launcher3.util.DefaultDisplay.getSingleFrameMs;
+import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 import static com.android.systemui.shared.recents.utilities.Utilities.postAtFrontOfQueueAsynchronously;
 
 import android.animation.Animator;
@@ -34,8 +34,7 @@ import com.android.systemui.shared.system.RemoteAnimationRunnerCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 @TargetApi(Build.VERSION_CODES.P)
-public abstract class LauncherAnimationRunner implements RemoteAnimationRunnerCompat,
-        WrappedAnimationRunnerImpl {
+public abstract class LauncherAnimationRunner implements RemoteAnimationRunnerCompat {
 
     private static final String TAG = "LauncherAnimationRunner";
 

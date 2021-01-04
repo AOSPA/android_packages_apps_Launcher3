@@ -24,6 +24,7 @@ import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTO
 
 import android.content.Context;
 import android.graphics.Rect;
+import android.os.Bundle;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.text.method.TextKeyListener;
@@ -38,22 +39,25 @@ import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Insettable;
+import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AlphabeticalAppsList;
 import com.android.launcher3.allapps.SearchUiManager;
 import com.android.launcher3.anim.PropertySetter;
-import com.android.launcher3.util.ComponentKey;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Layout to contain the All-apps search UI.
  */
 public class AppsSearchContainerLayout extends ExtendedEditText
         implements SearchUiManager, AllAppsSearchBarController.Callbacks,
-        AllAppsStore.OnUpdateListener, Insettable {
+        AllAppsStore.OnUpdateListener, Insettable, Consumer<List<Bundle>> {
 
     private final BaseDraggingActivity mLauncher;
     private final AllAppsSearchBarController mSearchBarController;
@@ -135,7 +139,8 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         mApps = appsView.getApps();
         mAppsView = appsView;
         mSearchBarController.initialize(
-                new DefaultAppSearchAlgorithm(mApps.getApps()), this, mLauncher, this);
+                new DefaultAppSearchAlgorithm(mLauncher, LauncherAppState.getInstance(mLauncher)),
+                this, mLauncher, this, this);
     }
 
     @Override
@@ -168,17 +173,25 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     }
 
     @Override
-    public void onSearchResult(String query, ArrayList<ComponentKey> apps) {
-        if (apps != null) {
-            mApps.setOrderedFilter(apps);
+    public void onSearchResult(String query, ArrayList<AdapterItem> items) {
+        if (items != null) {
+            mApps.setSearchResults(items);
             notifyResultChanged();
             mAppsView.setLastSearchQuery(query);
         }
     }
 
     @Override
+    public void onAppendSearchResult(String query, ArrayList<AdapterItem> items) {
+        if (items != null) {
+            mApps.appendSearchResults(items);
+            notifyResultChanged();
+        }
+    }
+
+    @Override
     public void clearSearchResult() {
-        if (mApps.setOrderedFilter(null)) {
+        if (mApps.setSearchResults(null)) {
             notifyResultChanged();
         }
 
@@ -216,7 +229,12 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     }
 
     @Override
-    public EditText setTextSearchEnabled(boolean isEnabled) {
+    public EditText getEditText() {
         return this;
+    }
+
+    @Override
+    public void accept(List<Bundle> bundles) {
+        // TODO: Render the result on mAppsView object
     }
 }

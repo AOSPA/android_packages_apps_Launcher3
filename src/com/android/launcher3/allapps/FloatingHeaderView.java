@@ -38,6 +38,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PropertySetter;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.systemui.plugins.AllAppsRow;
 import com.android.systemui.plugins.AllAppsRow.OnHeightUpdatedListener;
@@ -110,8 +111,8 @@ public class FloatingHeaderView extends LinearLayout implements
 
     public FloatingHeaderView(@NonNull Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        mHeaderTopPadding = context.getResources()
-                .getDimensionPixelSize(R.dimen.all_apps_header_top_padding);
+        mHeaderTopPadding = FeatureFlags.ENABLE_DEVICE_SEARCH.get() ? 0 :
+                context.getResources().getDimensionPixelSize(R.dimen.all_apps_header_top_padding);
     }
 
     @Override
@@ -129,6 +130,7 @@ public class FloatingHeaderView extends LinearLayout implements
             }
         }
         mFixedRows = rows.toArray(new FloatingHeaderRow[rows.size()]);
+        setPadding(0, mHeaderTopPadding, 0, 0);
         mAllRows = mFixedRows;
     }
 
@@ -194,6 +196,19 @@ public class FloatingHeaderView extends LinearLayout implements
         onHeightUpdated();
     }
 
+    @Override
+    public View getFocusedChild() {
+        if (FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
+            for (FloatingHeaderRow row : mAllRows) {
+                if (row.hasVisibleContent() && row.shouldDraw()) {
+                    return row.getFocusedChild();
+                }
+            }
+            return null;
+        }
+        return super.getFocusedChild();
+    }
+
     public void setup(AllAppsContainerView.AdapterHolder[] mAH, boolean tabsHidden) {
         for (FloatingHeaderRow row : mAllRows) {
             row.setup(this, mAllRows, tabsHidden);
@@ -233,7 +248,9 @@ public class FloatingHeaderView extends LinearLayout implements
 
     public int getMaxTranslation() {
         if (mMaxTranslation == 0 && mTabsHidden) {
-            return getResources().getDimensionPixelSize(R.dimen.all_apps_search_bar_bottom_padding);
+            int paddingOffset = getResources().getDimensionPixelSize(
+                    R.dimen.all_apps_search_bar_bottom_padding);
+            return FeatureFlags.ENABLE_DEVICE_SEARCH.get() ? 0 : paddingOffset;
         } else if (mMaxTranslation > 0 && mTabsHidden) {
             return mMaxTranslation + getPaddingTop();
         } else {

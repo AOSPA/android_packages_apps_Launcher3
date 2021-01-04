@@ -57,6 +57,7 @@
             <enum name="folder" value="2" />
             <enum name="widget_section" value="3" />
             <enum name="shortcut_popup" value="4" />
+            <enum name="hero_app" value="5" />
         </attr>
         <attr name="centerVertically" format="boolean" />
     </declare-styleable>
@@ -67,6 +68,13 @@
         <attr name="folderIconBorderColor" />
         <attr name="folderDotColor" />
     </declare-styleable>
+
+    <declare-styleable name="SearchResultIconRow">
+        <attr name="customIcon" format="reference" />
+        <attr name="matchTextInsetWithQuery" format="boolean" />
+    </declare-styleable>
+
+
 
     <declare-styleable name="ShadowInfo">
         <attr name="ambientShadowColor" format="color" />
@@ -164,6 +172,14 @@
 
     <declare-styleable name="RecyclerViewFastScroller">
         <attr name="canThumbDetach" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="LoggablePref">
+        <attr name="android:key" />
+        <attr name="android:defaultValue" />
+        <!-- Ground truth of this Pref integer can be found in StatsLogManager -->
+        <attr name="logIdOn" format="integer" />
+        <attr name="logIdOff" format="integer" />
     </declare-styleable>
 
     <declare-styleable name="PreviewFragment">

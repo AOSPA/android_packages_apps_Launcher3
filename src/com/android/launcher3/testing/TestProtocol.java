@@ -27,12 +27,11 @@ public final class TestProtocol {
     public static final int NORMAL_STATE_ORDINAL = 0;
     public static final int SPRING_LOADED_STATE_ORDINAL = 1;
     public static final int OVERVIEW_STATE_ORDINAL = 2;
-    public static final int OVERVIEW_PEEK_STATE_ORDINAL = 3;
-    public static final int OVERVIEW_MODAL_TASK_STATE_ORDINAL = 4;
-    public static final int QUICK_SWITCH_STATE_ORDINAL = 5;
-    public static final int ALL_APPS_STATE_ORDINAL = 6;
-    public static final int BACKGROUND_APP_STATE_ORDINAL = 7;
-    public static final int HINT_STATE_ORDINAL = 8;
+    public static final int OVERVIEW_MODAL_TASK_STATE_ORDINAL = 3;
+    public static final int QUICK_SWITCH_STATE_ORDINAL = 4;
+    public static final int ALL_APPS_STATE_ORDINAL = 5;
+    public static final int BACKGROUND_APP_STATE_ORDINAL = 6;
+    public static final int HINT_STATE_ORDINAL = 7;
     public static final String TAPL_EVENTS_TAG = "TaplEvents";
     public static final String SEQUENCE_MAIN = "Main";
     public static final String SEQUENCE_TIS = "TIS";
@@ -46,8 +45,6 @@ public final class TestProtocol {
                 return "SpringLoaded";
             case OVERVIEW_STATE_ORDINAL:
                 return "Overview";
-            case OVERVIEW_PEEK_STATE_ORDINAL:
-                return "OverviewPeek";
             case OVERVIEW_MODAL_TASK_STATE_ORDINAL:
                 return "OverviewModal";
             case QUICK_SWITCH_STATE_ORDINAL:
@@ -98,7 +95,9 @@ public final class TestProtocol {
     public static final String REQUEST_ENABLE_DEBUG_TRACING = "enable-debug-tracing";
     public static final String REQUEST_DISABLE_DEBUG_TRACING = "disable-debug-tracing";
 
-    public static final String REQUEST_OVERVIEW_ACTIONS_ENABLED = "overview-actions-enabled";
+    public static final String REQUEST_OVERVIEW_SHARE_ENABLED = "overview-share-enabled";
+    public static final String REQUEST_OVERVIEW_CONTENT_PUSH_ENABLED =
+            "overview-content-push-enabled";
 
     public static boolean sDisableSensorRotation;
     public static final String REQUEST_MOCK_SENSOR_ROTATION = "mock-sensor-rotation";
@@ -107,5 +106,5 @@ public final class TestProtocol {
     public static final String PAUSE_NOT_DETECTED = "b/139891609";
     public static final String OVERIEW_NOT_ALLAPPS = "b/156095088";
     public static final String NO_SWIPE_TO_HOME = "b/158017601";
-    public static final String NO_SCROLL_END_WIDGETS = "b/160238801";
+    public static final String WORK_PROFILE_REMOVED = "b/159671700";
 }

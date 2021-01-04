@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.logging;
 
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.IGNORE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_CLOSE_DOWN;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_OPEN_UP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOME_GESTURE;
@@ -23,21 +22,21 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 
 import android.content.Context;
 
-import androidx.annotation.Nullable;
-
 import com.android.launcher3.R;
 import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import com.android.launcher3.logger.LauncherAtom.FromState;
 import com.android.launcher3.logger.LauncherAtom.ToState;
 import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.userevent.LauncherLogProto;
 import com.android.launcher3.util.ResourceBasedOverride;
 
 /**
  * Handles the user event logging in R+.
+ *
+ * <pre>
  * All of the event ids are defined here.
- * Most of the methods are dummy methods for Launcher3
+ * Most of the methods are placeholder methods for Launcher3
  * Actual call happens only for Launcher variant that implements QuickStep.
+ * </pre>
  */
 public class StatsLogManager implements ResourceBasedOverride {
 
@@ -49,41 +48,22 @@ public class StatsLogManager implements ResourceBasedOverride {
     public static final int LAUNCHER_STATE_UNCHANGED = 5;
 
     /**
-     * Returns proper launcher state enum for {@link StatsLogManager}
-     * (to be removed during UserEventDispatcher cleanup)
+     * Returns event enum based on the two state transition information when swipe
+     * gesture happens(to be removed during UserEventDispatcher cleanup).
      */
-    public static int containerTypeToAtomState(int containerType) {
-        switch (containerType) {
-            case LauncherLogProto.ContainerType.ALLAPPS_VALUE:
-                return LAUNCHER_STATE_ALLAPPS;
-            case LauncherLogProto.ContainerType.OVERVIEW_VALUE:
-                return LAUNCHER_STATE_OVERVIEW;
-            case LauncherLogProto.ContainerType.WORKSPACE_VALUE:
-                return LAUNCHER_STATE_HOME;
-            case LauncherLogProto.ContainerType.APP_VALUE:
-                return LAUNCHER_STATE_BACKGROUND;
-        }
-        return LAUNCHER_STATE_UNSPECIFIED;
-    }
-
-    /**
-     * Returns event enum based on the two {@link ContainerType} transition information when
-     * swipe gesture happens.
-     * (to be removed during UserEventDispatcher cleanup)
-     */
-    public static EventEnum getLauncherAtomEvent(int startContainerType,
-            int targetContainerType, EventEnum fallbackEvent) {
-        if (startContainerType == LauncherLogProto.ContainerType.WORKSPACE.getNumber()
-                && targetContainerType == LauncherLogProto.ContainerType.WORKSPACE.getNumber()) {
+    public static EventEnum getLauncherAtomEvent(int startState,
+            int targetState, EventEnum fallbackEvent) {
+        if (startState == LAUNCHER_STATE_HOME
+                && targetState == LAUNCHER_STATE_HOME) {
             return LAUNCHER_HOME_GESTURE;
-        } else if (startContainerType != LauncherLogProto.ContainerType.TASKSWITCHER.getNumber()
-                && targetContainerType == LauncherLogProto.ContainerType.TASKSWITCHER.getNumber()) {
+        } else if (startState != LAUNCHER_STATE_OVERVIEW
+                && targetState == LAUNCHER_STATE_OVERVIEW) {
             return LAUNCHER_OVERVIEW_GESTURE;
-        } else if (startContainerType != LauncherLogProto.ContainerType.ALLAPPS.getNumber()
-                && targetContainerType == LauncherLogProto.ContainerType.ALLAPPS.getNumber()) {
+        } else if (startState != LAUNCHER_STATE_ALLAPPS
+                && targetState == LAUNCHER_STATE_ALLAPPS) {
             return LAUNCHER_ALLAPPS_OPEN_UP;
-        } else if (startContainerType == LauncherLogProto.ContainerType.ALLAPPS.getNumber()
-                && targetContainerType != LauncherLogProto.ContainerType.ALLAPPS.getNumber()) {
+        } else if (startState == LAUNCHER_STATE_ALLAPPS
+                && targetState != LAUNCHER_STATE_ALLAPPS) {
             return LAUNCHER_ALLAPPS_CLOSE_DOWN;
         }
         return fallbackEvent; // TODO fix
@@ -273,7 +253,86 @@ public class StatsLogManager implements ResourceBasedOverride {
         LAUNCHER_SELECT_MODE_CLOSE(583),
 
         @UiEvent(doc = "User tapped on the highlight items in select mode")
-        LAUNCHER_SELECT_MODE_ITEM(584);
+        LAUNCHER_SELECT_MODE_ITEM(584),
+
+        @UiEvent(doc = "Notification dot on app icon enabled.")
+        LAUNCHER_NOTIFICATION_DOT_ENABLED(611),
+
+        @UiEvent(doc = "Notification dot on app icon disabled.")
+        LAUNCHER_NOTIFICATION_DOT_DISABLED(612),
+
+        @UiEvent(doc = "For new apps, add app icons to home screen enabled.")
+        LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_ENABLED(613),
+
+        @UiEvent(doc = "For new apps, add app icons to home screen disabled.")
+        LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_DISABLED(614),
+
+        @UiEvent(doc = "Home screen rotation is enabled when phone is rotated.")
+        LAUNCHER_HOME_SCREEN_ROTATION_ENABLED(615),
+
+        @UiEvent(doc = "Home screen rotation is disabled when phone is rotated.")
+        LAUNCHER_HOME_SCREEN_ROTATION_DISABLED(616),
+
+        @UiEvent(doc = "Suggestions in all apps list enabled.")
+        LAUNCHER_ALL_APPS_SUGGESTIONS_ENABLED(619),
+
+        @UiEvent(doc = "Suggestions in all apps list disabled.")
+        LAUNCHER_ALL_APPS_SUGGESTIONS_DISABLED(620),
+
+        @UiEvent(doc = "Suggestions on home screen is enabled.")
+        LAUNCHER_HOME_SCREEN_SUGGESTIONS_ENABLED(621),
+
+        @UiEvent(doc = "Suggestions on home screen is disabled.")
+        LAUNCHER_HOME_SCREEN_SUGGESTIONS_DISABLED(622),
+
+        @UiEvent(doc = "System navigation is 3 button mode.")
+        LAUNCHER_NAVIGATION_MODE_3_BUTTON(623),
+
+        @UiEvent(doc = "System navigation mode is 2 button mode.")
+        LAUNCHER_NAVIGATION_MODE_2_BUTTON(624),
+
+        @UiEvent(doc = "System navigation mode is 0 button mode/gesture navigation mode .")
+        LAUNCHER_NAVIGATION_MODE_GESTURE_BUTTON(625),
+
+        @UiEvent(doc = "User tapped on image content in Overview Select mode.")
+        LAUNCHER_SELECT_MODE_IMAGE(627),
+
+        @UiEvent(doc = "A folder was replaced by a single item")
+        LAUNCHER_FOLDER_CONVERTED_TO_ICON(628),
+
+        @UiEvent(doc = "A hotseat prediction item was pinned")
+        LAUNCHER_HOTSEAT_PREDICTION_PINNED(629),
+
+        @UiEvent(doc = "Activity to add external item was started")
+        LAUNCHER_ADD_EXTERNAL_ITEM_START(641),
+
+        @UiEvent(doc = "Activity to add external item was cancelled")
+        LAUNCHER_ADD_EXTERNAL_ITEM_CANCELLED(642),
+
+        @UiEvent(doc = "Activity to add external item was backed out")
+        LAUNCHER_ADD_EXTERNAL_ITEM_BACK(643),
+
+        @UiEvent(doc = "Item was placed automatically in external item addition flow")
+        LAUNCHER_ADD_EXTERNAL_ITEM_PLACED_AUTOMATICALLY(644),
+
+        @UiEvent(doc = "Item was dragged in external item addition flow")
+        LAUNCHER_ADD_EXTERNAL_ITEM_DRAGGED(645),
+
+        @UiEvent(doc = "Undo event was tapped.")
+        LAUNCHER_UNDO(648),
+
+        @UiEvent(doc = "Task switcher clear all target was tapped.")
+        LAUNCHER_TASK_CLEAR_ALL(649),
+
+        @UiEvent(doc = "Task preview was long pressed.")
+        LAUNCHER_TASK_PREVIEW_LONGPRESS(650),
+
+        @UiEvent(doc = "User swiped down on workspace (triggering noti shade to open).")
+        LAUNCHER_SWIPE_DOWN_WORKSPACE_NOTISHADE_OPEN(651),
+
+        @UiEvent(doc = "Notification dismissed by swiping right.")
+        LAUNCHER_NOTIFICATION_DISMISSED(652),
+        ;
 
         // ADD MORE
 
@@ -401,24 +460,5 @@ public class StatsLogManager implements ResourceBasedOverride {
         StatsLogManager mgr = Overrides.getObject(StatsLogManager.class,
                 context.getApplicationContext(), R.string.stats_log_manager_class);
         return mgr;
-    }
-
-    /**
-     * Log an event with ranked-choice information along with package. Does nothing if event.getId()
-     * <= 0.
-     *
-     * @param rankingEvent an enum implementing EventEnum interface.
-     * @param instanceId An identifier obtained from an InstanceIdSequence.
-     * @param packageName the package name of the relevant app, if known (null otherwise).
-     * @param position the position picked.
-     */
-    public void log(EventEnum rankingEvent, InstanceId instanceId, @Nullable String packageName,
-            int position) {
-    }
-
-    /**
-     * Logs snapshot, or impression of the current workspace.
-     */
-    public void logSnapshot() {
     }
 }
