@@ -15,11 +15,15 @@
  */
 package com.android.quickstep;
 
+import static android.view.Surface.ROTATION_0;
+import static android.view.Surface.ROTATION_270;
+import static android.view.Surface.ROTATION_90;
 import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_STATE_HANDLER;
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
-import static com.android.launcher3.QuickstepAppTransitionManagerImpl.TRANSITION_OPEN_LAUNCHER;
+import static com.android.launcher3.QuickstepAppTransitionManagerImpl.RECENTS_LAUNCH_DURATION;
+import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.anim.Interpolators.DEACCEL;
 import static com.android.launcher3.anim.Interpolators.OVERSHOOT_1_2;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
@@ -31,6 +35,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_QUICKSWITCH_RIGHT;
 import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_OVERVIEW;
 import static com.android.launcher3.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.quickstep.GestureState.GestureEndTarget.HOME;
@@ -52,12 +57,11 @@ import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.SystemClock;
-import android.os.Trace;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnApplyWindowInsetsListener;
@@ -78,7 +82,6 @@ import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
 import com.android.launcher3.statemanager.StatefulActivity;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.tracing.InputConsumerProto;
 import com.android.launcher3.tracing.SwipeHandlerProto;
 import com.android.launcher3.util.TraceHelper;
@@ -92,7 +95,7 @@ import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.InputConsumerProxy;
 import com.android.quickstep.util.MotionPauseDetector;
-import com.android.quickstep.util.RecentsOrientedState;
+import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.quickstep.util.ProtoTracer;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.util.RectFSpringAnim;
@@ -108,6 +111,7 @@ import com.android.systemui.shared.system.InputConsumerController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.LatencyTrackerCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
+import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams;
 import com.android.systemui.shared.system.TaskInfoCompat;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 
@@ -321,13 +325,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
 
     protected boolean onActivityInit(Boolean alreadyOnHome) {
         T createdActivity = mActivityInterface.getCreatedActivity();
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.PAUSE_NOT_DETECTED, "BaseSwipeUpHandler.1");
-        }
         if (createdActivity != null) {
-            if (TestProtocol.sDebugTracing) {
-                Log.d(TestProtocol.PAUSE_NOT_DETECTED, "BaseSwipeUpHandler.2");
-            }
             initTransitionEndpoints(createdActivity.getDeviceProfile());
         }
         final T activity = mActivityInterface.getCreatedActivity();
@@ -729,6 +727,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
         setIsLikelyToStartNewTask(isLikelyToStartNewTask, false /* animate */);
         mStateCallback.setStateOnUiThread(STATE_GESTURE_STARTED);
         mGestureStarted = true;
+        mTaskViewSimulator.setDrawsBelowRecents(true);
     }
 
     /**
@@ -1069,7 +1068,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
                             runningTaskTarget.pictureInPictureParams) != null;
             if (mIsSwipingPipToHome) {
                 mSwipePipToHomeAnimator = getSwipePipToHomeAnimator(
-                        homeAnimFactory, runningTaskTarget);
+                        homeAnimFactory, runningTaskTarget, start);
                 mSwipePipToHomeAnimator.setDuration(SWIPE_PIP_TO_HOME_DURATION);
                 mSwipePipToHomeAnimator.setInterpolator(interpolator);
                 mSwipePipToHomeAnimator.setFloatValues(0f, 1f);
@@ -1139,23 +1138,34 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
     }
 
     private SwipePipToHomeAnimator getSwipePipToHomeAnimator(HomeAnimationFactory homeAnimFactory,
-            RemoteAnimationTargetCompat runningTaskTarget) {
+            RemoteAnimationTargetCompat runningTaskTarget, float startProgress) {
         // Directly animate the app to PiP (picture-in-picture) mode
         final ActivityManager.RunningTaskInfo taskInfo = mGestureState.getRunningTask();
         final RecentsOrientedState orientationState = mTaskViewSimulator.getOrientationState();
+        final int windowRotation = orientationState.getDisplayRotation();
+        final int homeRotation = orientationState.getRecentsActivityRotation();
         final Rect destinationBounds = SystemUiProxy.INSTANCE.get(mContext)
                 .startSwipePipToHome(taskInfo.topActivity,
                         TaskInfoCompat.getTopActivityInfo(taskInfo),
                         runningTaskTarget.pictureInPictureParams,
-                        orientationState.getRecentsActivityRotation(),
+                        homeRotation,
                         mDp.hotseatBarSizePx);
+        final Rect startBounds = new Rect();
+        updateProgressForStartRect(new Matrix(), startProgress).round(startBounds);
         final SwipePipToHomeAnimator swipePipToHomeAnimator = new SwipePipToHomeAnimator(
                 runningTaskTarget.taskId,
                 taskInfo.topActivity,
                 runningTaskTarget.leash.getSurfaceControl(),
                 TaskInfoCompat.getPipSourceRectHint(runningTaskTarget.pictureInPictureParams),
                 TaskInfoCompat.getWindowConfigurationBounds(taskInfo),
+                startBounds,
                 destinationBounds);
+        // We would assume home and app window always in the same rotation While homeRotation
+        // is not ROTATION_0 (which implies the rotation is turned on in launcher settings).
+        if (homeRotation == ROTATION_0
+                && (windowRotation == ROTATION_90 || windowRotation == ROTATION_270)) {
+            swipePipToHomeAnimator.setFromRotation(mTaskViewSimulator, windowRotation);
+        }
         swipePipToHomeAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
@@ -1213,7 +1223,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
         anim.addAnimatorListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {
-                Trace.beginAsyncSection(TRANSITION_OPEN_LAUNCHER, 0);
                 InteractionJankMonitorWrapper.begin(cuj);
                 if (mActivity != null) {
                     removeLiveTileOverlay();
@@ -1235,12 +1244,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
             public void onAnimationCancel(Animator animation) {
                 super.onAnimationCancel(animation);
                 InteractionJankMonitorWrapper.cancel(cuj);
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                super.onAnimationEnd(animation);
-                Trace.endAsyncSection(TRANSITION_OPEN_LAUNCHER, 0);
             }
         });
         if (mRecentsAnimationTargets != null) {
@@ -1391,32 +1394,53 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
             if (mRecentsAnimationController != null) {
                 // Update the screenshot of the task
                 if (mTaskSnapshot == null) {
-                    mTaskSnapshot = mRecentsAnimationController.screenshotTask(runningTaskId);
+                    UI_HELPER_EXECUTOR.execute(() -> {
+                        final ThumbnailData taskSnapshot =
+                                mRecentsAnimationController.screenshotTask(runningTaskId);
+                        MAIN_EXECUTOR.execute(() -> {
+                            mTaskSnapshot = taskSnapshot;
+                            if (!updateThumbnail(runningTaskId)) {
+                                setScreenshotCapturedState();
+                            }
+                        });
+                    });
+                    return;
                 }
-                final TaskView taskView;
-                if (mGestureState.getEndTarget() == HOME) {
-                    // Capture the screenshot before finishing the transition to home to ensure it's
-                    // taken in the correct orientation, but no need to update the thumbnail.
-                    taskView = null;
-                } else {
-                    taskView = mRecentsView.updateThumbnail(runningTaskId, mTaskSnapshot);
-                }
-                if (taskView != null && !mCanceled) {
-                    // Defer finishing the animation until the next launcher frame with the
-                    // new thumbnail
-                    finishTransitionPosted = ViewUtils.postFrameDrawn(taskView,
-                            () -> mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED),
-                            this::isCanceled);
-                }
+                finishTransitionPosted = updateThumbnail(runningTaskId);
             }
             if (!finishTransitionPosted) {
-                // If we haven't posted a draw callback, set the state immediately.
-                Object traceToken = TraceHelper.INSTANCE.beginSection(SCREENSHOT_CAPTURED_EVT,
-                        TraceHelper.FLAG_CHECK_FOR_RACE_CONDITIONS);
-                mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED);
-                TraceHelper.INSTANCE.endSection(traceToken);
+                setScreenshotCapturedState();
             }
         }
+    }
+
+    // Returns whether finish transition was posted.
+    private boolean updateThumbnail(int runningTaskId) {
+        boolean finishTransitionPosted = false;
+        final TaskView taskView;
+        if (mGestureState.getEndTarget() == HOME) {
+            // Capture the screenshot before finishing the transition to home to ensure it's
+            // taken in the correct orientation, but no need to update the thumbnail.
+            taskView = null;
+        } else {
+            taskView = mRecentsView.updateThumbnail(runningTaskId, mTaskSnapshot);
+        }
+        if (taskView != null && !mCanceled) {
+            // Defer finishing the animation until the next launcher frame with the
+            // new thumbnail
+            finishTransitionPosted = ViewUtils.postFrameDrawn(taskView,
+                    () -> mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED),
+                    this::isCanceled);
+        }
+        return finishTransitionPosted;
+    }
+
+    private void setScreenshotCapturedState() {
+        // If we haven't posted a draw callback, set the state immediately.
+        Object traceToken = TraceHelper.INSTANCE.beginSection(SCREENSHOT_CAPTURED_EVT,
+                TraceHelper.FLAG_CHECK_FOR_RACE_CONDITIONS);
+        mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED);
+        TraceHelper.INSTANCE.endSection(traceToken);
     }
 
     private void finishCurrentTransitionToRecents() {
@@ -1498,17 +1522,36 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
     }
 
     private void launchOtherTaskInLiveTileMode(int taskId, RemoteAnimationTargetCompat[] apps) {
-        TaskView taskView = mRecentsView.getTaskView(taskId);
-        if (taskView == null) {
-            return;
-        }
-
         AnimatorSet anim = new AnimatorSet();
-        TaskViewUtils.composeRecentsLaunchAnimator(
-                anim, taskView, apps,
-                mRecentsAnimationTargets.wallpapers, true /* launcherClosing */,
-                mActivity.getStateManager(), mRecentsView,
-                mActivityInterface.getDepthController());
+        TaskView taskView = mRecentsView.getTaskView(taskId);
+        if (taskView == null || !mRecentsView.isTaskViewVisible(taskView)) {
+            // TODO: Refine this animation.
+            SurfaceTransactionApplier surfaceApplier =
+                    new SurfaceTransactionApplier(mActivity.getDragLayer());
+            ValueAnimator appAnimator = ValueAnimator.ofFloat(0, 1);
+            appAnimator.setDuration(RECENTS_LAUNCH_DURATION);
+            appAnimator.setInterpolator(ACCEL_DEACCEL);
+            appAnimator.addUpdateListener(new MultiValueUpdateListener() {
+                @Override
+                public void onUpdate(float percent) {
+                    SurfaceParams.Builder builder = new SurfaceParams.Builder(
+                            apps[apps.length - 1].leash);
+                    Matrix matrix = new Matrix();
+                    matrix.postScale(percent, percent);
+                    matrix.postTranslate(mDp.widthPx * (1 - percent) / 2,
+                            mDp.heightPx * (1 - percent) / 2);
+                    builder.withAlpha(percent).withMatrix(matrix);
+                    surfaceApplier.scheduleApply(builder.build());
+                }
+            });
+            anim.play(appAnimator);
+        } else {
+            TaskViewUtils.composeRecentsLaunchAnimator(
+                    anim, taskView, apps,
+                    mRecentsAnimationTargets.wallpapers, true /* launcherClosing */,
+                    mActivity.getStateManager(), mRecentsView,
+                    mActivityInterface.getDepthController());
+        }
         anim.addListener(new AnimatorListenerAdapter(){
 
             @Override
@@ -1710,6 +1753,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
             LiveTileOverlay.INSTANCE.update(
                     mTaskViewSimulator.getCurrentRect(),
                     mTaskViewSimulator.getCurrentCornerRadius());
+            LiveTileOverlay.INSTANCE.setRotation(
+                    mRecentsView.getPagedViewOrientedState().getDisplayRotation());
         }
         ProtoTracer.INSTANCE.get(mContext).scheduleFrameUpdate();
     }
