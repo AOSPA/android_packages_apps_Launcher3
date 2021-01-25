@@ -172,9 +172,6 @@ public abstract class AbstractStateChangeTouchController
 
     @Override
     public final boolean onControllerTouchEvent(MotionEvent ev) {
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.PAUSE_NOT_DETECTED, "onControllerTouchEvent");
-        }
         return mDetector.onTouchEvent(ev);
     }
 
@@ -396,6 +393,12 @@ public abstract class AbstractStateChangeTouchController
 
     @Override
     public void onDragEnd(float velocity) {
+        if (mCurrentAnimation == null) {
+            // Unlikely, but we may have been canceled just before onDragEnd(). We assume whoever
+            // canceled us will handle a new state transition to clean up.
+            return;
+        }
+
         boolean fling = mDetector.isFling(velocity);
 
         boolean blockedFling = fling && mFlingBlockCheck.isBlocked();

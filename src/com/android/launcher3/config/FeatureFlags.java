@@ -153,7 +153,7 @@ public final class FeatureFlags {
             "ENABLE_OVERVIEW_CONTENT_PUSH", false, "Show Content Push button in Overview Actions");
 
     public static final BooleanFlag ENABLE_DATABASE_RESTORE = getDebugFlag(
-            "ENABLE_DATABASE_RESTORE", true,
+            "ENABLE_DATABASE_RESTORE", false,
             "Enable database restore when new restore session is created");
 
     public static final BooleanFlag ENABLE_SMARTSPACE_UNIVERSAL = getDebugFlag(
@@ -189,6 +189,10 @@ public final class FeatureFlags {
     public static final BooleanFlag EXPANDED_SMARTSPACE = new DeviceFlag(
             "EXPANDED_SMARTSPACE", false, "Expands smartspace height to two rows. "
               + "Any apps occupying the first row will be removed from workspace.");
+
+    public static final BooleanFlag ENABLE_FOUR_COLUMNS = new DeviceFlag(
+            "ENABLE_FOUR_COLUMNS", false, "Uses 4 columns in launcher grid."
+            + "Warning: This will permanently alter your home screen items and is not reversible.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
