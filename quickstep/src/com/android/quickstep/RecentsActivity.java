@@ -21,6 +21,7 @@ import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static com.android.launcher3.QuickstepAppTransitionManagerImpl.RECENTS_LAUNCH_DURATION;
 import static com.android.launcher3.QuickstepAppTransitionManagerImpl.STATUS_BAR_TRANSITION_DURATION;
 import static com.android.launcher3.QuickstepAppTransitionManagerImpl.STATUS_BAR_TRANSITION_PRE_DELAY;
+import static com.android.launcher3.Utilities.createHomeIntent;
 import static com.android.launcher3.testing.TestProtocol.OVERVIEW_STATE_ORDINAL;
 import static com.android.quickstep.TaskUtils.taskIsATargetWithMode;
 import static com.android.quickstep.TaskViewUtils.createRecentsWindowAnimator;
@@ -45,6 +46,7 @@ import com.android.launcher3.LauncherAnimationRunner.AnimationResult;
 import com.android.launcher3.R;
 import com.android.launcher3.WrappedAnimationRunnerImpl;
 import com.android.launcher3.WrappedLauncherAnimationRunner;
+import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
@@ -65,7 +67,6 @@ import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.system.ActivityOptionsCompat;
 import com.android.systemui.shared.system.RemoteAnimationAdapterCompat;
-import com.android.systemui.shared.system.RemoteAnimationRunnerCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.io.FileDescriptor;
@@ -92,6 +93,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
 
     // Strong refs to runners which are cleared when the activity is destroyed
     private WrappedAnimationRunnerImpl mActivityLaunchAnimationRunner;
+    private SearchAdapterProvider mSearchAdapterProvider;
 
     /**
      * Init drag layer and overview panel views.
@@ -308,9 +310,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     }
 
     public void startHome() {
-        startActivity(new Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_HOME)
-                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        startActivity(createHomeIntent());
     }
 
     @Override
@@ -332,7 +332,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
 
     @Override
     public AtomicAnimationFactory<RecentsState> createAtomicAnimationFactory() {
-        return new RecentsAtomicAnimationFactory<>(this, 0);
+        return new RecentsAtomicAnimationFactory<>(this);
     }
 
     private AnimatorListenerAdapter resetStateListener() {

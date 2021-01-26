@@ -136,6 +136,12 @@ public class TouchInteractionService extends Service implements PluginListener<O
                 SystemUiProxy.INSTANCE.get(TouchInteractionService.this).setProxy(proxy);
                 TouchInteractionService.this.initInputMonitor();
                 preloadOverview(true /* fromInit */);
+                mDeviceState.runOnUserUnlocked(() -> {
+                    final BaseActivityInterface ai =
+                            mOverviewComponentObserver.getActivityInterface();
+                    if (ai == null) return;
+                    ai.onOverviewServiceBound();
+                });
             });
             sIsInitialized = true;
         }
@@ -466,7 +472,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
                             this,
                             mGestureState,
                             InputConsumer.NO_OP, mInputMonitorCompat,
-                            mOverviewComponentObserver.assistantGestureIsConstrained());
+                            mDeviceState,
+                            event);
                 } else if (mDeviceState.canTriggerOneHandedAction(event)
                     && !mDeviceState.isOneHandedModeActive()) {
                     // Consume gesture event for triggering one handed feature.
@@ -563,12 +570,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
         }
         if (mDeviceState.isFullyGesturalNavMode()) {
             if (mDeviceState.canTriggerAssistantAction(event, newGestureState.getRunningTask())) {
-                base = new AssistantInputConsumer(
-                    this,
-                    newGestureState,
-                    base,
-                    mInputMonitorCompat,
-                    mOverviewComponentObserver.assistantGestureIsConstrained());
+                base = new AssistantInputConsumer(this, newGestureState, base, mInputMonitorCompat,
+                        mDeviceState, event);
             }
 
             if (FeatureFlags.ENABLE_QUICK_CAPTURE_GESTURE.get()) {
