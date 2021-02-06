@@ -26,7 +26,6 @@ import static android.view.Surface.ROTATION_90;
 import static com.android.launcher3.Utilities.newContentObserver;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.quickstep.SysUINavigationMode.Mode.TWO_BUTTONS;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
@@ -50,12 +49,12 @@ import androidx.annotation.NonNull;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
+import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.BaseActivityInterface;
-import com.android.quickstep.SysUINavigationMode;
 
 import java.lang.annotation.Retention;
 import java.util.function.IntConsumer;
@@ -158,7 +157,8 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
         Resources res = context.getResources();
         int originalSmallestWidth = res.getConfiguration().smallestScreenWidthDp
                 * res.getDisplayMetrics().densityDpi / DENSITY_DEVICE_STABLE;
-        if (originalSmallestWidth < 600) {
+        if (originalSmallestWidth < 600 && !mContext.getResources().getBoolean(
+                R.bool.allow_rotation)) {
             mFlags |= FLAG_MULTIPLE_ORIENTATION_SUPPORTED_BY_DENSITY;
         }
         mFlags |= FLAG_SWIPE_UP_NOT_RUNNING;
@@ -198,7 +198,6 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
      */
     public boolean update(
             @SurfaceRotation int touchRotation, @SurfaceRotation int displayRotation) {
-        mRecentsActivityRotation = inferRecentsActivityRotation(displayRotation);
         mDisplayRotation = displayRotation;
         mTouchRotation = touchRotation;
         mPreviousRotation = touchRotation;
@@ -206,6 +205,7 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
     }
 
     private boolean updateHandler() {
+        mRecentsActivityRotation = inferRecentsActivityRotation(mDisplayRotation);
         if (mRecentsActivityRotation == mTouchRotation
                 || (canRecentsActivityRotate() && (mFlags & FLAG_SWIPE_UP_NOT_RUNNING) != 0)) {
             mOrientationHandler = PagedOrientationHandler.PORTRAIT;
@@ -281,10 +281,7 @@ public final class RecentsOrientedState implements SharedPreferences.OnSharedPre
     }
 
     private void initFlags() {
-        SysUINavigationMode.Mode currentMode = SysUINavigationMode.getMode(mContext);
-        boolean rotationWatcherSupported = mOrientationListener.canDetectOrientation() &&
-                currentMode != TWO_BUTTONS;
-        setFlag(FLAG_ROTATION_WATCHER_SUPPORTED, rotationWatcherSupported);
+        setFlag(FLAG_ROTATION_WATCHER_SUPPORTED, mOrientationListener.canDetectOrientation());
 
         // initialize external flags
         updateAutoRotateSetting();
