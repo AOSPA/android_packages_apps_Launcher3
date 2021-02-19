@@ -721,16 +721,16 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
 
     @UiThread
     public void onGestureStarted(boolean isLikelyToStartNewTask) {
-        // Temporarily disable this until we have a view that we can use
-        // InteractionJankMonitorWrapper.begin(mRecentsView,
-        //         InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH, 2000 /* ms timeout */);
-        // InteractionJankMonitorWrapper.begin(mRecentsView,
-        //         InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
+        if (mRecentsView != null) {
+            InteractionJankMonitorWrapper.begin(mRecentsView,
+                    InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH, 2000 /* ms timeout */);
+            InteractionJankMonitorWrapper.begin(mRecentsView,
+                    InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
+        }
         notifyGestureStartedAsync();
         setIsLikelyToStartNewTask(isLikelyToStartNewTask, false /* animate */);
         mStateCallback.setStateOnUiThread(STATE_GESTURE_STARTED);
         mGestureStarted = true;
-        mTaskViewSimulator.setDrawsBelowRecents(true);
     }
 
     /**
@@ -957,7 +957,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
         if (endTarget == HOME) {
             duration = Math.max(MIN_OVERSHOOT_DURATION, duration);
         } else if (endTarget == RECENTS) {
-            LiveTileOverlay.INSTANCE.startIconAnimation();
             if (mRecentsView != null) {
                 int nearestPage = mRecentsView.getPageNearestToCenterOfScreen();
                 if (mRecentsView.getNextPage() != nearestPage) {
@@ -1058,10 +1057,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<?>, Q extends
         if (mGestureState.getEndTarget().isLauncher) {
             ActivityManagerWrapper.getInstance().registerTaskStackListener(
                     mActivityRestartListener);
+
+            mActivityInterface.onAnimateToLauncher(mGestureState.getEndTarget(), duration);
         }
 
         if (mGestureState.getEndTarget() == HOME) {
-            mTaskViewSimulator.setDrawsBelowRecents(false);
             getOrientationHandler().adjustFloatingIconStartVelocity(velocityPxPerMs);
             final RemoteAnimationTargetCompat runningTaskTarget = mRecentsAnimationTargets != null
                     ? mRecentsAnimationTargets.findTask(mGestureState.getRunningTaskId())

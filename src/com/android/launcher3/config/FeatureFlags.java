@@ -95,14 +95,14 @@ public final class FeatureFlags {
             "ENABLE_SUGGESTED_ACTIONS_OVERVIEW", true, "Show chip hints on the overview screen");
 
 
-    public static final BooleanFlag ENABLE_DEVICE_SEARCH = getDebugFlag(
+    public static final BooleanFlag ENABLE_DEVICE_SEARCH = new DeviceFlag(
             "ENABLE_DEVICE_SEARCH", false, "Allows on device search in all apps");
-
-    public static final BooleanFlag USE_SEARCH_API = getDebugFlag(
-            "USE_SEARCH_API", true, "Use SearchUIManager api for device search");
 
     public static final BooleanFlag DISABLE_INITIAL_IME_IN_ALLAPPS = getDebugFlag(
             "DISABLE_INITIAL_IME_IN_ALLAPPS", false, "Disable default IME state in all apps");
+
+    public static final BooleanFlag DISABLE_SLICE_IN_ALLAPPS = getDebugFlag(
+            "DISABLE_SLICE_IN_ALLAPPS", true, "Disable slice in all apps");
 
     public static final BooleanFlag FOLDER_NAME_SUGGEST = new DeviceFlag(
             "FOLDER_NAME_SUGGEST", true,
@@ -213,6 +213,9 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_APP_PREDICTIONS_WHILE_VISIBLE = new DeviceFlag(
             "ENABLE_APP_PREDICTIONS_WHILE_VISIBLE", true, "Allows app "
             + "predictions to be updated while they are visible to the user.");
+
+    public static final BooleanFlag ENABLE_TASKBAR = new DeviceFlag(
+            "ENABLE_TASKBAR", false, "Allows a system Taskbar to be shown on larger devices.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

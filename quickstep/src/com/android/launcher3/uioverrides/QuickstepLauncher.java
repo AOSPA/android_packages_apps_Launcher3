@@ -17,6 +17,7 @@ package com.android.launcher3.uioverrides;
 
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
 
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
@@ -24,6 +25,8 @@ import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
+import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.EXTENDED_CONTAINERS;
+import static com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers.ContainerCase.DEVICE_SEARCH_RESULT_CONTAINER;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
 import static com.android.launcher3.testing.TestProtocol.HINT_STATE_ORDINAL;
 import static com.android.launcher3.testing.TestProtocol.OVERVIEW_STATE_ORDINAL;
@@ -52,6 +55,7 @@ import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.search.DeviceSearchAdapterProvider;
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
@@ -80,7 +84,9 @@ import com.android.quickstep.views.TaskView;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public class QuickstepLauncher extends BaseQuickstepLauncher {
@@ -105,6 +111,15 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
 
     @Override
     protected void logAppLaunch(ItemInfo info, InstanceId instanceId) {
+        // If the app launch is from DeviceSearchResultContainer then add the InstanceId from
+        // LiveSearchManager to recreate the AllApps search session on the server side.
+        Optional<InstanceId> logInstanceId = this.getLiveSearchManager().getLogInstanceId();
+        if (info.getContainerInfo().getContainerCase() == EXTENDED_CONTAINERS
+                && info.getContainerInfo().getExtendedContainers().getContainerCase()
+                == DEVICE_SEARCH_RESULT_CONTAINER && logInstanceId.isPresent()) {
+            instanceId = logInstanceId.get();
+        }
+
         StatsLogger logger = getStatsLogManager()
                 .logger().withItemInfo(info).withInstanceId(instanceId);
 
@@ -152,7 +167,8 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     @Override
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
         if (mHotseatPredictionController != null) {
-            mHotseatPredictionController.setPauseUIUpdate(true);
+            // Only pause is taskbar controller is not present
+            mHotseatPredictionController.setPauseUIUpdate(getTaskbarController() == null);
         }
         return super.startActivitySafely(v, intent, item);
     }
@@ -214,6 +230,15 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
         } else if (item.containerId == Favorites.CONTAINER_HOTSEAT_PREDICTION
                 && mHotseatPredictionController != null) {
             mHotseatPredictionController.setPredictedItems(item);
+        }
+    }
+
+    @Override
+    public void bindWorkspaceItemsChanged(List<WorkspaceItemInfo> updated) {
+        super.bindWorkspaceItemsChanged(updated);
+        if (getTaskbarController() != null && updated.stream()
+                .filter(w -> w.container == CONTAINER_HOTSEAT).findFirst().isPresent()) {
+            getTaskbarController().onHotseatUpdated();
         }
     }
 
