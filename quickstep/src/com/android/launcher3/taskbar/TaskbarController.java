@@ -34,11 +34,15 @@ import android.view.WindowManager;
 
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepAppTransitionManagerImpl;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.folder.Folder;
+import com.android.launcher3.folder.FolderIcon;
+import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.ItemClickHandler;
@@ -81,11 +85,11 @@ public class TaskbarController {
             TaskbarContainerView taskbarContainerView) {
         mLauncher = launcher;
         mTaskbarContainerView = taskbarContainerView;
+        mTaskbarContainerView.construct(createTaskbarContainerViewCallbacks());
         mTaskbarView = mTaskbarContainerView.findViewById(R.id.taskbar_view);
-        mTaskbarView.setCallbacks(createTaskbarViewCallbacks());
+        mTaskbarView.construct(createTaskbarViewCallbacks());
         mWindowManager = mLauncher.getWindowManager();
-        mTaskbarSize = new Point(MATCH_PARENT,
-                mLauncher.getResources().getDimensionPixelSize(R.dimen.taskbar_size));
+        mTaskbarSize = new Point(MATCH_PARENT, mLauncher.getDeviceProfile().taskbarSize);
         mTaskbarStateHandler = mLauncher.getTaskbarStateHandler();
         mTaskbarVisibilityController = new TaskbarVisibilityController(mLauncher,
                 createTaskbarVisibilityControllerCallbacks());
@@ -110,6 +114,18 @@ public class TaskbarController {
         };
     }
 
+    private TaskbarContainerViewCallbacks createTaskbarContainerViewCallbacks() {
+        return new TaskbarContainerViewCallbacks() {
+            @Override
+            public void onViewRemoved() {
+                if (mTaskbarContainerView.getChildCount() == 1) {
+                    // Only TaskbarView remains.
+                    setTaskbarWindowFullscreen(false);
+                }
+            }
+        };
+    }
+
     private TaskbarViewCallbacks createTaskbarViewCallbacks() {
         return new TaskbarViewCallbacks() {
             @Override
@@ -120,9 +136,29 @@ public class TaskbarController {
                         Task task = (Task) tag;
                         ActivityManagerWrapper.getInstance().startActivityFromRecents(task.key,
                                 ActivityOptions.makeBasic());
+                    } else if (tag instanceof FolderInfo) {
+                        FolderIcon folderIcon = (FolderIcon) view;
+                        Folder folder = folderIcon.getFolder();
+
+                        setTaskbarWindowFullscreen(true);
+
+                        mTaskbarContainerView.post(() -> {
+                            folder.animateOpen();
+
+                            folder.iterateOverItems((itemInfo, itemView) -> {
+                                itemView.setOnClickListener(getItemOnClickListener());
+                                itemView.setOnLongClickListener(getItemOnLongClickListener());
+                                // To play haptic when dragging, like other Taskbar items do.
+                                itemView.setHapticFeedbackEnabled(true);
+                                return false;
+                            });
+                        });
                     } else {
                         ItemClickHandler.INSTANCE.onClick(view);
                     }
+
+                    AbstractFloatingView.closeAllOpenViews(
+                            mTaskbarContainerView.getTaskbarActivityContext());
                 };
             }
 
@@ -196,14 +232,10 @@ public class TaskbarController {
     }
 
     private void removeFromWindowManager() {
-        if (mTaskbarContainerView.isAttachedToWindow()) {
-            mWindowManager.removeViewImmediate(mTaskbarContainerView);
-        }
+        mWindowManager.removeViewImmediate(mTaskbarContainerView);
     }
 
     private void addToWindowManager() {
-        removeFromWindowManager();
-
         final int gravity = Gravity.BOTTOM;
 
         mWindowLayoutParams = new WindowManager.LayoutParams(
@@ -341,7 +373,22 @@ public class TaskbarController {
      * @return Whether the given View is in the same window as Taskbar.
      */
     public boolean isViewInTaskbar(View v) {
-        return mTaskbarContainerView.getWindowId().equals(v.getWindowId());
+        return mTaskbarContainerView.isAttachedToWindow()
+                && mTaskbarContainerView.getWindowId().equals(v.getWindowId());
+    }
+
+    /**
+     * Updates the TaskbarContainer to MATCH_PARENT vs original Taskbar size.
+     */
+    private void setTaskbarWindowFullscreen(boolean fullscreen) {
+        if (fullscreen) {
+            mWindowLayoutParams.width = MATCH_PARENT;
+            mWindowLayoutParams.height = MATCH_PARENT;
+        } else {
+            mWindowLayoutParams.width = mTaskbarSize.x;
+            mWindowLayoutParams.height = mTaskbarSize.y;
+        }
+        mWindowManager.updateViewLayout(mTaskbarContainerView, mWindowLayoutParams);
     }
 
     /**
@@ -358,6 +405,13 @@ public class TaskbarController {
     protected interface TaskbarVisibilityControllerCallbacks {
         void updateTaskbarBackgroundAlpha(float alpha);
         void updateTaskbarVisibilityAlpha(float alpha);
+    }
+
+    /**
+     * Contains methods that TaskbarContainerView can call to interface with TaskbarController.
+     */
+    protected interface TaskbarContainerViewCallbacks {
+        void onViewRemoved();
     }
 
     /**

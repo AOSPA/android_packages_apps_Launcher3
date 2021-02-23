@@ -26,10 +26,11 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.android.launcher3.CellLayout.ContainerType;
+import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 
-public class ShortcutAndWidgetContainer extends ViewGroup {
+public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.FolderIconParent {
     static final String TAG = "ShortcutAndWidgetContainer";
 
     // These are temporary variables to prevent having to allocate a new object just to
@@ -42,8 +43,10 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
 
     private int mCellWidth;
     private int mCellHeight;
+    private int mBorderSpacing;
 
     private int mCountX;
+    private int mCountY;
 
     private final ActivityContext mActivity;
     private boolean mInvertIfRtl = false;
@@ -55,20 +58,23 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
         mContainerType = containerType;
     }
 
-    public void setCellDimensions(int cellWidth, int cellHeight, int countX, int countY) {
+    public void setCellDimensions(int cellWidth, int cellHeight, int countX, int countY,
+            int borderSpacing) {
         mCellWidth = cellWidth;
         mCellHeight = cellHeight;
         mCountX = countX;
+        mCountY = countY;
+        mBorderSpacing = borderSpacing;
     }
 
-    public View getChildAt(int x, int y) {
+    public View getChildAt(int cellX, int cellY) {
         final int count = getChildCount();
         for (int i = 0; i < count; i++) {
             View child = getChildAt(i);
             CellLayout.LayoutParams lp = (CellLayout.LayoutParams) child.getLayoutParams();
 
-            if ((lp.cellX <= x) && (x < lp.cellX + lp.cellHSpan) &&
-                    (lp.cellY <= y) && (y < lp.cellY + lp.cellVSpan)) {
+            if ((lp.cellX <= cellX) && (cellX < lp.cellX + lp.cellHSpan)
+                    && (lp.cellY <= cellY) && (cellY < lp.cellY + lp.cellVSpan)) {
                 return child;
             }
         }
@@ -95,10 +101,11 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
         CellLayout.LayoutParams lp = (CellLayout.LayoutParams) child.getLayoutParams();
         if (child instanceof LauncherAppWidgetHostView) {
             DeviceProfile profile = mActivity.getDeviceProfile();
-            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX,
-                    profile.appWidgetScale.x, profile.appWidgetScale.y);
+            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX, mCountY,
+                    profile.appWidgetScale.x, profile.appWidgetScale.y, mBorderSpacing);
         } else {
-            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX);
+            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX, mCountY,
+                    mBorderSpacing);
         }
     }
 
@@ -117,11 +124,12 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
         final DeviceProfile profile = mActivity.getDeviceProfile();
 
         if (child instanceof LauncherAppWidgetHostView) {
-            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX,
-                    profile.appWidgetScale.x, profile.appWidgetScale.y);
+            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX, mCountY,
+                    profile.appWidgetScale.x, profile.appWidgetScale.y, mBorderSpacing);
             // Widgets have their own padding
         } else {
-            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX);
+            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX, mCountY,
+                    mBorderSpacing);
             // Center the icon/folder
             int cHeight = getCellContentHeight();
             int cellPaddingY = (int) Math.max(0, ((lp.height - cHeight) / 2f));
@@ -219,6 +227,26 @@ public class ShortcutAndWidgetContainer extends ViewGroup {
         for (int i = 0; i < count; i++) {
             final View child = getChildAt(i);
             child.cancelLongPress();
+        }
+    }
+
+    @Override
+    public void drawFolderLeaveBehindForIcon(FolderIcon child) {
+        CellLayout.LayoutParams lp = (CellLayout.LayoutParams) child.getLayoutParams();
+        // While the folder is open, the position of the icon cannot change.
+        lp.canReorder = false;
+        if (mContainerType == CellLayout.HOTSEAT) {
+            CellLayout cl = (CellLayout) getParent();
+            cl.setFolderLeaveBehindCell(lp.cellX, lp.cellY);
+        }
+    }
+
+    @Override
+    public void clearFolderLeaveBehind(FolderIcon child) {
+        ((CellLayout.LayoutParams) child.getLayoutParams()).canReorder = true;
+        if (mContainerType == CellLayout.HOTSEAT) {
+            CellLayout cl = (CellLayout) getParent();
+            cl.clearFolderLeaveBehind();
         }
     }
 }

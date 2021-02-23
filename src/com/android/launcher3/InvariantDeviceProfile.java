@@ -18,7 +18,6 @@ package com.android.launcher3;
 
 import static com.android.launcher3.Utilities.getDevicePrefs;
 import static com.android.launcher3.Utilities.getPointString;
-import static com.android.launcher3.config.FeatureFlags.APPLY_CONFIG_AT_RUNTIME;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_FOUR_COLUMNS;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
@@ -131,6 +130,8 @@ public class InvariantDeviceProfile {
     public DeviceProfile landscapeProfile;
     public DeviceProfile portraitProfile;
 
+    public DevicePaddings devicePaddings;
+
     public Point defaultWallpaperSize;
     public Rect defaultWidgetPadding;
 
@@ -160,6 +161,7 @@ public class InvariantDeviceProfile {
         demoModeLayoutId = p.demoModeLayoutId;
         mExtraAttrs = p.mExtraAttrs;
         mOverlayMonitor = p.mOverlayMonitor;
+        devicePaddings = p.devicePaddings;
     }
 
     @TargetApi(23)
@@ -174,8 +176,7 @@ public class InvariantDeviceProfile {
                 .putString(KEY_MIGRATION_SRC_WORKSPACE_SIZE, getPointString(numColumns, numRows))
                 .apply();
 
-        mConfigMonitor = new ConfigMonitor(context,
-                APPLY_CONFIG_AT_RUNTIME.get() ? this::onConfigChanged : this::killProcess);
+        mConfigMonitor = new ConfigMonitor(context, this::onConfigChanged);
         mOverlayMonitor = new OverlayMonitor(context);
     }
 
@@ -212,6 +213,8 @@ public class InvariantDeviceProfile {
         result.landscapeIconSize = defaultDisplayOption.landscapeIconSize;
         result.allAppsIconSize = Math.min(
                 defaultDisplayOption.allAppsIconSize, myDisplayOption.allAppsIconSize);
+
+        devicePaddings = new DevicePaddings(context);
         initGrid(context, myInfo, result);
     }
 
@@ -239,6 +242,7 @@ public class InvariantDeviceProfile {
         ArrayList<DisplayOption> allOptions = getPredefinedDeviceProfiles(context, gridName);
 
         DisplayOption displayOption = invDistWeightedInterpolate(displayInfo, allOptions);
+        devicePaddings = new DevicePaddings(context);
         initGrid(context, displayInfo, displayOption);
         return displayOption.grid.name;
     }
@@ -315,11 +319,6 @@ public class InvariantDeviceProfile {
 
     public void removeOnChangeListener(OnIDPChangeListener listener) {
         mChangeListeners.remove(listener);
-    }
-
-    private void killProcess(Context context) {
-        Log.e("ConfigMonitor", "restarting launcher");
-        android.os.Process.killProcess(android.os.Process.myPid());
     }
 
     public void verifyConfigChangedInBackground(final Context context) {

@@ -21,12 +21,11 @@ import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
+import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
-import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.EXTENDED_CONTAINERS;
-import static com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers.ContainerCase.DEVICE_SEARCH_RESULT_CONTAINER;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
 import static com.android.launcher3.testing.TestProtocol.HINT_STATE_ORDINAL;
 import static com.android.launcher3.testing.TestProtocol.OVERVIEW_STATE_ORDINAL;
@@ -44,12 +43,11 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.QuickstepAccessibilityDelegate;
 import com.android.launcher3.Workspace;
-import com.android.launcher3.allapps.AllAppsContainerView;
-import com.android.launcher3.allapps.search.SearchAdapterProvider;
+import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.appprediction.PredictionRowView;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.hybridhotseat.HotseatPredictionController;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
@@ -57,7 +55,6 @@ import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.SystemShortcut;
-import com.android.launcher3.search.DeviceSearchAdapterProvider;
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
 import com.android.launcher3.uioverrides.states.QuickstepAtomicAnimationFactory;
 import com.android.launcher3.uioverrides.touchcontrollers.NavBarToHomeTouchController;
@@ -86,7 +83,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Stream;
 
 public class QuickstepLauncher extends BaseQuickstepLauncher {
@@ -104,20 +100,16 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     @Override
     protected void setupViews() {
         super.setupViews();
-        if (FeatureFlags.ENABLE_HYBRID_HOTSEAT.get()) {
-            mHotseatPredictionController = new HotseatPredictionController(this);
-        }
+        mHotseatPredictionController = new HotseatPredictionController(this);
     }
 
     @Override
     protected void logAppLaunch(ItemInfo info, InstanceId instanceId) {
-        // If the app launch is from DeviceSearchResultContainer then add the InstanceId from
-        // LiveSearchManager to recreate the AllApps search session on the server side.
-        Optional<InstanceId> logInstanceId = this.getLiveSearchManager().getLogInstanceId();
-        if (info.getContainerInfo().getContainerCase() == EXTENDED_CONTAINERS
-                && info.getContainerInfo().getExtendedContainers().getContainerCase()
-                == DEVICE_SEARCH_RESULT_CONTAINER && logInstanceId.isPresent()) {
-            instanceId = logInstanceId.get();
+        // If the app launch is from any of the surfaces in AllApps then add the InstanceId from
+        // LiveSearchManager to recreate the AllApps session on the server side.
+        if (mAllAppsSessionLogId != null && ALL_APPS.equals(
+                getStateManager().getCurrentStableState())) {
+            instanceId = mAllAppsSessionLogId;
         }
 
         StatsLogger logger = getStatsLogManager()
@@ -141,9 +133,12 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
         }
         logger.log(LAUNCHER_APP_LAUNCH_TAP);
 
-        if (mHotseatPredictionController != null) {
-            mHotseatPredictionController.logLaunchedAppRankingInfo(info, instanceId);
-        }
+        mHotseatPredictionController.logLaunchedAppRankingInfo(info, instanceId);
+    }
+
+    @Override
+    protected LauncherAccessibilityDelegate createAccessibilityDelegate() {
+        return new QuickstepAccessibilityDelegate(this);
     }
 
     /**
@@ -166,10 +161,8 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
 
     @Override
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
-        if (mHotseatPredictionController != null) {
-            // Only pause is taskbar controller is not present
-            mHotseatPredictionController.setPauseUIUpdate(getTaskbarController() == null);
-        }
+        // Only pause is taskbar controller is not present
+        mHotseatPredictionController.setPauseUIUpdate(getTaskbarController() == null);
         return super.startActivitySafely(v, intent, item);
     }
 
@@ -181,7 +174,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
             onStateOrResumeChanging((getActivityFlags() & ACTIVITY_STATE_TRANSITION_ACTIVE) == 0);
         }
 
-        if (mHotseatPredictionController != null && ((changeBits & ACTIVITY_STATE_STARTED) != 0
+        if (((changeBits & ACTIVITY_STATE_STARTED) != 0
                 || (changeBits & getActivityFlags() & ACTIVITY_STATE_DEFERRED_RESUMED) != 0)) {
             mHotseatPredictionController.setPauseUIUpdate(false);
         }
@@ -195,12 +188,8 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
 
     @Override
     public Stream<SystemShortcut.Factory> getSupportedShortcuts() {
-        if (mHotseatPredictionController != null) {
-            return Stream.concat(super.getSupportedShortcuts(),
-                    Stream.of(mHotseatPredictionController));
-        } else {
-            return super.getSupportedShortcuts();
-        }
+        return Stream.concat(
+                super.getSupportedShortcuts(), Stream.of(mHotseatPredictionController));
     }
 
     /**
@@ -227,8 +216,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
             mAllAppsPredictions = item;
             getAppsView().getFloatingHeaderView().findFixedRowByType(PredictionRowView.class)
                     .setPredictedApps(item.items);
-        } else if (item.containerId == Favorites.CONTAINER_HOTSEAT_PREDICTION
-                && mHotseatPredictionController != null) {
+        } else if (item.containerId == Favorites.CONTAINER_HOTSEAT_PREDICTION) {
             mHotseatPredictionController.setPredictedItems(item);
         }
     }
@@ -246,10 +234,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     public void onDestroy() {
         super.onDestroy();
         getAppsView().getSearchUiManager().destroy();
-        if (mHotseatPredictionController != null) {
-            mHotseatPredictionController.destroy();
-            mHotseatPredictionController = null;
-        }
+        mHotseatPredictionController.destroy();
     }
 
     @Override
@@ -290,11 +275,6 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
             }
 
         }
-    }
-
-    @Override
-    public SearchAdapterProvider createSearchAdapterProvider(AllAppsContainerView appsView) {
-        return new DeviceSearchAdapterProvider(this, appsView);
     }
 
     @Override
