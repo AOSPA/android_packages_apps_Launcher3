@@ -29,7 +29,6 @@ import android.util.Log;
 
 import com.android.launcher3.ResourceUtils;
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
-import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.MainThreadInitializedObject;
 
 import java.io.PrintWriter;
@@ -74,6 +73,7 @@ public class SysUINavigationMode {
     private Mode mMode;
 
     private int mNavBarGesturalHeight;
+    private int mNavBarLargerGesturalHeight;
 
     private final List<NavigationModeChangeListener> mChangeListeners = new ArrayList<>();
     private final List<OneHandedModeChangeListener> mOneHandedOverlayChangeListeners =
@@ -113,6 +113,17 @@ public class SysUINavigationMode {
 
         if (mNavBarGesturalHeight != newGesturalHeight) {
             mNavBarGesturalHeight = newGesturalHeight;
+        }
+
+        int newLargerGesturalHeight = ResourceUtils.getDimenByName(
+                ResourceUtils.NAVBAR_BOTTOM_GESTURE_LARGER_SIZE, mContext.getResources(),
+                INVALID_RESOURCE_HANDLE);
+        if (newLargerGesturalHeight == INVALID_RESOURCE_HANDLE) {
+            Log.e(TAG, "Failed to get system resource ID. Incompatible framework version?");
+            return;
+        }
+        if (mNavBarLargerGesturalHeight != newLargerGesturalHeight) {
+            mNavBarLargerGesturalHeight = newLargerGesturalHeight;
             dispatchOneHandedOverlayChange();
         }
     }
@@ -123,6 +134,9 @@ public class SysUINavigationMode {
         mNavBarGesturalHeight = ResourceUtils.getDimenByName(
                 ResourceUtils.NAVBAR_BOTTOM_GESTURE_SIZE, mContext.getResources(),
                 INVALID_RESOURCE_HANDLE);
+        mNavBarLargerGesturalHeight = ResourceUtils.getDimenByName(
+                ResourceUtils.NAVBAR_BOTTOM_GESTURE_LARGER_SIZE, mContext.getResources(),
+                mNavBarGesturalHeight);
 
         if (modeInt == INVALID_RESOURCE_HANDLE) {
             Log.e(TAG, "Failed to get system resource ID. Incompatible framework version?");
@@ -144,7 +158,7 @@ public class SysUINavigationMode {
 
     private void dispatchOneHandedOverlayChange() {
         for (OneHandedModeChangeListener listener : mOneHandedOverlayChangeListeners) {
-            listener.onOneHandedModeChanged(mNavBarGesturalHeight);
+            listener.onOneHandedModeChanged(mNavBarLargerGesturalHeight);
         }
     }
 
@@ -159,7 +173,7 @@ public class SysUINavigationMode {
 
     public int addOneHandedOverlayChangeListener(OneHandedModeChangeListener listener) {
         mOneHandedOverlayChangeListeners.add(listener);
-        return mNavBarGesturalHeight;
+        return mNavBarLargerGesturalHeight;
     }
 
     public void removeOneHandedOverlayChangeListener(OneHandedModeChangeListener listener) {
@@ -168,18 +182,6 @@ public class SysUINavigationMode {
 
     public Mode getMode() {
         return mMode;
-    }
-
-    /** @return Whether we can remove the shelf from overview. */
-    public static boolean removeShelfFromOverview(Context context) {
-        // The shelf is core to the two-button mode model, so we need to continue supporting it.
-        return getMode(context) != Mode.TWO_BUTTONS;
-    }
-
-    public static boolean hideShelfInTwoButtonLandscape(Context context,
-            PagedOrientationHandler pagedOrientationHandler) {
-        return  getMode(context) == Mode.TWO_BUTTONS &&
-                !pagedOrientationHandler.isLayoutNaturalToLauncher();
     }
 
     public void dump(PrintWriter pw) {

@@ -98,6 +98,12 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = getDebugFlag(
             "ENABLE_DEVICE_SEARCH", false, "Allows on device search in all apps");
 
+    public static final BooleanFlag USE_SEARCH_API = getDebugFlag(
+            "USE_SEARCH_API", true, "Use SearchUIManager api for device search");
+
+    public static final BooleanFlag DISABLE_INITIAL_IME_IN_ALLAPPS = getDebugFlag(
+            "DISABLE_INITIAL_IME_IN_ALLAPPS", false, "Disable default IME state in all apps");
+
     public static final BooleanFlag FOLDER_NAME_SUGGEST = new DeviceFlag(
             "FOLDER_NAME_SUGGEST", true,
             "Suggests folder names instead of blank text.");
@@ -149,6 +155,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_OVERVIEW_SHARE = getDebugFlag(
             "ENABLE_OVERVIEW_SHARE", false, "Show Share button in Overview Actions");
 
+    public static final BooleanFlag ENABLE_OVERVIEW_SHARING_TO_PEOPLE = getDebugFlag(
+            "ENABLE_OVERVIEW_SHARING_TO_PEOPLE", false,
+            "Show indicators for content on Overview to share with top people. ");
+
     public static final BooleanFlag ENABLE_OVERVIEW_CONTENT_PUSH = getDebugFlag(
             "ENABLE_OVERVIEW_CONTENT_PUSH", false, "Show Content Push button in Overview Actions");
 
@@ -193,6 +203,16 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_FOUR_COLUMNS = new DeviceFlag(
             "ENABLE_FOUR_COLUMNS", false, "Uses 4 columns in launcher grid."
             + "Warning: This will permanently alter your home screen items and is not reversible.");
+
+    // TODO: b/172467144 Remove ENABLE_LAUNCHER_ACTIVITY_THEME_CROSSFADE feature flag.
+    public static final BooleanFlag ENABLE_LAUNCHER_ACTIVITY_THEME_CROSSFADE = new DeviceFlag(
+            "ENABLE_LAUNCHER_ACTIVITY_THEME_CROSSFADE", false, "Enables a "
+            + "crossfade animation when the system these changes.");
+
+    // TODO: b/174174514 Remove ENABLE_APP_PREDICTIONS_WHILE_VISIBLE feature flag.
+    public static final BooleanFlag ENABLE_APP_PREDICTIONS_WHILE_VISIBLE = new DeviceFlag(
+            "ENABLE_APP_PREDICTIONS_WHILE_VISIBLE", true, "Allows app "
+            + "predictions to be updated while they are visible to the user.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
