@@ -20,7 +20,9 @@ import static com.android.launcher3.LauncherPrefs.ALLAPPS_THEMED_ICONS;
 import static com.android.launcher3.LauncherPrefs.DB_FILE;
 import static com.android.launcher3.LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE;
 import static com.android.launcher3.LauncherPrefs.FIXED_LANDSCAPE_MODE;
+import static com.android.launcher3.LauncherPrefs.FONT_SIZE;
 import static com.android.launcher3.LauncherPrefs.GRID_NAME;
+import static com.android.launcher3.LauncherPrefs.ICON_SIZE;
 import static com.android.launcher3.LauncherPrefs.NON_FIXED_LANDSCAPE_GRID_NAME;
 import static com.android.launcher3.LauncherPrefs.SHOW_DESKTOP_LABELS;
 import static com.android.launcher3.LauncherPrefs.SHOW_DRAWER_LABELS;
@@ -308,11 +310,18 @@ public class InvariantDeviceProfile {
             } else if (SHOW_DESKTOP_LABELS.getSharedPrefKey().equals(key) ||
                     SHOW_DRAWER_LABELS.getSharedPrefKey().equals(key)) {
                 onConfigChanged();
+            } else if (FONT_SIZE.getSharedPrefKey().equals(key) ||
+                    ICON_SIZE.getSharedPrefKey().equals(key)) {
+                onConfigChanged();
             }
         };
-        prefs.addListener(prefListener, FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE);
+        prefs.addListener(prefListener, FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
+                WORKSPACE_ITEMS_LABEL_HIDDEN, ALLAPPS_THEMED_ICONS, SHOW_DESKTOP_LABELS,
+                SHOW_DRAWER_LABELS, FONT_SIZE, ICON_SIZE);
         lifeCycle.addCloseable(() -> prefs.removeListener(prefListener,
-                FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE));
+                FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
+                WORKSPACE_ITEMS_LABEL_HIDDEN, ALLAPPS_THEMED_ICONS, SHOW_DESKTOP_LABELS,
+                SHOW_DRAWER_LABELS, FONT_SIZE, ICON_SIZE));
 
         SimpleBroadcastReceiver localeReceiver = new SimpleBroadcastReceiver(context,
                 mMainExecutor, i -> onConfigChanged());
@@ -421,7 +430,13 @@ public class InvariantDeviceProfile {
 
         inlineNavButtonsEndSpacing = closestProfile.inlineNavButtonsEndSpacing;
 
-        iconSize = displayOption.iconSizes;
+        float iconSizeModifier = Math.max(0.1f, mPrefs.get(ICON_SIZE) / 100f);
+        float fontSizeModifier = Math.max(0.1f, mPrefs.get(FONT_SIZE) / 100f);
+
+        iconSize = new float[displayOption.iconSizes.length];
+        for (int i = 0; i < iconSize.length; i++) {
+            iconSize[i] = displayOption.iconSizes[i] * iconSizeModifier;
+        }
         float maxIconSize = iconSize[0];
         for (int i = 1; i < iconSize.length; i++) {
             maxIconSize = Math.max(maxIconSize, iconSize[i]);
@@ -430,7 +445,10 @@ public class InvariantDeviceProfile {
 
         fillResIconDpi = getLauncherIconDensity(iconBitmapSize);
 
-        iconTextSize = displayOption.textSizes;
+        iconTextSize = new float[displayOption.textSizes.length];
+        for (int i = 0; i < iconTextSize.length; i++) {
+            iconTextSize[i] = displayOption.textSizes[i] * fontSizeModifier;
+        }
 
         minCellSize = displayOption.minCellSize;
 
@@ -454,8 +472,14 @@ public class InvariantDeviceProfile {
 
         allAppsCellSize = displayOption.allAppsCellSize;
         allAppsBorderSpaces = displayOption.allAppsBorderSpaces;
-        allAppsIconSize = displayOption.allAppsIconSizes;
-        allAppsIconTextSize = displayOption.allAppsIconTextSizes;
+        allAppsIconSize = new float[displayOption.allAppsIconSizes.length];
+        for (int i = 0; i < allAppsIconSize.length; i++) {
+            allAppsIconSize[i] = displayOption.allAppsIconSizes[i] * iconSizeModifier;
+        }
+        allAppsIconTextSize = new float[displayOption.allAppsIconTextSizes.length];
+        for (int i = 0; i < allAppsIconTextSize.length; i++) {
+            allAppsIconTextSize[i] = displayOption.allAppsIconTextSizes[i] * fontSizeModifier;
+        }
 
         inlineQsb = closestProfile.inlineQsb;
 
@@ -872,5 +896,4 @@ public class InvariantDeviceProfile {
             startAlignTaskbar = inv.startAlignTaskbar[typeIndex];
         }
     }
-
 }
