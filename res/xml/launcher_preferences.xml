@@ -16,7 +16,8 @@
 
 <androidx.preference.PreferenceScreen
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:launcher="http://schemas.android.com/apk/res-auto">
+    xmlns:launcher="http://schemas.android.com/apk/res-auto"
+    xmlns:settings="http://schemas.android.com/apk/res/com.android.launcher3">
 
     <!--
       LAUNCHER_HOME_SCREEN_ROTATION_ENABLED(615)
@@ -115,6 +116,24 @@
             android:title="@string/drawer_show_labels"
             android:defaultValue="true"
             android:persistent="true" />
+
+        <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+            android:key="pref_custom_icon_size"
+            android:title="@string/icon_size_title"
+            android:persistent="true"
+            android:max="150"
+            android:min="50"
+            settings:units="%"
+            android:defaultValue="100" />
+
+        <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+            android:key="pref_custom_font_size"
+            android:title="@string/font_size_title"
+            android:persistent="true"
+            android:max="150"
+            android:min="50"
+            settings:units="%"
+            android:defaultValue="100" />
 
     </androidx.preference.PreferenceCategory>
 
