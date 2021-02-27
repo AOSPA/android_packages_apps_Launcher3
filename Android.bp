@@ -412,6 +412,7 @@ android_library {
         "com_android_systemui_shared_flags_lib",
         "SettingsLib",
         "libGoogleFeed",
+        "co.aospa.framework",
     ],
     manifest: "AndroidManifest-common.xml",
     sdk_version: "current",

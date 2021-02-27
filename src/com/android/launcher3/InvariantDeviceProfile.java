@@ -33,6 +33,9 @@ import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUN
 import static com.android.launcher3.util.DisplayController.CHANGE_TASKBAR_PINNING;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_FONT_SIZE;
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_ICON_SIZE;
+
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
@@ -1263,6 +1266,11 @@ public class InvariantDeviceProfile {
 
             TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ProfileDisplayOption);
 
+            float iconSizeModifier =
+                    (float) LauncherPrefs.getPrefs(context).getInt(KEY_ICON_SIZE, 100) / 100F;
+            float fontSizeModifier =
+                    (float) LauncherPrefs.getPrefs(context).getInt(KEY_FONT_SIZE, 100) / 100F;
+
             minWidthDps = a.getFloat(R.styleable.ProfileDisplayOption_minWidthDps, 0);
             minHeightDps = a.getFloat(R.styleable.ProfileDisplayOption_minHeightDps, 0);
 
@@ -1392,7 +1400,7 @@ public class InvariantDeviceProfile {
             allAppsBorderSpaces[INDEX_TWO_PANEL_LANDSCAPE] = new PointF(x, y);
 
             iconSizes[INDEX_DEFAULT] =
-                    a.getFloat(R.styleable.ProfileDisplayOption_iconImageSize, 0);
+                    a.getFloat(R.styleable.ProfileDisplayOption_iconImageSize, 0) * iconSizeModifier;
             iconSizes[INDEX_LANDSCAPE] =
                     a.getFloat(R.styleable.ProfileDisplayOption_iconSizeLandscape,
                             iconSizes[INDEX_DEFAULT]);
@@ -1416,7 +1424,7 @@ public class InvariantDeviceProfile {
                     allAppsIconSizes[INDEX_DEFAULT]);
 
             textSizes[INDEX_DEFAULT] =
-                    a.getFloat(R.styleable.ProfileDisplayOption_iconTextSize, 0);
+                    a.getFloat(R.styleable.ProfileDisplayOption_iconTextSize, 0) * fontSizeModifier;
             textSizes[INDEX_LANDSCAPE] =
                     a.getFloat(R.styleable.ProfileDisplayOption_iconTextSizeLandscape,
                             textSizes[INDEX_DEFAULT]);
