@@ -20,7 +20,9 @@ import static com.android.launcher3.LauncherPrefs.ALLAPPS_THEMED_ICONS;
 import static com.android.launcher3.LauncherPrefs.DB_FILE;
 import static com.android.launcher3.LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE;
 import static com.android.launcher3.LauncherPrefs.FIXED_LANDSCAPE_MODE;
+import static com.android.launcher3.LauncherPrefs.FONT_SIZE;
 import static com.android.launcher3.LauncherPrefs.GRID_NAME;
+import static com.android.launcher3.LauncherPrefs.ICON_SIZE;
 import static com.android.launcher3.LauncherPrefs.NON_FIXED_LANDSCAPE_GRID_NAME;
 import static com.android.launcher3.LauncherPrefs.SHOW_DESKTOP_LABELS;
 import static com.android.launcher3.LauncherPrefs.SHOW_DRAWER_LABELS;
@@ -37,6 +39,9 @@ import static com.android.launcher3.display.LauncherDisplayInfo.CHANGE_SUPPORTED
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.SimpleBroadcastReceiver.actionsFilter;
+
+import static com.android.launcher3.Utilities.KEY_FONT_SIZE;
+import static com.android.launcher3.Utilities.KEY_ICON_SIZE;
 
 import android.content.Context;
 import android.content.Intent;
@@ -308,11 +313,18 @@ public class InvariantDeviceProfile {
             } else if (SHOW_DESKTOP_LABELS.getSharedPrefKey().equals(key) ||
                     SHOW_DRAWER_LABELS.getSharedPrefKey().equals(key)) {
                 onConfigChanged();
+            } else if (FONT_SIZE.getSharedPrefKey().equals(key) ||
+                    ICON_SIZE.getSharedPrefKey().equals(key)) {
+                onConfigChanged();
             }
         };
-        prefs.addListener(prefListener, FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE);
+        prefs.addListener(prefListener, FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
+                WORKSPACE_ITEMS_LABEL_HIDDEN, ALLAPPS_THEMED_ICONS, SHOW_DESKTOP_LABELS,
+                SHOW_DRAWER_LABELS, FONT_SIZE, ICON_SIZE);
         lifeCycle.addCloseable(() -> prefs.removeListener(prefListener,
-                FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE));
+                FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
+                WORKSPACE_ITEMS_LABEL_HIDDEN, ALLAPPS_THEMED_ICONS, SHOW_DESKTOP_LABELS,
+                SHOW_DRAWER_LABELS, FONT_SIZE, ICON_SIZE));
 
         SimpleBroadcastReceiver localeReceiver = new SimpleBroadcastReceiver(context,
                 mMainExecutor, i -> onConfigChanged());
@@ -872,5 +884,4 @@ public class InvariantDeviceProfile {
             startAlignTaskbar = inv.startAlignTaskbar[typeIndex];
         }
     }
-
 }

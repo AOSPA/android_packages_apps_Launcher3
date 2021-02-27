@@ -89,13 +89,6 @@
             android:persistent="true" />
     </androidx.preference.PreferenceCategory>
 
-    <SwitchPreferenceCompat
-        android:key="pref_hide_top_shadow"
-        android:title="@string/hide_top_shadow_title"
-        android:summary="@string/hide_top_shadow_summary"
-        android:defaultValue="false"
-        android:persistent="true" />
-
     <androidx.preference.PreferenceCategory
         android:key="icon_category"
         android:title="@string/category_icon">
@@ -119,67 +112,25 @@
             android:persistent="false"
             android:widgetLayout="@layout/notification_pref_warning" />
 
-<<<<<<< HEAD
-=======
-        <SwitchPreferenceCompat
-            android:key="pref_desktop_show_labels"
-            android:title="@string/desktop_show_labels"
-            android:defaultValue="true"
-            android:persistent="true" />
+        <co.aospa.framework.preference.CustomSeekBarPreference
+            android:key="pref_icon_size"
+            android:title="@string/icon_size_title"
+            android:persistent="true"
+            android:max="150"
+            launcher:min="50"
+            launcher:interval="5"
+            launcher:units="%"
+            android:defaultValue="100" />
 
-    </androidx.preference.PreferenceCategory>
+        <co.aospa.framework.preference.CustomSeekBarPreference
+            android:key="pref_font_size"
+            android:title="@string/font_size_title"
+            android:persistent="true"
+            android:max="150"
+            launcher:min="50"
+            launcher:interval="5"
+            launcher:units="%"
+            android:defaultValue="100" />
 
-    <androidx.preference.PreferenceCategory
-        android:key="allapps_category"
-        android:title="@string/category_allapps">
-
-        <SwitchPreferenceCompat
-            android:key="pref_allapps_themed_icons"
-            android:title="@string/pref_themed_icons_title"
-            android:summary="@string/pref_themed_icons_summary"
-            android:defaultValue="false"
-            android:persistent="true" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_drawer_show_labels"
-            android:title="@string/drawer_show_labels"
-            android:defaultValue="true"
-            android:persistent="true" />
-    </androidx.preference.PreferenceCategory>
-
-    <androidx.preference.PreferenceCategory
-        android:key="google_category"
-        android:title="@string/category_google">
-
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="pref_enable_minus_one"
-            android:summary="@string/pref_show_google_now_summary"
-            android:title="@string/title_show_google_app" />
-
-<<<<<<< HEAD
-        <Preference
-            android:key="pref_suggestions"
-            android:title="@string/suggestion_screen_title"
-            android:summary="@string/suggestion_screen_summary"
-            android:persistent="false" >
-            <intent android:action="android.settings.ACTION_CONTENT_SUGGESTIONS_SETTINGS" />
-        </Preference>
->>>>>>> d3e09c6497 (Launcher3: Allow changing app suggestion settings)
-=======
-        <SwitchPreferenceCompat
-            android:key="pref_hotseat_suggestions"
-            android:title="@string/pref_suggestions_title"
-            android:summary="@string/pref_hotseat_suggestions_summary"
-            android:defaultValue="true"
-            android:persistent="true"/>
-
-        <SwitchPreferenceCompat
-            android:key="pref_allapps_suggestions"
-            android:title="@string/pref_suggestions_title"
-            android:summary="@string/pref_allapps_suggestions_summary"
-            android:defaultValue="true"
-            android:persistent="true"/>
->>>>>>> 7c011483a8 (Launcher3: Rework app suggestions preferences)
     </androidx.preference.PreferenceCategory>
 </androidx.preference.PreferenceScreen>

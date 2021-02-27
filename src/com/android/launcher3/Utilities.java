@@ -138,6 +138,8 @@ public final class Utilities {
     public static final String GSA_PACKAGE = "com.google.android.googlequicksearchbox";
     public static final String KEY_HOTSEAT_SUGGESTIONS = "pref_hotseat_suggestions";
     public static final String KEY_ALLAPPS_SUGGESTIONS = "pref_allapps_suggestions";
+    public static final String KEY_FONT_SIZE = "pref_font_size";
+    public static final String KEY_ICON_SIZE = "pref_icon_size";
     /**
      * Returns true if theme is dark.
      */

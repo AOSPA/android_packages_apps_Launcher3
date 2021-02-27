@@ -18,6 +18,7 @@ package com.android.launcher3.deviceprofile.parser
 import android.content.Context
 import android.content.res.TypedArray
 import android.graphics.PointF
+import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.R
 import com.android.launcher3.deviceprofile.parser.DeviceTypedMap.COUNT_SIZES
 import com.android.launcher3.deviceprofile.parser.DeviceTypedMap.INDEX_DEFAULT
@@ -112,6 +113,11 @@ private constructor(@JvmField val grid: GridOption, context: Context, ta: TypedA
             }
             .toFloatArray()
 
+    private val iconSizeModifier: Float =
+        (LauncherPrefs.ICON_SIZE.get(context).toFloat() / 100f).coerceAtLeast(0.1f)
+    private val fontSizeModifier: Float =
+        (LauncherPrefs.FONT_SIZE.get(context).toFloat() / 100f).coerceAtLeast(0.1f)
+
     @JvmField
     val iconSizes: FloatArray =
         ta.parseTypedMap(
@@ -121,7 +127,7 @@ private constructor(@JvmField val grid: GridOption, context: Context, ta: TypedA
                 R.styleable.ProfileDisplayOption_iconSizeTwoPanelPortrait,
                 R.styleable.ProfileDisplayOption_iconSizeTwoPanelLandscape,
             ) { i, v ->
-                getFloat(i, v)
+                getFloat(i, v) * iconSizeModifier
             }
             .toFloatArray()
 
@@ -134,7 +140,7 @@ private constructor(@JvmField val grid: GridOption, context: Context, ta: TypedA
                 R.styleable.ProfileDisplayOption_iconTextSizeTwoPanelPortrait,
                 R.styleable.ProfileDisplayOption_iconTextSizeTwoPanelLandscape,
             ) { i, v ->
-                getFloat(i, v)
+                getFloat(i, v) * fontSizeModifier
             }
             .toFloatArray()
 
@@ -160,7 +166,7 @@ private constructor(@JvmField val grid: GridOption, context: Context, ta: TypedA
                 R.styleable.ProfileDisplayOption_allAppsIconSizeTwoPanelPortrait,
                 R.styleable.ProfileDisplayOption_allAppsIconSizeTwoPanelLandscape,
             ) { i, v ->
-                getFloat(i, v)
+                getFloat(i, v) * iconSizeModifier
             }
             .toFloatArray()
 
@@ -173,7 +179,7 @@ private constructor(@JvmField val grid: GridOption, context: Context, ta: TypedA
                 R.styleable.ProfileDisplayOption_allAppsIconTextSizeTwoPanelPortrait,
                 R.styleable.ProfileDisplayOption_allAppsIconTextSizeTwoPanelLandscape,
             ) { i, v ->
-                getFloat(i, v)
+                getFloat(i, v) * fontSizeModifier
             }
             .toFloatArray()
 
