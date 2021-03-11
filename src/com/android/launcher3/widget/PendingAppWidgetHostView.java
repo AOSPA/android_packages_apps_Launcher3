@@ -29,6 +29,7 @@ import android.os.Bundle;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.util.SizeF;
 import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.View;
@@ -45,6 +46,8 @@ import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.Themes;
+
+import java.util.List;
 
 public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
         implements OnClickListener, ItemInfoUpdateReceiver {
@@ -105,6 +108,11 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
     @Override
     public void updateAppWidgetSize(Bundle newOptions, int minWidth, int minHeight, int maxWidth,
             int maxHeight) {
+        // No-op
+    }
+
+    @Override
+    public void updateAppWidgetSize(Bundle newOptions, List<SizeF> sizes) {
         // No-op
     }
 

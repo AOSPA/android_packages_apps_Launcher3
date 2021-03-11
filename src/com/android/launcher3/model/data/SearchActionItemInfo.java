@@ -25,6 +25,9 @@ import android.os.UserHandle;
 
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.logger.LauncherAtom.ItemInfo;
+import com.android.launcher3.logger.LauncherAtom.SearchActionItem;
+
 /**
  * Represents a SearchAction with in launcher
  */
@@ -34,17 +37,21 @@ public class SearchActionItemInfo extends ItemInfoWithIcon {
     public static final int FLAG_SHOULD_START_FOR_RESULT = FLAG_SHOULD_START | 1 << 2;
     public static final int FLAG_BADGE_WITH_PACKAGE = 1 << 3;
     public static final int FLAG_PRIMARY_ICON_FROM_TITLE = 1 << 4;
+    public static final int FLAG_BADGE_WITH_COMPONENT_NAME = 1 << 5;
 
     private final String mFallbackPackageName;
     private int mFlags = 0;
     private final Icon mIcon;
 
+    // If true title does not contain any personal info and eligible for logging.
+    private final boolean mIsPersonalTitle;
     private Intent mIntent;
 
     private PendingIntent mPendingIntent;
 
     public SearchActionItemInfo(Icon icon, String packageName, UserHandle user,
-            CharSequence title) {
+            CharSequence title, boolean isPersonalTitle) {
+        mIsPersonalTitle = isPersonalTitle;
         this.user = user == null ? Process.myUserHandle() : user;
         this.title = title;
         this.container = EXTENDED_CONTAINERS;
@@ -59,6 +66,7 @@ public class SearchActionItemInfo extends ItemInfoWithIcon {
         mFlags = info.mFlags;
         title = info.title;
         this.container = EXTENDED_CONTAINERS;
+        this.mIsPersonalTitle = info.mIsPersonalTitle;
     }
 
     /**
@@ -111,5 +119,19 @@ public class SearchActionItemInfo extends ItemInfoWithIcon {
     @Override
     public ItemInfoWithIcon clone() {
         return new SearchActionItemInfo(this);
+    }
+
+    @Override
+    public ItemInfo buildProto(FolderInfo fInfo) {
+        SearchActionItem.Builder itemBuilder = SearchActionItem.newBuilder()
+                .setPackageName(mFallbackPackageName);
+
+        if (!mIsPersonalTitle) {
+            itemBuilder.setTitle(title.toString());
+        }
+        return getDefaultItemInfoBuilder()
+                .setSearchActionItem(itemBuilder)
+                .setContainerInfo(getContainerInfo())
+                .build();
     }
 }

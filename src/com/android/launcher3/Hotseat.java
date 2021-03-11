@@ -21,6 +21,7 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewDebug;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -98,14 +99,20 @@ public class Hotseat extends CellLayout implements Insettable {
         } else {
             lp.gravity = Gravity.BOTTOM;
             lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            lp.height = grid.hotseatBarSizePx + insets.bottom;
+            lp.height = grid.isTaskbarPresent
+                    ? grid.taskbarSize
+                    : grid.hotseatBarSizePx + insets.bottom;
         }
-        Rect padding = grid.getHotseatLayoutPadding();
-        int paddingBottom = padding.bottom;
-        if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && !grid.isVerticalBarLayout()) {
-            paddingBottom -= grid.hotseatBarBottomPaddingPx;
+        if (!grid.isTaskbarPresent) {
+            // When taskbar is present, we set the padding separately to ensure a seamless visual
+            // handoff between taskbar and hotseat during drag and drop.
+            Rect padding = grid.getHotseatLayoutPadding();
+            int paddingBottom = padding.bottom;
+            if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && !grid.isVerticalBarLayout()) {
+                paddingBottom -= grid.hotseatBarBottomPaddingPx;
+            }
+            setPadding(padding.left, padding.top, padding.right, paddingBottom);
         }
-        setPadding(padding.left, padding.top, padding.right, paddingBottom);
 
         setLayoutParams(lp);
         InsettableFrameLayout.dispatchInsets(this, insets);
@@ -159,5 +166,12 @@ public class Hotseat extends CellLayout implements Insettable {
 
     protected void showInlineQsb() {
         //Does nothing
+    }
+
+    /**
+     * Returns the first View for which the given itemOperator returns true, or null.
+     */
+    public View getFirstItemMatch(Workspace.ItemOperator itemOperator) {
+        return mWorkspace.getFirstMatch(new CellLayout[] { this }, itemOperator);
     }
 }

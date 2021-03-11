@@ -63,7 +63,6 @@ import android.view.ViewTreeObserver;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
 
-import com.android.launcher3.LauncherAppWidgetHost.ProviderChangedListener;
 import com.android.launcher3.accessibility.AccessibleDragListenerAdapter;
 import com.android.launcher3.accessibility.WorkspaceAccessibilityHelper;
 import com.android.launcher3.anim.Interpolators;
@@ -104,6 +103,8 @@ import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.WallpaperOffsetInterpolator;
+import com.android.launcher3.widget.LauncherAppWidgetHost;
+import com.android.launcher3.widget.LauncherAppWidgetHost.ProviderChangedListener;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
@@ -416,7 +417,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                 // widgets as they cannot be placed inside a folder.
                 // Start at the current page and search right (on LTR) until finding a page with
                 // enough space. Since an empty screen is the furthest right, a page must be found.
-                int currentPage = getPageNearestToCenterOfScreen();
+                int currentPage = getDestinationPage();
                 for (int pageIndex = currentPage; pageIndex < getPageCount(); pageIndex++) {
                     CellLayout page = (CellLayout) getPageAt(pageIndex);
                     if (page.hasReorderSolution(dragObject.dragInfo)) {
@@ -445,6 +446,19 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         }
 
         updateChildrenLayersEnabled();
+        StateManager<LauncherState> stateManager = mLauncher.getStateManager();
+        stateManager.addStateListener(new StateManager.StateListener<LauncherState>() {
+            @Override
+            public void onStateTransitionComplete(LauncherState finalState) {
+                if (finalState == NORMAL) {
+                    if (!mDeferRemoveExtraEmptyScreen) {
+                        removeExtraEmptyScreen(true /* stripEmptyScreens */);
+                    }
+                    stateManager.removeStateListener(this);
+                }
+            }
+        });
+
         mDragInfo = null;
         mOutlineProvider = null;
         mDragSourceInternal = null;
@@ -1876,19 +1890,6 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
                             };
                         }
                     }
-                    StateManager<LauncherState> stateManager = mLauncher.getStateManager();
-                    stateManager.addStateListener(new StateManager.StateListener<LauncherState>() {
-                        @Override
-                        public void onStateTransitionComplete(LauncherState finalState) {
-                            if (finalState == NORMAL) {
-                                if (!mDeferRemoveExtraEmptyScreen) {
-                                    removeExtraEmptyScreen(true /* stripEmptyScreens */);
-                                }
-                                stateManager.removeStateListener(this);
-                            }
-                        }
-                    });
-
                     mLauncher.getModelWriter().modifyItemInDatabase(info, container, screenId,
                             lp.cellX, lp.cellY, item.spanX, item.spanY);
                 } else {
@@ -2972,7 +2973,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
      * @param operators List of operators, in order starting from best matching operator.
      * @return
      */
-    private View getFirstMatch(CellLayout[] cellLayouts, final ItemOperator... operators) {
+    View getFirstMatch(CellLayout[] cellLayouts, final ItemOperator... operators) {
         // This array is filled with the first match for each operator.
         final View[] matches = new View[operators.length];
         // For efficiency, the outer loop should be CellLayout.
