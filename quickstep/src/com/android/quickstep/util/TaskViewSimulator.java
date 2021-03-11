@@ -41,7 +41,6 @@ import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.BaseActivityInterface;
 import com.android.quickstep.views.RecentsView.ScrollState;
 import com.android.quickstep.views.TaskThumbnailView.PreviewPositionHelper;
-import com.android.quickstep.views.TaskView;
 import com.android.quickstep.views.TaskView.FullscreenDrawParams;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
@@ -92,7 +91,6 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
 
     // TaskView properties
     private final FullscreenDrawParams mCurrentFullscreenParams;
-    private float mCurveScale = 1;
     public final AnimatedFloat taskPrimaryTranslation = new AnimatedFloat();
     public final AnimatedFloat taskSecondaryTranslation = new AnimatedFloat();
 
@@ -276,8 +274,7 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
             int start = mOrientationState.getOrientationHandler()
                     .getPrimaryValue(mTaskRect.left, mTaskRect.top);
             mScrollState.screenCenter = start + mScrollState.scroll + mScrollState.halfPageSize;
-            mScrollState.updateInterpolation(start);
-            mCurveScale = TaskView.getCurveScaleForInterpolation(mScrollState.linearInterpolation);
+            mScrollState.updateInterpolation(mDp, start);
         }
 
         float progress = Utilities.boundToRange(fullScreenProgress.value, 0, 1);
@@ -294,8 +291,7 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         mMatrix.postTranslate(insets.left, insets.top);
         mMatrix.postScale(scale, scale);
 
-        // Apply TaskView matrix: scale, translate, scroll
-        mMatrix.postScale(mCurveScale, mCurveScale, taskWidth / 2, taskHeight / 2);
+        // Apply TaskView matrix: translate, scroll
         mMatrix.postTranslate(mTaskRect.left, mTaskRect.top);
         mOrientationState.getOrientationHandler().set(mMatrix, MATRIX_POST_TRANSLATE,
                 taskPrimaryTranslation.value);

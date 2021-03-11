@@ -17,6 +17,7 @@
 package com.android.launcher3;
 
 import static com.android.launcher3.FastBitmapDrawable.newIcon;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_FOUR_COLUMNS;
 import static com.android.launcher3.graphics.IconShape.getShape;
 import static com.android.launcher3.graphics.PreloadIconDrawable.newPendingIcon;
 import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
@@ -24,7 +25,6 @@ import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
@@ -34,8 +34,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
-import android.graphics.PorterDuff.Mode;
-import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -52,11 +50,9 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
-import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.Launcher.OnResumeCallback;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
-import com.android.launcher3.allapps.AllAppsSectionDecorator;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DraggableView;
@@ -87,7 +83,7 @@ import java.text.NumberFormat;
  * too aggressive.
  */
 public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver, OnResumeCallback,
-        IconLabelDotView, DraggableView, Reorderable, AllAppsSectionDecorator.SelfDecoratingView {
+        IconLabelDotView, DraggableView, Reorderable {
 
     private static final int DISPLAY_WORKSPACE = 0;
     private static final int DISPLAY_ALL_APPS = 1;
@@ -198,6 +194,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver, 
             setTextSize(TypedValue.COMPLEX_UNIT_PX, grid.iconTextSizePx);
             setCompoundDrawablePadding(grid.iconDrawablePaddingPx);
             defaultIconSize = grid.iconSizePx;
+            setCenterVertically(ENABLE_FOUR_COLUMNS.get());
         } else if (mDisplay == DISPLAY_ALL_APPS) {
             setTextSize(TypedValue.COMPLEX_UNIT_PX, grid.allAppsIconTextSizePx);
             setCompoundDrawablePadding(grid.allAppsIconDrawablePaddingPx);
@@ -232,7 +229,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver, 
         int shadowSize = context.getResources().getDimensionPixelSize(
                 R.dimen.blur_size_click_shadow);
         mHighlightShadowFilter = new BlurMaskFilter(shadowSize, BlurMaskFilter.Blur.INNER);
-
     }
 
     @Override
@@ -508,7 +504,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver, 
      * @param canvas The canvas to draw to.
      */
     protected void drawDotIfNecessary(Canvas canvas) {
-        if (mDisplay == DISPLAY_TASKBAR) {
+        if (mActivity instanceof Launcher && ((Launcher) mActivity).isViewInTaskbar(this)) {
             // TODO: support notification dots in Taskbar
             return;
         }
@@ -552,6 +548,14 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver, 
         int right = left + iconSize;
         int bottom = top + iconSize;
         outBounds.set(left, top, right, bottom);
+    }
+
+
+    /**
+     * Sets whether to vertically center the content.
+     */
+    public void setCenterVertically(boolean centerVertically) {
+        mCenterVertically = centerVertically;
     }
 
     @Override
@@ -798,7 +802,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver, 
         if (mIcon != null
                 && mIcon instanceof PlaceHolderIconDrawable
                 && iconUpdateAnimationEnabled()) {
-            animateIconUpdate((PlaceHolderIconDrawable) mIcon, icon);
+            ((PlaceHolderIconDrawable) mIcon).animateIconUpdate(icon);
         }
 
         mDisableRelayout = false;
@@ -948,39 +952,5 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver, 
         } else {
             setCompoundDrawables(null, newIcon, null, null);
         }
-    }
-
-    private static void animateIconUpdate(PlaceHolderIconDrawable oldIcon, Drawable newIcon) {
-        int placeholderColor = oldIcon.mPaint.getColor();
-        int originalAlpha = Color.alpha(placeholderColor);
-
-        ValueAnimator iconUpdateAnimation = ValueAnimator.ofInt(originalAlpha, 0);
-        iconUpdateAnimation.setDuration(ICON_UPDATE_ANIMATION_DURATION);
-        iconUpdateAnimation.addUpdateListener(valueAnimator -> {
-            int newAlpha = (int) valueAnimator.getAnimatedValue();
-            int newColor = ColorUtils.setAlphaComponent(placeholderColor, newAlpha);
-
-            newIcon.setColorFilter(new PorterDuffColorFilter(newColor, Mode.SRC_ATOP));
-        });
-        iconUpdateAnimation.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                newIcon.setColorFilter(null);
-            }
-        });
-        iconUpdateAnimation.start();
-    }
-
-
-    @Override
-    public void decorate(int color) {
-        mHighlightColor = color;
-        invalidate();
-    }
-
-    @Override
-    public void removeDecoration() {
-        mHighlightColor = Color.TRANSPARENT;
-        invalidate();
     }
 }
