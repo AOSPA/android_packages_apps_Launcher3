@@ -20,10 +20,10 @@
     android:padding="@dimen/dynamic_grid_edge_margin">
 
     <com.android.launcher3.search.SearchResultIcon
-        android:layout_width="wrap_content"
         android:id="@+id/icon"
-        launcher:iconDisplay="hero_app"
-        android:layout_height="wrap_content" />
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        launcher:iconDisplay="hero_app" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -34,8 +34,8 @@
         android:layout_gravity="center_vertical">
 
         <TextView
-            android:layout_width="wrap_content"
             android:id="@id/title"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="start|center_vertical"
             android:maxLines="1"
@@ -45,32 +45,46 @@
 
         <TextView
             android:layout_width="wrap_content"
-            android:id="@+id/desc"
+            android:id="@+id/subtitle"
             android:maxLines="1"
             android:textColor="?android:attr/textColorTertiary"
             android:textSize="@dimen/search_hero_subtitle_size"
             android:layout_height="wrap_content" />
     </LinearLayout>
 
-    <com.android.launcher3.BubbleTextView
+    <com.android.launcher3.search.SearchResultIcon
         android:id="@+id/shortcut_0"
         style="@style/BaseIcon"
         android:layout_width="@dimen/deep_shortcut_icon_size"
         android:layout_height="match_parent"
-        android:gravity="start|center_vertical"
-        launcher:iconDisplay="shortcut_popup"
-        android:textSize="@dimen/search_hero_subtitle_size"
-        launcher:iconSizeOverride="@dimen/deep_shortcut_icon_size"
-        launcher:layoutHorizontal="false" />
-
-    <com.android.launcher3.BubbleTextView
-        android:id="@+id/shortcut_1"
-        style="@style/BaseIcon"
-        android:layout_width="@dimen/deep_shortcut_icon_size"
-        android:layout_height="match_parent"
+        android:layout_marginStart="4dp"
+        android:gravity="center"
         launcher:iconDisplay="shortcut_popup"
         android:textSize="@dimen/search_hero_inline_button_size"
         launcher:iconSizeOverride="@dimen/deep_shortcut_icon_size"
         launcher:layoutHorizontal="false" />
 
+    <com.android.launcher3.search.SearchResultIcon
+        android:id="@+id/shortcut_1"
+        style="@style/BaseIcon"
+        android:layout_width="@dimen/deep_shortcut_icon_size"
+        android:layout_height="match_parent"
+        android:layout_marginStart="4dp"
+        android:gravity="center"
+        launcher:iconDisplay="shortcut_popup"
+        android:textSize="@dimen/search_hero_inline_button_size"
+        launcher:iconSizeOverride="@dimen/deep_shortcut_icon_size"
+        launcher:layoutHorizontal="false" />
+
+    <com.android.launcher3.search.SearchResultIcon
+        android:id="@+id/shortcut_2"
+        style="@style/BaseIcon"
+        android:layout_width="@dimen/deep_shortcut_icon_size"
+        android:layout_height="match_parent"
+        android:layout_marginStart="4dp"
+        android:gravity="center"
+        launcher:iconDisplay="shortcut_popup"
+        android:textSize="@dimen/search_hero_inline_button_size"
+        launcher:iconSizeOverride="@dimen/deep_shortcut_icon_size"
+        launcher:layoutHorizontal="false" />
 </com.android.launcher3.search.SearchResultIconRow>

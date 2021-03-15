@@ -15,6 +15,11 @@
  */
 package com.android.launcher3.search;
 
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
+
+import android.app.search.SearchTarget;
+import android.app.search.SearchTargetEvent;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.Context;
@@ -23,32 +28,37 @@ import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.RelativeLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AppWidgetResizeFrame;
+import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.CheckLongPressHelper;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
+import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherAppWidgetProviderInfo;
+import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.search.SearchWidgetInfoContainer;
 import com.android.launcher3.dragndrop.DraggableView;
+import com.android.launcher3.icons.cache.HandlerRunnable;
+import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
-import com.android.systemui.plugins.shared.SearchTargetEventLegacy;
-import com.android.systemui.plugins.shared.SearchTargetLegacy;
+
+import java.util.List;
 
 /**
  * displays live version of a widget upon receiving {@link AppWidgetProviderInfo} from Search
  * provider
  */
-public class SearchResultWidget extends RelativeLayout implements
-        SearchTargetHandler, DraggableView, View.OnLongClickListener {
+public class SearchResultWidget extends LinearLayout implements SearchTargetHandler, DraggableView,
+        View.OnLongClickListener {
 
-    private static final String TAG = "SearchResultWidget";
-
-    public static final String TARGET_TYPE_WIDGET_LIVE = "widget";
 
     private final Rect mWidgetOffset = new Rect();
 
@@ -58,10 +68,10 @@ public class SearchResultWidget extends RelativeLayout implements
     private final AppWidgetHostView mHostView;
     private final float mScaleToFit;
 
-    private SearchTargetLegacy mSearchTarget;
-    private AppWidgetProviderInfo mProviderInfo;
-
     private SearchWidgetInfoContainer mInfoContainer;
+    private HandlerRunnable mLabelRequest;
+    private BubbleTextView mWidgetProvider;
+    private TextView mWidgetLabel;
 
     public SearchResultWidget(@NonNull Context context) {
         this(context, null, 0);
@@ -82,8 +92,8 @@ public class SearchResultWidget extends RelativeLayout implements
 
         // detect tap event on widget container for search target event reporting
         mClickDetector = new GestureDetector(context,
-                new ClickListener(() -> handleSelection(SearchTargetEventLegacy.CHILD_SELECT)));
-
+                new ClickListener(
+                        () -> reportEvent(SearchTargetEvent.ACTION_LAUNCH_TOUCH)));
         mLongPressHelper = new CheckLongPressHelper(this);
         mLongPressHelper.setLongPressTimeoutFactor(1);
         setOnLongClickListener(this);
@@ -92,26 +102,17 @@ public class SearchResultWidget extends RelativeLayout implements
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
+        mWidgetProvider = findViewById(R.id.widget_provider);
+        mWidgetLabel = findViewById(R.id.widget_label);
         addView(mHostView);
     }
 
     @Override
-    public void applySearchTarget(SearchTargetLegacy searchTarget) {
-        if (searchTarget.getExtras() == null
-                || searchTarget.getExtras().getParcelable("provider") == null) {
-            setVisibility(GONE);
-            return;
-        }
-        AppWidgetProviderInfo providerInfo = searchTarget.getExtras().getParcelable("provider");
-        if (mProviderInfo != null && providerInfo.provider.equals(mProviderInfo.provider)
-                && providerInfo.getProfile().equals(mProviderInfo.getProfile())) {
-            return;
-        }
+    public void apply(SearchTarget parentTarget, List<SearchTarget> children) {
+        AppWidgetProviderInfo providerInfo = parentTarget.getAppWidgetProviderInfo();
         removeListener();
 
-        mSearchTarget = searchTarget;
-        mProviderInfo = providerInfo;
-
+        showWidgetInfo(providerInfo);
         mInfoContainer = mLauncher.getLiveSearchManager().getPlaceHolderWidget(providerInfo);
         if (mInfoContainer == null) {
             setVisibility(GONE);
@@ -129,19 +130,44 @@ public class SearchResultWidget extends RelativeLayout implements
         setTag(info);
     }
 
+    private void showWidgetInfo(AppWidgetProviderInfo providerInfo) {
+        PackageItemInfo pinfo = new PackageItemInfo(providerInfo.provider.getPackageName());
+        pinfo.user = providerInfo.getProfile();
+        mWidgetProvider.applyFromItemInfoWithIcon(pinfo);
+
+        mLabelRequest = new HandlerRunnable<>(
+                MODEL_EXECUTOR.getHandler(),
+                () -> LauncherAppState.getInstance(mLauncher).getIconCache()
+                        .getTitleNoCache(LauncherAppWidgetProviderInfo
+                                .fromProviderInfo(mLauncher, providerInfo)),
+                MAIN_EXECUTOR,
+                mWidgetLabel::setText);
+        Utilities.postAsyncCallback(MODEL_EXECUTOR.getHandler(), mLabelRequest);
+    }
+
     /**
      * Stops hostView from getting updates on a widget provider
      */
     public void removeListener() {
         if (mInfoContainer != null) {
             mInfoContainer.detachWidget(mHostView);
+            mInfoContainer = null;
+        }
+        if (mLabelRequest != null) {
+            mLabelRequest.cancel();
+            mLabelRequest = null;
         }
     }
 
     @Override
-    public void handleSelection(int eventType) {
-        SearchEventTracker.INSTANCE.get(getContext()).notifySearchTargetEvent(
-                new SearchTargetEventLegacy.Builder(mSearchTarget, eventType).build());
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        removeListener();
+    }
+
+    private void reportEvent(int eventType) {
+        SearchSessionTracker.INSTANCE.get(getContext()).notifyEvent(
+                new SearchTargetEvent.Builder("search target id", eventType).build());
     }
 
     @Override
@@ -182,9 +208,9 @@ public class SearchResultWidget extends RelativeLayout implements
     @Override
     public boolean onLongClick(View view) {
         ItemLongClickListener.INSTANCE_ALL_APPS.onLongClick(view);
-        handleSelection(SearchTargetEventLegacy.LONG_PRESS);
         return false;
     }
+
 
     static class ClickListener extends GestureDetector.SimpleOnGestureListener {
         private final Runnable mCb;

@@ -98,13 +98,9 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.CallSuper;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
-import androidx.lifecycle.Lifecycle;
-import androidx.lifecycle.LifecycleOwner;
-import androidx.lifecycle.LifecycleRegistry;
 
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
@@ -211,8 +207,7 @@ import java.util.stream.Stream;
  * Default launcher application.
  */
 public class Launcher extends StatefulActivity<LauncherState> implements LauncherExterns,
-        Callbacks, InvariantDeviceProfile.OnIDPChangeListener, PluginListener<OverlayPlugin>,
-        LifecycleOwner {
+        Callbacks, InvariantDeviceProfile.OnIDPChangeListener, PluginListener<OverlayPlugin> {
     public static final String TAG = "Launcher";
 
     public static final ActivityTracker<Launcher> ACTIVITY_TRACKER = new ActivityTracker<>();
@@ -274,8 +269,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     private LauncherAppTransitionManager mAppTransitionManager;
     private Configuration mOldConfig;
-
-    private LifecycleRegistry mLifecycleRegistry;
 
     private LiveSearchManager mLiveSearchManager;
 
@@ -392,11 +385,11 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         mIconCache = app.getIconCache();
         mAccessibilityDelegate = new LauncherAccessibilityDelegate(this);
 
-        mLiveSearchManager = new LiveSearchManager(this);
-
         mDragController = new DragController(this);
         mAllAppsController = new AllAppsTransitionController(this);
         mStateManager = new StateManager<>(this, NORMAL);
+
+        mLiveSearchManager = new LiveSearchManager(this);
 
         mOnboardingPrefs = createOnboardingPrefs(mSharedPrefs);
 
@@ -486,15 +479,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         if (Utilities.ATLEAST_R) {
             getWindow().setSoftInputMode(LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         }
-
-        mLifecycleRegistry = new LifecycleRegistry(this);
-        mLifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
-    }
-
-    @NonNull
-    @Override
-    public Lifecycle getLifecycle() {
-        return mLifecycleRegistry;
     }
 
     public LiveSearchManager getLiveSearchManager() {
@@ -913,7 +897,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     @Override
     protected void onStop() {
-        mLifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
         super.onStop();
         if (mDeferOverlayCallbacks) {
             checkIfOverlayStillDeferred();
@@ -922,7 +905,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         }
 
         logStopAndResume(false /* isResume */);
-        mAppWidgetHost.setListenIfResumed(false);
+        mAppWidgetHost.setActivityStarted(false);
         NotificationListener.removeNotificationsChangedListener();
     }
 
@@ -935,9 +918,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             mOverlayManager.onActivityStarted(this);
         }
 
-        mAppWidgetHost.setListenIfResumed(true);
+        mAppWidgetHost.setActivityStarted(true);
         TraceHelper.INSTANCE.endSection(traceToken);
-        mLifecycleRegistry.setCurrentState(Lifecycle.State.STARTED);
     }
 
     @Override
@@ -956,6 +938,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         NotificationListener.setNotificationsChangedListener(mPopupDataProvider);
 
         DiscoveryBounce.showForHomeIfNeeded(this);
+        mAppWidgetHost.setActivityResumed(true);
     }
 
     private void logStopAndResume(boolean isResume) {
@@ -1049,7 +1032,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     @Override
     public void onStateSetEnd(LauncherState state) {
         super.onStateSetEnd(state);
-        getAppWidgetHost().setResumed(state == LauncherState.NORMAL);
+        getAppWidgetHost().setStateIsNormal(state == LauncherState.NORMAL);
         getWorkspace().setClipChildren(!state.hasFlag(FLAG_MULTI_PAGE));
 
         finishAutoCancelActionMode();
@@ -1091,7 +1074,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         }
 
         TraceHelper.INSTANCE.endSection(traceToken);
-        mLifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
     }
 
     @Override
@@ -1099,7 +1081,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         // Ensure that items added to Launcher are queued until Launcher returns
         ItemInstallQueue.INSTANCE.get(this).pauseModelPush(FLAG_ACTIVITY_PAUSED);
 
-        mLifecycleRegistry.setCurrentState(Lifecycle.State.STARTED);
         super.onPause();
         mDragController.cancelDrag();
         mLastTouchUpTime = -1;
@@ -1108,6 +1089,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         if (!mDeferOverlayCallbacks) {
             mOverlayManager.onActivityPaused(this);
         }
+        mAppWidgetHost.setActivityResumed(false);
     }
 
     class LauncherOverlayCallbacksImpl implements LauncherOverlayCallbacks {
@@ -1598,7 +1580,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         mAppTransitionManager.unregisterRemoteAnimations();
         mAppTransitionManager.unregisterRemoteTransitions();
         mUserChangedCallbackCloseable.close();
-        mLifecycleRegistry.setCurrentState(Lifecycle.State.DESTROYED);
         mLiveSearchManager.stop();
     }
 
@@ -1917,6 +1898,13 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     @Override
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
+        if (isViewInTaskbar(v)) {
+            // Start the activity without the hacky workarounds below, which assume the View was
+            // clicked when Launcher was resumed and will be hidden until Launcher is re-resumed
+            // (this isn't the case for Taskbar).
+            return super.startActivitySafely(v, intent, item);
+        }
+
         if (!hasBeenResumed()) {
             // Workaround an issue where the WM launch animation is clobbered when finishing the
             // recents animation into launcher. Defer launching the activity until Launcher is
@@ -2681,7 +2669,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                             && focusedView.getTag() instanceof ItemInfo
                             && mAccessibilityDelegate.performAction(focusedView,
                             (ItemInfo) focusedView.getTag(),
-                            LauncherAccessibilityDelegate.DEEP_SHORTCUTS)) {
+                            LauncherAccessibilityDelegate.DEEP_SHORTCUTS,
+                            true)) {
                         PopupContainerWithArrow.getOpen(this).requestFocus();
                         return true;
                     }
@@ -2816,6 +2805,13 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 .alpha(0f)
                 .withEndAction(() -> getRootView().removeView(crossFadeHelper))
                 .start();
+    }
+
+    /**
+     * @return Whether the View is in the same window as the Taskbar window.
+     */
+    public boolean isViewInTaskbar(View v) {
+        return false;
     }
 
     private static class NonConfigInstance {
