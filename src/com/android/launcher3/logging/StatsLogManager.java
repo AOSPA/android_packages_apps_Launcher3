@@ -21,8 +21,10 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_GESTURE;
 
 import android.content.Context;
+import android.view.View;
 
 import androidx.annotation.Nullable;
+import androidx.slice.SliceItem;
 
 import com.android.launcher3.R;
 import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
@@ -361,11 +363,57 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User closed the AllApps keyboard.")
         LAUNCHER_ALLAPPS_KEYBOARD_CLOSED(694),
 
-        @UiEvent(doc = "User switched to Main tab in AllApps screen.")
-        LAUNCHER_ALLAPPS_SWITCHED_TO_MAIN_TAB(695),
+        @UiEvent(doc = "User switched to AllApps Main/Personal tab by swiping left.")
+        LAUNCHER_ALLAPPS_SWIPE_TO_PERSONAL_TAB(695),
 
-        @UiEvent(doc = "User switched to Work tab in AllApps screen.")
-        LAUNCHER_ALLAPPS_SWITCHED_TO_WORK_TAB(696),
+        @UiEvent(doc = "User switched to AllApps Work tab by swiping right.")
+        LAUNCHER_ALLAPPS_SWIPE_TO_WORK_TAB(696),
+
+        @UiEvent(doc = "Default event when dedicated UI event is not available for the user action"
+                + " on slice .")
+        LAUNCHER_SLICE_DEFAULT_ACTION(700),
+
+        @UiEvent(doc = "User toggled-on a Slice item.")
+        LAUNCHER_SLICE_TOGGLE_ON(701),
+
+        @UiEvent(doc = "User toggled-off a Slice item.")
+        LAUNCHER_SLICE_TOGGLE_OFF(702),
+
+        @UiEvent(doc = "User acted on a Slice item with a button.")
+        LAUNCHER_SLICE_BUTTON_ACTION(703),
+
+        @UiEvent(doc = "User acted on a Slice item with a slider.")
+        LAUNCHER_SLICE_SLIDER_ACTION(704),
+
+        @UiEvent(doc = "User tapped on the entire row of a Slice.")
+        LAUNCHER_SLICE_CONTENT_ACTION(705),
+
+        @UiEvent(doc = "User tapped on the see more button of a Slice.")
+        LAUNCHER_SLICE_SEE_MORE_ACTION(706),
+
+        @UiEvent(doc = "User selected from a selection row of Slice.")
+        LAUNCHER_SLICE_SELECTION_ACTION(707),
+
+        @UiEvent(doc = "IME is used for selecting the focused item on the AllApps screen.")
+        LAUNCHER_ALLAPPS_FOCUSED_ITEM_SELECTED_WITH_IME(718),
+
+        @UiEvent(doc = "User long-pressed on an AllApps item.")
+        LAUNCHER_ALLAPPS_ITEM_LONG_PRESSED(719),
+
+        @UiEvent(doc = "Launcher entered into AllApps state with device search enabled.")
+        LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH(720),
+
+        @UiEvent(doc = "User switched to AllApps Main/Personal tab by tapping on it.")
+        LAUNCHER_ALLAPPS_TAP_ON_PERSONAL_TAB(721),
+
+        @UiEvent(doc = "User switched to AllApps Work tab by tapping on it.")
+        LAUNCHER_ALLAPPS_TAP_ON_WORK_TAB(722),
+
+        @UiEvent(doc = "All apps vertical fling started.")
+        LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN(724),
+
+        @UiEvent(doc = "All apps vertical fling ended.")
+        LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END(725)
         ;
 
         // ADD MORE
@@ -473,9 +521,23 @@ public class StatsLogManager implements ResourceBasedOverride {
         }
 
         /**
+         * Sets logging fields from provided {@link SliceItem}.
+         */
+        default StatsLogger withSliceItem(SliceItem sliceItem) {
+            return this;
+        }
+
+        /**
          * Builds the final message and logs it as {@link EventEnum}.
          */
         default void log(EventEnum event) {
+        }
+
+        /**
+         * Builds the final message and logs it to two different atoms, one for
+         * event tracking and the other for jank tracking.
+         */
+        default void sendToInteractionJankMonitor(EventEnum event, View v) {
         }
     }
 

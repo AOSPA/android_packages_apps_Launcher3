@@ -17,6 +17,7 @@ package com.android.launcher3.touch;
 
 import static com.android.launcher3.Launcher.REQUEST_BIND_PENDING_APPWIDGET;
 import static com.android.launcher3.Launcher.REQUEST_RECONFIGURE_APPWIDGET;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_DISABLED_BY_PUBLISHER;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_DISABLED_LOCKED_USER;
@@ -40,7 +41,6 @@ import android.widget.Toast;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.Launcher;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.folder.Folder;
@@ -58,6 +58,7 @@ import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.views.FloatingIconView;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAppWidgetHostView;
 import com.android.launcher3.widget.WidgetAddFlowHandler;
 import com.android.launcher3.widget.WidgetManagerHelper;
@@ -272,6 +273,7 @@ public class ItemClickHandler {
                         Toast.LENGTH_SHORT).show();
             }
         }
+        launcher.getStatsLogManager().logger().withItemInfo(itemInfo).log(LAUNCHER_APP_LAUNCH_TAP);
     }
 
     private static void startAppShortcutOrInfoActivity(View v, ItemInfo item, Launcher launcher) {

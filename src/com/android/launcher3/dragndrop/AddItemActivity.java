@@ -47,8 +47,6 @@ import com.android.launcher3.BaseActivity;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.LauncherAppWidgetHost;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.ItemInstallQueue;
@@ -56,8 +54,11 @@ import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.PinRequestHelper;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.LauncherAppWidgetHost;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
+import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.WidgetHostViewLoader;
 import com.android.launcher3.widget.WidgetImageView;
 import com.android.launcher3.widget.WidgetManagerHelper;
@@ -78,7 +79,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
     private LauncherAppState mApp;
     private InvariantDeviceProfile mIdp;
 
-    private LivePreviewWidgetCell mWidgetCell;
+    private WidgetCell mWidgetCell;
 
     // Widget request specific options.
     private LauncherAppWidgetHost mAppWidgetHost;
@@ -117,8 +118,9 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
             }
         }
 
-        mWidgetCell.setOnTouchListener(this);
-        mWidgetCell.setOnLongClickListener(this);
+        WidgetImageView preview = mWidgetCell.findViewById(R.id.widget_preview);
+        preview.setOnTouchListener(this);
+        preview.setOnLongClickListener(this);
 
         // savedInstanceState is null when the activity is created the first time (i.e., avoids
         // duplicate logging during rotation)
