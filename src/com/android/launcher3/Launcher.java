@@ -42,6 +42,7 @@ import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_LAUNCHER_LOA
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_ENTRY;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_EXIT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONRESUME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONSTOP;
@@ -120,6 +121,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragLayer;
+import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.folder.FolderGridOrganizer;
 import com.android.launcher3.folder.FolderIcon;
@@ -180,7 +182,9 @@ import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.FloatingSurfaceView;
 import com.android.launcher3.views.OptionsPopupView;
 import com.android.launcher3.views.ScrimView;
+import com.android.launcher3.widget.LauncherAppWidgetHost;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.PendingAppWidgetHostView;
@@ -1067,7 +1071,11 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         if (ALL_APPS.equals(state)) {
             // creates new instance ID since new all apps session is started.
             mAllAppsSessionLogId = new InstanceIdSequence().newInstanceId();
-            getStatsLogManager().logger().log(LAUNCHER_ALLAPPS_ENTRY);
+            getStatsLogManager()
+                    .logger()
+                    .log(FeatureFlags.ENABLE_DEVICE_SEARCH.get()
+                            ? LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH
+                            : LAUNCHER_ALLAPPS_ENTRY);
         } else if (ALL_APPS.equals(mPrevLauncherState)
                 // Check if mLogInstanceId is not null to make sure exit event is logged only once.
                 && mAllAppsSessionLogId != null) {
@@ -1601,8 +1609,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         LauncherAppState.getIDP(this).removeOnChangeListener(this);
 
         mOverlayManager.onActivityDestroyed(this);
-        mAppTransitionManager.unregisterRemoteAnimations();
-        mAppTransitionManager.unregisterRemoteTransitions();
+        mAppTransitionManager.onActivityDestroyed();
         mUserChangedCallbackCloseable.close();
         mLiveSearchManager.stop();
     }
@@ -2753,8 +2760,10 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return super.onKeyUp(keyCode, event);
     }
 
-    protected StateHandler<LauncherState>[] createStateHandlers() {
-        return new StateHandler[] { getAllAppsController(), getWorkspace() };
+    @Override
+    protected void collectStateHandlers(List<StateHandler> out) {
+        out.add(getAllAppsController());
+        out.add(getWorkspace());
     }
 
     public TouchController[] createTouchControllers() {
@@ -2854,6 +2863,10 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      */
     public boolean isViewInTaskbar(View v) {
         return false;
+    }
+
+    public DragOptions getDefaultWorkspaceDragOptions() {
+        return new DragOptions();
     }
 
     private static class NonConfigInstance {

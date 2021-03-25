@@ -34,7 +34,6 @@ import android.widget.RemoteViews;
 
 import com.android.launcher3.CheckLongPressHelper;
 import com.android.launcher3.Launcher;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.dragndrop.DragLayer;
@@ -69,8 +68,6 @@ public class LauncherAppWidgetHostView extends NavigableAppWidgetHostView
     private boolean mIsAttachedToWindow;
     private boolean mIsAutoAdvanceRegistered;
     private Runnable mAutoAdvanceRunnable;
-
-
 
     public LauncherAppWidgetHostView(Context context) {
         super(context);

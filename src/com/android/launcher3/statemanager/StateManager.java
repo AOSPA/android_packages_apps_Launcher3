@@ -26,14 +26,12 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.states.StateAnimationConfig.AnimationFlags;
-import com.android.launcher3.testing.TestProtocol;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -90,7 +88,9 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
 
     public StateHandler[] getStateHandlers() {
         if (mStateHandlers == null) {
-            mStateHandlers = mActivity.createStateHandlers();
+            ArrayList<StateHandler> handlers = new ArrayList<>();
+            mActivity.collectStateHandlers(handlers);
+            mStateHandlers = handlers.toArray(new StateHandler[handlers.size()]);
         }
         return mStateHandlers;
     }
@@ -302,10 +302,6 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
     }
 
     private PendingAnimation createAnimationToNewWorkspaceInternal(final STATE_TYPE state) {
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.OVERIEW_NOT_ALLAPPS, "createAnimationToNewWorkspaceInternal: "
-                    + state);
-        }
         PendingAnimation builder = new PendingAnimation(mConfig.duration);
         if (mConfig.getAnimComponents() != 0) {
             for (StateHandler handler : getStateHandlers()) {
@@ -328,9 +324,6 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
 
             @Override
             public void onAnimationSuccess(Animator animator) {
-                if (TestProtocol.sDebugTracing) {
-                    Log.d(TestProtocol.OVERIEW_NOT_ALLAPPS, "onAnimationSuccess: " + state);
-                }
                 onStateTransitionEnd(state);
             }
         };

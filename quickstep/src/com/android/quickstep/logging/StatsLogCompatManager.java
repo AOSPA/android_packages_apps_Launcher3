@@ -16,6 +16,9 @@
 
 package com.android.quickstep.logging;
 
+import static androidx.core.util.Preconditions.checkNotNull;
+import static androidx.core.util.Preconditions.checkState;
+
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.EXTENDED_CONTAINERS;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.FOLDER;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerCase.SEARCH_RESULT_CONTAINER;
@@ -28,8 +31,11 @@ import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGE
 
 import android.content.Context;
 import android.util.Log;
+import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
+import androidx.slice.SliceItem;
 
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.Utilities;
@@ -50,6 +56,7 @@ import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.LogConfig;
+import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.SysUiStatsLog;
 
 import java.util.Optional;
@@ -89,7 +96,7 @@ public class StatsLogCompatManager extends StatsLogManager {
 
     @Override
     protected StatsLogger createLogger() {
-        return new StatsCompatLogger();
+        return new StatsCompatLogger(mContext);
     }
 
     /**
@@ -131,6 +138,7 @@ public class StatsLogCompatManager extends StatsLogManager {
 
         private static final ItemInfo DEFAULT_ITEM_INFO = new ItemInfo();
 
+        private Context mContext;
         private ItemInfo mItemInfo = DEFAULT_ITEM_INFO;
         private InstanceId mInstanceId = DEFAULT_INSTANCE_ID;
         private OptionalInt mRank = OptionalInt.empty();
@@ -140,6 +148,11 @@ public class StatsLogCompatManager extends StatsLogManager {
         private Optional<FromState> mFromState = Optional.empty();
         private Optional<ToState> mToState = Optional.empty();
         private Optional<String> mEditText = Optional.empty();
+        private SliceItem mSliceItem;
+
+        StatsCompatLogger(Context context) {
+            mContext = context;
+        }
 
         @Override
         public StatsLogger withItemInfo(ItemInfo itemInfo) {
@@ -177,10 +190,8 @@ public class StatsLogCompatManager extends StatsLogManager {
 
         @Override
         public StatsLogger withContainerInfo(ContainerInfo containerInfo) {
-            if (mItemInfo != DEFAULT_ITEM_INFO) {
-                throw new IllegalArgumentException(
+            checkState(mItemInfo == DEFAULT_ITEM_INFO,
                         "ItemInfo and ContainerInfo are mutual exclusive; cannot log both.");
-            }
             this.mContainerInfo = Optional.of(containerInfo);
             return this;
         }
@@ -204,12 +215,33 @@ public class StatsLogCompatManager extends StatsLogManager {
         }
 
         @Override
+        public StatsLogger withSliceItem(@NonNull SliceItem sliceItem) {
+            this.mSliceItem = checkNotNull(sliceItem, "expected valid sliceItem but received null");
+            checkState(mItemInfo == DEFAULT_ITEM_INFO,
+                    "ItemInfo and SliceItem are mutual exclusive; cannot log both.");
+            return this;
+        }
+
+        @Override
         public void log(EventEnum event) {
             if (!Utilities.ATLEAST_R) {
                 return;
             }
-
             LauncherAppState appState = LauncherAppState.getInstanceNoCreate();
+
+            if (mSliceItem != null) {
+                Executors.MODEL_EXECUTOR.execute(
+                        () -> {
+                            LauncherAtom.ItemInfo.Builder itemInfoBuilder =
+                                    LauncherAtom.ItemInfo.newBuilder().setSlice(
+                                            LauncherAtom.Slice.newBuilder().setUri(
+                                                    mSliceItem.getSlice().getUri().toString()));
+                            mContainerInfo.ifPresent(itemInfoBuilder::setContainerInfo);
+                            write(event, applyOverwrites(itemInfoBuilder.build()));
+                        });
+                return;
+            }
+
             if (mItemInfo.container < 0 || appState == null) {
                 // Write log on the model thread so that logs do not go out of order
                 // (for eg: drop comes after drag)
@@ -227,6 +259,26 @@ public class StatsLogCompatManager extends StatsLogManager {
                                 write(event, applyOverwrites(mItemInfo.buildProto(folderInfo)));
                             }
                         });
+            }
+        }
+
+        @Override
+        public void sendToInteractionJankMonitor(EventEnum event, View view) {
+            if (!(event instanceof LauncherEvent)) {
+                return;
+            }
+            switch ((LauncherEvent) event) {
+                case LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN:
+                    InteractionJankMonitorWrapper.begin(
+                            view,
+                            InteractionJankMonitorWrapper.CUJ_ALL_APPS_SCROLL);
+                    break;
+                case LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END:
+                    InteractionJankMonitorWrapper.end(
+                            InteractionJankMonitorWrapper.CUJ_ALL_APPS_SCROLL);
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -327,6 +379,8 @@ public class StatsLogCompatManager extends StatsLogManager {
                 return info.getWidget().getPackageName();
             case TASK:
                 return info.getTask().getPackageName();
+            case SEARCH_ACTION_ITEM:
+                return info.getSearchActionItem().getPackageName();
             default:
                 return null;
         }
@@ -342,6 +396,10 @@ public class StatsLogCompatManager extends StatsLogManager {
                 return info.getWidget().getComponentName();
             case TASK:
                 return info.getTask().getComponentName();
+            case SEARCH_ACTION_ITEM:
+                return info.getSearchActionItem().getTitle();
+            case SLICE:
+                return info.getSlice().getUri();
             default:
                 return null;
         }

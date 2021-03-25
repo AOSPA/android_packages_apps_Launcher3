@@ -13,16 +13,7 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<com.android.launcher3.dragndrop.LivePreviewWidgetCell
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_weight="1"
-    android:orientation="vertical"
-    android:focusable="true"
-    android:background="?android:attr/colorPrimaryDark"
-    android:gravity="center_horizontal">
-
-    <include layout="@layout/widget_cell_content"  />
-
-</com.android.launcher3.dragndrop.LivePreviewWidgetCell>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FFFFF7" />
+    <corners android:radius="24dp" />
+</shape>

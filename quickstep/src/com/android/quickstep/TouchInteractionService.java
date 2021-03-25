@@ -21,9 +21,9 @@ import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
 
 import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER_FOCUS;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
+import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
 
@@ -37,18 +37,23 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.drawable.Icon;
+import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.view.Choreographer;
+import android.view.Display;
 import android.view.InputEvent;
 import android.view.MotionEvent;
+import android.view.Surface;
 import android.view.accessibility.AccessibilityManager;
 
 import androidx.annotation.BinderThread;
@@ -91,6 +96,7 @@ import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.shared.system.InputChannelCompat;
 import com.android.systemui.shared.system.InputChannelCompat.InputEventReceiver;
 import com.android.systemui.shared.system.InputConsumerController;
 import com.android.systemui.shared.system.InputMonitorCompat;
@@ -120,6 +126,9 @@ public class TouchInteractionService extends Service implements PluginListener<O
      * TODO: Use AccessibilityService's corresponding global action constant in S
      */
     private static final int SYSTEM_ACTION_ID_ALL_APPS = 14;
+
+    public static final boolean ENABLE_PER_WINDOW_INPUT_ROTATION =
+            SystemProperties.getBoolean("persist.debug.per_window_input_rotation", false);
 
     private int mBackGestureNotificationCounter = -1;
     @Nullable
@@ -248,6 +257,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
     private InputMonitorCompat mInputMonitorCompat;
     private InputEventReceiver mInputEventReceiver;
 
+    private DisplayManager mDisplayManager;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -261,6 +272,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         mDeviceState.addOneHandedModeChangedCallback(this::onOneHandedModeOverlayChanged);
         mDeviceState.runOnUserUnlocked(this::onUserUnlocked);
         ProtoTracer.INSTANCE.get(this).add(this);
+        mDisplayManager = getSystemService(DisplayManager.class);
 
         sConnected = true;
     }
@@ -278,7 +290,13 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
     private void initInputMonitor() {
         disposeEventHandlers();
-        if (mDeviceState.isButtonNavMode() || !SystemUiProxy.INSTANCE.get(this).isActive()) {
+
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.TIS_NO_EVENTS, "initInputMonitor: isButtonMode? "
+                    + mDeviceState.isButtonNavMode());
+        }
+
+        if (mDeviceState.isButtonNavMode()) {
             return;
         }
 
@@ -426,6 +444,15 @@ public class TouchInteractionService extends Service implements PluginListener<O
             return;
         }
         MotionEvent event = (MotionEvent) ev;
+        if (ENABLE_PER_WINDOW_INPUT_ROTATION) {
+            final Display display = mDisplayManager.getDisplay(mDeviceState.getDisplayId());
+            int rotation = display.getRotation();
+            Point sz = new Point();
+            display.getRealSize(sz);
+            if (rotation != Surface.ROTATION_0) {
+                event.transform(InputChannelCompat.createRotationMatrix(rotation, sz.x, sz.y));
+            }
+        }
 
         TestLogging.recordMotionEvent(
                 TestProtocol.SEQUENCE_TIS, "TouchInteractionService.onInputEvent", event);
@@ -660,8 +687,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
                     runningComponent != null && runningComponent.equals(homeComponent);
         }
 
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get()
-                && gestureState.getActivityInterface().isInLiveTileMode()) {
+        if (LIVE_TILE.get() && gestureState.getActivityInterface().isInLiveTileMode()) {
             return createOverviewInputConsumer(
                     previousGestureState, gestureState, event, forceOverviewInputConsumer);
         } else if (gestureState.getRunningTask() == null) {
@@ -717,8 +743,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
                 || previousGestureState.isRunningAnimationToLauncher()
                 || (ASSISTANT_GIVES_LAUNCHER_FOCUS.get()
                     && forceOverviewInputConsumer)
-                || (ENABLE_QUICKSTEP_LIVE_TILE.get())
-                    && gestureState.getActivityInterface().isInLiveTileMode()) {
+                || (LIVE_TILE.get()) && gestureState.getActivityInterface().isInLiveTileMode()) {
             return new OverviewInputConsumer(gestureState, activity, mInputMonitorCompat,
                     false /* startingInActivityBounds */);
         } else {

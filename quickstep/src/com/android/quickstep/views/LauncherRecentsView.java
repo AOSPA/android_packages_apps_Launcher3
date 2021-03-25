@@ -16,14 +16,14 @@
 package com.android.quickstep.views;
 
 import static com.android.launcher3.LauncherState.ALL_APPS_HEADER_EXTRA;
+import static com.android.launcher3.LauncherState.CLEAR_ALL_BUTTON;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
-import static com.android.launcher3.LauncherState.OVERVIEW_BUTTONS;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.QuickstepAppTransitionManagerImpl.ALL_APPS_PROGRESS_OFF_SCREEN;
 import static com.android.launcher3.allapps.AllAppsTransitionController.ALL_APPS_PROGRESS;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
+import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
@@ -95,7 +95,7 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher>
     public void startHome() {
         Runnable onReachedHome = () -> mActivity.getStateManager().goToState(NORMAL, false);
         OverviewToHomeAnim overviewToHomeAnim = new OverviewToHomeAnim(mActivity, onReachedHome);
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+        if (LIVE_TILE.get()) {
             switchToScreenshot(null,
                     () -> finishRecentsAnimation(true /* toRecents */,
                             () -> overviewToHomeAnim.animateWithVelocity(0)));
@@ -160,6 +160,8 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher>
             reset();
         }
         setOverlayEnabled(finalState == OVERVIEW || finalState == OVERVIEW_MODAL_TASK);
+        setOverviewGridEnabled(finalState.displayOverviewTasksAsGrid(mActivity));
+        setOverviewFullscreenEnabled(finalState.getOverviewFullscreenProgress() == 1);
         setFreezeViewVisibility(false);
     }
 
@@ -169,7 +171,7 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher>
         if (enabled) {
             LauncherState state = mActivity.getStateManager().getState();
             boolean hasClearAllButton = (state.getVisibleElements(mActivity)
-                    & OVERVIEW_BUTTONS) != 0;
+                    & CLEAR_ALL_BUTTON) != 0;
             setDisallowScrollToClearAll(!hasClearAllButton);
         }
     }

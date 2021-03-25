@@ -32,7 +32,6 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup.MarginLayoutParams;
 import android.view.animation.Interpolator;
-import android.widget.EditText;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
@@ -47,6 +46,7 @@ import com.android.launcher3.allapps.AlphabeticalAppsList;
 import com.android.launcher3.allapps.SearchUiManager;
 import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.search.SearchCallback;
 
 import java.util.ArrayList;
 
@@ -54,7 +54,7 @@ import java.util.ArrayList;
  * Layout to contain the All-apps search UI.
  */
 public class AppsSearchContainerLayout extends ExtendedEditText
-        implements SearchUiManager, AllAppsSearchBarController.Callbacks,
+        implements SearchUiManager, SearchCallback<AdapterItem>,
         AllAppsStore.OnUpdateListener, Insettable {
 
     private final BaseDraggingActivity mLauncher;
@@ -229,7 +229,7 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     }
 
     @Override
-    public EditText getEditText() {
+    public ExtendedEditText getEditText() {
         return this;
     }
 }
