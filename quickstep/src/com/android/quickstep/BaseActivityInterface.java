@@ -31,8 +31,10 @@ import android.animation.Animator;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.Build;
+import android.view.Gravity;
 import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
@@ -42,6 +44,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -53,6 +56,7 @@ import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.SplitScreenBounds;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
@@ -193,90 +197,118 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     }
 
     /**
-     * Calculates the taskView size for the provided device configuration
+     * Calculates the taskView size for the provided device configuration.
      */
     public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect,
             PagedOrientationHandler orientedState) {
-        calculateTaskSize(context, dp, getExtraSpace(context, dp, orientedState), outRect);
-    }
-
-    protected abstract float getExtraSpace(Context context, DeviceProfile dp,
-            PagedOrientationHandler orientedState);
-
-    private void calculateTaskSize(Context context, DeviceProfile dp, float extraVerticalSpace,
-            Rect outRect) {
         Resources res = context.getResources();
+        if (dp.isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get()) {
+            Rect gridRect = new Rect();
+            calculateGridSize(context, dp, gridRect);
 
-        final int paddingResId;
-        if (dp.isMultiWindowMode) {
-            paddingResId = R.dimen.multi_window_task_card_horz_space;
-        } else if (dp.isVerticalBarLayout()) {
-            paddingResId = R.dimen.landscape_task_card_horz_space;
+            int rowSpacing = res.getDimensionPixelSize(R.dimen.overview_grid_row_spacing);
+            float rowHeight = (gridRect.height() - rowSpacing) / 2f;
+
+            PointF taskDimension = getTaskDimension(context, dp);
+            float scale = (rowHeight - dp.overviewTaskThumbnailTopMarginPx) / Math.max(
+                    taskDimension.x, taskDimension.y);
+            int outWidth = Math.round(scale * taskDimension.x);
+            int outHeight = Math.round(scale * taskDimension.y);
+
+            int gravity = Gravity.TOP;
+            gravity |= orientedState.getRecentsRtlSetting(res) ? Gravity.RIGHT : Gravity.LEFT;
+            gridRect.inset(0, dp.overviewTaskThumbnailTopMarginPx, 0, 0);
+            Gravity.apply(gravity, outWidth, outHeight, gridRect, outRect);
         } else {
-            paddingResId = R.dimen.portrait_task_card_horz_space_big_overview;
+            int taskMargin = dp.overviewTaskMarginPx;
+            int proactiveRowAndMargin;
+            if (dp.isVerticalBarLayout()) {
+                // In Vertical Bar Layout the proactive row doesn't have its own space, it's inside
+                // the actions row.
+                proactiveRowAndMargin = 0;
+            } else {
+                proactiveRowAndMargin = res.getDimensionPixelSize(
+                        R.dimen.overview_proactive_row_height)
+                        + res.getDimensionPixelSize(R.dimen.overview_proactive_row_bottom_margin);
+            }
+            calculateTaskSizeInternal(context, dp,
+                    dp.overviewTaskThumbnailTopMarginPx,
+                    proactiveRowAndMargin + getOverviewActionsHeight(context) + taskMargin,
+                    res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
+                    outRect);
         }
-        float paddingHorz = res.getDimension(paddingResId);
-        float paddingVert = 0;
-
-        calculateTaskSizeInternal(context, dp, extraVerticalSpace, paddingHorz, paddingVert,
-                res.getDimension(R.dimen.task_thumbnail_top_margin), outRect);
     }
 
     private void calculateTaskSizeInternal(Context context, DeviceProfile dp,
-            float extraVerticalSpace, float paddingHorz, float paddingVert, float topIconMargin,
+            int claimedSpaceAbove, int claimedSpaceBelow, int minimumHorizontalPadding,
             Rect outRect) {
-        float taskWidth, taskHeight;
+        PointF taskDimension = getTaskDimension(context, dp);
         Rect insets = dp.getInsets();
+
+        Rect potentialTaskRect = new Rect(0, 0, dp.widthPx, dp.heightPx);
+        potentialTaskRect.inset(insets.left, insets.top, insets.right, insets.bottom);
+        potentialTaskRect.inset(
+                minimumHorizontalPadding,
+                claimedSpaceAbove,
+                minimumHorizontalPadding,
+                claimedSpaceBelow);
+
+        float scale = Math.min(
+                potentialTaskRect.width() / taskDimension.x,
+                potentialTaskRect.height() / taskDimension.y);
+        int outWidth = Math.round(scale * taskDimension.x);
+        int outHeight = Math.round(scale * taskDimension.y);
+
+        Gravity.apply(Gravity.CENTER, outWidth, outHeight, potentialTaskRect, outRect);
+    }
+
+    private PointF getTaskDimension(Context context, DeviceProfile dp) {
+        PointF dimension = new PointF();
         if (dp.isMultiWindowMode) {
             WindowBounds bounds = SplitScreenBounds.INSTANCE.getSecondaryWindowBounds(context);
-            taskWidth = bounds.availableSize.x;
-            taskHeight = bounds.availableSize.y;
+            dimension.x = bounds.availableSize.x;
+            dimension.y = bounds.availableSize.y;
+        } else if (TaskView.CLIP_STATUS_AND_NAV_BARS) {
+            dimension.x = dp.availableWidthPx;
+            dimension.y = dp.availableHeightPx;
         } else {
-            taskWidth = dp.availableWidthPx;
-            taskHeight = dp.availableHeightPx;
+            dimension.x = dp.widthPx;
+            dimension.y = dp.heightPx;
         }
+        return dimension;
+    }
 
-        // Note this should be same as dp.availableWidthPx and dp.availableHeightPx unless
-        // we override the insets ourselves.
-        int launcherVisibleWidth = dp.widthPx - insets.left - insets.right;
-        int launcherVisibleHeight = dp.heightPx - insets.top - insets.bottom;
+    /**
+     * Calculates the overview grid size for the provided device configuration.
+     */
+    public final void calculateGridSize(Context context, DeviceProfile dp, Rect outRect) {
+        Resources res = context.getResources();
+        int topMargin = res.getDimensionPixelSize(R.dimen.overview_grid_top_margin);
+        int bottomMargin = res.getDimensionPixelSize(R.dimen.overview_grid_bottom_margin);
+        int sideMargin = res.getDimensionPixelSize(R.dimen.overview_grid_side_margin);
 
-        float availableHeight = launcherVisibleHeight
-                - topIconMargin - extraVerticalSpace - paddingVert;
-        float availableWidth = launcherVisibleWidth - paddingHorz;
-
-        float scale = Math.min(availableWidth / taskWidth, availableHeight / taskHeight);
-        float outWidth = scale * taskWidth;
-        float outHeight = scale * taskHeight;
-
-        // Center in the visible space
-        float x = insets.left + (launcherVisibleWidth - outWidth) / 2;
-        float y = insets.top + Math.max(topIconMargin,
-                (launcherVisibleHeight - extraVerticalSpace - outHeight) / 2);
-        outRect.set(Math.round(x), Math.round(y),
-                Math.round(x) + Math.round(outWidth), Math.round(y) + Math.round(outHeight));
+        Rect insets = dp.getInsets();
+        outRect.set(0, 0, dp.widthPx, dp.heightPx);
+        outRect.inset(Math.max(insets.left, sideMargin), Math.max(insets.top, topMargin),
+                Math.max(insets.right, sideMargin), Math.max(insets.bottom, bottomMargin));
     }
 
     /**
      * Calculates the modal taskView size for the provided device configuration
      */
     public final void calculateModalTaskSize(Context context, DeviceProfile dp, Rect outRect) {
-        float paddingHorz = context.getResources().getDimension(dp.isMultiWindowMode
-                ? R.dimen.multi_window_task_card_horz_space
-                : dp.isVerticalBarLayout()
-                        ? R.dimen.landscape_task_card_horz_space
-                        : R.dimen.portrait_modal_task_card_horz_space);
-        float extraVerticalSpace = getOverviewActionsHeight(context);
-        float paddingVert = 0;
-        float topIconMargin = 0;
-        calculateTaskSizeInternal(context, dp, extraVerticalSpace, paddingHorz, paddingVert,
-                topIconMargin, outRect);
+        calculateTaskSizeInternal(
+                context, dp,
+                dp.overviewTaskMarginPx,
+                getOverviewActionsHeight(context) + dp.overviewTaskMarginPx,
+                dp.overviewTaskMarginPx,
+                outRect);
     }
 
-    /** Gets the space that the overview actions will take, including margins. */
-    public final float getOverviewActionsHeight(Context context) {
+    /** Gets the space that the overview actions will take, including bottom margin. */
+    public final int getOverviewActionsHeight(Context context) {
         Resources res = context.getResources();
-        float actionsBottomMargin = 0;
+        int actionsBottomMargin = 0;
         if (getMode(context) == Mode.THREE_BUTTONS) {
             actionsBottomMargin = res.getDimensionPixelSize(
                     R.dimen.overview_actions_bottom_margin_three_button);
@@ -284,9 +316,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             actionsBottomMargin = res.getDimensionPixelSize(
                     R.dimen.overview_actions_bottom_margin_gesture);
         }
-        float overviewActionsHeight = actionsBottomMargin
+        return actionsBottomMargin
                 + res.getDimensionPixelSize(R.dimen.overview_actions_height);
-        return overviewActionsHeight;
     }
 
     /**
@@ -302,6 +333,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      */
     public void onSystemUiFlagsChanged(int systemUiStateFlags) {
     }
+
+    /**
+     * Returns the expected STATE_TYPE from the provided GestureEndTarget.
+     */
+    public abstract STATE_TYPE stateFromGestureEndTarget(GestureState.GestureEndTarget endTarget);
 
     public interface AnimationFactory {
 

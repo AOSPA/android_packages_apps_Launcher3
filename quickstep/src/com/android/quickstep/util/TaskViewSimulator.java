@@ -15,7 +15,6 @@
  */
 package com.android.quickstep.util;
 
-import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.states.RotationHelper.deltaRotation;
 import static com.android.launcher3.touch.PagedOrientationHandler.MATRIX_POST_TRANSLATE;
 import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
@@ -36,7 +35,6 @@ import android.util.IntProperty;
 import androidx.annotation.NonNull;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.touch.PagedOrientationHandler;
@@ -97,21 +95,18 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
     private final FullscreenDrawParams mCurrentFullscreenParams;
     public final AnimatedFloat taskPrimaryTranslation = new AnimatedFloat();
     public final AnimatedFloat taskSecondaryTranslation = new AnimatedFloat();
-    public final AnimatedFloat gridTranslationSecondary = new AnimatedFloat();
 
     // RecentsView properties
     public final AnimatedFloat recentsViewScale = new AnimatedFloat();
     public final AnimatedFloat fullScreenProgress = new AnimatedFloat();
     public final AnimatedFloat recentsViewSecondaryTranslation = new AnimatedFloat();
-    public final AnimatedFloat gridProgress = new AnimatedFloat();
+    public final AnimatedFloat recentsViewPrimaryTranslation = new AnimatedFloat();
     private final ScrollState mScrollState = new ScrollState();
 
     // Cached calculations
     private boolean mLayoutValid = false;
     private boolean mScrollValid = false;
     private int mOrientationStateId;
-    private final int mTaskThumbnailPadding;
-    private final int mRowSpacing;
 
     public TaskViewSimulator(Context context, BaseActivityInterface sizeStrategy) {
         mContext = context;
@@ -123,8 +118,6 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         mOrientationStateId = mOrientationState.getStateId();
         Resources resources = context.getResources();
         mIsRecentsRtl = mOrientationState.getOrientationHandler().getRecentsRtlSetting(resources);
-        mTaskThumbnailPadding = (int) resources.getDimension(R.dimen.task_thumbnail_top_margin);
-        mRowSpacing = (int) resources.getDimension(R.dimen.recents_row_spacing);
     }
 
     /**
@@ -268,10 +261,12 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
             getFullScreenScale();
             mThumbnailData.rotation = mOrientationState.getDisplayRotation();
 
+            // mIsRecentsRtl is the inverse of TaskView RTL.
+            boolean isRtlEnabled = !mIsRecentsRtl;
             mPositionHelper.updateThumbnailMatrix(
                     mThumbnailPosition, mThumbnailData,
                     mTaskRect.width(), mTaskRect.height(),
-                    mDp, mOrientationState.getRecentsActivityRotation());
+                    mDp, mOrientationState.getRecentsActivityRotation(), isRtlEnabled);
             mPositionHelper.getMatrix().invert(mInversePositionMatrix);
 
             PagedOrientationHandler poh = mOrientationState.getOrientationHandler();
@@ -304,24 +299,6 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         mMatrix.postTranslate(insets.left, insets.top);
         mMatrix.postScale(scale, scale);
 
-        float interpolatedGridProgress = ACCEL_DEACCEL.getInterpolation(gridProgress.value);
-
-        // Apply TaskView matrix: gridProgress
-        final int boxLength = (int) Math.max(taskWidth, taskHeight);
-        float availableHeight =
-                mTaskThumbnailPadding + taskHeight + mSizeStrategy.getOverviewActionsHeight(
-                        mContext);
-        float rowHeight = (availableHeight - mRowSpacing) / 2;
-        float gridScale = rowHeight / (boxLength + mTaskThumbnailPadding);
-        scale = Utilities.mapRange(interpolatedGridProgress, 1f, gridScale);
-        mMatrix.postScale(scale, scale, mIsRecentsRtl ? 0 : taskWidth, 0);
-        float taskWidthDiff = taskWidth * (1 - gridScale);
-        float taskWidthOffset = mIsRecentsRtl ? taskWidthDiff : -taskWidthDiff;
-        mOrientationState.getOrientationHandler().set(mMatrix, MATRIX_POST_TRANSLATE,
-                Utilities.mapRange(interpolatedGridProgress, 0, taskWidthOffset));
-        mOrientationState.getOrientationHandler().setSecondary(mMatrix, MATRIX_POST_TRANSLATE,
-                Utilities.mapRange(interpolatedGridProgress, 0, gridTranslationSecondary.value));
-
         // Apply TaskView matrix: translate, scroll
         mMatrix.postTranslate(mTaskRect.left, mTaskRect.top);
         mOrientationState.getOrientationHandler().set(mMatrix, MATRIX_POST_TRANSLATE,
@@ -335,6 +312,8 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         mMatrix.postScale(recentsViewScale.value, recentsViewScale.value, mPivot.x, mPivot.y);
         mOrientationState.getOrientationHandler().setSecondary(mMatrix, MATRIX_POST_TRANSLATE,
                 recentsViewSecondaryTranslation.value);
+        mOrientationState.getOrientationHandler().set(mMatrix, MATRIX_POST_TRANSLATE,
+                recentsViewPrimaryTranslation.value);
         applyWindowToHomeRotation(mMatrix);
 
         // Crop rect is the inverse of thumbnail matrix

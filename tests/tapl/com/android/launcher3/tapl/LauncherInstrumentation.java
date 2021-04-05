@@ -52,6 +52,7 @@ import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.test.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.BySelector;
@@ -155,8 +156,7 @@ public final class LauncherInstrumentation {
     private static final String OVERVIEW_RES_ID = "overview_panel";
     private static final String WIDGETS_RES_ID = "primary_widgets_list_view";
     private static final String CONTEXT_MENU_RES_ID = "deep_shortcuts_container";
-    public static final int WAIT_TIME_MS = 10000;
-    public static final int LONG_WAIT_TIME_MS = 60000;
+    public static final int WAIT_TIME_MS = 60000;
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
     private static final String ANDROID_PACKAGE = "android";
 
@@ -586,11 +586,7 @@ public final class LauncherInstrumentation {
                 "but the current state is not " + containerType.name())) {
             switch (containerType) {
                 case WORKSPACE: {
-                    if (mDevice.isNaturalOrientation()) {
-                        waitForLauncherObject(APPS_RES_ID);
-                    } else {
-                        waitUntilLauncherObjectGone(APPS_RES_ID);
-                    }
+                    waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(OVERVIEW_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
                     return waitForLauncherObject(WORKSPACE_RES_ID);
@@ -656,7 +652,7 @@ public final class LauncherInstrumentation {
         try {
             final AccessibilityEvent event =
                     mInstrumentation.getUiAutomation().executeAndWaitForEvent(
-                            command, eventFilter, LONG_WAIT_TIME_MS);
+                            command, eventFilter, WAIT_TIME_MS);
             assertNotNull("executeAndWaitForEvent returned null (this can't happen)", event);
             final Parcelable parcelableData = event.getParcelableData();
             event.recycle();
@@ -872,6 +868,16 @@ public final class LauncherInstrumentation {
         return object;
     }
 
+    @Nullable
+    UiObject2 findObjectInContainer(UiObject2 container, BySelector selector) {
+        try {
+            return container.findObject(selector);
+        } catch (StaleObjectException e) {
+            fail("The container disappeared from screen");
+            return null;
+        }
+    }
+
     @NonNull
     List<UiObject2> getObjectsInContainer(UiObject2 container, String resName) {
         try {
@@ -1028,14 +1034,18 @@ public final class LauncherInstrumentation {
                 expectedState);
     }
 
-    int getBottomGestureSize() {
+    private int getBottomGestureSize() {
         return ResourceUtils.getNavbarSize(
                 ResourceUtils.NAVBAR_BOTTOM_GESTURE_SIZE, getResources()) + 1;
     }
 
     int getBottomGestureMarginInContainer(UiObject2 container) {
-        final int bottomGestureStartOnScreen = getRealDisplaySize().y - getBottomGestureSize();
+        final int bottomGestureStartOnScreen = getBottomGestureStartOnScreen();
         return getVisibleBounds(container).bottom - bottomGestureStartOnScreen;
+    }
+
+    int getBottomGestureStartOnScreen() {
+        return getRealDisplaySize().y - getBottomGestureSize();
     }
 
     void clickLauncherObject(UiObject2 object) {
@@ -1060,6 +1070,11 @@ public final class LauncherInstrumentation {
         final int itemRowNewTopOnScreen = containerRect.top + topPaddingInContainer;
         final int distance = itemRowCurrentTopOnScreen - itemRowNewTopOnScreen + getTouchSlop();
 
+        scrollDownByDistance(container, distance);
+    }
+
+    void scrollDownByDistance(UiObject2 container, int distance) {
+        final Rect containerRect = getVisibleBounds(container);
         final int bottomGestureMarginInContainer = getBottomGestureMarginInContainer(container);
         scroll(
                 container,
@@ -1215,7 +1230,7 @@ public final class LauncherInstrumentation {
 
         final MotionEvent event = getMotionEvent(downTime, currentTime, action, point.x, point.y);
         assertTrue("injectInputEvent failed",
-                mInstrumentation.getUiAutomation().injectInputEvent(event, true));
+                mInstrumentation.getUiAutomation().injectInputEvent(event, true, false));
         event.recycle();
     }
 

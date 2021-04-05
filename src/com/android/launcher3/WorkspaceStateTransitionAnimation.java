@@ -34,7 +34,6 @@ import static com.android.launcher3.anim.Interpolators.ZOOM_OUT;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
 import static com.android.launcher3.graphics.Scrim.SCRIM_PROGRESS;
 import static com.android.launcher3.graphics.SysUiScrim.SYSUI_PROGRESS;
-import static com.android.launcher3.states.StateAnimationConfig.ANIM_HOTSEAT_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_HOTSEAT_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_HOTSEAT_TRANSLATE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_FADE;
@@ -47,7 +46,6 @@ import android.view.animation.Interpolator;
 
 import com.android.launcher3.LauncherState.PageAlphaProvider;
 import com.android.launcher3.LauncherState.ScaleAndTranslation;
-import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.anim.SpringAnimationBuilder;
@@ -96,7 +94,6 @@ public class WorkspaceStateTransitionAnimation {
         ScaleAndTranslation scaleAndTranslation = state.getWorkspaceScaleAndTranslation(mLauncher);
         ScaleAndTranslation hotseatScaleAndTranslation = state.getHotseatScaleAndTranslation(
                 mLauncher);
-        ScaleAndTranslation qsbScaleAndTranslation = state.getQsbScaleAndTranslation(mLauncher);
         mNewScale = scaleAndTranslation.scale;
         PageAlphaProvider pageAlphaProvider = state.getWorkspacePageAlphaProvider(mLauncher);
         final int childCount = mWorkspace.getChildCount();
@@ -110,9 +107,6 @@ public class WorkspaceStateTransitionAnimation {
                 pageAlphaProvider.interpolator);
         boolean playAtomicComponent = config.playAtomicOverviewScaleComponent();
         Hotseat hotseat = mWorkspace.getHotseat();
-        // Since we set the pivot relative to mWorkspace, we need to scale a sibling of Workspace.
-        AllAppsContainerView qsbScaleView = mLauncher.getAppsView();
-        View qsbView = qsbScaleView.getSearchView();
         if (playAtomicComponent) {
             Interpolator scaleInterpolator = config.getInterpolator(ANIM_WORKSPACE_SCALE, ZOOM_OUT);
             LauncherState fromState = mLauncher.getStateManager().getState();
@@ -126,25 +120,19 @@ public class WorkspaceStateTransitionAnimation {
             }
 
             setPivotToScaleWithWorkspace(hotseat);
-            setPivotToScaleWithWorkspace(qsbScaleView);
             float hotseatScale = hotseatScaleAndTranslation.scale;
             if (shouldSpring) {
                 PendingAnimation pa = (PendingAnimation) propertySetter;
                 pa.add(getSpringScaleAnimator(mLauncher, hotseat, hotseatScale));
-                pa.add(getSpringScaleAnimator(mLauncher, qsbScaleView,
-                        qsbScaleAndTranslation.scale));
             } else {
                 Interpolator hotseatScaleInterpolator = config.getInterpolator(ANIM_HOTSEAT_SCALE,
                         scaleInterpolator);
                 propertySetter.setFloat(hotseat, SCALE_PROPERTY, hotseatScale,
                         hotseatScaleInterpolator);
-                propertySetter.setFloat(qsbScaleView, SCALE_PROPERTY, qsbScaleAndTranslation.scale,
-                        hotseatScaleInterpolator);
             }
 
             float hotseatIconsAlpha = (elements & HOTSEAT_ICONS) != 0 ? 1 : 0;
-            propertySetter.setViewAlpha(hotseat, hotseatIconsAlpha,
-                    config.getInterpolator(ANIM_HOTSEAT_FADE, fadeInterpolator));
+            propertySetter.setViewAlpha(hotseat, hotseatIconsAlpha, fadeInterpolator);
             float workspacePageIndicatorAlpha = (elements & WORKSPACE_PAGE_INDICATOR) != 0 ? 1 : 0;
             propertySetter.setViewAlpha(mLauncher.getWorkspace().getPageIndicator(),
                     workspacePageIndicatorAlpha, fadeInterpolator);
@@ -169,8 +157,6 @@ public class WorkspaceStateTransitionAnimation {
                 hotseatScaleAndTranslation.translationY, hotseatTranslationInterpolator);
         propertySetter.setFloat(mWorkspace.getPageIndicator(), VIEW_TRANSLATE_Y,
                 hotseatScaleAndTranslation.translationY, hotseatTranslationInterpolator);
-        propertySetter.setFloat(qsbView, VIEW_TRANSLATE_Y,
-                qsbScaleAndTranslation.translationY, hotseatTranslationInterpolator);
 
         setScrim(propertySetter, state);
     }

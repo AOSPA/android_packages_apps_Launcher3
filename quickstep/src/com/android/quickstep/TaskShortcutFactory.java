@@ -34,12 +34,13 @@ import android.view.View;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.model.WellbeingModel;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.popup.SystemShortcut.AppInfo;
-import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.InstantAppResolver;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskThumbnailView;
 import com.android.quickstep.views.TaskView;
@@ -54,13 +55,11 @@ import com.android.systemui.shared.system.WindowManagerWrapper;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Consumer;
 
 /**
  * Represents a system shortcut that can be shown for a recent task.
  */
 public interface TaskShortcutFactory {
-
     SystemShortcut getShortcut(BaseDraggingActivity activity, TaskView view);
 
     TaskShortcutFactory APP_INFO = (activity, view) -> new AppInfo(activity, view.getItemInfo());
@@ -92,6 +91,23 @@ public interface TaskShortcutFactory {
             }
             return new MultiWindowSystemShortcut(mIconRes, mTextRes, activity, taskView, this,
                     mLauncherEvent);
+        }
+    }
+
+    class SplitSelectSystemShortcut extends SystemShortcut {
+        private final TaskView mTaskView;
+        private SplitPositionOption mSplitPositionOption;
+        public SplitSelectSystemShortcut(BaseDraggingActivity target, TaskView taskView,
+                SplitPositionOption option) {
+            super(option.mIconResId, option.mTextResId, target, taskView.getItemInfo());
+            mTaskView = taskView;
+            mSplitPositionOption = option;
+            setEnabled(taskView.getRecentsView().getTaskViewCount() > 1);
+        }
+
+        @Override
+        public void onClick(View view) {
+            mTaskView.initiateSplitSelect(mSplitPositionOption);
         }
     }
 
@@ -213,6 +229,16 @@ public interface TaskShortcutFactory {
         }
 
         @Override
+        public SystemShortcut getShortcut(BaseDraggingActivity activity, TaskView taskView) {
+            SystemShortcut shortcut = super.getShortcut(activity, taskView);
+            if (FeatureFlags.ENABLE_SPLIT_SELECT.get()) {
+                // Disable if there's only one recent app for split screen
+                shortcut.setEnabled(taskView.getRecentsView().getTaskViewCount() > 1);
+            }
+            return shortcut;
+        }
+
+        @Override
         protected ActivityOptions makeLaunchOptions(Activity activity) {
             final ActivityCompat act = new ActivityCompat(activity);
             final int navBarPosition = WindowManagerWrapper.getInstance().getNavBarPosition(
@@ -281,15 +307,9 @@ public interface TaskShortcutFactory {
 
         @Override
         public void onClick(View view) {
-            Consumer<Boolean> resultCallback = success -> {
-                if (success) {
-                    SystemUiProxy.INSTANCE.get(mTarget).startScreenPinning(
-                            mTaskView.getTask().key.id);
-                } else {
-                    mTaskView.notifyTaskLaunchFailed(TAG);
-                }
-            };
-            mTaskView.launchTask(true, resultCallback, Executors.MAIN_EXECUTOR.getHandler());
+            if (mTaskView.launchTaskAnimated() != null) {
+                SystemUiProxy.INSTANCE.get(mTarget).startScreenPinning(mTaskView.getTask().key.id);
+            }
             dismissTaskMenuView(mTarget);
             mTarget.getStatsLogManager().logger().withItemInfo(mTaskView.getItemInfo())
                     .log(LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_PIN_TAP);

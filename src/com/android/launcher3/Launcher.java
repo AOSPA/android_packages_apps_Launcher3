@@ -61,7 +61,6 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
-import android.app.ActivityOptions;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
 import android.content.ActivityNotFoundException;
@@ -114,7 +113,6 @@ import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DiscoveryBounce;
-import com.android.launcher3.allapps.search.LiveSearchManager;
 import com.android.launcher3.anim.PropertyListBuilder;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
@@ -276,10 +274,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     private static final int THEME_CROSS_FADE_ANIMATION_DURATION = 375;
 
-    private LauncherAppTransitionManager mAppTransitionManager;
     private Configuration mOldConfig;
-
-    private LiveSearchManager mLiveSearchManager;
 
     @Thunk
     Workspace mWorkspace;
@@ -311,8 +306,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     @Thunk
     boolean mWorkspaceLoading = true;
-
-    private ArrayList<OnResumeCallback> mOnResumeCallbacks = new ArrayList<>();
 
     // Used to notify when an activity launch has been deferred because launcher is not yet resumed
     // TODO: See if we can remove this later
@@ -405,8 +398,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         mAllAppsController = new AllAppsTransitionController(this);
         mStateManager = new StateManager<>(this, NORMAL);
 
-        mLiveSearchManager = new LiveSearchManager(this);
-
         mOnboardingPrefs = createOnboardingPrefs(mSharedPrefs);
 
         mAppWidgetManager = new WidgetManagerHelper(this);
@@ -418,9 +409,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         setupViews();
         crossFadeWithPreviousAppearance();
         mPopupDataProvider = new PopupDataProvider(this::updateNotificationDots);
-
-        mAppTransitionManager = LauncherAppTransitionManager.newInstance(this);
-        mAppTransitionManager.registerRemoteAnimations();
 
         boolean internalStateHandled = ACTIVITY_TRACKER.handleCreate(this);
         if (internalStateHandled) {
@@ -495,10 +483,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         if (Utilities.ATLEAST_R) {
             getWindow().setSoftInputMode(LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         }
-    }
-
-    public LiveSearchManager getLiveSearchManager() {
-        return mLiveSearchManager;
     }
 
     protected LauncherOverlayManager getDefaultOverlay() {
@@ -1090,15 +1074,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 TraceHelper.FLAG_UI_EVENT);
         super.onResume();
 
-        if (!mOnResumeCallbacks.isEmpty()) {
-            final ArrayList<OnResumeCallback> resumeCallbacks = new ArrayList<>(mOnResumeCallbacks);
-            mOnResumeCallbacks.clear();
-            for (int i = resumeCallbacks.size() - 1; i >= 0; i--) {
-                resumeCallbacks.get(i).onLauncherResume();
-            }
-            resumeCallbacks.clear();
-        }
-
         if (mDeferOverlayCallbacks) {
             scheduleDeferredCheck();
         } else {
@@ -1609,9 +1584,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         LauncherAppState.getIDP(this).removeOnChangeListener(this);
 
         mOverlayManager.onActivityDestroyed(this);
-        mAppTransitionManager.onActivityDestroyed();
         mUserChangedCallbackCloseable.close();
-        mLiveSearchManager.stop();
     }
 
     public LauncherAccessibilityDelegate getAccessibilityDelegate() {
@@ -1935,16 +1908,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     @TargetApi(Build.VERSION_CODES.M)
     @Override
-    public ActivityOptions getActivityLaunchOptions(View v) {
-        return mAppTransitionManager.getActivityLaunchOptions(this, v);
-    }
-
-    public LauncherAppTransitionManager getAppTransitionManager() {
-        return mAppTransitionManager;
-    }
-
-    @TargetApi(Build.VERSION_CODES.M)
-    @Override
     protected boolean onErrorStartingShortcut(Intent intent, ItemInfo info) {
         // Due to legacy reasons, direct call shortcuts require Launchers to have the
         // corresponding permission. Show the appropriate permission prompt if that
@@ -1993,7 +1956,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             // state when we return to launcher.
             BubbleTextView btv = (BubbleTextView) v;
             btv.setStayPressed(true);
-            addOnResumeCallback(btv);
+            addOnResumeCallback(() -> btv.setStayPressed(false));
         }
         return success;
     }
@@ -2035,10 +1998,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 ? getString(R.string.home_screen)
                 : mStateManager.getState().getDescription(this));
         return result;
-    }
-
-    public void addOnResumeCallback(OnResumeCallback callback) {
-        mOnResumeCallbacks.add(callback);
     }
 
     /**
@@ -2675,6 +2634,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         mDragLayer.dump(prefix, writer);
         mStateManager.dump(prefix, writer);
         mPopupDataProvider.dump(prefix, writer);
+        mDeviceProfile.dump(prefix, writer);
 
         try {
             FileLog.flushAll(writer);
@@ -2803,6 +2763,13 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return new float[] {NO_SCALE, NO_OFFSET};
     }
 
+    /**
+     * @see LauncherState#getTaskbarScale(Launcher)
+     */
+    public float getNormalTaskbarScale() {
+        return 1f;
+    }
+
     public static Launcher getLauncher(Context context) {
         return fromContext(context);
     }
@@ -2812,15 +2779,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      */
     public static <T extends Launcher> T cast(ActivityContext activityContext) {
         return (T) activityContext;
-    }
-
-
-    /**
-     * Callback for listening for onResume
-     */
-    public interface OnResumeCallback {
-
-        void onLauncherResume();
     }
 
     /**
@@ -2862,6 +2820,10 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      * @return Whether the View is in the same window as the Taskbar window.
      */
     public boolean isViewInTaskbar(View v) {
+        return false;
+    }
+
+    public boolean supportsAdaptiveIconAnimation(View clickedView) {
         return false;
     }
 

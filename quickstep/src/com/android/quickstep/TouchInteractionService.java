@@ -24,6 +24,12 @@ import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
 import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
+import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_ONE_HANDED;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_PIP;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SPLIT_SCREEN;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_STARTING_WINDOW;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
 
@@ -101,6 +107,11 @@ import com.android.systemui.shared.system.InputChannelCompat.InputEventReceiver;
 import com.android.systemui.shared.system.InputConsumerController;
 import com.android.systemui.shared.system.InputMonitorCompat;
 import com.android.systemui.shared.tracing.ProtoTraceable;
+import com.android.wm.shell.onehanded.IOneHanded;
+import com.android.wm.shell.pip.IPip;
+import com.android.wm.shell.splitscreen.ISplitScreen;
+import com.android.wm.shell.startingsurface.IStartingWindow;
+import com.android.wm.shell.transition.IShellTransitions;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -140,8 +151,18 @@ public class TouchInteractionService extends Service implements PluginListener<O
         public void onInitialize(Bundle bundle) {
             ISystemUiProxy proxy = ISystemUiProxy.Stub.asInterface(
                     bundle.getBinder(KEY_EXTRA_SYSUI_PROXY));
+            IPip pip = IPip.Stub.asInterface(bundle.getBinder(KEY_EXTRA_SHELL_PIP));
+            ISplitScreen splitscreen = ISplitScreen.Stub.asInterface(bundle.getBinder(
+                    KEY_EXTRA_SHELL_SPLIT_SCREEN));
+            IOneHanded onehanded = IOneHanded.Stub.asInterface(
+                    bundle.getBinder(KEY_EXTRA_SHELL_ONE_HANDED));
+            IShellTransitions shellTransitions = IShellTransitions.Stub.asInterface(
+                    bundle.getBinder(KEY_EXTRA_SHELL_SHELL_TRANSITIONS));
+            IStartingWindow startingWindow = IStartingWindow.Stub.asInterface(
+                    bundle.getBinder(KEY_EXTRA_SHELL_STARTING_WINDOW));
             MAIN_EXECUTOR.execute(() -> {
-                SystemUiProxy.INSTANCE.get(TouchInteractionService.this).setProxy(proxy);
+                SystemUiProxy.INSTANCE.get(TouchInteractionService.this).setProxy(proxy, pip,
+                        splitscreen, onehanded, shellTransitions, startingWindow);
                 TouchInteractionService.this.initInputMonitor();
                 preloadOverview(true /* fromInit */);
                 mDeviceState.runOnUserUnlocked(() -> {
@@ -157,13 +178,23 @@ public class TouchInteractionService extends Service implements PluginListener<O
         @BinderThread
         public void onOverviewToggle() {
             TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onOverviewToggle");
-            mOverviewCommandHelper.onOverviewToggle();
+            // If currently screen pinning, do not enter overview
+            if (mDeviceState.isScreenPinningActive()) {
+                return;
+            }
+            TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
+            mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_TOGGLE);
         }
 
         @BinderThread
         @Override
         public void onOverviewShown(boolean triggeredFromAltTab) {
-            mOverviewCommandHelper.onOverviewShown(triggeredFromAltTab);
+            if (triggeredFromAltTab) {
+                TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
+                mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_SHOW_NEXT_FOCUS);
+            } else {
+                mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_SHOW);
+            }
         }
 
         @BinderThread
@@ -171,7 +202,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         public void onOverviewHidden(boolean triggeredFromAltTab, boolean triggeredFromHomeKey) {
             if (triggeredFromAltTab && !triggeredFromHomeKey) {
                 // onOverviewShownFromAltTab hides the overview and ends at the target app
-                mOverviewCommandHelper.onOverviewHidden();
+                mOverviewCommandHelper.addCommand(OverviewCommandHelper.TYPE_HIDE);
             }
         }
 
@@ -326,8 +357,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
     public void onUserUnlocked() {
         mTaskAnimationManager = new TaskAnimationManager(this);
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
-        mOverviewCommandHelper = new OverviewCommandHelper(this, mDeviceState,
-                mOverviewComponentObserver);
+        mOverviewCommandHelper = new OverviewCommandHelper(this,
+                mOverviewComponentObserver, mTaskAnimationManager);
         mResetGestureInputConsumer = new ResetGestureInputConsumer(mTaskAnimationManager);
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
         mInputConsumer.registerInputConsumer();
@@ -421,7 +452,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         }
         disposeEventHandlers();
         mDeviceState.destroy();
-        SystemUiProxy.INSTANCE.get(this).setProxy(null);
+        SystemUiProxy.INSTANCE.get(this).clearProxy();
         ProtoTracer.INSTANCE.get(this).stop();
         ProtoTracer.INSTANCE.get(this).remove(this);
 
@@ -555,7 +586,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         ProtoTracer.INSTANCE.get(this).scheduleFrameUpdate();
     }
 
-    private GestureState createGestureState(GestureState previousGestureState) {
+    public GestureState createGestureState(GestureState previousGestureState) {
         GestureState gestureState = new GestureState(mOverviewComponentObserver,
                 ActiveGestureLog.INSTANCE.generateAndSetLogId());
         if (mTaskAnimationManager.isRecentsAnimationRunning()) {
@@ -704,16 +735,15 @@ public class TouchInteractionService extends Service implements PluginListener<O
         }
     }
 
+    public AbsSwipeUpHandler.Factory getSwipeUpHandlerFactory() {
+        return !mOverviewComponentObserver.isHomeAndOverviewSame()
+                ? mFallbackSwipeHandlerFactory : mLauncherSwipeHandlerFactory;
+    }
+
     private InputConsumer createOtherActivityInputConsumer(GestureState gestureState,
             MotionEvent event) {
 
-        final AbsSwipeUpHandler.Factory factory;
-        if (!mOverviewComponentObserver.isHomeAndOverviewSame()) {
-            factory = mFallbackSwipeHandlerFactory;
-        } else {
-            factory = mLauncherSwipeHandlerFactory;
-        }
-
+        final AbsSwipeUpHandler.Factory factory = getSwipeUpHandlerFactory();
         final boolean shouldDefer = !mOverviewComponentObserver.isHomeAndOverviewSame()
                 || gestureState.getActivityInterface().deferStartingActivity(mDeviceState, event);
         final boolean disableHorizontalSwipe = mDeviceState.isInExclusionRegion(event);
@@ -857,6 +887,9 @@ public class TouchInteractionService extends Service implements PluginListener<O
             if (mGestureState != null) {
                 mGestureState.dump(pw);
             }
+            pw.println("Input state:");
+            pw.println("  mInputMonitorCompat=" + mInputMonitorCompat);
+            pw.println("  mInputEventReceiver=" + mInputEventReceiver);
             SysUINavigationMode.INSTANCE.get(this).dump(pw);
             pw.println("TouchState:");
             BaseDraggingActivity createdOverviewActivity = mOverviewComponentObserver == null ? null
@@ -886,15 +919,17 @@ public class TouchInteractionService extends Service implements PluginListener<O
     }
 
     private AbsSwipeUpHandler createLauncherSwipeHandler(
-            GestureState gestureState, long touchTimeMs, boolean continuingLastGesture) {
+            GestureState gestureState, long touchTimeMs) {
         return new LauncherSwipeHandlerV2(this, mDeviceState, mTaskAnimationManager,
-                gestureState, touchTimeMs, continuingLastGesture, mInputConsumer);
+                gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
+                mInputConsumer);
     }
 
     private AbsSwipeUpHandler createFallbackSwipeHandler(
-            GestureState gestureState, long touchTimeMs, boolean continuingLastGesture) {
+            GestureState gestureState, long touchTimeMs) {
         return new FallbackSwipeHandler(this, mDeviceState, mTaskAnimationManager,
-                gestureState, touchTimeMs, continuingLastGesture, mInputConsumer);
+                gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
+                mInputConsumer);
     }
 
     protected boolean shouldNotifyBackGesture() {
