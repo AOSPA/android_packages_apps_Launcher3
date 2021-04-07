@@ -60,6 +60,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.notification.NotificationInfo;
 import com.android.launcher3.notification.NotificationItemView;
 import com.android.launcher3.notification.NotificationKeyData;
+import com.android.launcher3.notification.NotificationMainView;
 import com.android.launcher3.popup.PopupDataProvider.PopupDataChangeListener;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.shortcuts.ShortcutDragPreviewProvider;
@@ -91,6 +92,7 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
     private BubbleTextView mOriginalIcon;
     private NotificationItemView mNotificationItemView;
     private int mNumNotifications;
+    private ViewGroup mNotificationContainer;
 
     private ViewGroup mSystemShortcutContainer;
 
@@ -169,6 +171,14 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
         return false;
     }
 
+    @Override
+    protected void setChildColor(View v, int color) {
+        super.setChildColor(v, color);
+        if (v.getId() == R.id.notification_container && mNotificationItemView != null) {
+            mNotificationItemView.updateBackgroundColor(color);
+        }
+    }
+
     /**
      * Returns true if we can show the container.
      */
@@ -222,20 +232,6 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
         if (isReversed && mNotificationItemView != null) {
             mNotificationItemView.inverseGutterMargin();
         }
-
-        // Update dividers
-        int count = getChildCount();
-        DeepShortcutView lastView = null;
-        for (int i = 0; i < count; i++) {
-            View view = getChildAt(i);
-            if (view.getVisibility() == VISIBLE && view instanceof DeepShortcutView) {
-                if (lastView != null) {
-                    lastView.setDividerVisibility(VISIBLE);
-                }
-                lastView = (DeepShortcutView) view;
-                lastView.setDividerVisibility(INVISIBLE);
-            }
-        }
     }
 
     @TargetApi(Build.VERSION_CODES.P)
@@ -257,8 +253,12 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
         // Add views
         if (mNumNotifications > 0) {
             // Add notification entries
-            View.inflate(getContext(), R.layout.notification_content, this);
-            mNotificationItemView = new NotificationItemView(this);
+            if (mNotificationContainer == null) {
+                mNotificationContainer = findViewById(R.id.notification_container);
+                mNotificationContainer.setVisibility(VISIBLE);
+            }
+            View.inflate(getContext(), R.layout.notification_content, mNotificationContainer);
+            mNotificationItemView = new NotificationItemView(this, mNotificationContainer);
             if (mNumNotifications == 1) {
                 mNotificationItemView.removeFooter();
             }
@@ -342,34 +342,11 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
     private void updateHiddenShortcuts() {
         int allowedCount = mNotificationItemView != null
                 ? MAX_SHORTCUTS_IF_NOTIFICATIONS : MAX_SHORTCUTS;
-        int originalHeight = getResources().getDimensionPixelSize(R.dimen.bg_popup_item_height);
-        int itemHeight = mNotificationItemView != null ?
-                getResources().getDimensionPixelSize(R.dimen.bg_popup_item_condensed_height)
-                : originalHeight;
-        float iconScale = ((float) itemHeight) / originalHeight;
 
         int total = mShortcuts.size();
         for (int i = 0; i < total; i++) {
             DeepShortcutView view = mShortcuts.get(i);
             view.setVisibility(i >= allowedCount ? GONE : VISIBLE);
-            view.getLayoutParams().height = itemHeight;
-            view.getIconView().setScaleX(iconScale);
-            view.getIconView().setScaleY(iconScale);
-        }
-    }
-
-    private void updateDividers() {
-        int count = getChildCount();
-        DeepShortcutView lastView = null;
-        for (int i = 0; i < count; i++) {
-            View view = getChildAt(i);
-            if (view.getVisibility() == VISIBLE && view instanceof DeepShortcutView) {
-                if (lastView != null) {
-                    lastView.setDividerVisibility(VISIBLE);
-                }
-                lastView = (DeepShortcutView) view;
-                lastView.setDividerVisibility(INVISIBLE);
-            }
         }
     }
 
@@ -591,8 +568,9 @@ public class PopupContainerWithArrow<T extends BaseDraggingActivity> extends Arr
                 // No more notifications, remove the notification views and expand all shortcuts.
                 mNotificationItemView.removeAllViews();
                 mNotificationItemView = null;
+                mNotificationContainer.setVisibility(GONE);
                 updateHiddenShortcuts();
-                updateDividers();
+                assignMarginsAndBackgrounds();
             } else {
                 mNotificationItemView.trimNotifications(
                         NotificationKeyData.extractKeysOnly(dotInfo.getNotificationKeys()));

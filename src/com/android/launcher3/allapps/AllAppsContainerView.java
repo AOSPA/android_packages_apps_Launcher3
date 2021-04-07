@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.allapps;
 
-import static com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_PERSONAL_TAB;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_WORK_TAB;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCUT_PERMISSION;
@@ -63,7 +62,6 @@ import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.keyboard.FocusedItemDecorator;
 import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.MultiValueAlpha;
@@ -201,9 +199,9 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         }
         if (!mAH[AdapterHolder.MAIN].appsList.hasFilter()) {
             rebindAdapters(hasWorkApps);
-        }
-        if (hasWorkApps) {
-            resetWorkProfile();
+            if (hasWorkApps) {
+                resetWorkProfile();
+            }
         }
     }
 
@@ -246,11 +244,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             hideInput();
             return false;
         }
-        boolean shouldScroll = rv.shouldContainerScroll(ev, mLauncher.getDragLayer());
-        if (shouldScroll) {
-            hideInput();
-        }
-        return shouldScroll;
+        return rv.shouldContainerScroll(ev, mLauncher.getDragLayer());
     }
 
     @Override
@@ -347,7 +341,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
         mSearchContainer = findViewById(R.id.search_container_all_apps);
         mSearchUiManager = (SearchUiManager) mSearchContainer;
-        mSearchUiManager.initialize(this);
+        mSearchUiManager.initializeSearch(this);
     }
 
     public SearchUiManager getSearchUiManager() {
@@ -395,7 +389,8 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     @Override
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
         if (Utilities.ATLEAST_Q) {
-            mNavBarScrimHeight = insets.getTappableElementInsets().bottom;
+            mNavBarScrimHeight = insets.getTappableElementInsets().bottom
+                    - mLauncher.getDeviceProfile().nonOverlappingTaskbarInset;
         } else {
             mNavBarScrimHeight = insets.getStableInsetBottom();
         }
@@ -567,37 +562,9 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     /**
      * Handles selection on focused view and returns success
      */
-    public boolean selectFocusedView(View v) {
-        ItemInfo headerItem = getHighlightedItemFromHeader();
-        if (headerItem != null) {
-            return mLauncher.startActivitySafely(v, headerItem.getIntent(), headerItem);
-        }
-        AdapterItem focusedItem = getActiveRecyclerView().getApps().getFocusedChild();
-        if (focusedItem != null) {
-            View focusedView = getActiveRecyclerView().getLayoutManager()
-                    .findViewByPosition(focusedItem.position);
-            if (focusedView != null && mSearchAdapterProvider.onAdapterItemSelected(focusedItem,
-                    focusedView)) {
-                return true;
-            }
-        }
-        if (focusedItem != null && focusedItem.appInfo != null) {
-            ItemInfo itemInfo = focusedItem.appInfo;
-            return mLauncher.startActivitySafely(v, itemInfo.getIntent(), itemInfo);
-        }
-        return false;
-    }
-
-    /**
-     * Returns the ItemInfo of a focused view inside {@link FloatingHeaderView}
-     */
-    public ItemInfo getHighlightedItemFromHeader() {
-        View view = getFloatingHeaderView().getFocusedChild();
-        if (view != null && view.getTag() instanceof ItemInfo) {
-            return ((ItemInfo) view.getTag());
-        }
-
-        return null;
+    public boolean launchHighlightedItem() {
+        if (mSearchAdapterProvider == null) return false;
+        return mSearchAdapterProvider.launchHighlightedItem();
     }
 
     public SearchAdapterProvider getSearchAdapterProvider() {
@@ -616,10 +583,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         int padding = mHeader.getMaxTranslation();
         for (int i = 0; i < mAH.length; i++) {
             mAH[i].padding.top = padding;
-            if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && mUsingTabs) {
-                //add extra space between tabs and recycler view
-                mAH[i].padding.top += mLauncher.getDeviceProfile().edgeMarginPx;
-            }
             mAH[i].applyPadding();
         }
     }

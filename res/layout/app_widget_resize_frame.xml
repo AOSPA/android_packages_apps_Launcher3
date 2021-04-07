@@ -26,6 +26,7 @@
 
         <!-- Frame -->
         <ImageView
+            android:id="@+id/widget_resize_frame"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_gravity="center"
@@ -34,6 +35,7 @@
 
         <!-- Left -->
         <ImageView
+            android:id="@+id/widget_resize_left_handle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="left|center_vertical"
@@ -43,6 +45,7 @@
 
         <!-- Top -->
         <ImageView
+            android:id="@+id/widget_resize_top_handle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|center_horizontal"
@@ -52,6 +55,7 @@
 
         <!-- Right -->
         <ImageView
+            android:id="@+id/widget_resize_right_handle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="right|center_vertical"
@@ -61,12 +65,25 @@
 
         <!-- Bottom -->
         <ImageView
+            android:id="@+id/widget_resize_bottom_handle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
             android:layout_marginBottom="@dimen/widget_handle_margin"
             android:src="@drawable/ic_widget_resize_handle"
             android:tint="?android:attr/colorAccent" />
+
+        <ImageButton
+            android:id="@+id/widget_reconfigure_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/widget_reconfigure_button_padding"
+            android:layout_gravity="bottom|end"
+            android:layout_marginBottom="@dimen/widget_reconfigure_button_margin"
+            android:layout_marginEnd="@dimen/widget_reconfigure_button_margin"
+            android:src="@drawable/widget_reconfigure_button_frame"
+            android:background="?android:attr/selectableItemBackground"
+            android:visibility="gone" />
 
     </FrameLayout>
 </com.android.launcher3.AppWidgetResizeFrame>
