@@ -49,7 +49,7 @@ import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
-import com.android.launcher3.widget.WidgetsFullSheet;
+import com.android.launcher3.widget.picker.WidgetsFullSheet;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -118,7 +118,8 @@ public class OptionsPopupView extends ArrowPopup
         mTargetRect.roundOut(outPos);
     }
 
-    public static void show(Launcher launcher, RectF targetRect, List<OptionItem> items) {
+    public static OptionsPopupView show(
+            Launcher launcher, RectF targetRect, List<OptionItem> items) {
         OptionsPopupView popup = (OptionsPopupView) launcher.getLayoutInflater()
                 .inflate(R.layout.longpress_options_menu, launcher.getDragLayer(), false);
         popup.mTargetRect = targetRect;
@@ -134,6 +135,7 @@ public class OptionsPopupView extends ArrowPopup
             popup.mItemMap.put(view, item);
         }
         popup.show();
+        return popup;
     }
 
     @VisibleForTesting
@@ -156,6 +158,14 @@ public class OptionsPopupView extends ArrowPopup
      */
     public static ArrayList<OptionItem> getOptions(Launcher launcher) {
         ArrayList<OptionItem> options = new ArrayList<>();
+        options.add(new OptionItem(R.string.settings_button_text, R.drawable.ic_setting,
+                LAUNCHER_SETTINGS_BUTTON_TAP_OR_LONGPRESS,
+                OptionsPopupView::startSettings));
+        if (!WidgetsModel.GO_DISABLE_WIDGETS) {
+            options.add(new OptionItem(R.string.widget_button_text, R.drawable.ic_widget,
+                    LAUNCHER_WIDGETSTRAY_BUTTON_TAP_OR_LONGPRESS,
+                    OptionsPopupView::onWidgetsClicked));
+        }
         int resString = Utilities.existsStyleWallpapers(launcher) ?
                 R.string.styles_wallpaper_button_text : R.string.wallpaper_button_text;
         int resDrawable = Utilities.existsStyleWallpapers(launcher) ?
@@ -163,15 +173,6 @@ public class OptionsPopupView extends ArrowPopup
         options.add(new OptionItem(resString, resDrawable,
                 IGNORE,
                 OptionsPopupView::startWallpaperPicker));
-        if (!WidgetsModel.GO_DISABLE_WIDGETS) {
-            options.add(new OptionItem(R.string.widget_button_text, R.drawable.ic_widget,
-                    LAUNCHER_WIDGETSTRAY_BUTTON_TAP_OR_LONGPRESS,
-                    OptionsPopupView::onWidgetsClicked));
-        }
-        options.add(new OptionItem(R.string.settings_button_text, R.drawable.ic_setting,
-                LAUNCHER_SETTINGS_BUTTON_TAP_OR_LONGPRESS,
-                OptionsPopupView::startSettings));
-
         return options;
     }
 

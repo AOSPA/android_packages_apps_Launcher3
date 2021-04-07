@@ -15,6 +15,10 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_KEYBOARD_CLOSED;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_SWITCHED_TO_MAIN_TAB;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_SWITCHED_TO_WORK_TAB;
+
 import android.content.Context;
 import android.graphics.Rect;
 import android.util.AttributeSet;
@@ -83,14 +87,28 @@ public class LauncherAllAppsContainerView extends AllAppsContainerView {
     }
 
     @Override
-    public void onTabChanged(int pos) {
-        super.onTabChanged(pos);
+    public void onActivePageChanged(int currentActivePage) {
+        super.onActivePageChanged(currentActivePage);
         if (mUsingTabs) {
-            if (pos == AdapterHolder.WORK) {
+            // Log tab switches only when the launcher is in AllApps state
+            if (mLauncher.getStateManager().getCurrentStableState() == LauncherState.ALL_APPS) {
+                mLauncher.getStatsLogManager().logger()
+                        .log(currentActivePage == AdapterHolder.WORK
+                                ? LAUNCHER_ALLAPPS_SWITCHED_TO_WORK_TAB
+                                : LAUNCHER_ALLAPPS_SWITCHED_TO_MAIN_TAB);
+            }
+
+            if (currentActivePage == AdapterHolder.WORK) {
                 WorkEduView.showWorkEduIfNeeded(mLauncher);
             } else {
                 mWorkTabListener = WorkEduView.showEduFlowIfNeeded(mLauncher, mWorkTabListener);
             }
         }
+    }
+
+    @Override
+    protected void hideIme() {
+        super.hideIme();
+        mLauncher.getStatsLogManager().logger().log(LAUNCHER_ALLAPPS_KEYBOARD_CLOSED);
     }
 }

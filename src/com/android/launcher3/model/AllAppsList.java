@@ -22,7 +22,6 @@ import static com.android.launcher3.model.data.AppInfo.EMPTY_ARRAY;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.os.LocaleList;
@@ -137,7 +136,7 @@ public class AllAppsList {
         if (findAppInfo(info.componentName, info.user) != null) {
             return;
         }
-        mIconCache.getTitleAndIcon(info, activityInfo, true /* useLowResIcon */);
+        mIconCache.getTitleAndIcon(info, activityInfo, false /* useLowResIcon */);
         info.sectionName = mIndex.computeSectionName(info.title);
 
         data.add(info);
@@ -145,10 +144,9 @@ public class AllAppsList {
     }
 
     public void addPromiseApp(Context context, PackageInstallInfo installInfo) {
-        ApplicationInfo applicationInfo = new PackageManagerHelper(context)
-                .getApplicationInfo(installInfo.packageName, installInfo.user, 0);
         // only if not yet installed
-        if (applicationInfo == null) {
+        if (!new PackageManagerHelper(context)
+                .isAppInstalled(installInfo.packageName, installInfo.user)) {
             AppInfo info = new AppInfo(installInfo);
             mIconCache.getTitleAndIcon(info, info.usingLowResIcon());
             info.sectionName = mIndex.computeSectionName(info.title);
@@ -282,7 +280,7 @@ public class AllAppsList {
                 } else {
                     Intent launchIntent = AppInfo.makeLaunchIntent(info);
 
-                    mIconCache.getTitleAndIcon(applicationInfo, info, true /* useLowResIcon */);
+                    mIconCache.getTitleAndIcon(applicationInfo, info, false /* useLowResIcon */);
                     applicationInfo.sectionName = mIndex.computeSectionName(applicationInfo.title);
                     applicationInfo.setProgressLevel(
                             PackageManagerHelper.getLoadingProgress(info),

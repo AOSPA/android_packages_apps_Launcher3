@@ -51,6 +51,7 @@ import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SystemUiController;
@@ -480,9 +481,11 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
             float scale = thumbnailData.scale;
             final float thumbnailScale;
 
-            // Landscape vs portrait change
+            // Landscape vs portrait change.
+            // Note: Disable rotation in grid layout.
             boolean windowingModeSupportsRotation = !dp.isMultiWindowMode
-                    && thumbnailData.windowingMode == WINDOWING_MODE_FULLSCREEN;
+                    && thumbnailData.windowingMode == WINDOWING_MODE_FULLSCREEN
+                    && !(dp.isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get());
             isOrientationDifferent = isOrientationChange(deltaRotate)
                     && windowingModeSupportsRotation;
             if (canvasWidth == 0 || canvasHeight == 0 || scale == 0) {
