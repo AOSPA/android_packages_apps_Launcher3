@@ -1,2 +1,3 @@
 Temp file to prevent build breakage.
 Will be removed in followup cl.
+TODO(b/184874810): Remove this file once Android S GMS is integrated.
