@@ -110,7 +110,6 @@ public class AllAppsTransitionController
         setScrollRangeDelta(mScrollRangeDelta);
 
         if (mIsVerticalLayout) {
-            mAppsView.getAlphaProperty(APPS_VIEW_ALPHA_CHANNEL_INDEX).setValue(1);
             mLauncher.getHotseat().setTranslationY(0);
             mLauncher.getWorkspace().getPageIndicator().setTranslationY(0);
         }
@@ -128,7 +127,7 @@ public class AllAppsTransitionController
         mProgress = progress;
 
         mScrimView.setProgress(progress);
-        mAppsView.setTranslationY(progress * mShiftRange);
+        mAppsView.setTranslationY(mProgress * mShiftRange);
     }
 
     public float getProgress() {
@@ -155,16 +154,9 @@ public class AllAppsTransitionController
             StateAnimationConfig config, PendingAnimation builder) {
         float targetProgress = toState.getVerticalProgress(mLauncher);
         if (Float.compare(mProgress, targetProgress) == 0) {
-            if (!config.onlyPlayAtomicComponent()) {
-                setAlphas(toState, config, builder);
-            }
+            setAlphas(toState, config, builder);
             // Fail fast
             onProgressAnimationEnd();
-            return;
-        }
-
-        if (config.onlyPlayAtomicComponent()) {
-            // There is no atomic component for the all apps transition, so just return early.
             return;
         }
 
