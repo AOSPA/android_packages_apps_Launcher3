@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static com.android.quickstep.SysUINavigationMode.Mode.NO_BUTTON;
 import static com.android.quickstep.fallback.RecentsState.BACKGROUND_APP;
 import static com.android.quickstep.fallback.RecentsState.DEFAULT;
+import static com.android.quickstep.fallback.RecentsState.HOME;
 
 import android.content.Context;
 import android.graphics.Rect;
@@ -26,7 +27,6 @@ import android.view.MotionEvent;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.R;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.quickstep.fallback.RecentsState;
 import com.android.quickstep.util.ActivityInitListener;
@@ -82,6 +82,7 @@ public final class FallbackActivityInterface extends
     @Override
     public AnimationFactory prepareRecentsUI(RecentsAnimationDeviceState deviceState,
             boolean activityVisible, Consumer<AnimatorControllerWithResistance> callback) {
+        notifyRecentsOfOrientation(deviceState.getRotationTouchHelper());
         DefaultAnimationFactory factory = new DefaultAnimationFactory(callback);
         factory.initUI();
         return factory;
@@ -104,7 +105,7 @@ public final class FallbackActivityInterface extends
     @Override
     public RecentsView getVisibleRecentsView() {
         RecentsActivity activity = getCreatedActivity();
-        if (activity != null && activity.hasWindowFocus()) {
+        if (activity != null && activity.hasBeenResumed()) {
             return activity.getOverviewPanel();
         }
         return null;
@@ -157,8 +158,23 @@ public final class FallbackActivityInterface extends
     }
 
     @Override
-    protected float getExtraSpace(Context context, DeviceProfile dp,
-            PagedOrientationHandler orientationHandler) {
-        return context.getResources().getDimensionPixelSize(R.dimen.overview_actions_height);
+    public RecentsState stateFromGestureEndTarget(GestureState.GestureEndTarget endTarget) {
+        switch (endTarget) {
+            case RECENTS:
+                return DEFAULT;
+            case NEW_TASK:
+            case LAST_TASK:
+                return BACKGROUND_APP;
+            case HOME:
+            default:
+                return HOME;
+        }
+    }
+
+    private void notifyRecentsOfOrientation(RotationTouchHelper rotationTouchHelper) {
+        // reset layout on swipe to home
+        RecentsView recentsView = getCreatedActivity().getOverviewPanel();
+        recentsView.setLayoutRotation(rotationTouchHelper.getCurrentActiveRotation(),
+                rotationTouchHelper.getDisplayRotation());
     }
 }

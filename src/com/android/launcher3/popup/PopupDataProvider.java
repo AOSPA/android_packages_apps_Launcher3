@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -58,8 +59,11 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
     private HashMap<ComponentKey, Integer> mDeepShortcutMap = new HashMap<>();
     /** Maps packages to their DotInfo's . */
     private Map<PackageUserKey, DotInfo> mPackageUserToDotInfos = new HashMap<>();
-    /** Maps packages to their Widgets */
+
+    /** All installed widgets. */
     private List<WidgetsListBaseEntry> mAllWidgets = List.of();
+    /** Widgets that can be recommended to the users. */
+    private List<ItemInfo> mRecommendedWidgets = List.of();
 
     private PopupDataChangeListener mChangeListener = PopupDataChangeListener.INSTANCE;
 
@@ -187,6 +191,15 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
         notificationListener.cancelNotificationFromLauncher(notificationKey);
     }
 
+    /**
+     * Sets a list of recommended widgets ordered by their order of appearance in the widgets
+     * recommendation UI.
+     */
+    public void setRecommendedWidgets(List<ItemInfo> recommendedWidgets) {
+        mRecommendedWidgets = recommendedWidgets;
+        mChangeListener.onRecommendedWidgetsBound();
+    }
+
     public void setAllWidgets(List<WidgetsListBaseEntry> allWidgets) {
         mAllWidgets = allWidgets;
         mChangeListener.onWidgetsBound();
@@ -198,6 +211,22 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
 
     public List<WidgetsListBaseEntry> getAllWidgets() {
         return mAllWidgets;
+    }
+
+    /** Returns a list of recommended widgets. */
+    public List<WidgetItem> getRecommendedWidgets() {
+        HashMap<ComponentKey, WidgetItem> allWidgetItems = new HashMap<>();
+        mAllWidgets.stream()
+                .filter(entry -> entry instanceof WidgetsListContentEntry)
+                .forEach(entry -> ((WidgetsListContentEntry) entry).mWidgets
+                        .forEach(widget -> allWidgetItems.put(
+                                new ComponentKey(widget.componentName, widget.user), widget)));
+        return mRecommendedWidgets.stream()
+                .map(recommendedWidget -> allWidgetItems.get(
+                        new ComponentKey(recommendedWidget.getTargetComponent(),
+                                recommendedWidget.user)))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     public List<WidgetItem> getWidgetsForPackageUser(PackageUserKey packageUserKey) {
@@ -244,5 +273,8 @@ public class PopupDataProvider implements NotificationListener.NotificationsChan
         default void trimNotifications(Map<PackageUserKey, DotInfo> updatedDots) { }
 
         default void onWidgetsBound() { }
+
+        /** A callback to get notified when recommended widgets are bound. */
+        default void onRecommendedWidgetsBound() { }
     }
 }

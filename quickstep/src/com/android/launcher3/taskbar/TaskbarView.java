@@ -15,9 +15,14 @@
  */
 package com.android.launcher3.taskbar;
 
+import android.animation.Animator;
+import android.animation.AnimatorSet;
+import android.animation.LayoutTransition;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -34,7 +39,9 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
+import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -45,11 +52,13 @@ import com.android.systemui.shared.recents.model.Task;
 /**
  * Hosts the Taskbar content such as Hotseat and Recent Apps. Drawn on top of other apps.
  */
-public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconParent {
+public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconParent, Insettable {
 
     private final ColorDrawable mBackgroundDrawable;
-    private final int mItemMarginLeftRight;
+    private final int mDividerWidth;
+    private final int mDividerHeight;
     private final int mIconTouchSize;
+    private final boolean mIsRtl;
     private final int mTouchSlop;
     private final RectF mTempDelegateBounds = new RectF();
     private final RectF mDelegateSlopBounds = new RectF();
@@ -57,8 +66,12 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
 
     // Initialized in TaskbarController constructor.
     private TaskbarController.TaskbarViewCallbacks mControllerCallbacks;
+    // Scale on elements that aren't icons.
+    private float mNonIconScale;
+    private int mItemMarginLeftRight;
 
     // Initialized in init().
+    private LayoutTransition mLayoutTransition;
     private int mHotseatStartIndex;
     private int mHotseatEndIndex;
     private View mHotseatRecentsDivider;
@@ -92,13 +105,18 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
 
         Resources resources = getResources();
         mBackgroundDrawable = (ColorDrawable) getBackground();
-        mItemMarginLeftRight = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
+        mDividerWidth = resources.getDimensionPixelSize(R.dimen.taskbar_divider_thickness);
+        mDividerHeight = resources.getDimensionPixelSize(R.dimen.taskbar_divider_height);
         mIconTouchSize = resources.getDimensionPixelSize(R.dimen.taskbar_icon_touch_size);
+        mIsRtl = Utilities.isRtl(resources);
         mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
     }
 
     protected void construct(TaskbarController.TaskbarViewCallbacks taskbarViewCallbacks) {
         mControllerCallbacks = taskbarViewCallbacks;
+        mNonIconScale = mControllerCallbacks.getNonIconScale(this);
+        mItemMarginLeftRight = getResources().getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
+        mItemMarginLeftRight = Math.round(mItemMarginLeftRight * mNonIconScale);
     }
 
     protected void init(int numHotseatIcons, int numRecentIcons) {
@@ -112,10 +130,50 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
         mRecentsStartIndex = dividerIndex + 1;
         mRecentsEndIndex = mRecentsStartIndex + numRecentIcons - 1;
         updateRecentTasks(new Task[numRecentIcons]);
+
+        mLayoutTransition = new LayoutTransition();
+        addUpdateListenerForAllLayoutTransitions(() -> {
+            if (getLayoutTransition() == mLayoutTransition) {
+                mControllerCallbacks.onItemPositionsChanged(this);
+            }
+        });
+        setLayoutTransition(mLayoutTransition);
+    }
+
+    private void addUpdateListenerForAllLayoutTransitions(Runnable onUpdate) {
+        addUpdateListenerForLayoutTransition(LayoutTransition.CHANGE_APPEARING, onUpdate);
+        addUpdateListenerForLayoutTransition(LayoutTransition.CHANGE_DISAPPEARING, onUpdate);
+        addUpdateListenerForLayoutTransition(LayoutTransition.CHANGING, onUpdate);
+        addUpdateListenerForLayoutTransition(LayoutTransition.APPEARING, onUpdate);
+        addUpdateListenerForLayoutTransition(LayoutTransition.DISAPPEARING, onUpdate);
+    }
+
+    private void addUpdateListenerForLayoutTransition(int transitionType, Runnable onUpdate) {
+        Animator anim = mLayoutTransition.getAnimator(transitionType);
+        if (anim instanceof ValueAnimator) {
+            ((ValueAnimator) anim).addUpdateListener(valueAnimator -> onUpdate.run());
+        } else {
+            AnimatorSet animSet = new AnimatorSet();
+            ValueAnimator updateAnim = ValueAnimator.ofFloat(0, 1);
+            updateAnim.addUpdateListener(valueAnimator -> onUpdate.run());
+            animSet.playTogether(anim, updateAnim);
+            mLayoutTransition.setAnimator(transitionType, animSet);
+        }
     }
 
     protected void cleanup() {
+        endAllLayoutTransitionAnimators();
+        setLayoutTransition(null);
         removeAllViews();
+        mHotseatRecentsDivider = null;
+    }
+
+    private void endAllLayoutTransitionAnimators() {
+        mLayoutTransition.getAnimator(LayoutTransition.CHANGE_APPEARING).end();
+        mLayoutTransition.getAnimator(LayoutTransition.CHANGE_DISAPPEARING).end();
+        mLayoutTransition.getAnimator(LayoutTransition.CHANGING).end();
+        mLayoutTransition.getAnimator(LayoutTransition.APPEARING).end();
+        mLayoutTransition.getAnimator(LayoutTransition.DISAPPEARING).end();
     }
 
     /**
@@ -131,7 +189,8 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
      */
     protected void updateHotseatItems(ItemInfo[] hotseatItemInfos) {
         for (int i = 0; i < hotseatItemInfos.length; i++) {
-            ItemInfo hotseatItemInfo = hotseatItemInfos[i];
+            ItemInfo hotseatItemInfo = hotseatItemInfos[!mIsRtl ? i
+                    : hotseatItemInfos.length - i - 1];
             int hotseatIndex = mHotseatStartIndex + i;
             View hotseatView = getChildAt(hotseatIndex);
 
@@ -154,12 +213,11 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
             if (hotseatView == null || hotseatView.getSourceLayoutResId() != expectedLayoutResId
                     || needsReinflate) {
                 removeView(hotseatView);
-                TaskbarActivityContext activityContext =
-                        ActivityContext.lookupContext(getContext());
+                ActivityContext activityContext = ActivityContext.lookupContext(getContext());
                 if (isFolder) {
                     FolderInfo folderInfo = (FolderInfo) hotseatItemInfo;
                     FolderIcon folderIcon = FolderIcon.inflateFolderAndIcon(expectedLayoutResId,
-                            activityContext, this, folderInfo);
+                            ActivityContext.lookupContext(getContext()), this, folderInfo);
                     folderIcon.setTextVisible(false);
                     hotseatView = folderIcon;
                 } else {
@@ -176,28 +234,52 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
                     && hotseatItemInfo instanceof WorkspaceItemInfo) {
                 ((BubbleTextView) hotseatView).applyFromWorkspaceItem(
                         (WorkspaceItemInfo) hotseatItemInfo);
-                hotseatView.setVisibility(VISIBLE);
                 hotseatView.setOnClickListener(mControllerCallbacks.getItemOnClickListener());
                 hotseatView.setOnLongClickListener(
                         mControllerCallbacks.getItemOnLongClickListener());
             } else if (isFolder) {
-                hotseatView.setVisibility(VISIBLE);
                 hotseatView.setOnClickListener(mControllerCallbacks.getItemOnClickListener());
                 hotseatView.setOnLongClickListener(
                         mControllerCallbacks.getItemOnLongClickListener());
             } else {
-                hotseatView.setVisibility(GONE);
                 hotseatView.setOnClickListener(null);
                 hotseatView.setOnLongClickListener(null);
+                hotseatView.setTag(null);
             }
+            updateHotseatItemVisibility(hotseatView);
         }
 
         updateHotseatRecentsDividerVisibility();
     }
 
+    protected void updateHotseatItemsVisibility() {
+        for (int i = mHotseatStartIndex; i <= mHotseatEndIndex; i++) {
+            updateHotseatItemVisibility(getChildAt(i));
+        }
+    }
+
+    private void updateHotseatItemVisibility(View hotseatView) {
+        if (hotseatView.getTag() != null) {
+            hotseatView.setVisibility(VISIBLE);
+        } else {
+            int oldVisibility = hotseatView.getVisibility();
+            int newVisibility = mControllerCallbacks.getEmptyHotseatViewVisibility(this);
+            hotseatView.setVisibility(newVisibility);
+            if (oldVisibility == GONE && newVisibility != GONE) {
+                // By default, the layout transition only runs when going to VISIBLE,
+                // but we want it to run when going to GONE to INVISIBLE as well.
+                getLayoutTransition().showChild(this, hotseatView, oldVisibility);
+            }
+        }
+    }
+
     private View addDivider(int dividerIndex) {
         View divider = inflate(R.layout.taskbar_divider);
-        addView(divider, dividerIndex);
+        LayoutParams lp = new LayoutParams(mDividerWidth, mDividerHeight);
+        lp.setMargins(mItemMarginLeftRight, 0, mItemMarginLeftRight, 0);
+        divider.setScaleX(mNonIconScale);
+        divider.setScaleY(mNonIconScale);
+        addView(divider, dividerIndex, lp);
         return divider;
     }
 
@@ -390,6 +472,32 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
         return mIsDraggingItem;
     }
 
+    /**
+     * @return The bounding box of where the hotseat elements are relative to this TaskbarView.
+     */
+    protected RectF getHotseatBounds() {
+        View firstHotseatView = null, lastHotseatView = null;
+        for (int i = mHotseatStartIndex; i <= mHotseatEndIndex; i++) {
+            View child = getChildAt(i);
+            if (child.getVisibility() != GONE) {
+                if (firstHotseatView == null) {
+                    firstHotseatView = child;
+                }
+                lastHotseatView = child;
+            }
+        }
+        if (firstHotseatView == null || lastHotseatView == null) {
+            return new RectF();
+        }
+        View leftmostHotseatView = !mIsRtl ? firstHotseatView : lastHotseatView;
+        View rightmostHotseatView = !mIsRtl ? lastHotseatView : firstHotseatView;
+        return new RectF(
+                leftmostHotseatView.getLeft() - mItemMarginLeftRight,
+                leftmostHotseatView.getTop(),
+                rightmostHotseatView.getRight() + mItemMarginLeftRight,
+                rightmostHotseatView.getBottom());
+    }
+
     // FolderIconParent implemented methods.
 
     @Override
@@ -418,7 +526,12 @@ public class TaskbarView extends LinearLayout implements FolderIcon.FolderIconPa
     }
 
     private View inflate(@LayoutRes int layoutResId) {
-        TaskbarActivityContext taskbarActivityContext = ActivityContext.lookupContext(getContext());
-        return taskbarActivityContext.getLayoutInflater().inflate(layoutResId, this, false);
+        return ActivityContext.lookupContext(getContext()).getLayoutInflater()
+                .inflate(layoutResId, this, false);
+    }
+
+    @Override
+    public void setInsets(Rect insets) {
+        // Ignore, we just implement Insettable to draw behind system insets.
     }
 }

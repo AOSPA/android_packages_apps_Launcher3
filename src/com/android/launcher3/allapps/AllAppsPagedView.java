@@ -15,12 +15,14 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_SWIPE_TO_PERSONAL_TAB;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_SWIPE_TO_WORK_TAB;
+
 import android.content.Context;
 import android.util.AttributeSet;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.PagedView;
-import com.android.launcher3.R;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.workprofile.PersonalWorkPagedView;
 
 /**
@@ -39,9 +41,17 @@ public class AllAppsPagedView extends PersonalWorkPagedView {
 
     public AllAppsPagedView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        int topPadding = FeatureFlags.ENABLE_DEVICE_SEARCH.get() ? 0
-                : context.getResources().getDimensionPixelOffset(
-                        R.dimen.all_apps_header_top_padding);
-        setPadding(0, topPadding, 0, 0);
+    }
+
+    @Override
+    protected boolean snapToPageWithVelocity(int whichPage, int velocity) {
+        boolean resp = super.snapToPageWithVelocity(whichPage, velocity);
+        if (resp && whichPage != mCurrentPage) {
+            Launcher.getLauncher(getContext()).getStatsLogManager().logger()
+                    .log(mCurrentPage < whichPage
+                            ? LAUNCHER_ALLAPPS_SWIPE_TO_WORK_TAB
+                            : LAUNCHER_ALLAPPS_SWIPE_TO_PERSONAL_TAB);
+        }
+        return resp;
     }
 }

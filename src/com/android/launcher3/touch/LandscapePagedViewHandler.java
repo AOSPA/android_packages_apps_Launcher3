@@ -21,6 +21,10 @@ import static android.widget.ListPopupWindow.WRAP_CONTENT;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.HORIZONTAL;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_SIDE;
 
 import android.content.res.Resources;
 import android.graphics.PointF;
@@ -36,8 +40,13 @@ import android.widget.LinearLayout;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.PagedView;
+import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.OverScroller;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
@@ -127,7 +136,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getClearAllScrollOffset(View view, boolean isRtl) {
+    public int getClearAllSidePadding(View view, boolean isRtl) {
         return (isRtl ? view.getPaddingBottom() : - view.getPaddingTop()) / 2;
     }
 
@@ -144,13 +153,6 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     @Override
     public FloatProperty<View> getSecondaryViewTranslate() {
         return VIEW_TRANSLATE_X;
-    }
-
-    @Override
-    public void setPrimaryAndResetSecondaryTranslate(
-            View view, float translation, float defaultTranslationX, float defaultTranslationY) {
-        view.setTranslationX(defaultTranslationX);
-        view.setTranslationY(translation);
     }
 
     @Override
@@ -216,6 +218,20 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     public int getSecondaryTranslationDirectionFactor() {
         return 1;
+    }
+
+    @Override
+    public int getSplitTranslationDirectionFactor(int stagePosition) {
+        if (stagePosition == STAGE_POSITION_BOTTOM_OR_RIGHT) {
+            return -1;
+        } else {
+            return 1;
+        }
+    }
+
+    @Override
+    public int getSplitAnimationTranslation(int translationOffset, DeviceProfile dp) {
+        return translationOffset;
     }
 
     @Override
@@ -288,5 +304,24 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     @Override
     public int getDistanceToBottomOfRect(DeviceProfile dp, Rect rect) {
         return rect.left;
+    }
+
+    @Override
+    public List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp) {
+        List<SplitPositionOption> options = new ArrayList<>(2);
+        // Add left/right options where left => position top, right => position bottom
+        options.add(new SplitPositionOption(
+                R.drawable.ic_split_screen, R.string.split_screen_position_left,
+                STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+        options.add(new SplitPositionOption(
+                R.drawable.ic_split_screen, R.string.split_screen_position_right,
+                STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_SIDE));
+        return options;
+    }
+
+    @Override
+    public FloatProperty getSplitSelectTaskOffset(FloatProperty primary, FloatProperty secondary,
+            DeviceProfile deviceProfile) {
+        return primary;
     }
 }

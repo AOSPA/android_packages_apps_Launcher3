@@ -30,7 +30,6 @@ import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.dragndrop.DragOptions;
-import com.android.launcher3.dragndrop.LivePreviewWidgetCell;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
@@ -75,7 +74,18 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView
 
     @Override
     public final void onClick(View v) {
-        mWidgetInstructionToast = showWidgetToast(getContext(), mWidgetInstructionToast);
+        Object tag = null;
+        if (v instanceof WidgetCell) {
+            tag = v.getTag();
+        } else if (v.getParent() instanceof WidgetCell) {
+            tag = ((WidgetCell) v.getParent()).getTag();
+        }
+        if (tag instanceof PendingAddShortcutInfo) {
+            mWidgetInstructionToast = showShortcutToast(getContext(), mWidgetInstructionToast);
+        } else {
+            mWidgetInstructionToast = showWidgetToast(getContext(), mWidgetInstructionToast);
+        }
+
     }
 
     @Override
@@ -86,6 +96,8 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView
 
         if (v instanceof WidgetCell) {
             return beginDraggingWidget((WidgetCell) v);
+        } else if (v.getParent() instanceof WidgetCell) {
+            return beginDraggingWidget((WidgetCell) v.getParent());
         }
         return true;
     }
@@ -96,19 +108,18 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView
 
         // If the ImageView doesn't have a drawable yet, the widget preview hasn't been loaded and
         // we abort the drag.
-        if (image.getBitmap() == null) {
+        if (image.getDrawable() == null) {
             return false;
         }
 
         PendingItemDragHelper dragHelper = new PendingItemDragHelper(v);
-        if (v instanceof LivePreviewWidgetCell) {
-            dragHelper.setPreview(((LivePreviewWidgetCell) v).getPreview());
-        }
+        dragHelper.setRemoteViewsPreview(v.getPreview());
+        dragHelper.setAppWidgetHostViewPreview(v.getAppWidgetHostViewPreview());
 
         int[] loc = new int[2];
         getPopupContainer().getLocationInDragLayer(image, loc);
 
-        dragHelper.startDrag(image.getBitmapBounds(), image.getBitmap().getWidth(),
+        dragHelper.startDrag(image.getBitmapBounds(), image.getDrawable().getIntrinsicWidth(),
                 image.getWidth(), new Point(loc[0], loc[1]), this, new DragOptions());
         close(true);
         return true;
@@ -155,6 +166,23 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView
         CharSequence msg = Utilities.wrapForTts(
                 context.getText(R.string.long_press_widget_to_add),
                 context.getString(R.string.long_accessible_way_to_add));
+        toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
+        toast.show();
+        return toast;
+    }
+
+    /**
+     * Show shortcut tap toast prompting user to drag instead.
+     */
+    private static Toast showShortcutToast(Context context, Toast toast) {
+        // Let the user know that they have to long press to add a widget
+        if (toast != null) {
+            toast.cancel();
+        }
+
+        CharSequence msg = Utilities.wrapForTts(
+                context.getText(R.string.long_press_shortcut_to_add),
+                context.getString(R.string.long_accessible_way_to_add_shortcut));
         toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
         toast.show();
         return toast;

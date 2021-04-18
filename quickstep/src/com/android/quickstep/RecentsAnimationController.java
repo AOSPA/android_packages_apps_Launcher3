@@ -20,6 +20,7 @@ import static com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
 import android.graphics.Rect;
+import android.window.PictureInPictureSurfaceTransaction;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.UiThread;
@@ -149,10 +150,13 @@ public class RecentsAnimationController {
      * accordingly. This should be called before `finish`
      * @param taskId for which the leash should be updated
      * @param destinationBounds bounds of the final PiP window
+     * @param finishTransaction leash operations for the final transform.
      */
-    public void setFinishTaskBounds(int taskId, Rect destinationBounds) {
+    public void setFinishTaskBounds(int taskId, Rect destinationBounds,
+            PictureInPictureSurfaceTransaction finishTransaction) {
         UI_HELPER_EXECUTOR.execute(
-                () -> mController.setFinishTaskBounds(taskId, destinationBounds));
+                () -> mController.setFinishTaskBounds(taskId, destinationBounds,
+                        finishTransaction));
     }
 
     /**

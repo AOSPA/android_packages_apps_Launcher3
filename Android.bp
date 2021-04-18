@@ -12,6 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+package {
+    default_applicable_licenses: ["packages_apps_Launcher3_license"],
+}
+
+// Added automatically by a large-scale-change
+// See: http://go/android-license-faq
+license {
+    name: "packages_apps_Launcher3_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "NOTICE",
+    ],
+}
+
 android_library {
     name: "launcher-aosp-tapl",
     static_libs: [
@@ -27,6 +44,7 @@ android_library {
         "src/com/android/launcher3/ResourceUtils.java",
         "src/com/android/launcher3/testing/TestProtocol.java",
     ],
+    resource_dirs: [ ],
     manifest: "tests/tapl/AndroidManifest.xml",
     platform_apis: true,
 }
@@ -75,4 +93,122 @@ java_library {
 
     sdk_version: "current",
     min_sdk_version: "28",
+}
+
+// Library with all the dependencies for building Launcher3
+android_library {
+    name: "Launcher3ResLib",
+    srcs: [ ],
+    resource_dirs: ["res"],
+    static_libs: [
+        "LauncherPluginLib",
+        "launcher_quickstep_log_protos_lite",
+        "androidx-constraintlayout_constraintlayout",
+        "androidx.recyclerview_recyclerview",
+        "androidx.dynamicanimation_dynamicanimation",
+        "androidx.fragment_fragment",
+        "androidx.preference_preference",
+        "androidx.slice_slice-view",
+        "androidx.cardview_cardview",
+        "iconloader_base",
+    ],
+    manifest: "AndroidManifest-common.xml",
+    sdk_version: "current",
+    min_sdk_version: "26",
+}
+
+//
+// Build rule for Launcher3 dependencies lib.
+//
+android_library {
+    name: "Launcher3CommonDepsLib",
+    srcs: ["src_build_config/**/*.java"],
+    static_libs: ["Launcher3ResLib"],
+    sdk_version: "current",
+    min_sdk_version: "26",
+    manifest: "AndroidManifest-common.xml",
+}
+
+//
+// Build rule for Launcher3 app.
+//
+android_app {
+    name: "Launcher3",
+
+    static_libs: [
+        "Launcher3CommonDepsLib",
+    ],
+    srcs: [
+        "src/**/*.java",
+        "src_shortcuts_overrides/**/*.java",
+        "src_ui_overrides/**/*.java",
+        "ext_tests/src/**/*.java",
+    ],
+    resource_dirs: [
+        "ext_tests/res",
+    ],
+    optimize: {
+        proguard_flags_files: ["proguard.flags"],
+        // Proguard is disable for testing. Derivarive prjects to keep proguard enabled
+        enabled: false,
+    },
+
+    sdk_version: "current",
+    min_sdk_version: "26",
+    target_sdk_version: "29",
+    privileged: true,
+    system_ext_specific: true,
+
+    overrides: [
+        "Home",
+        "Launcher2",
+    ],
+    required: ["privapp_whitelist_com.android.launcher3"],
+
+    jacoco: {
+        include_filter: ["com.android.launcher3.**"],
+    },
+    additional_manifests: [
+        "AndroidManifest-common.xml",
+    ],
+}
+
+// Library with all the dependencies for building quickstep
+android_library {
+    name: "QuickstepResLib",
+    srcs: [ ],
+    resource_dirs: [
+        "quickstep/res",
+        "quickstep/overview_ui_overrides/res",
+    ],
+    static_libs: [
+        "Launcher3ResLib",
+        "SystemUISharedLib",
+        "SystemUI-statsd",
+    ],
+    manifest: "quickstep/AndroidManifest.xml",
+    min_sdk_version: "28",
+}
+
+
+// Source code used for test helpers
+filegroup {
+    name: "launcher-src-ext-tests",
+    srcs: ["ext_tests/src/**/*.java"],
+}
+
+// Common source files used to build launcher
+filegroup {
+    name: "launcher-src-no-build-config",
+    srcs: [
+        "src/**/*.java",
+        "src_shortcuts_overrides/**/*.java",
+        "quickstep/src/**/*.java",
+    ],
+}
+
+// Proguard files for Launcher3
+filegroup {
+    name: "launcher-proguard-rules",
+    srcs: ["proguard.flags"],
 }

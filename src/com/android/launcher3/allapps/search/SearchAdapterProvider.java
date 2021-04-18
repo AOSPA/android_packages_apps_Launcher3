@@ -16,11 +16,15 @@
 
 package com.android.launcher3.allapps.search;
 
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.android.launcher3.BaseDraggingActivity;
+import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsGridAdapter;
 
 /**
@@ -30,7 +34,7 @@ public abstract class SearchAdapterProvider {
 
     protected final BaseDraggingActivity mLauncher;
 
-    public SearchAdapterProvider(BaseDraggingActivity launcher) {
+    public SearchAdapterProvider(BaseDraggingActivity launcher, AllAppsContainerView appsView) {
         mLauncher = launcher;
     }
 
@@ -38,6 +42,12 @@ public abstract class SearchAdapterProvider {
      * Called from RecyclerView.Adapter#onBindViewHolder
      */
     public abstract void onBindView(AllAppsGridAdapter.ViewHolder holder, int position);
+
+    /**
+     * Called from LiveSearchManager to notify slice status updates.
+     */
+    public void onSliceStatusUpdate(Uri sliceUri) {
+    }
 
     /**
      * Returns whether or not viewType can be handled by searchProvider
@@ -51,16 +61,32 @@ public abstract class SearchAdapterProvider {
             ViewGroup parent, int viewType);
 
     /**
-     * Returns how many cells a view should span
+     * Returns supported item per row combinations supported
      */
-    public int getGridSpanSize(int viewType, int appsPerRow) {
-        return appsPerRow * AllAppsGridAdapter.SPAN_MULTIPLIER;
+    public int[] getSupportedItemsPerRowArray() {
+        return new int[]{};
     }
 
     /**
-     * handles selection event on search adapter item. Returns false if provider can not handle
+     * Returns how many cells a view should span
+     */
+    public int getItemsPerRow(int viewType, int appsPerRow) {
+        return appsPerRow;
+    }
+
+    /**
+     * Handles selection event on search adapter item. Returns false if provider can not handle
      * event
      */
-    public abstract boolean onAdapterItemSelected(AllAppsGridAdapter.AdapterItem adapterItem,
-            View view);
+    public abstract boolean launchHighlightedItem();
+
+    /**
+     * Returns the current highlighted view
+     */
+    public abstract View getHighlightedItem();
+
+    /**
+     * Returns the item decorator.
+     */
+    public abstract RecyclerView.ItemDecoration getDecorator();
 }

@@ -19,6 +19,7 @@ package com.android.launcher3;
 import static com.android.launcher3.Utilities.getDevicePrefs;
 import static com.android.launcher3.Utilities.getPointString;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_FOUR_COLUMNS;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_TWO_PANEL_HOME;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.PackageManagerHelper.getPackageFilter;
 
@@ -111,6 +112,10 @@ public class InvariantDeviceProfile {
     public float allAppsIconSize;
     public float allAppsIconTextSize;
 
+    public float minCellHeight;
+    public float minCellWidth;
+    public float borderSpacing;
+
     private SparseArray<TypedValue> mExtraAttrs;
 
     /**
@@ -123,6 +128,12 @@ public class InvariantDeviceProfile {
      */
     public int numAllAppsColumns;
 
+    /**
+     * Do not query directly. see {@link DeviceProfile#isScalableGrid}.
+     */
+    protected boolean isScalable;
+    public int devicePaddingId;
+
     public String dbFile;
     public int defaultLayoutId;
     int demoModeLayoutId;
@@ -130,7 +141,7 @@ public class InvariantDeviceProfile {
     public DeviceProfile landscapeProfile;
     public DeviceProfile portraitProfile;
 
-    public DevicePaddings devicePaddings;
+    @Nullable public DevicePaddings devicePaddings;
 
     public Point defaultWallpaperSize;
     public Rect defaultWidgetPadding;
@@ -154,6 +165,11 @@ public class InvariantDeviceProfile {
         iconTextSize = p.iconTextSize;
         numHotseatIcons = p.numHotseatIcons;
         numAllAppsColumns = p.numAllAppsColumns;
+        isScalable = p.isScalable;
+        devicePaddingId = p.devicePaddingId;
+        minCellHeight = p.minCellHeight;
+        minCellWidth = p.minCellWidth;
+        borderSpacing = p.borderSpacing;
         dbFile = p.dbFile;
         allAppsIconSize = p.allAppsIconSize;
         allAppsIconTextSize = p.allAppsIconTextSize;
@@ -211,14 +227,24 @@ public class InvariantDeviceProfile {
                 .add(myDisplayOption);
         result.iconSize = defaultDisplayOption.iconSize;
         result.landscapeIconSize = defaultDisplayOption.landscapeIconSize;
-        result.allAppsIconSize = Math.min(
-                defaultDisplayOption.allAppsIconSize, myDisplayOption.allAppsIconSize);
+        if (defaultDisplayOption.allAppsIconSize < myDisplayOption.allAppsIconSize) {
+            result.allAppsIconSize = defaultDisplayOption.allAppsIconSize;
+            result.numAllAppsColumns = defaultDisplayOption.numAllAppsColumns;
+        } else {
+            result.allAppsIconSize = myDisplayOption.allAppsIconSize;
+            result.numAllAppsColumns = myDisplayOption.numAllAppsColumns;
+        }
+        result.minCellHeight = defaultDisplayOption.minCellHeight;
+        result.minCellWidth = defaultDisplayOption.minCellWidth;
+        result.borderSpacing = defaultDisplayOption.borderSpacing;
 
-        devicePaddings = new DevicePaddings(context);
         initGrid(context, myInfo, result);
     }
 
     public static String getCurrentGridName(Context context) {
+        if (ENABLE_TWO_PANEL_HOME.get()) {
+            return ENABLE_TWO_PANEL_HOME.key;
+        }
         if (ENABLE_FOUR_COLUMNS.get()) {
             return ENABLE_FOUR_COLUMNS.key;
         }
@@ -242,7 +268,6 @@ public class InvariantDeviceProfile {
         ArrayList<DisplayOption> allOptions = getPredefinedDeviceProfiles(context, gridName);
 
         DisplayOption displayOption = invDistWeightedInterpolate(displayInfo, allOptions);
-        devicePaddings = new DevicePaddings(context);
         initGrid(context, displayInfo, displayOption);
         return displayOption.grid.name;
     }
@@ -258,7 +283,8 @@ public class InvariantDeviceProfile {
         demoModeLayoutId = closestProfile.demoModeLayoutId;
         numFolderRows = closestProfile.numFolderRows;
         numFolderColumns = closestProfile.numFolderColumns;
-        numAllAppsColumns = closestProfile.numAllAppsColumns;
+        isScalable = closestProfile.isScalable;
+        devicePaddingId = closestProfile.devicePaddingId;
 
         mExtraAttrs = closestProfile.extraAttrs;
 
@@ -269,12 +295,21 @@ public class InvariantDeviceProfile {
         iconTextSize = displayOption.iconTextSize;
         fillResIconDpi = getLauncherIconDensity(iconBitmapSize);
 
+        minCellHeight = displayOption.minCellHeight;
+        minCellWidth = displayOption.minCellWidth;
+        borderSpacing = displayOption.borderSpacing;
+        numAllAppsColumns = Math.round(displayOption.numAllAppsColumns);
+
         if (Utilities.isGridOptionsEnabled(context)) {
             allAppsIconSize = displayOption.allAppsIconSize;
             allAppsIconTextSize = displayOption.allAppsIconTextSize;
         } else {
             allAppsIconSize = iconSize;
             allAppsIconTextSize = iconTextSize;
+        }
+
+        if (devicePaddingId != 0) {
+            devicePaddings = new DevicePaddings(context, devicePaddingId);
         }
 
         // If the partner customization apk contains any grid overrides, apply them
@@ -584,10 +619,14 @@ public class InvariantDeviceProfile {
         private final int numHotseatIcons;
 
         private final String dbFile;
-        private final int numAllAppsColumns;
 
         private final int defaultLayoutId;
         private final int demoModeLayoutId;
+
+        private final boolean isScalable;
+        private final int devicePaddingId;
+
+        public final boolean visible;
 
         private final SparseArray<TypedValue> extraAttrs;
 
@@ -609,8 +648,13 @@ public class InvariantDeviceProfile {
                     R.styleable.GridDisplayOption_numFolderRows, numRows);
             numFolderColumns = a.getInt(
                     R.styleable.GridDisplayOption_numFolderColumns, numColumns);
-            numAllAppsColumns = a.getInt(
-                    R.styleable.GridDisplayOption_numAllAppsColumns, numColumns);
+
+            isScalable = a.getBoolean(
+                    R.styleable.GridDisplayOption_isScalable, false);
+            devicePaddingId = a.getResourceId(
+                    R.styleable.GridDisplayOption_devicePaddingId, 0);
+
+            visible = a.getBoolean(R.styleable.GridDisplayOption_visible, true);
 
             a.recycle();
 
@@ -625,6 +669,11 @@ public class InvariantDeviceProfile {
         private final float minWidthDps;
         private final float minHeightDps;
         private final boolean canBeDefault;
+
+        private float numAllAppsColumns;
+        private float minCellHeight;
+        private float minCellWidth;
+        private float borderSpacing;
 
         private float iconSize;
         private float iconTextSize;
@@ -642,6 +691,12 @@ public class InvariantDeviceProfile {
             minHeightDps = a.getFloat(R.styleable.ProfileDisplayOption_minHeightDps, 0);
             canBeDefault = a.getBoolean(
                     R.styleable.ProfileDisplayOption_canBeDefault, false);
+            numAllAppsColumns = a.getInt(R.styleable.ProfileDisplayOption_numAllAppsColumns,
+                    grid.numColumns);
+
+            minCellHeight = a.getFloat(R.styleable.ProfileDisplayOption_minCellHeightDps, 0);
+            minCellWidth = a.getFloat(R.styleable.ProfileDisplayOption_minCellWidthDps, 0);
+            borderSpacing = a.getFloat(R.styleable.ProfileDisplayOption_borderSpacingDps, 0);
 
             iconSize = a.getFloat(R.styleable.ProfileDisplayOption_iconImageSize, 0);
             landscapeIconSize = a.getFloat(R.styleable.ProfileDisplayOption_landscapeIconSize,
@@ -664,23 +719,35 @@ public class InvariantDeviceProfile {
             minWidthDps = 0;
             minHeightDps = 0;
             canBeDefault = false;
+            numAllAppsColumns = 0;
+            minCellHeight = 0;
+            minCellWidth = 0;
+            borderSpacing = 0;
         }
 
         private DisplayOption multiply(float w) {
+            numAllAppsColumns *= w;
             iconSize *= w;
             landscapeIconSize *= w;
             allAppsIconSize *= w;
             iconTextSize *= w;
             allAppsIconTextSize *= w;
+            minCellHeight *= w;
+            minCellWidth *= w;
+            borderSpacing *= w;
             return this;
         }
 
         private DisplayOption add(DisplayOption p) {
+            numAllAppsColumns += p.numAllAppsColumns;
             iconSize += p.iconSize;
             landscapeIconSize += p.landscapeIconSize;
             allAppsIconSize += p.allAppsIconSize;
             iconTextSize += p.iconTextSize;
             allAppsIconTextSize += p.allAppsIconTextSize;
+            minCellHeight += p.minCellHeight;
+            minCellWidth += p.minCellWidth;
+            borderSpacing += p.borderSpacing;
             return this;
         }
     }

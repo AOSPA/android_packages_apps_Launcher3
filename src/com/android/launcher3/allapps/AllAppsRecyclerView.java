@@ -19,6 +19,9 @@ import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.UNSPECIFIED;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END;
+
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
@@ -28,6 +31,7 @@ import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowInsets;
 
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -36,7 +40,7 @@ import com.android.launcher3.BaseRecyclerView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
-import com.android.launcher3.allapps.AllAppsGridAdapter.AppsGridLayoutManager;
+import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 
 import java.util.ArrayList;
@@ -109,23 +113,6 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
         mViewHeights.put(AllAppsGridAdapter.VIEW_TYPE_ICON, grid.allAppsCellHeightPx);
     }
 
-    /**
-     * Scrolls this recycler view to the top.
-     */
-    public void scrollToTop() {
-        // Ensure we reattach the scrollbar if it was previously detached while fast-scrolling
-        if (mScrollbar != null) {
-            mScrollbar.reattachThumbToScroll();
-        }
-        if (getLayoutManager() instanceof AppsGridLayoutManager) {
-            AppsGridLayoutManager layoutManager = (AppsGridLayoutManager) getLayoutManager();
-            if (layoutManager.findFirstCompletelyVisibleItemPosition() == 0) {
-                // We are at the top, so don't scrollToPosition (would cause unnecessary relayout).
-                return;
-            }
-        }
-        scrollToPosition(0);
-    }
 
     @Override
     public void onDraw(Canvas c) {
@@ -190,6 +177,25 @@ public class AllAppsRecyclerView extends BaseRecyclerView {
             // For the time being, we just immediately hide the background to ensure that it does
             // not overlap with the results
             mEmptySearchBackground.setBgAlpha(0f);
+        }
+    }
+
+    @Override
+    public void onScrollStateChanged(int state) {
+        super.onScrollStateChanged(state);
+
+        StatsLogManager mgr = BaseDraggingActivity.fromContext(getContext()).getStatsLogManager();
+        switch (state) {
+            case SCROLL_STATE_DRAGGING:
+                mgr.logger().sendToInteractionJankMonitor(
+                        LAUNCHER_ALLAPPS_VERTICAL_SWIPE_BEGIN, this);
+                requestFocus();
+                getWindowInsetsController().hide(WindowInsets.Type.ime());
+                break;
+            case SCROLL_STATE_IDLE:
+                mgr.logger().sendToInteractionJankMonitor(
+                        LAUNCHER_ALLAPPS_VERTICAL_SWIPE_END, this);
+                break;
         }
     }
 

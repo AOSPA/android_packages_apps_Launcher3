@@ -18,7 +18,9 @@ package com.android.launcher3.widget.picker;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.robolectric.Shadows.shadowOf;
 
 import android.appwidget.AppWidgetProviderInfo;
@@ -26,25 +28,22 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
-import androidx.annotation.Nullable;
-
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.R;
+import com.android.launcher3.WidgetPreviewLoader;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.ComponentWithLabel;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.testing.TestActivity;
-import com.android.launcher3.widget.WidgetCell;
+import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
-import com.android.launcher3.widget.picker.WidgetsListHeaderViewHolderBinder.OnHeaderClickListener;
 
 import org.junit.After;
 import org.junit.Before;
@@ -74,12 +73,15 @@ public final class WidgetsListHeaderViewHolderBinderTest {
     // testing.
     private ActivityController<TestActivity> mActivityController;
     private TestActivity mTestActivity;
-    private FakeOnHeaderClickListener mFakeOnHeaderClickListener = new FakeOnHeaderClickListener();
 
     @Mock
     private IconCache mIconCache;
     @Mock
     private DeviceProfile mDeviceProfile;
+    @Mock
+    private WidgetPreviewLoader mWidgetPreviewLoader;
+    @Mock
+    private OnHeaderClickListener mOnHeaderClickListener;
 
     @Before
     public void setUp() {
@@ -98,9 +100,15 @@ public final class WidgetsListHeaderViewHolderBinderTest {
             return componentWithLabel.getComponent().getShortClassName();
         }).when(mIconCache).getTitleNoCache(any());
 
-        mViewHolderBinder = new WidgetsListHeaderViewHolderBinder(
+        WidgetsListAdapter widgetsListAdapter = new WidgetsListAdapter(mContext,
                 LayoutInflater.from(mTestActivity),
-                mFakeOnHeaderClickListener);
+                mWidgetPreviewLoader,
+                mIconCache,
+                /* iconClickListener= */ view -> {},
+                /* iconLongClickListener= */ view -> false,
+                /* searchBarUIHelper= */ null);
+        mViewHolderBinder = new WidgetsListHeaderViewHolderBinder(
+                LayoutInflater.from(mTestActivity), mOnHeaderClickListener, widgetsListAdapter);
     }
 
     @After
@@ -117,12 +125,29 @@ public final class WidgetsListHeaderViewHolderBinderTest {
                 APP_NAME,
                 TEST_PACKAGE,
                 /* numOfWidgets= */ 3);
-        mViewHolderBinder.bindViewHolder(viewHolder, entry);
+        mViewHolderBinder.bindViewHolder(viewHolder, entry, /* position= */ 0);
 
         TextView appTitle = widgetsListHeader.findViewById(R.id.app_title);
         TextView appSubtitle = widgetsListHeader.findViewById(R.id.app_subtitle);
         assertThat(appTitle.getText()).isEqualTo(APP_NAME);
         assertThat(appSubtitle.getText()).isEqualTo("3 widgets");
+    }
+
+    @Test
+    public void bindViewHolder_shouldAttachOnHeaderClickListener() {
+        WidgetsListHeaderHolder viewHolder = mViewHolderBinder.newViewHolder(
+                new FrameLayout(mTestActivity));
+        WidgetsListHeader widgetsListHeader = viewHolder.mWidgetsListHeader;
+        WidgetsListHeaderEntry entry = generateSampleAppHeader(
+                APP_NAME,
+                TEST_PACKAGE,
+                /* numOfWidgets= */ 3);
+
+        mViewHolderBinder.bindViewHolder(viewHolder, entry, /* position= */ 0);
+        widgetsListHeader.callOnClick();
+
+        verify(mOnHeaderClickListener).onHeaderClicked(eq(true),
+                eq(new PackageUserKey(entry.mPkgItem.packageName, entry.mPkgItem.user)));
     }
 
     private WidgetsListHeaderEntry generateSampleAppHeader(String appName, String packageName,
@@ -151,23 +176,5 @@ public final class WidgetsListHeaderViewHolderBinderTest {
                     mTestProfile, mIconCache));
         }
         return widgetItems;
-    }
-
-    private void assertWidgetCellWithLabel(View view, String label) {
-        assertThat(view).isInstanceOf(WidgetCell.class);
-        TextView widgetLabel = (TextView) view.findViewById(R.id.widget_name);
-        assertThat(widgetLabel.getText()).isEqualTo(label);
-    }
-
-    private final class FakeOnHeaderClickListener implements OnHeaderClickListener {
-
-        boolean mShowWidgets = false;
-        @Nullable  String mHeaderClickedPackage = null;
-
-        @Override
-        public void onHeaderClicked(boolean showWidgets, String packageName) {
-            mShowWidgets = showWidgets;
-            mHeaderClickedPackage = packageName;
-        }
     }
 }

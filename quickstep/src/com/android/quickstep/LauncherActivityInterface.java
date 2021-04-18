@@ -18,14 +18,12 @@ package com.android.quickstep;
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
+import static com.android.launcher3.LauncherState.QUICK_SWITCH;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.quickstep.SysUINavigationMode.getMode;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.graphics.Rect;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
@@ -36,13 +34,11 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statehandlers.DepthController.ClampedDepthProperty;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.taskbar.TaskbarController;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.quickstep.GestureState.GestureEndTarget;
 import com.android.quickstep.SysUINavigationMode.Mode;
@@ -181,20 +177,18 @@ public final class LauncherActivityInterface extends
     @UiThread
     private Launcher getVisibleLauncher() {
         Launcher launcher = getCreatedActivity();
-        return (launcher != null) && launcher.isStarted() && launcher.hasWindowFocus()
+        return (launcher != null) && launcher.isStarted() && launcher.hasBeenResumed()
                 ? launcher : null;
     }
 
     @Override
     public boolean switchToRecentsIfVisible(Runnable onCompleteCallback) {
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.OVERIEW_NOT_ALLAPPS, "switchToRecentsIfVisible");
-        }
         Launcher launcher = getVisibleLauncher();
         if (launcher == null) {
             return false;
         }
 
+        closeOverlay();
         launcher.getStateManager().goToState(OVERVIEW,
                 launcher.getStateManager().shouldAnimateStateChange(), onCompleteCallback);
         return true;
@@ -266,27 +260,6 @@ public final class LauncherActivityInterface extends
     }
 
     @Override
-    protected float getExtraSpace(Context context, DeviceProfile dp,
-            PagedOrientationHandler orientationHandler) {
-        Resources res = context.getResources();
-        //TODO: this needs to account for the swipe gesture height and accessibility
-        // UI when shown.
-        float actionsBottomMargin = 0;
-        if (!dp.isVerticalBarLayout()) {
-            if (getMode(context) == Mode.THREE_BUTTONS) {
-                actionsBottomMargin = res.getDimensionPixelSize(
-                    R.dimen.overview_actions_bottom_margin_three_button);
-            } else {
-                actionsBottomMargin = res.getDimensionPixelSize(
-                    R.dimen.overview_actions_bottom_margin_gesture);
-            }
-        }
-        float actionsHeight = actionsBottomMargin
-                + res.getDimensionPixelSize(R.dimen.overview_actions_height);
-        return actionsHeight;
-    }
-
-    @Override
     void onOverviewServiceBound() {
         final BaseQuickstepLauncher activity = getCreatedActivity();
         if (activity == null) return;
@@ -299,7 +272,7 @@ public final class LauncherActivityInterface extends
         if (taskbarController == null) {
             return;
         }
-        LauncherState toState = endTarget == GestureEndTarget.RECENTS ? OVERVIEW : NORMAL;
+        LauncherState toState = stateFromGestureEndTarget(endTarget);
         taskbarController.createAnimToLauncher(toState, duration).start();
     }
 
@@ -329,5 +302,19 @@ public final class LauncherActivityInterface extends
             return super.shouldCancelCurrentGesture();
         }
         return taskbarController.isDraggingItem();
+    }
+
+    @Override
+    public LauncherState stateFromGestureEndTarget(GestureEndTarget endTarget) {
+        switch (endTarget) {
+            case RECENTS:
+                return OVERVIEW;
+            case NEW_TASK:
+            case LAST_TASK:
+                return QUICK_SWITCH;
+            case HOME:
+            default:
+                return NORMAL;
+        }
     }
 }

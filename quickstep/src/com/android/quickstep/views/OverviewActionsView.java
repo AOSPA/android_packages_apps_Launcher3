@@ -29,6 +29,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.util.MultiValueAlpha;
@@ -144,6 +145,7 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     public void setInsets(Rect insets) {
         mInsets.set(insets);
         updateVerticalMargin(SysUINavigationMode.getMode(getContext()));
+        updateHorizontalPadding();
     }
 
     public void updateHiddenFlags(@ActionsHiddenFlags int visibilityFlags, boolean enable) {
@@ -187,8 +189,27 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         return mMultiValueAlpha.getProperty(INDEX_FULLSCREEN_ALPHA);
     }
 
+    private void updateHorizontalPadding() {
+        setPadding(mInsets.left, 0, mInsets.right, 0);
+    }
+
     /** Updates vertical margins for different navigation mode or configuration changes. */
     public void updateVerticalMargin(Mode mode) {
+        LayoutParams actionParams = (LayoutParams) findViewById(
+                R.id.action_buttons).getLayoutParams();
+        actionParams.setMargins(
+                actionParams.leftMargin, actionParams.topMargin, actionParams.rightMargin,
+                getBottomVerticalMargin(mode));
+    }
+
+    /**
+     * Set the device profile for this view to draw with.
+     */
+    public void setDp(DeviceProfile dp) {
+        requestLayout();
+    }
+
+    protected int getBottomVerticalMargin(Mode mode) {
         int bottomMargin;
         int orientation = getResources().getConfiguration().orientation;
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -201,8 +222,6 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
                     .getDimensionPixelSize(R.dimen.overview_actions_bottom_margin_gesture);
         }
         bottomMargin += mInsets.bottom;
-        LayoutParams params = (LayoutParams) getLayoutParams();
-        params.setMargins(
-                params.leftMargin, params.topMargin, params.rightMargin, bottomMargin);
+        return bottomMargin;
     }
 }

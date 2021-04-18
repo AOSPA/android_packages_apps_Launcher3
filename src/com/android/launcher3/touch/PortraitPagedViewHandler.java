@@ -19,6 +19,10 @@ package com.android.launcher3.touch;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_SIDE;
 
 import android.content.res.Resources;
 import android.graphics.PointF;
@@ -34,8 +38,13 @@ import android.widget.LinearLayout;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.PagedView;
+import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.OverScroller;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class PortraitPagedViewHandler implements PagedOrientationHandler {
 
@@ -123,7 +132,7 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public int getClearAllScrollOffset(View view, boolean isRtl) {
+    public int getClearAllSidePadding(View view, boolean isRtl) {
         return (isRtl ? view.getPaddingRight() : - view.getPaddingLeft()) / 2;
     }
 
@@ -140,13 +149,6 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     @Override
     public FloatProperty<View> getSecondaryViewTranslate() {
         return VIEW_TRANSLATE_Y;
-    }
-
-    @Override
-    public void setPrimaryAndResetSecondaryTranslate(
-            View view, float translation, float defaultTranslationX, float defaultTranslationY) {
-        view.setTranslationX(translation);
-        view.setTranslationY(defaultTranslationY);
     }
 
     @Override
@@ -212,6 +214,23 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
 
     public int getSecondaryTranslationDirectionFactor() {
         return -1;
+    }
+
+    @Override
+    public int getSplitTranslationDirectionFactor(int stagePosition) {
+        if (stagePosition == STAGE_POSITION_BOTTOM_OR_RIGHT) {
+            return -1;
+        } else {
+            return 1;
+        }
+    }
+
+    @Override
+    public int getSplitAnimationTranslation(int translationOffset, DeviceProfile dp) {
+        if (dp.isLandscape) {
+            return translationOffset;
+        }
+        return 0;
     }
 
     @Override
@@ -283,5 +302,36 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
     @Override
     public int getDistanceToBottomOfRect(DeviceProfile dp, Rect rect) {
         return dp.heightPx - rect.bottom;
+    }
+
+    @Override
+    public List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp) {
+        List<SplitPositionOption> options = new ArrayList<>(2);
+        // TODO: Add in correct icons
+        if (dp.isLandscape) { // or seascape
+            // Add left/right options
+            options.add(new SplitPositionOption(
+                    R.drawable.ic_split_screen, R.string.split_screen_position_left,
+                    STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+            options.add(new SplitPositionOption(
+                    R.drawable.ic_split_screen, R.string.split_screen_position_right,
+                    STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_SIDE));
+        } else {
+            // Only add top option
+            options.add(new SplitPositionOption(
+                    R.drawable.ic_split_screen, R.string.split_screen_position_top,
+                    STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+        }
+        return options;
+    }
+
+    @Override
+    public FloatProperty getSplitSelectTaskOffset(FloatProperty primary, FloatProperty secondary,
+            DeviceProfile dp) {
+        if (dp.isLandscape) { // or seascape
+            return primary;
+        } else {
+            return secondary;
+        }
     }
 }

@@ -15,8 +15,6 @@
  */
 package com.android.launcher3.widget.picker;
 
-import static com.android.launcher3.FastBitmapDrawable.newIcon;
-
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
@@ -29,18 +27,22 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.FastBitmapDrawable;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
-import com.android.launcher3.graphics.PlaceHolderIconDrawable;
+import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.IconCache.ItemInfoUpdateReceiver;
+import com.android.launcher3.icons.PlaceHolderIconDrawable;
 import com.android.launcher3.icons.cache.HandlerRunnable;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
+import com.android.launcher3.widget.model.WidgetsListSearchHeaderEntry;
+
+import java.util.stream.Collectors;
 
 /**
  * A UI represents a header of an app shown in the full widgets tray.
@@ -55,6 +57,7 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
     @Nullable private HandlerRunnable mIconLoadRequest;
     @Nullable private Drawable mIconDrawable;
     private final int mIconSize;
+    private final int mBottomMarginSize;
 
     private ImageView mAppIcon;
     private TextView mTitle;
@@ -80,6 +83,8 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
                 R.styleable.WidgetsListRowHeader, defStyleAttr, /* defStyleRes= */ 0);
         mIconSize = a.getDimensionPixelSize(R.styleable.WidgetsListRowHeader_appIconSize,
                 grid.iconSizePx);
+        mBottomMarginSize =
+                getResources().getDimensionPixelSize(R.dimen.widget_list_entry_bottom_margin);
     }
 
     @Override
@@ -110,6 +115,13 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
     public void setExpanded(boolean isExpanded) {
         this.mIsExpanded = isExpanded;
         mExpandToggle.setChecked(isExpanded);
+        if (getLayoutParams() instanceof RecyclerView.LayoutParams) {
+            int bottomMargin = isExpanded ? 0 : mBottomMarginSize;
+            RecyclerView.LayoutParams layoutParams =
+                    ((RecyclerView.LayoutParams) getLayoutParams());
+            layoutParams.bottomMargin = bottomMargin;
+            setLayoutParams(layoutParams);
+        }
     }
 
     /** Apply app icon, labels and tag using a generic {@link WidgetsListHeaderEntry}. */
@@ -131,7 +143,7 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
     }
 
     private void setIcon(PackageItemInfo info) {
-        FastBitmapDrawable icon = newIcon(getContext(), info);
+        FastBitmapDrawable icon = info.newIcon(getContext());
         applyDrawables(icon);
         mIconDrawable = icon;
         if (mIconDrawable != null) {
@@ -157,14 +169,55 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
     private void setTitles(WidgetsListHeaderEntry entry) {
         mTitle.setText(entry.mPkgItem.title);
 
-        if (entry.widgetsCount > 0) {
-            Resources resources = getContext().getResources();
-            mSubtitle.setText(resources.getQuantityString(R.plurals.widgets_tray_subtitle,
-                    entry.widgetsCount, entry.widgetsCount));
-            mSubtitle.setVisibility(VISIBLE);
-        } else {
+        Resources resources = getContext().getResources();
+        if (entry.widgetsCount == 0 && entry.shortcutsCount == 0) {
             mSubtitle.setVisibility(GONE);
+            return;
         }
+
+        String subtitle;
+        if (entry.widgetsCount > 0 && entry.shortcutsCount > 0) {
+            String widgetsCount = resources.getQuantityString(R.plurals.widgets_count,
+                    entry.widgetsCount, entry.widgetsCount);
+            String shortcutsCount = resources.getQuantityString(R.plurals.shortcuts_count,
+                    entry.shortcutsCount, entry.shortcutsCount);
+            subtitle = resources.getString(R.string.widgets_and_shortcuts_count, widgetsCount,
+                    shortcutsCount);
+        } else if (entry.widgetsCount > 0) {
+            subtitle = resources.getQuantityString(R.plurals.widgets_count,
+                    entry.widgetsCount, entry.widgetsCount);
+        } else {
+            subtitle = resources.getQuantityString(R.plurals.shortcuts_count,
+                    entry.shortcutsCount, entry.shortcutsCount);
+        }
+        mSubtitle.setText(subtitle);
+        mSubtitle.setVisibility(VISIBLE);
+    }
+
+    /** Apply app icon, labels and tag using a generic {@link WidgetsListSearchHeaderEntry}. */
+    @UiThread
+    public void applyFromItemInfoWithIcon(WidgetsListSearchHeaderEntry entry) {
+        applyIconAndLabel(entry);
+    }
+
+    @UiThread
+    private void applyIconAndLabel(WidgetsListSearchHeaderEntry entry) {
+        PackageItemInfo info = entry.mPkgItem;
+        setIcon(info);
+        setTitles(entry);
+        setExpanded(entry.isWidgetListShown());
+
+        super.setTag(info);
+
+        verifyHighRes();
+    }
+
+    private void setTitles(WidgetsListSearchHeaderEntry entry) {
+        mTitle.setText(entry.mPkgItem.title);
+
+        mSubtitle.setText(entry.mWidgets.stream()
+                .map(item -> item.label).sorted().collect(Collectors.joining(", ")));
+        mSubtitle.setVisibility(VISIBLE);
     }
 
     @Override

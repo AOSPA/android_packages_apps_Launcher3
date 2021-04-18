@@ -36,7 +36,6 @@ import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_FA
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_TRANSLATE_X;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_TRANSLATE_Y;
-import static com.android.launcher3.states.StateAnimationConfig.ANIM_TASKBAR_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_TRANSLATE;
@@ -48,7 +47,6 @@ import android.view.View;
 
 import com.android.launcher3.CellLayout;
 import com.android.launcher3.Hotseat;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.allapps.AllAppsContainerView;
@@ -62,7 +60,7 @@ import com.android.quickstep.views.RecentsView;
  * Animation factory for quickstep specific transitions
  */
 public class QuickstepAtomicAnimationFactory extends
-        RecentsAtomicAnimationFactory<Launcher, LauncherState> {
+        RecentsAtomicAnimationFactory<QuickstepLauncher, LauncherState> {
 
     // Scale recents takes before animating in
     private static final float RECENTS_PREPARE_SCALE = 1.33f;
@@ -81,7 +79,6 @@ public class QuickstepAtomicAnimationFactory extends
         if (toState == NORMAL && fromState == OVERVIEW) {
             config.setInterpolator(ANIM_WORKSPACE_SCALE, DEACCEL);
             config.setInterpolator(ANIM_WORKSPACE_FADE, ACCEL);
-            config.setInterpolator(ANIM_TASKBAR_FADE, ACCEL);
             config.setInterpolator(ANIM_ALL_APPS_FADE, ACCEL);
             config.setInterpolator(ANIM_OVERVIEW_SCALE, clampToProgress(ACCEL, 0, 0.9f));
             config.setInterpolator(ANIM_OVERVIEW_TRANSLATE_X, ACCEL_DEACCEL);
@@ -140,7 +137,6 @@ public class QuickstepAtomicAnimationFactory extends
             config.setInterpolator(ANIM_DEPTH, OVERSHOOT_1_2);
             config.setInterpolator(ANIM_OVERVIEW_TRANSLATE_X, OVERSHOOT_1_2);
             config.setInterpolator(ANIM_OVERVIEW_TRANSLATE_Y, OVERSHOOT_1_2);
-            config.setInterpolator(ANIM_TASKBAR_FADE, OVERSHOOT_1_2);
         } else if (fromState == HINT_STATE && toState == NORMAL) {
             config.setInterpolator(ANIM_DEPTH, DEACCEL_3);
             if (mHintToNormalDuration == -1) {

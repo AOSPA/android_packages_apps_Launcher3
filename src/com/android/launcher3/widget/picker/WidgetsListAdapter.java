@@ -16,13 +16,14 @@
 package com.android.launcher3.widget.picker;
 
 import android.content.Context;
+import android.os.Process;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.view.ViewGroup;
+import android.widget.TableRow;
 
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
@@ -34,15 +35,19 @@ import com.android.launcher3.WidgetPreviewLoader;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.recyclerview.ViewHolderBinder;
 import com.android.launcher3.util.LabelComparator;
+import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
-import com.android.launcher3.widget.picker.WidgetsListHeaderViewHolderBinder.OnHeaderClickListener;
+import com.android.launcher3.widget.model.WidgetsListSearchHeaderEntry;
+import com.android.launcher3.widget.picker.search.WidgetsSearchBarUIHelper;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -61,28 +66,50 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
     private static final boolean DEBUG = false;
 
     /** Uniquely identifies widgets list view type within the app. */
-    private static final int VIEW_TYPE_WIDGETS_LIST = R.layout.widgets_list_row_view;
-    private static final int VIEW_TYPE_WIDGETS_HEADER = R.layout.widgets_list_row_header;
+    private static final int VIEW_TYPE_WIDGETS_LIST = R.id.view_type_widgets_list;
+    private static final int VIEW_TYPE_WIDGETS_HEADER = R.id.view_type_widgets_header;
+    private static final int VIEW_TYPE_WIDGETS_SEARCH_HEADER = R.id.view_type_widgets_search_header;
 
+    @Nullable private final WidgetsSearchBarUIHelper mSearchBarUIHelper;
     private final WidgetsDiffReporter mDiffReporter;
     private final SparseArray<ViewHolderBinder> mViewHolderBinders = new SparseArray<>();
-    private final WidgetsListRowViewHolderBinder mWidgetsListRowViewHolderBinder;
+    private final WidgetsListTableViewHolderBinder mWidgetsListTableViewHolderBinder;
     private final WidgetListBaseRowEntryComparator mRowComparator =
             new WidgetListBaseRowEntryComparator();
 
     private List<WidgetsListBaseEntry> mAllEntries = new ArrayList<>();
     private ArrayList<WidgetsListBaseEntry> mVisibleEntries = new ArrayList<>();
-    @Nullable private String mWidgetsContentVisiblePackage = null;
+    @Nullable private PackageUserKey mWidgetsContentVisiblePackageUserKey = null;
+
+    private Predicate<WidgetsListBaseEntry> mHeaderAndSelectedContentFilter = entry ->
+            entry instanceof WidgetsListHeaderEntry
+                    || entry instanceof WidgetsListSearchHeaderEntry
+                    || new PackageUserKey(entry.mPkgItem.packageName, entry.mPkgItem.user)
+                            .equals(mWidgetsContentVisiblePackageUserKey);
+    @Nullable private Predicate<WidgetsListBaseEntry> mFilter = null;
 
     public WidgetsListAdapter(Context context, LayoutInflater layoutInflater,
             WidgetPreviewLoader widgetPreviewLoader, IconCache iconCache,
-            OnClickListener iconClickListener, OnLongClickListener iconLongClickListener) {
+            OnClickListener iconClickListener, OnLongClickListener iconLongClickListener,
+            @Nullable WidgetsSearchBarUIHelper searchBarUIHelper) {
+        mSearchBarUIHelper = searchBarUIHelper;
         mDiffReporter = new WidgetsDiffReporter(iconCache, this);
-        mWidgetsListRowViewHolderBinder = new WidgetsListRowViewHolderBinder(context,
-                layoutInflater, iconClickListener, iconLongClickListener, widgetPreviewLoader);
-        mViewHolderBinders.put(VIEW_TYPE_WIDGETS_LIST, mWidgetsListRowViewHolderBinder);
-        mViewHolderBinders.put(VIEW_TYPE_WIDGETS_HEADER,
-                new WidgetsListHeaderViewHolderBinder(layoutInflater, this::onHeaderClicked));
+        mWidgetsListTableViewHolderBinder = new WidgetsListTableViewHolderBinder(context,
+                layoutInflater, iconClickListener, iconLongClickListener,
+                widgetPreviewLoader, /* listAdapter= */ this);
+        mViewHolderBinders.put(VIEW_TYPE_WIDGETS_LIST, mWidgetsListTableViewHolderBinder);
+        mViewHolderBinders.put(
+                VIEW_TYPE_WIDGETS_HEADER,
+                new WidgetsListHeaderViewHolderBinder(
+                        layoutInflater, /* onHeaderClickListener= */this, /* listAdapter= */ this));
+        mViewHolderBinders.put(
+                VIEW_TYPE_WIDGETS_SEARCH_HEADER,
+                new WidgetsListSearchHeaderViewHolderBinder(
+                        layoutInflater, /*onHeaderClickListener=*/ this, /* listAdapter= */ this));
+    }
+
+    public void setFilter(Predicate<WidgetsListBaseEntry> filter) {
+        mFilter = filter;
     }
 
     /**
@@ -91,16 +118,16 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
      * @see WidgetCell#setApplyBitmapDeferred(boolean)
      */
     public void setApplyBitmapDeferred(boolean isDeferred, RecyclerView rv) {
-        mWidgetsListRowViewHolderBinder.setApplyBitmapDeferred(isDeferred);
+        mWidgetsListTableViewHolderBinder.setApplyBitmapDeferred(isDeferred);
 
         for (int i = rv.getChildCount() - 1; i >= 0; i--) {
             ViewHolder viewHolder = rv.getChildViewHolder(rv.getChildAt(i));
             if (viewHolder.getItemViewType() == VIEW_TYPE_WIDGETS_LIST) {
                 WidgetsRowViewHolder holder = (WidgetsRowViewHolder) viewHolder;
-                for (int j = holder.cellContainer.getChildCount() - 1; j >= 0; j--) {
-                    View v = holder.cellContainer.getChildAt(j);
-                    if (v instanceof WidgetCell) {
-                        ((WidgetCell) v).setApplyBitmapDeferred(isDeferred);
+                for (int j = holder.mTableContainer.getChildCount() - 1; j >= 0; j--) {
+                    TableRow row =  (TableRow) holder.mTableContainer.getChildAt(j);
+                    for (int k = row.getChildCount() - 1; k >= 0; k--) {
+                        ((WidgetCell) row.getChildAt(k)).setApplyBitmapDeferred(isDeferred);
                     }
                 }
             }
@@ -112,36 +139,61 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
         return mVisibleEntries.size();
     }
 
+    /** Returns all items that will be drawn in a recycler view. */
+    public List<WidgetsListBaseEntry> getItems() {
+        return mVisibleEntries;
+    }
+
     /** Gets the section name for {@link com.android.launcher3.views.RecyclerViewFastScroller}. */
     public String getSectionName(int pos) {
         return mVisibleEntries.get(pos).mTitleSectionName;
     }
 
-    /** Updates the widget list. */
+    /** Updates the widget list based on {@code tempEntries}. */
     public void setWidgets(List<WidgetsListBaseEntry> tempEntries) {
         mAllEntries = tempEntries.stream().sorted(mRowComparator)
                 .collect(Collectors.toList());
         updateVisibleEntries();
     }
 
+    /** Updates the widget list based on {@code searchResults}. */
+    public void setWidgetsOnSearch(List<WidgetsListBaseEntry> searchResults) {
+        // Forget the expanded package every time widget list is refreshed in search mode.
+        mWidgetsContentVisiblePackageUserKey = null;
+        setWidgets(searchResults);
+    }
+
     private void updateVisibleEntries() {
         mAllEntries.forEach(entry -> {
             if (entry instanceof WidgetsListHeaderEntry) {
                 ((WidgetsListHeaderEntry) entry).setIsWidgetListShown(
-                        entry.mPkgItem.packageName.equals(mWidgetsContentVisiblePackage));
+                        new PackageUserKey(entry.mPkgItem.packageName, entry.mPkgItem.user)
+                                .equals(mWidgetsContentVisiblePackageUserKey));
+            } else if (entry instanceof WidgetsListSearchHeaderEntry) {
+                ((WidgetsListSearchHeaderEntry) entry).setIsWidgetListShown(
+                        new PackageUserKey(entry.mPkgItem.packageName, entry.mPkgItem.user)
+                                .equals(mWidgetsContentVisiblePackageUserKey));
             }
         });
         List<WidgetsListBaseEntry> newVisibleEntries = mAllEntries.stream()
-                .filter(entry -> entry instanceof WidgetsListHeaderEntry
-                        || entry.mPkgItem.packageName.equals(mWidgetsContentVisiblePackage))
+                .filter(entry -> (mFilter == null || mFilter.test(entry))
+                        && mHeaderAndSelectedContentFilter.test(entry))
                 .collect(Collectors.toList());
         mDiffReporter.process(mVisibleEntries, newVisibleEntries, mRowComparator);
+    }
+
+    /**
+     * Resets any expanded widget header.
+     */
+    public void resetExpandedHeader() {
+        mWidgetsContentVisiblePackageUserKey = null;
+        updateVisibleEntries();
     }
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int pos) {
         ViewHolderBinder viewHolderBinder = mViewHolderBinders.get(getItemViewType(pos));
-        viewHolderBinder.bindViewHolder(holder, mVisibleEntries.get(pos));
+        viewHolderBinder.bindViewHolder(holder, mVisibleEntries.get(pos), pos);
     }
 
     @Override
@@ -169,7 +221,9 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
 
     @Override
     public long getItemId(int pos) {
-        return pos;
+        return Arrays.hashCode(new Object[]{
+                mVisibleEntries.get(pos).mPkgItem.hashCode(),
+                getItemViewType(pos)});
     }
 
     @Override
@@ -179,19 +233,41 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
             return VIEW_TYPE_WIDGETS_LIST;
         } else if (entry instanceof WidgetsListHeaderEntry) {
             return VIEW_TYPE_WIDGETS_HEADER;
+        } else if (entry instanceof WidgetsListSearchHeaderEntry) {
+            return VIEW_TYPE_WIDGETS_SEARCH_HEADER;
         }
         throw new UnsupportedOperationException("ViewHolderBinder not found for " + entry);
     }
 
     @Override
-    public void onHeaderClicked(boolean showWidgets, String expandedPackage) {
+    public void onHeaderClicked(boolean showWidgets, PackageUserKey packageUserKey) {
+        if (mSearchBarUIHelper != null) {
+            mSearchBarUIHelper.clearSearchBarFocus();
+        }
         if (showWidgets) {
-            mWidgetsContentVisiblePackage = expandedPackage;
+            mWidgetsContentVisiblePackageUserKey = packageUserKey;
             updateVisibleEntries();
-        } else if (expandedPackage.equals(mWidgetsContentVisiblePackage)) {
-            mWidgetsContentVisiblePackage = null;
+        } else if (packageUserKey.equals(mWidgetsContentVisiblePackageUserKey)) {
+            mWidgetsContentVisiblePackageUserKey = null;
             updateVisibleEntries();
         }
+    }
+
+    /**
+     * Sets the max horizontal spans that are allowed for grouping more than one widgets in a table
+     * row.
+     *
+     * <p>If there is only one widget in a row, that widget horizontal span is allowed to exceed
+     * {@code maxHorizontalSpans}.
+     * <p>Let's say the max horizontal spans is set to 5. Widgets can be grouped in the same row if
+     * their total horizontal spans added don't exceed 5.
+     * Example 1: Row 1: 2x2, 2x3, 1x1. Total horizontal spans is 5. This is okay.
+     * Example 2: Row 1: 2x2, 4x3, 1x1. the total horizontal spans is 7. This is wrong.
+     *            4x3 and 1x1 should be moved to a new row.
+     * Example 3: Row 1: 6x4. This is okay because this is the only item in the row.
+     */
+    public void setMaxHorizontalSpansPerRow(int maxHorizontalSpans) {
+        mWidgetsListTableViewHolderBinder.setMaxSpansPerRow(maxHorizontalSpans);
     }
 
     /** Comparator for sorting WidgetListRowEntry based on package title. */
@@ -202,7 +278,14 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
 
         @Override
         public int compare(WidgetsListBaseEntry a, WidgetsListBaseEntry b) {
-            return mComparator.compare(a.mPkgItem.title.toString(), b.mPkgItem.title.toString());
+            int i = mComparator.compare(a.mPkgItem.title.toString(), b.mPkgItem.title.toString());
+            if (i != 0) {
+                return i;
+            }
+            // Prioritize entries from current user over other users if the entries are same.
+            if (a.mPkgItem.user.equals(b.mPkgItem.user)) return 0;
+            if (a.mPkgItem.user.equals(Process.myUserHandle())) return -1;
+            return 1;
         }
     }
 }

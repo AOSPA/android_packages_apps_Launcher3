@@ -28,6 +28,7 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.Workspace;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
@@ -77,37 +78,13 @@ public class OverviewState extends LauncherState {
     }
 
     @Override
-    public ScaleAndTranslation getHotseatScaleAndTranslation(Launcher launcher) {
-        if ((getVisibleElements(launcher) & HOTSEAT_ICONS) != 0) {
-            DeviceProfile dp = launcher.getDeviceProfile();
-            if (dp.allAppsIconSizePx >= dp.iconSizePx) {
-                return new ScaleAndTranslation(1, 0, 0);
-            } else {
-                float scale = ((float) dp.allAppsIconSizePx) / dp.iconSizePx;
-                // Distance between the screen center (which is the pivotY for hotseat) and the
-                // bottom of the hotseat (which we want to preserve)
-                float distanceFromBottom = dp.heightPx / 2 - dp.hotseatBarBottomPaddingPx;
-                // On scaling, the bottom edge is moved closer to the pivotY. We move the
-                // hotseat back down so that the bottom edge's position is preserved.
-                float translationY = distanceFromBottom * (1 - scale);
-                return new ScaleAndTranslation(scale, 0, translationY);
-            }
-        }
-        return getWorkspaceScaleAndTranslation(launcher);
-    }
-
-    @Override
     public float[] getOverviewScaleAndOffset(Launcher launcher) {
         return new float[] {NO_SCALE, NO_OFFSET};
     }
 
     @Override
-    public ScaleAndTranslation getQsbScaleAndTranslation(Launcher launcher) {
-        if (this == OVERVIEW) {
-            // Treat the QSB as part of the hotseat so they move together.
-            return getHotseatScaleAndTranslation(launcher);
-        }
-        return super.getQsbScaleAndTranslation(launcher);
+    public float getTaskbarScale(Launcher launcher) {
+        return 1f;
     }
 
     @Override
@@ -122,12 +99,18 @@ public class OverviewState extends LauncherState {
 
     @Override
     public int getVisibleElements(Launcher launcher) {
-        return OVERVIEW_BUTTONS;
+        return displayOverviewTasksAsGrid(launcher.getDeviceProfile()) ? CLEAR_ALL_BUTTON
+                : CLEAR_ALL_BUTTON | OVERVIEW_ACTIONS;
     }
 
     @Override
     public float getOverviewScrimAlpha(Launcher launcher) {
         return 0.5f;
+    }
+
+    @Override
+    public boolean displayOverviewTasksAsGrid(DeviceProfile deviceProfile) {
+        return deviceProfile.isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get();
     }
 
     @Override
@@ -148,7 +131,7 @@ public class OverviewState extends LauncherState {
     public void onBackPressed(Launcher launcher) {
         TaskView taskView = launcher.<RecentsView>getOverviewPanel().getRunningTaskView();
         if (taskView != null) {
-            taskView.launchTask(true);
+            taskView.launchTaskAnimated();
         } else {
             super.onBackPressed(launcher);
         }
@@ -167,5 +150,13 @@ public class OverviewState extends LauncherState {
      */
     public static OverviewState newModalTaskState(int id) {
         return new OverviewModalTaskState(id);
+    }
+
+    /**
+     * New Overview substate representing state where 1 app for split screen has been selected and
+     * pinned and user is selecting the second one
+     */
+    public static OverviewState newSplitSelectState(int id) {
+        return new SplitScreenSelectState(id);
     }
 }

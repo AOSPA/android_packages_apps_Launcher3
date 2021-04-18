@@ -15,15 +15,16 @@
  */
 package com.android.quickstep.util;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.states.RotationHelper.deltaRotation;
 import static com.android.launcher3.touch.PagedOrientationHandler.MATRIX_POST_TRANSLATE;
+import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
 import static com.android.quickstep.util.RecentsOrientedState.postDisplayRotation;
 import static com.android.quickstep.util.RecentsOrientedState.preDisplayRotation;
 import static com.android.systemui.shared.system.WindowManagerWrapper.WINDOWING_MODE_FULLSCREEN;
 
 import android.animation.TimeInterpolator;
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -73,6 +74,7 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
 
     @NonNull
     private RecentsOrientedState mOrientationState;
+    private final boolean mIsRecentsRtl;
 
     private final Rect mTaskRect = new Rect();
     private boolean mDrawsBelowRecents;
@@ -98,6 +100,7 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
     public final AnimatedFloat recentsViewScale = new AnimatedFloat();
     public final AnimatedFloat fullScreenProgress = new AnimatedFloat();
     public final AnimatedFloat recentsViewSecondaryTranslation = new AnimatedFloat();
+    public final AnimatedFloat recentsViewPrimaryTranslation = new AnimatedFloat();
     private final ScrollState mScrollState = new ScrollState();
 
     // Cached calculations
@@ -113,6 +116,8 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         mOrientationState.setGestureActive(true);
         mCurrentFullscreenParams = new FullscreenDrawParams(context);
         mOrientationStateId = mOrientationState.getStateId();
+        Resources resources = context.getResources();
+        mIsRecentsRtl = mOrientationState.getOrientationHandler().getRecentsRtlSetting(resources);
     }
 
     /**
@@ -256,10 +261,12 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
             getFullScreenScale();
             mThumbnailData.rotation = mOrientationState.getDisplayRotation();
 
+            // mIsRecentsRtl is the inverse of TaskView RTL.
+            boolean isRtlEnabled = !mIsRecentsRtl;
             mPositionHelper.updateThumbnailMatrix(
                     mThumbnailPosition, mThumbnailData,
                     mTaskRect.width(), mTaskRect.height(),
-                    mDp, mOrientationState.getRecentsActivityRotation());
+                    mDp, mOrientationState.getRecentsActivityRotation(), isRtlEnabled);
             mPositionHelper.getMatrix().invert(mInversePositionMatrix);
 
             PagedOrientationHandler poh = mOrientationState.getOrientationHandler();
@@ -277,9 +284,10 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
             mScrollState.updateInterpolation(mDp, start);
         }
 
-        float progress = Utilities.boundToRange(fullScreenProgress.value, 0, 1);
+        float fullScreenProgress = Utilities.boundToRange(this.fullScreenProgress.value, 0, 1);
         mCurrentFullscreenParams.setProgress(
-                progress, recentsViewScale.value, mTaskRect.width(), mDp, mPositionHelper);
+                fullScreenProgress, recentsViewScale.value, mTaskRect.width(), mDp,
+                mPositionHelper);
 
         // Apply thumbnail matrix
         RectF insets = mCurrentFullscreenParams.mCurrentDrawnInsets;
@@ -304,6 +312,8 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         mMatrix.postScale(recentsViewScale.value, recentsViewScale.value, mPivot.x, mPivot.y);
         mOrientationState.getOrientationHandler().setSecondary(mMatrix, MATRIX_POST_TRANSLATE,
                 recentsViewSecondaryTranslation.value);
+        mOrientationState.getOrientationHandler().set(mMatrix, MATRIX_POST_TRANSLATE,
+                recentsViewPrimaryTranslation.value);
         applyWindowToHomeRotation(mMatrix);
 
         // Crop rect is the inverse of thumbnail matrix
@@ -323,7 +333,7 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
                 .withCornerRadius(getCurrentCornerRadius())
                 .withShadowRadius(app.isTranslucent ? 0 : params.getShadowRadius());
 
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && params.getRecentsSurface() != null) {
+        if (LIVE_TILE.get() && params.getRecentsSurface() != null) {
             // When relativeLayer = 0, it reverts the surfaces back to the original order.
             builder.withRelativeLayerTo(params.getRecentsSurface(),
                     mDrawsBelowRecents ? Integer.MIN_VALUE : 0);

@@ -16,26 +16,36 @@
 
 package com.android.launcher3.widget;
 
+import static com.android.launcher3.Utilities.ATLEAST_S;
+
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 import android.os.CancellationSignal;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnLayoutChangeListener;
-import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.RemoteViews;
 import android.widget.TextView;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.CheckLongPressHelper;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.WidgetPreviewLoader;
+import com.android.launcher3.dragndrop.AppWidgetHostViewDrawable;
 import com.android.launcher3.icons.BaseIconFactory;
+import com.android.launcher3.icons.BitmapRenderer;
+import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.model.WidgetItem;
 
 /**
@@ -60,12 +70,16 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
     /** Widget preview width is calculated by multiplying this factor to the widget cell width. */
     private static final float PREVIEW_SCALE = 0.8f;
 
+    protected int mPreviewWidth;
+    protected int mPreviewHeight;
     protected int mPresetPreviewSize;
     private int mCellSize;
+    private float mPreviewScale = 1f;
 
     private WidgetImageView mWidgetImage;
     private TextView mWidgetName;
     private TextView mWidgetDims;
+    private TextView mWidgetDescription;
 
     protected WidgetItem mItem;
 
@@ -75,11 +89,15 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
     private boolean mAnimatePreview = true;
 
     private boolean mApplyBitmapDeferred = false;
-    private Bitmap mDeferredBitmap;
+    private Drawable mDeferredDrawable;
 
     protected final BaseActivity mActivity;
     protected final DeviceProfile mDeviceProfile;
     private final CheckLongPressHelper mLongPressHelper;
+    private final float mEnforcedCornerRadius;
+
+    private RemoteViews mPreview;
+    private LauncherAppWidgetHostView mAppWidgetHostViewPreview;
 
     public WidgetCell(Context context) {
         this(context, null);
@@ -101,20 +119,31 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
         setWillNotDraw(false);
         setClipToPadding(false);
         setAccessibilityDelegate(mActivity.getAccessibilityDelegate());
+        mEnforcedCornerRadius = RoundedCornerEnforcement.computeEnforcedRadius(context);
     }
 
     private void setContainerWidth() {
         mCellSize = (int) (mDeviceProfile.allAppsIconSizePx * WIDTH_SCALE);
         mPresetPreviewSize = (int) (mCellSize * PREVIEW_SCALE);
+        mPreviewWidth = mPreviewHeight = mPresetPreviewSize;
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
 
-        mWidgetImage = (WidgetImageView) findViewById(R.id.widget_preview);
-        mWidgetName = ((TextView) findViewById(R.id.widget_name));
-        mWidgetDims = ((TextView) findViewById(R.id.widget_dims));
+        mWidgetImage = findViewById(R.id.widget_preview);
+        mWidgetName = findViewById(R.id.widget_name);
+        mWidgetDims = findViewById(R.id.widget_dims);
+        mWidgetDescription = findViewById(R.id.widget_description);
+    }
+
+    public void setPreview(RemoteViews view) {
+        mPreview = view;
+    }
+
+    public RemoteViews getPreview() {
+        return mPreview;
     }
 
     /**
@@ -125,25 +154,41 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
             Log.d(TAG, "reset called on:" + mWidgetName.getText());
         }
         mWidgetImage.animate().cancel();
-        mWidgetImage.setBitmap(null, null);
+        mWidgetImage.setDrawable(null, null);
         mWidgetName.setText(null);
         mWidgetDims.setText(null);
+        mWidgetDescription.setText(null);
+        mWidgetDescription.setVisibility(GONE);
+        mPreviewWidth = mPreviewHeight = mPresetPreviewSize;
 
         if (mActiveRequest != null) {
             mActiveRequest.cancel();
             mActiveRequest = null;
         }
+        mPreview = null;
+        mAppWidgetHostViewPreview = null;
     }
 
     public void applyFromCellItem(WidgetItem item, WidgetPreviewLoader loader) {
+        applyPreviewLayout(item);
+
         mItem = item;
         mWidgetName.setText(mItem.label);
         mWidgetDims.setText(getContext().getString(R.string.widget_dims_format,
                 mItem.spanX, mItem.spanY));
         mWidgetDims.setContentDescription(getContext().getString(
                 R.string.widget_accessible_dims_format, mItem.spanX, mItem.spanY));
-        mWidgetPreviewLoader = loader;
+        if (ATLEAST_S && mItem.widgetInfo != null) {
+            CharSequence description = mItem.widgetInfo.loadDescription(getContext());
+            if (description != null && description.length() > 0) {
+                mWidgetDescription.setText(description);
+                mWidgetDescription.setVisibility(VISIBLE);
+            } else {
+                mWidgetDescription.setVisibility(GONE);
+            }
+        }
 
+        mWidgetPreviewLoader = loader;
         if (item.activityInfo != null) {
             setTag(new PendingAddShortcutInfo(item.activityInfo));
         } else {
@@ -151,8 +196,34 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
         }
     }
 
+    private void applyPreviewLayout(WidgetItem item) {
+        if (ATLEAST_S
+                && mPreview == null
+                && item.widgetInfo != null
+                && item.widgetInfo.previewLayout != Resources.ID_NULL) {
+            mAppWidgetHostViewPreview = new LauncherAppWidgetHostView(getContext());
+            LauncherAppWidgetProviderInfo launcherAppWidgetProviderInfo =
+                    LauncherAppWidgetProviderInfo.fromProviderInfo(getContext(),
+                            item.widgetInfo.clone());
+            // A hack to force the initial layout to be the preview layout since there is no API for
+            // rendering a preview layout for work profile apps yet. For non-work profile layout, a
+            // proper solution is to use RemoteViews(PackageName, LayoutId).
+            launcherAppWidgetProviderInfo.initialLayout = item.widgetInfo.previewLayout;
+            mAppWidgetHostViewPreview.setAppWidget(/* appWidgetId= */ -1,
+                    launcherAppWidgetProviderInfo);
+            mAppWidgetHostViewPreview.setPadding(/* left= */ 0, /* top= */0, /* right= */
+                    0, /* bottom= */ 0);
+            mAppWidgetHostViewPreview.updateAppWidget(/* remoteViews= */ null);
+        }
+    }
+
     public WidgetImageView getWidgetView() {
         return mWidgetImage;
+    }
+
+    @Nullable
+    public LauncherAppWidgetHostView getAppWidgetHostViewPreview() {
+        return mAppWidgetHostViewPreview;
     }
 
     /**
@@ -164,9 +235,9 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
     public void setApplyBitmapDeferred(boolean isDeferred) {
         if (mApplyBitmapDeferred != isDeferred) {
             mApplyBitmapDeferred = isDeferred;
-            if (!mApplyBitmapDeferred && mDeferredBitmap != null) {
-                applyPreview(mDeferredBitmap);
-                mDeferredBitmap = null;
+            if (!mApplyBitmapDeferred && mDeferredDrawable != null) {
+                applyPreview(mDeferredDrawable);
+                mDeferredDrawable = null;
             }
         }
     }
@@ -176,12 +247,23 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
     }
 
     public void applyPreview(Bitmap bitmap) {
+        FastBitmapDrawable drawable = new FastBitmapDrawable(bitmap);
+        drawable.setRoundedCornersRadius(mEnforcedCornerRadius);
+        applyPreview(drawable);
+    }
+
+    private void applyPreview(Drawable drawable) {
         if (mApplyBitmapDeferred) {
-            mDeferredBitmap = bitmap;
+            mDeferredDrawable = drawable;
             return;
         }
-        if (bitmap != null) {
-            mWidgetImage.setBitmap(bitmap, mWidgetPreviewLoader.getBadgeForUser(mItem.user,
+        if (drawable != null) {
+            LayoutParams layoutParams = (LayoutParams) mWidgetImage.getLayoutParams();
+            layoutParams.width = (int) (drawable.getIntrinsicWidth() * mPreviewScale);
+            layoutParams.height = (int) (drawable.getIntrinsicHeight() * mPreviewScale);
+            mWidgetImage.setLayoutParams(layoutParams);
+
+            mWidgetImage.setDrawable(drawable, mWidgetPreviewLoader.getBadgeForUser(mItem.user,
                     BaseIconFactory.getBadgeSizeForIconSize(mDeviceProfile.allAppsIconSizePx)));
             if (mAnimatePreview) {
                 mWidgetImage.setAlpha(0f);
@@ -194,11 +276,50 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
     }
 
     public void ensurePreview() {
+        if (mPreview != null && mActiveRequest == null) {
+            Bitmap preview = generateFromRemoteViews(
+                    mActivity, mPreview, mItem.widgetInfo, mPresetPreviewSize, new int[1]);
+            if (preview != null) {
+                applyPreview(new FastBitmapDrawable(preview));
+                return;
+            }
+        }
+
+        if (mAppWidgetHostViewPreview != null) {
+            DeviceProfile dp = mActivity.getDeviceProfile();
+            int viewWidth = dp.cellWidthPx * mItem.spanX;
+            int viewHeight = dp.cellHeightPx * mItem.spanY;
+
+            mAppWidgetHostViewPreview.measure(
+                    MeasureSpec.makeMeasureSpec(viewWidth, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(viewHeight, MeasureSpec.EXACTLY));
+
+            viewWidth = mAppWidgetHostViewPreview.getMeasuredWidth();
+            viewHeight = mAppWidgetHostViewPreview.getMeasuredHeight();
+            mAppWidgetHostViewPreview.layout(0, 0, viewWidth, viewHeight);
+            Drawable drawable = new AppWidgetHostViewDrawable(mAppWidgetHostViewPreview);
+            applyPreview(drawable);
+            return;
+        }
         if (mActiveRequest != null) {
             return;
         }
-        mActiveRequest = mWidgetPreviewLoader.getPreview(
-                mItem, mPresetPreviewSize, mPresetPreviewSize, this);
+        mActiveRequest = mWidgetPreviewLoader.getPreview(mItem, mPreviewWidth, mPreviewHeight,
+                this);
+    }
+
+    /** Sets the widget preview image size in number of cells. */
+    public void setPreviewSize(int spanX, int spanY) {
+        setPreviewSize(spanX, spanY, 1f);
+    }
+
+    /** Sets the widget preview image size, in number of cells, and preview scale. */
+    public void setPreviewSize(int spanX, int spanY, float previewScale) {
+        int padding = 2 * getResources()
+                .getDimensionPixelSize(R.dimen.widget_preview_shortcut_padding);
+        mPreviewWidth = mDeviceProfile.cellWidthPx * spanX + padding;
+        mPreviewHeight = mDeviceProfile.cellHeightPx * spanY + padding;
+        mPreviewScale = previewScale;
     }
 
     @Override
@@ -233,12 +354,6 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
     }
 
     @Override
-    public void setLayoutParams(ViewGroup.LayoutParams params) {
-        params.width = params.height = mCellSize;
-        super.setLayoutParams(params);
-    }
-
-    @Override
     public CharSequence getAccessibilityClassName() {
         return WidgetCell.class.getName();
     }
@@ -247,5 +362,54 @@ public class WidgetCell extends LinearLayout implements OnLayoutChangeListener {
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
         info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK);
+    }
+
+    /**
+     * Generates a bitmap by inflating {@param views}.
+     * @see com.android.launcher3.WidgetPreviewLoader#generateWidgetPreview
+     *
+     * TODO: Consider moving this to the background thread.
+     */
+    public static Bitmap generateFromRemoteViews(BaseActivity activity, RemoteViews views,
+            LauncherAppWidgetProviderInfo info, int previewSize, int[] preScaledWidthOut) {
+        try {
+            return generateFromView(activity, views.apply(activity, new FrameLayout(activity)),
+                    info, previewSize, preScaledWidthOut);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Bitmap generateFromView(BaseActivity activity, View v,
+            LauncherAppWidgetProviderInfo info, int previewSize, int[] preScaledWidthOut) {
+
+        DeviceProfile dp = activity.getDeviceProfile();
+        int viewWidth = dp.cellWidthPx * info.spanX;
+        int viewHeight = dp.cellHeightPx * info.spanY;
+
+        v.measure(MeasureSpec.makeMeasureSpec(viewWidth, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(viewHeight, MeasureSpec.EXACTLY));
+
+        viewWidth = v.getMeasuredWidth();
+        viewHeight = v.getMeasuredHeight();
+        v.layout(0, 0, viewWidth, viewHeight);
+
+        preScaledWidthOut[0] = viewWidth;
+        final int bitmapWidth, bitmapHeight;
+        final float scale;
+        if (viewWidth > previewSize) {
+            scale = ((float) previewSize) / viewWidth;
+            bitmapWidth = previewSize;
+            bitmapHeight = (int) (viewHeight * scale);
+        } else {
+            scale = 1;
+            bitmapWidth = viewWidth;
+            bitmapHeight = viewHeight;
+        }
+
+        return BitmapRenderer.createSoftwareBitmap(bitmapWidth, bitmapHeight, c -> {
+            c.scale(scale, scale);
+            v.draw(c);
+        });
     }
 }

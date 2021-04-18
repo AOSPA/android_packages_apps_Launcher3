@@ -32,12 +32,12 @@ import android.os.UserHandle;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.InvariantDeviceProfile;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.ComponentWithLabel;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.PackageItemInfo;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
@@ -217,6 +217,27 @@ public final class WidgetsDiffReporterTest {
 
         // THEN notify "B" has been changed.
         verify(mAdapter).notifyItemChanged(/* position= */ 1);
+        // THEN the current list contains all elements from the new list.
+        assertThat(currentList).containsExactlyElementsIn(newList);
+    }
+
+    @Test
+    public void headersContentsMix_headerWidgetsModified_shouldInvokeCorrectCallbacks() {
+        // GIVEN the current list has app headers [A, B, E content].
+        ArrayList<WidgetsListBaseEntry> currentList = new ArrayList<>(
+                List.of(mHeaderA, mHeaderB, mContentE));
+        // GIVEN the new list has one of the headers widgets list modified.
+        List<WidgetsListBaseEntry> newList = List.of(
+                new WidgetsListHeaderEntry(
+                        mHeaderA.mPkgItem, mHeaderA.mTitleSectionName,
+                        mHeaderA.mWidgets.subList(0, 1)),
+                mHeaderB, mContentE);
+
+        // WHEN computing the list difference.
+        mWidgetsDiffReporter.process(currentList, newList, COMPARATOR);
+
+        // THEN notify "A" has been changed.
+        verify(mAdapter).notifyItemChanged(/* position= */ 0);
         // THEN the current list contains all elements from the new list.
         assertThat(currentList).containsExactlyElementsIn(newList);
     }

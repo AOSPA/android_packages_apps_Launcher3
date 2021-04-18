@@ -85,7 +85,7 @@ public final class FeatureFlags {
             "ADAPTIVE_ICON_WINDOW_ANIM", true, "Use adaptive icons for window animations.");
 
     public static final BooleanFlag ENABLE_QUICKSTEP_LIVE_TILE = getDebugFlag(
-            "ENABLE_QUICKSTEP_LIVE_TILE", false, "Enable live tile in Quickstep overview");
+            "ENABLE_QUICKSTEP_LIVE_TILE", true, "Enable live tile in Quickstep overview");
 
     // Keep as DeviceFlag to allow remote disable in emergency.
     public static final BooleanFlag ENABLE_SUGGESTED_ACTIONS_OVERVIEW = new DeviceFlag(
@@ -94,9 +94,6 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = new DeviceFlag(
             "ENABLE_DEVICE_SEARCH", false, "Allows on device search in all apps");
-
-    public static final BooleanFlag DISABLE_INITIAL_IME_IN_ALLAPPS = getDebugFlag(
-            "DISABLE_INITIAL_IME_IN_ALLAPPS", false, "Disable default IME state in all apps");
 
     public static final BooleanFlag FOLDER_NAME_SUGGEST = new DeviceFlag(
             "FOLDER_NAME_SUGGEST", true,
@@ -143,6 +140,9 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_OVERVIEW_SELECTIONS = new DeviceFlag(
             "ENABLE_OVERVIEW_SELECTIONS", true, "Show Select Mode button in Overview Actions");
 
+    public static final BooleanFlag ENABLE_WIDGETS_PICKER_AIAI_SEARCH = new DeviceFlag(
+            "ENABLE_WIDGETS_PICKER_AIAI_SEARCH", false, "Enable AiAi search in the widgets picker");
+
     public static final BooleanFlag ENABLE_OVERVIEW_SHARE = getDebugFlag(
             "ENABLE_OVERVIEW_SHARE", false, "Show Share button in Overview Actions");
 
@@ -161,7 +161,7 @@ public final class FeatureFlags {
             "ENABLE_SMARTSPACE_UNIVERSAL", false,
             "Replace Smartspace with a version rendered by System UI.");
 
-    public static final BooleanFlag ENABLE_SMARTSPACE_ENHANCED = getDebugFlag(
+    public static final BooleanFlag ENABLE_SMARTSPACE_ENHANCED = new DeviceFlag(
             "ENABLE_SMARTSPACE_ENHANCED", false,
             "Replace Smartspace with the enhanced version. "
               + "Ignored if ENABLE_SMARTSPACE_UNIVERSAL is enabled.");
@@ -187,7 +187,7 @@ public final class FeatureFlags {
             "EXPANDED_SMARTSPACE", false, "Expands smartspace height to two rows. "
               + "Any apps occupying the first row will be removed from workspace.");
 
-    public static final BooleanFlag ENABLE_FOUR_COLUMNS = new DeviceFlag(
+    public static final DeviceFlag ENABLE_FOUR_COLUMNS = new DeviceFlag(
             "ENABLE_FOUR_COLUMNS", false, "Uses 4 columns in launcher grid."
             + "Warning: This will permanently alter your home screen items and is not reversible.");
 
@@ -201,12 +201,22 @@ public final class FeatureFlags {
             "ENABLE_APP_PREDICTIONS_WHILE_VISIBLE", true, "Allows app "
             + "predictions to be updated while they are visible to the user.");
 
-    public static final BooleanFlag ENABLE_TASKBAR = new DeviceFlag(
+    public static final BooleanFlag ENABLE_TASKBAR = getDebugFlag(
             "ENABLE_TASKBAR", false, "Allows a system Taskbar to be shown on larger devices.");
 
-    public static final BooleanFlag ENABLE_OVERVIEW_GRID = new DeviceFlag(
+    public static final BooleanFlag ENABLE_OVERVIEW_GRID = getDebugFlag(
             "ENABLE_OVERVIEW_GRID", false, "Uses grid overview layout. "
             + "Only applicable on large screen devices.");
+
+    public static final BooleanFlag ENABLE_TWO_PANEL_HOME = getDebugFlag(
+            "ENABLE_TWO_PANEL_HOME", false,
+            "Uses two panel on home screen. Only applicable on large screen devices.");
+
+    public static final BooleanFlag ENABLE_SPLIT_SELECT = getDebugFlag(
+            "ENABLE_SPLIT_SELECT", false, "Uses new split screen selection overview UI");
+
+    public static final BooleanFlag ENABLE_ENFORCED_ROUNDED_CORNERS = new DeviceFlag(
+            "ENABLE_ENFORCED_ROUNDED_CORNERS", true, "Enforce rounded corners on all App Widgets");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
@@ -214,6 +224,12 @@ public final class FeatureFlags {
                 flag.initialize(context);
             }
             sDebugFlags.sort((f1, f2) -> f1.key.compareToIgnoreCase(f2.key));
+        }
+    }
+
+    public static void removeFlag(DebugFlag flag) {
+        synchronized (sDebugFlags) {
+            sDebugFlags.remove(flag);
         }
     }
 
@@ -266,6 +282,8 @@ public final class FeatureFlags {
         }
 
         public void addChangeListener(Context context, Runnable r) { }
+
+        public void removeChangeListener(Runnable r) {}
     }
 
     public static class DebugFlag extends BooleanFlag {
@@ -290,6 +308,15 @@ public final class FeatureFlags {
         public void initialize(Context context) {
             mCurrentValue = context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE)
                     .getBoolean(key, defaultValue);
+        }
+
+        /**
+         * Resets value to default value.
+         */
+        public void reset(Context context) {
+            mCurrentValue = defaultValue;
+            context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE)
+                    .edit().putBoolean(key, defaultValue).apply();
         }
 
         @Override

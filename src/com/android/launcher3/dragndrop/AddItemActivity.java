@@ -37,18 +37,19 @@ import android.graphics.Rect;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.DragShadowBuilder;
 import android.view.View.OnLongClickListener;
 import android.view.View.OnTouchListener;
+import android.view.WindowManager;
+import android.widget.TextView;
 
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.LauncherAppWidgetHost;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.ItemInstallQueue;
@@ -56,8 +57,11 @@ import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.PinRequestHelper;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.LauncherAppWidgetHost;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
+import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.WidgetHostViewLoader;
 import com.android.launcher3.widget.WidgetImageView;
 import com.android.launcher3.widget.WidgetManagerHelper;
@@ -78,7 +82,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
     private LauncherAppState mApp;
     private InvariantDeviceProfile mIdp;
 
-    private LivePreviewWidgetCell mWidgetCell;
+    private WidgetCell mWidgetCell;
 
     // Widget request specific options.
     private LauncherAppWidgetHost mAppWidgetHost;
@@ -117,14 +121,18 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
             }
         }
 
-        mWidgetCell.setOnTouchListener(this);
-        mWidgetCell.setOnLongClickListener(this);
+        WidgetImageView preview = mWidgetCell.findViewById(R.id.widget_preview);
+        preview.setOnTouchListener(this);
+        preview.setOnLongClickListener(this);
 
         // savedInstanceState is null when the activity is created the first time (i.e., avoids
         // duplicate logging during rotation)
         if (savedInstanceState == null) {
             logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_START);
         }
+
+        TextView widgetAppName = findViewById(R.id.widget_appName);
+        widgetAppName.setText(getApplicationInfo().labelRes);
     }
 
     @Override
@@ -140,7 +148,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
 
         // If the ImageView doesn't have a drawable yet, the widget preview hasn't been loaded and
         // we abort the drag.
-        if (img.getBitmap() == null) {
+        if (img.getDrawable() == null) {
             return false;
         }
 
@@ -149,7 +157,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
 
         // Start home and pass the draw request params
         PinItemDragListener listener = new PinItemDragListener(mRequest, bounds,
-                img.getBitmap().getWidth(), img.getWidth());
+                img.getDrawable().getIntrinsicWidth(), img.getWidth());
 
 
         // Start a system drag and drop. We use a transparent bitmap as preview for system drag
@@ -323,5 +331,16 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
         getStatsLogManager().logger()
                 .withItemInfo((ItemInfo) mWidgetCell.getWidgetView().getTag())
                 .log(command);
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        View view = getWindow().getDecorView();
+        WindowManager.LayoutParams layoutParams =
+                (WindowManager.LayoutParams) view.getLayoutParams();
+        layoutParams.gravity = Gravity.BOTTOM;
+        layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT;
+        getWindowManager().updateViewLayout(view, layoutParams);
     }
 }

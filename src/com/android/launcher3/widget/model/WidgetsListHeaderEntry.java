@@ -18,7 +18,7 @@ package com.android.launcher3.widget.model;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.PackageItemInfo;
 
-import java.util.Collection;
+import java.util.List;
 
 /** An information holder for an app which has widgets or/and shortcuts. */
 public final class WidgetsListHeaderEntry extends WidgetsListBaseEntry {
@@ -30,8 +30,8 @@ public final class WidgetsListHeaderEntry extends WidgetsListBaseEntry {
     private boolean mHasEntryUpdated = false;
 
     public WidgetsListHeaderEntry(PackageItemInfo pkgItem, String titleSectionName,
-            Collection<WidgetItem> items) {
-        super(pkgItem, titleSectionName);
+            List<WidgetItem> items) {
+        super(pkgItem, titleSectionName, items);
         widgetsCount = (int) items.stream().filter(item -> item.widgetInfo != null).count();
         shortcutsCount = Math.max(0, items.size() - widgetsCount);
     }
@@ -57,8 +57,21 @@ public final class WidgetsListHeaderEntry extends WidgetsListBaseEntry {
     }
 
     @Override
+    public String toString() {
+        return "Header:" + mPkgItem.packageName + ":" + mWidgets.size();
+    }
+
+    @Override
     @Rank
     public int getRank() {
         return RANK_WIDGETS_LIST_HEADER;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof WidgetsListHeaderEntry)) return false;
+        WidgetsListHeaderEntry otherEntry = (WidgetsListHeaderEntry) obj;
+        return mWidgets.equals(otherEntry.mWidgets) && mPkgItem.equals(otherEntry.mPkgItem)
+                && mTitleSectionName.equals(otherEntry.mTitleSectionName);
     }
 }

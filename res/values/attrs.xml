@@ -33,7 +33,6 @@
     <attr name="workspaceKeyShadowColor" format="color" />
     <attr name="workspaceStatusBarScrim" format="reference" />
     <attr name="widgetsTheme" format="reference" />
-    <attr name="loadingIconColor" format="color" />
     <attr name="iconOnlyShortcutColor" format="color" />
     <attr name="eduHalfSheetBGColor" format="color" />
 
@@ -44,7 +43,6 @@
     <attr name="folderTextColor" format="color" />
     <attr name="folderHintColor" format="color" />
     <attr name="workProfileOverlayTextColor" format="color" />
-    <attr name="disabledIconAlpha" format="float" />
 
     <!-- BubbleTextView specific attributes. -->
     <declare-styleable name="BubbleTextView">
@@ -129,10 +127,14 @@
         <!-- numHotseatIcons defaults to numColumns, if not specified -->
         <attr name="numHotseatIcons" format="integer" />
         <attr name="dbFile" format="string" />
-        <!-- numAllAppsColumns defaults to numColumns, if not specified -->
-        <attr name="numAllAppsColumns" format="integer" />
         <attr name="defaultLayoutId" format="reference" />
         <attr name="demoModeLayoutId" format="reference" />
+        <attr name="isScalable" format="boolean" />
+        <attr name="devicePaddingId" format="reference" />
+
+        <!-- whether the grid option is shown to the user -->
+        <attr name="visible" format="boolean" />
+
     </declare-styleable>
 
     <declare-styleable name="DevicePadding">
@@ -150,6 +152,12 @@
         <attr name="minWidthDps" format="float" />
         <attr name="minHeightDps" format="float" />
 
+        <!-- These min cell values are only used if GridDisplayOption#isScalable is true-->
+        <attr name="minCellHeightDps" format="float" />
+        <attr name="minCellWidthDps" format="float" />
+
+        <attr name="borderSpacingDps" format="float" />
+
         <attr name="iconImageSize" format="float" />
         <!-- landscapeIconSize defaults to iconSize, if not specified -->
         <attr name="landscapeIconSize" format="float" />
@@ -162,6 +170,9 @@
         <attr name="allAppsIconSize" format="float" />
         <!-- allAppsIconTextSize defaults to iconTextSize, if not specified -->
         <attr name="allAppsIconTextSize" format="float" />
+
+        <!-- numAllAppsColumns defaults to GridDisplayOption.numColumns, if not specified -->
+        <attr name="numAllAppsColumns" format="integer" />
     </declare-styleable>
 
     <declare-styleable name="CellLayout">

@@ -21,6 +21,7 @@ import static android.text.format.DateUtils.formatElapsedTime;
 import static com.android.launcher3.InvariantDeviceProfile.CHANGE_FLAG_GRID;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_PREDICTION;
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_WIDGETS_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.Utilities.getDevicePrefs;
@@ -72,6 +73,7 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
 
     public static final String LAST_PREDICTION_ENABLED_STATE = "last_prediction_enabled_state";
     private static final String LAST_SNAPSHOT_TIME_MILLIS = "LAST_SNAPSHOT_TIME_MILLIS";
+    private static final int NUM_OF_RECOMMENDED_WIDGETS_PREDICATION = 20;
 
     private static final boolean IS_DEBUG = false;
     private static final String TAG = "QuickstepModelDelegate";
@@ -80,6 +82,8 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
             new PredictorState(CONTAINER_PREDICTION, "all_apps_predictions");
     private final PredictorState mHotseatState =
             new PredictorState(CONTAINER_HOTSEAT_PREDICTION, "hotseat_predictions");
+    private final PredictorState mWidgetsRecommendationState =
+            new PredictorState(CONTAINER_WIDGETS_PREDICTION, "widgets_prediction");
 
     private final InvariantDeviceProfile mIDP;
     private final AppEventProducer mAppEventProducer;
@@ -111,6 +115,9 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
         mHotseatState.items.setItems(
                 mHotseatState.storage.read(mApp.getContext(), hotseatFactory, ums.allUsers::get));
         mDataModel.extraItems.put(CONTAINER_HOTSEAT_PREDICTION, mHotseatState.items);
+
+        // Widgets prediction isn't used frequently. And thus, it is not persisted on disk.
+        mDataModel.extraItems.put(CONTAINER_WIDGETS_PREDICTION, mWidgetsRecommendationState.items);
         mActive = true;
     }
 
@@ -148,15 +155,21 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
                         ? (FolderInfo) itemsIdMap.get(info.container) : null;
                 StatsLogCompatManager.writeSnapshot(info.buildProto(parent), instanceId);
             }
+            additionalSnapshotEvents(instanceId);
             prefs.edit().putLong(LAST_SNAPSHOT_TIME_MILLIS, now).apply();
         }
     }
+
+    protected void additionalSnapshotEvents(InstanceId snapshotInstanceId){}
 
     @Override
     public void validateData() {
         super.validateData();
         if (mAllAppsState.predictor != null) {
             mAllAppsState.predictor.requestPredictionUpdate();
+        }
+        if (mWidgetsRecommendationState.predictor != null) {
+            mWidgetsRecommendationState.predictor.requestPredictionUpdate();
         }
     }
 
@@ -173,6 +186,7 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
     private void destroyPredictors() {
         mAllAppsState.destroyPredictor();
         mHotseatState.destroyPredictor();
+        mWidgetsRecommendationState.destroyPredictor();
     }
 
     @WorkerThread
@@ -200,6 +214,12 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
                         .setPredictedTargetCount(mIDP.numHotseatIcons)
                         .setExtras(convertDataModelToAppTargetBundle(context, mDataModel))
                         .build()));
+
+        registerWidgetsPredictor(apm.createAppPredictionSession(
+                new AppPredictionContext.Builder(context)
+                        .setUiSurface("widgets")
+                        .setPredictedTargetCount(NUM_OF_RECOMMENDED_WIDGETS_PREDICATION)
+                        .build()));
     }
 
     private void registerPredictor(PredictorState state, AppPredictor predictor) {
@@ -215,6 +235,20 @@ public class QuickstepModelDelegate extends ModelDelegate implements OnIDPChange
             return;
         }
         mApp.getModel().enqueueModelUpdateTask(new PredictionUpdateTask(state, targets));
+    }
+
+    private void registerWidgetsPredictor(AppPredictor predictor) {
+        mWidgetsRecommendationState.predictor = predictor;
+        mWidgetsRecommendationState.predictor.registerPredictionUpdates(
+                Executors.MODEL_EXECUTOR, targets -> {
+                    if (mWidgetsRecommendationState.setTargets(targets)) {
+                        // No diff, skip
+                        return;
+                    }
+                    mApp.getModel().enqueueModelUpdateTask(
+                            new WidgetsPredictionUpdateTask(mWidgetsRecommendationState, targets));
+                });
+        mWidgetsRecommendationState.predictor.requestPredictionUpdate();
     }
 
     @Override

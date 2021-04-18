@@ -20,7 +20,6 @@ import android.content.Context;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
-import com.android.launcher3.allapps.search.SectionDecorationInfo;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.util.ItemInfoMatcher;
@@ -185,7 +184,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
         if (results == null || mSearchResults != results) {
             boolean same = mSearchResults != null && mSearchResults.equals(results);
             mSearchResults = results;
-            onAppsUpdated();
+            updateAdapterItems();
             return !same;
         }
         return false;
@@ -257,11 +256,13 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
         }
 
         // Recompose the set of adapter items from the current set of apps
-        updateAdapterItems();
+        if (mSearchResults == null) {
+            updateAdapterItems();
+        }
     }
 
     /**
-     * Updates the set of filtered apps with the current filter.  At this point, we expect
+     * Updates the set of filtered apps with the current filter. At this point, we expect
      * mCachedSectionNames to have been calculated for the set of all apps in mApps.
      */
     private void updateAdapterItems() {
@@ -286,11 +287,6 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
         mFastScrollerSections.clear();
         mAdapterItems.clear();
 
-        SectionDecorationInfo appSection = new SectionDecorationInfo();
-        appSection.setDecorationHandler(
-                new AllAppsSectionDecorator.SectionDecorationHandler(mLauncher, true,
-                        0, false, false));
-
         // Recreate the filtered and sectioned apps (for convenience for the grid layout) from the
         // ordered set of sections
 
@@ -311,9 +307,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
                 if (lastFastScrollerSectionInfo.fastScrollToItem == null) {
                     lastFastScrollerSectionInfo.fastScrollToItem = appItem;
                 }
-                if (FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
-                    appItem.sectionDecorationInfo = appSection;
-                }
+
                 mAdapterItems.add(appItem);
             }
         } else {

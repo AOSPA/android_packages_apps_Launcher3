@@ -24,14 +24,17 @@ import android.app.ActivityManager.RunningTaskInfo;
 import android.content.Context;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.util.Log;
 
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statemanager.StateManager.StateListener;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.quickstep.FallbackActivityInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.SplitPlaceholderView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.Task.TaskKey;
@@ -54,8 +57,8 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity>
     }
 
     @Override
-    public void init(OverviewActionsView actionsView) {
-        super.init(actionsView);
+    public void init(OverviewActionsView actionsView, SplitPlaceholderView splitPlaceholderView) {
+        super.init(actionsView, splitPlaceholderView);
         setOverviewStateEnabled(true);
         setOverlayEnabled(true);
     }
@@ -63,6 +66,7 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity>
     @Override
     public void startHome() {
         mActivity.startHome();
+        mActivity.getStateManager().goToState(RecentsState.HOME);
     }
 
     /**
@@ -120,6 +124,10 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity>
         // as well. This tile is never shown as we have setCurrentTaskHidden, but allows use to
         // track the index of the next task appropriately, as if we are switching on any other app.
         if (mHomeTaskInfo != null && mHomeTaskInfo.taskId == mRunningTaskId && !tasks.isEmpty()) {
+            if (TestProtocol.sDebugTracing) {
+                Log.d(TestProtocol.GET_RECENTS_FAILED,
+                        "FallbackRecentsView.applyLoadPlan: running task is home");
+            }
             // Check if the task list has running task
             boolean found = false;
             for (Task t : tasks) {
@@ -148,6 +156,11 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity>
     }
 
     @Override
+    protected boolean isHomeTask(TaskView taskView) {
+        return mHomeTaskInfo != null && taskView.hasTaskId(mHomeTaskInfo.taskId);
+    }
+
+    @Override
     public void setModalStateEnabled(boolean isModalState) {
         super.setModalStateEnabled(isModalState);
         if (isModalState) {
@@ -162,6 +175,8 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity>
     @Override
     public void onStateTransitionStart(RecentsState toState) {
         setOverviewStateEnabled(true);
+        setOverviewGridEnabled(toState.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()));
+        setOverviewFullscreenEnabled(toState.isFullScreen());
         setFreezeViewVisibility(true);
     }
 
@@ -176,7 +191,7 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity>
         super.setOverviewStateEnabled(enabled);
         if (enabled) {
             RecentsState state = mActivity.getStateManager().getState();
-            setDisallowScrollToClearAll(!state.hasButtons());
+            setDisallowScrollToClearAll(!state.hasClearAllButton());
         }
     }
 }

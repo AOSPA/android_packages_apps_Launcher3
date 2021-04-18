@@ -5,11 +5,12 @@ import static android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_P
 
 import static com.android.launcher3.pm.ShortcutConfigActivityInfo.queryList;
 
+import static java.util.stream.Collectors.toList;
+
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.os.Process;
 import android.os.UserHandle;
 import android.util.Log;
 
@@ -18,7 +19,6 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.AppFilter;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.compat.AlphabeticIndexCompat;
 import com.android.launcher3.config.FeatureFlags;
@@ -28,6 +28,7 @@ import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.pm.ShortcutConfigActivityInfo;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.Preconditions;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
@@ -68,7 +69,7 @@ public class WidgetsModel {
      *
      * @see com.android.launcher3.widget.picker.WidgetsListAdapter#setWidgets(List)
      */
-    public synchronized ArrayList<WidgetsListBaseEntry> getWidgetsList(Context context) {
+    public synchronized ArrayList<WidgetsListBaseEntry> getWidgetsListForPicker(Context context) {
         ArrayList<WidgetsListBaseEntry> result = new ArrayList<>();
         AlphabeticIndexCompat indexer = new AlphabeticIndexCompat(context);
 
@@ -81,6 +82,22 @@ public class WidgetsModel {
             result.add(new WidgetsListContentEntry(pkgItem, sectionName, widgetItems));
         }
         return result;
+    }
+
+    /** Returns a mapping of packages to their widgets without static shortcuts. */
+    public synchronized Map<PackageUserKey, List<WidgetItem>> getAllWidgetsWithoutShortcuts() {
+        Map<PackageUserKey, List<WidgetItem>> packagesToWidgets = new HashMap<>();
+        mWidgetsList.forEach((packageItemInfo, widgetsAndShortcuts) -> {
+            List<WidgetItem> widgets = widgetsAndShortcuts.stream()
+                        .filter(item -> item.widgetInfo != null)
+                        .collect(toList());
+            if (widgets.size() > 0) {
+                packagesToWidgets.put(
+                        new PackageUserKey(packageItemInfo.packageName, packageItemInfo.user),
+                        widgets);
+            }
+        });
+        return packagesToWidgets;
     }
 
     /**
@@ -139,45 +156,25 @@ public class WidgetsModel {
 
         // Temporary list for {@link PackageItemInfos} to avoid having to go through
         // {@link mPackageItemInfos} to locate the key to be used for {@link #mWidgetsList}
-        HashMap<String, PackageItemInfo> tmpPackageItemInfos = new HashMap<>();
+        HashMap<PackageUserKey, PackageItemInfo> tmpPackageItemInfos = new HashMap<>();
 
-        // clear the lists.
+        // Clear the lists only if this is an update on all widgets and shortcuts. If packageUser
+        // isn't null, only updates the shortcuts and widgets for the app represented in
+        // packageUser.
         if (packageUser == null) {
             mWidgetsList.clear();
-        } else {
-            PackageItemInfo packageItem = mWidgetsList.keySet()
-                    .stream()
-                    .filter(item -> item.packageName.equals(packageUser.mPackageName))
-                    .findFirst()
-                    .orElse(null);
-            if (packageItem != null) {
-                // We want to preserve the user that was on the packageItem previously,
-                // so add it to tmpPackageItemInfos here to avoid creating a new entry.
-                tmpPackageItemInfos.put(packageItem.packageName, packageItem);
-
-                // Add the widgets for other users in the rawList as it only contains widgets for
-                // packageUser
-                List<WidgetItem> otherUserItems = mWidgetsList.remove(packageItem);
-                otherUserItems.removeIf(w -> w.user.equals(packageUser.mUser));
-                rawWidgetsShortcuts.addAll(otherUserItems);
-            }
         }
-
-        UserHandle myUser = Process.myUserHandle();
-
         // add and update.
         mWidgetsList.putAll(rawWidgetsShortcuts.stream()
                 .filter(new WidgetValidityCheck(app))
                 .collect(Collectors.groupingBy(item -> {
-                    String packageName = item.componentName.getPackageName();
-                    PackageItemInfo pInfo = tmpPackageItemInfos.get(packageName);
+                    PackageUserKey packageUserKey = new PackageUserKey(
+                            item.componentName.getPackageName(), item.user);
+                    PackageItemInfo pInfo = tmpPackageItemInfos.get(packageUserKey);
                     if (pInfo == null) {
-                        pInfo = new PackageItemInfo(packageName);
+                        pInfo = new PackageItemInfo(packageUserKey.mPackageName);
                         pInfo.user = item.user;
-                        tmpPackageItemInfos.put(packageName,  pInfo);
-                    } else if (!myUser.equals(pInfo.user)) {
-                        // Keep updating the user, until we get the primary user.
-                        pInfo.user = item.user;
+                        tmpPackageItemInfos.put(packageUserKey,  pInfo);
                     }
                     return pInfo;
                 })));

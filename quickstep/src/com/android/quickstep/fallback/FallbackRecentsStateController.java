@@ -25,9 +25,11 @@ import static com.android.launcher3.states.StateAnimationConfig.PLAY_ATOMIC_OVER
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_OVERVIEW;
 import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_OFFSET;
 import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
+import static com.android.quickstep.views.RecentsView.RECENTS_GRID_PROGRESS;
 import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
 import static com.android.quickstep.views.RecentsView.TASK_MODALNESS;
 import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
+import static com.android.quickstep.views.TaskView.FLAG_UPDATE_ALL;
 
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.PropertySetter;
@@ -69,7 +71,7 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
             return;
         }
         // While animating into recents, update the visible task data as needed
-        setter.addOnFrameCallback(mRecentsView::loadVisibleTaskData);
+        setter.addOnFrameCallback(() -> mRecentsView.loadVisibleTaskData(FLAG_UPDATE_ALL));
         mRecentsView.updateEmptyMessage();
 
         setProperties(toState, config, setter);
@@ -77,11 +79,12 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
 
     private void setProperties(RecentsState state, StateAnimationConfig config,
             PropertySetter setter) {
-        float buttonAlpha = state.hasButtons() ? 1 : 0;
+        float clearAllButtonAlpha = state.hasClearAllButton() ? 1 : 0;
         setter.setFloat(mRecentsView.getClearAllButton(), ClearAllButton.VISIBILITY_ALPHA,
-                buttonAlpha, LINEAR);
+                clearAllButtonAlpha, LINEAR);
+        float overviewButtonAlpha =  state.hasOverviewActions(mActivity) ? 1 : 0;
         setter.setFloat(mActivity.getActionsView().getVisibilityAlpha(),
-                MultiValueAlpha.VALUE, buttonAlpha, LINEAR);
+                MultiValueAlpha.VALUE, overviewButtonAlpha, LINEAR);
 
         float[] scaleAndOffset = state.getOverviewScaleAndOffset(mActivity);
         setter.setFloat(mRecentsView, RECENTS_SCALE_PROPERTY, scaleAndOffset[0],
@@ -94,5 +97,7 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
         setter.setFloat(mRecentsView, TASK_MODALNESS, state.getOverviewModalness(),
                 config.getInterpolator(ANIM_OVERVIEW_MODAL, LINEAR));
         setter.setFloat(mRecentsView, FULLSCREEN_PROGRESS, state.isFullScreen() ? 1 : 0, LINEAR);
+        setter.setFloat(mRecentsView, RECENTS_GRID_PROGRESS,
+                state.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()) ? 1f : 0f, LINEAR);
     }
 }

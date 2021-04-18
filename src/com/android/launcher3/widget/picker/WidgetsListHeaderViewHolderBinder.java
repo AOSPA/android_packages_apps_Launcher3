@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 
 import com.android.launcher3.R;
 import com.android.launcher3.recyclerview.ViewHolderBinder;
+import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
 
 /**
@@ -29,11 +30,14 @@ public final class WidgetsListHeaderViewHolderBinder implements
         ViewHolderBinder<WidgetsListHeaderEntry, WidgetsListHeaderHolder> {
     private final LayoutInflater mLayoutInflater;
     private final OnHeaderClickListener mOnHeaderClickListener;
+    private final WidgetsListAdapter mWidgetsListAdapter;
 
     public WidgetsListHeaderViewHolderBinder(LayoutInflater layoutInflater,
-            OnHeaderClickListener onHeaderClickListener) {
+            OnHeaderClickListener onHeaderClickListener,
+            WidgetsListAdapter listAdapter) {
         mLayoutInflater = layoutInflater;
         mOnHeaderClickListener = onHeaderClickListener;
+        mWidgetsListAdapter = listAdapter;
     }
 
     @Override
@@ -45,17 +49,24 @@ public final class WidgetsListHeaderViewHolderBinder implements
     }
 
     @Override
-    public void bindViewHolder(WidgetsListHeaderHolder viewHolder, WidgetsListHeaderEntry data) {
+    public void bindViewHolder(WidgetsListHeaderHolder viewHolder, WidgetsListHeaderEntry data,
+            int position) {
         WidgetsListHeader widgetsListHeader = viewHolder.mWidgetsListHeader;
+        if (mWidgetsListAdapter.getItemCount() == 1) {
+            widgetsListHeader.setBackgroundResource(R.drawable.widgets_list_single_item_ripple);
+        } else if (position == 0) {
+            widgetsListHeader.setBackgroundResource(R.drawable.widgets_list_top_ripple);
+        } else if (position == mWidgetsListAdapter.getItemCount() - 1) {
+            widgetsListHeader.setBackgroundResource(R.drawable.widgets_list_bottom_ripple);
+        } else {
+            widgetsListHeader.setBackgroundResource(R.drawable.widgets_list_middle_ripple);
+        }
         widgetsListHeader.applyFromItemInfoWithIcon(data);
         widgetsListHeader.setExpanded(data.isWidgetListShown());
         widgetsListHeader.setOnExpandChangeListener(isExpanded ->
-                mOnHeaderClickListener.onHeaderClicked(isExpanded, data.mPkgItem.packageName));
-    }
-
-    /** A listener to be invoked when {@link WidgetsListHeader} is clicked. */
-    public interface OnHeaderClickListener {
-        /** Calls when {@link WidgetsListHeader} is clicked to show / hide widgets for a package. */
-        void onHeaderClicked(boolean showWidgets, String packageName);
+                mOnHeaderClickListener.onHeaderClicked(
+                        isExpanded,
+                        new PackageUserKey(data.mPkgItem.packageName, data.mPkgItem.user)
+                ));
     }
 }

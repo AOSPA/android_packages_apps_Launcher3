@@ -32,6 +32,7 @@ public final class TestProtocol {
     public static final int ALL_APPS_STATE_ORDINAL = 5;
     public static final int BACKGROUND_APP_STATE_ORDINAL = 6;
     public static final int HINT_STATE_ORDINAL = 7;
+    public static final int OVERVIEW_SPLIT_SELECT_ORDINAL = 8;
     public static final String TAPL_EVENTS_TAG = "TaplEvents";
     public static final String SEQUENCE_MAIN = "Main";
     public static final String SEQUENCE_TIS = "TIS";
@@ -55,6 +56,8 @@ public final class TestProtocol {
                 return "Background";
             case HINT_STATE_ORDINAL:
                 return "Hint";
+            case OVERVIEW_SPLIT_SELECT_ORDINAL:
+                return "OverviewSplitSelect";
             default:
                 return "Unknown";
         }
@@ -103,7 +106,8 @@ public final class TestProtocol {
     public static final String REQUEST_MOCK_SENSOR_ROTATION = "mock-sensor-rotation";
 
     public static final String PERMANENT_DIAG_TAG = "TaplTarget";
-    public static final String OVERIEW_NOT_ALLAPPS = "b/156095088";
     public static final String NO_SWIPE_TO_HOME = "b/158017601";
     public static final String WORK_PROFILE_REMOVED = "b/159671700";
+    public static final String TIS_NO_EVENTS = "b/180915942";
+    public static final String GET_RECENTS_FAILED = "b/177472267";
 }

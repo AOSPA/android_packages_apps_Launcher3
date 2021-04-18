@@ -16,19 +16,21 @@
 
 package com.android.quickstep.views;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
+import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
 import static com.android.quickstep.views.TaskThumbnailView.DIM_ALPHA;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
+import android.graphics.Outline;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -38,12 +40,13 @@ import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.touch.PagedOrientationHandler;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskUtils;
+import com.android.quickstep.util.TaskCornerRadius;
 
 /**
  * Contains options for a recent task when long-pressing its icon.
@@ -55,7 +58,6 @@ public class TaskMenuView extends AbstractFloatingView {
     private static final int REVEAL_OPEN_DURATION = 150;
     private static final int REVEAL_CLOSE_DURATION = 100;
 
-    private final float mThumbnailTopMargin;
     private BaseDraggingActivity mActivity;
     private TextView mTaskName;
     private AnimatorSet mOpenCloseAnimator;
@@ -70,7 +72,7 @@ public class TaskMenuView extends AbstractFloatingView {
         super(context, attrs, defStyleAttr);
 
         mActivity = BaseDraggingActivity.fromContext(context);
-        mThumbnailTopMargin = getResources().getDimension(R.dimen.task_thumbnail_top_margin);
+        setClipToOutline(true);
     }
 
     @Override
@@ -107,13 +109,30 @@ public class TaskMenuView extends AbstractFloatingView {
         return (type & TYPE_TASK_MENU) != 0;
     }
 
+    @Override
+    public ViewOutlineProvider getOutlineProvider() {
+        return new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(),
+                        TaskCornerRadius.get(view.getContext()));
+            }
+        };
+    }
+
     public void setPosition(float x, float y, PagedOrientationHandler pagedOrientationHandler) {
-        float adjustedY = y + mThumbnailTopMargin;
+        int taskTopMargin = mActivity.getDeviceProfile().overviewTaskThumbnailTopMarginPx;
+        float adjustedY = y + taskTopMargin;
         // Changing pivot to make computations easier
         // NOTE: Changing the pivots means the rotated view gets rotated about the new pivots set,
         // which would render the X and Y position set here incorrect
         setPivotX(0);
-        setPivotY(0);
+        if (mActivity.getDeviceProfile().isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get()) {
+            // In tablet, set pivotY to original position without mThumbnailTopMargin adjustment.
+            setPivotY(-taskTopMargin);
+        } else {
+            setPivotY(0);
+        }
         setRotation(pagedOrientationHandler.getDegreesRotated());
         setX(pagedOrientationHandler.getTaskMenuX(x, mTaskView.getThumbnail()));
         setY(pagedOrientationHandler.getTaskMenuY(adjustedY, mTaskView.getThumbnail()));
@@ -166,7 +185,8 @@ public class TaskMenuView extends AbstractFloatingView {
         mTaskName.setText(TaskUtils.getTitle(getContext(), taskView.getTask()));
         mTaskName.setOnClickListener(v -> close(true));
 
-        TaskOverlayFactory.getEnabledShortcuts(taskView).forEach(this::addMenuOption);
+        TaskOverlayFactory.getEnabledShortcuts(taskView, mActivity.getDeviceProfile())
+                .forEach(this::addMenuOption);
     }
 
     private void addMenuOption(SystemShortcut menuOption) {
@@ -176,8 +196,10 @@ public class TaskMenuView extends AbstractFloatingView {
                 menuOptionView.findViewById(R.id.icon), menuOptionView.findViewById(R.id.text));
         LayoutParams lp = (LayoutParams) menuOptionView.getLayoutParams();
         mTaskView.getPagedOrientationHandler().setLayoutParamsForTaskMenuOptionItem(lp);
+        menuOptionView.setEnabled(menuOption.isEnabled());
+        menuOptionView.setAlpha(menuOption.isEnabled() ? 1 : 0.5f);
         menuOptionView.setOnClickListener(view -> {
-            if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+            if (LIVE_TILE.get()) {
                 RecentsView recentsView = mTaskView.getRecentsView();
                 recentsView.switchToScreenshot(null,
                         () -> recentsView.finishRecentsAnimation(true /* toRecents */,
@@ -254,7 +276,7 @@ public class TaskMenuView extends AbstractFloatingView {
     }
 
     private RoundedRectRevealOutlineProvider createOpenCloseOutlineProvider() {
-        float radius = Themes.getDialogCornerRadius(getContext());
+        float radius = TaskCornerRadius.get(mContext);
         Rect fromRect = new Rect(0, 0, getWidth(), 0);
         Rect toRect = new Rect(0, 0, getWidth(), getHeight());
         return new RoundedRectRevealOutlineProvider(radius, radius, fromRect, toRect);

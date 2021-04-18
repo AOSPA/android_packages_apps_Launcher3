@@ -45,12 +45,12 @@ import android.os.Bundle;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.text.TextUtils;
+import android.util.ArrayMap;
 import android.util.Log;
 import android.util.LongSparseArray;
 import android.util.TimingLogger;
 
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.Utilities;
@@ -87,6 +87,7 @@ import com.android.launcher3.util.LooperIdleLock;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.TraceHelper;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.WidgetManagerHelper;
 
 import java.util.ArrayList;
@@ -126,7 +127,7 @@ public class LoaderTask implements Runnable {
 
     private final UserManagerState mUserManagerState = new UserManagerState();
 
-    protected Map<ComponentKey, AppWidgetProviderInfo> mWidgetProvidersMap;
+    protected final Map<ComponentKey, AppWidgetProviderInfo> mWidgetProvidersMap = new ArrayMap<>();
 
     private boolean mStopped;
 
@@ -190,6 +191,16 @@ public class LoaderTask implements Runnable {
             List<ShortcutInfo> allShortcuts = new ArrayList<>();
             loadWorkspace(allShortcuts);
             logger.addSplit("loadWorkspace");
+
+            // Sanitize data re-syncs widgets/shortcuts based on the workspace loaded from db.
+            // sanitizeData should not be invoked if the workspace is loaded from a db different
+            // from the main db as defined in the invariant device profile.
+            // (e.g. both grid preview and minimal device mode uses a different db)
+            if (mApp.getInvariantDeviceProfile().dbFile.equals(mDbName)) {
+                verifyNotStopped();
+                sanitizeData();
+                logger.addSplit("sanitizeData");
+            }
 
             verifyNotStopped();
             mResults.bindWorkspace();
@@ -271,14 +282,6 @@ public class LoaderTask implements Runnable {
             // fifth step
             if (FeatureFlags.FOLDER_NAME_SUGGEST.get()) {
                 loadFolderNames();
-            }
-
-            // Sanitize data re-syncs widgets/shortcuts based on the workspace loaded from db.
-            // sanitizeData should not be invoked if the workspace is loaded from a db different
-            // from the main db as defined in the invariant device profile.
-            // (e.g. both grid preview and minimal device mode uses a different db)
-            if (mApp.getInvariantDeviceProfile().dbFile.equals(mDbName)) {
-                sanitizeData();
             }
 
             verifyNotStopped();
@@ -664,12 +667,13 @@ public class LoaderTask implements Runnable {
                             final boolean wasProviderReady = !c.hasRestoreFlag(
                                     LauncherAppWidgetInfo.FLAG_PROVIDER_NOT_READY);
 
-                            if (mWidgetProvidersMap == null) {
-                                mWidgetProvidersMap = WidgetManagerHelper.getAllProvidersMap(
-                                        context);
+                            ComponentKey providerKey = new ComponentKey(component, c.user);
+                            if (!mWidgetProvidersMap.containsKey(providerKey)) {
+                                mWidgetProvidersMap.put(providerKey,
+                                        widgetHelper.findProvider(component, c.user));
                             }
-                            final AppWidgetProviderInfo provider = mWidgetProvidersMap.get(
-                                    new ComponentKey(component, c.user));
+                            final AppWidgetProviderInfo provider =
+                                    mWidgetProvidersMap.get(providerKey);
 
                             final boolean isProviderReady = isValidProvider(provider);
                             if (!isSafeMode && !customWidget &&
@@ -874,10 +878,10 @@ public class LoaderTask implements Runnable {
                 }
             }
 
-            // Remove any ghost widgets
-            LauncherSettings.Settings.call(contentResolver,
-                    LauncherSettings.Settings.METHOD_REMOVE_GHOST_WIDGETS);
         }
+        // Remove any ghost widgets
+        LauncherSettings.Settings.call(contentResolver,
+                LauncherSettings.Settings.METHOD_REMOVE_GHOST_WIDGETS);
 
         // Update pinned state of model shortcuts
         mBgDataModel.updateShortcutPinnedState(context);

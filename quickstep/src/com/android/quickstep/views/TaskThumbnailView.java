@@ -19,7 +19,7 @@ package com.android.quickstep.views;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
+import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
 import static com.android.systemui.shared.system.WindowManagerWrapper.WINDOWING_MODE_FULLSCREEN;
 
 import android.content.Context;
@@ -212,13 +212,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         return mDimAlpha;
     }
 
-    public Rect getInsets(Rect fallback) {
-        if (mThumbnailData != null) {
-            return mThumbnailData.insets;
-        }
-        return fallback;
-    }
-
     /**
      * Get the scaled insets that are being used to draw the task view. This is a subsection of
      * the full snapshot.
@@ -227,6 +220,10 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
     @RequiresApi(api = Build.VERSION_CODES.Q)
     public Insets getScaledInsets() {
         if (mThumbnailData == null) {
+            return Insets.NONE;
+        }
+
+        if (!TaskView.CLIP_STATUS_AND_NAV_BARS) {
             return Insets.NONE;
         }
 
@@ -319,7 +316,7 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
 
     public void drawOnCanvas(Canvas canvas, float x, float y, float width, float height,
             float cornerRadius) {
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+        if (LIVE_TILE.get()) {
             if (mTask != null && getTaskView().isRunningTask() && !getTaskView().showScreenshot()) {
                 canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius, mClearPaint);
                 canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius,
@@ -382,9 +379,10 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
                     mThumbnailData.thumbnail.getHeight());
             int currentRotation = getTaskView().getRecentsView().getPagedViewOrientedState()
                     .getRecentsActivityRotation();
+            boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
             mPreviewPositionHelper.updateThumbnailMatrix(mPreviewRect, mThumbnailData,
                     getMeasuredWidth(), getMeasuredHeight(), mActivity.getDeviceProfile(),
-                    currentRotation);
+                    currentRotation, isRtl);
 
             mBitmapShader.setLocalMatrix(mPreviewPositionHelper.mMatrix);
             mPaint.setShader(mBitmapShader);
@@ -442,13 +440,14 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
     }
 
     /**
-     * Returns whether the snapshot is real.
+     * Returns whether the snapshot is real. If the device is locked for the user of the task,
+     * the snapshot used will be an app-theme generated snapshot instead of a real snapshot.
      */
     public boolean isRealSnapshot() {
         if (mThumbnailData == null) {
             return false;
         }
-        return mThumbnailData.isRealSnapshot;
+        return mThumbnailData.isRealSnapshot && !mTask.isLocked;
     }
 
     /**
@@ -459,7 +458,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         // Contains the portion of the thumbnail that is clipped when fullscreen progress = 0.
         private final RectF mClippedInsets = new RectF();
         private final Matrix mMatrix = new Matrix();
-        private float mClipBottom = -1;
         private boolean mIsOrientationChanged;
 
         public Matrix getMatrix() {
@@ -470,13 +468,15 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
          * Updates the matrix based on the provided parameters
          */
         public void updateThumbnailMatrix(Rect thumbnailBounds, ThumbnailData thumbnailData,
-                int canvasWidth, int canvasHeight, DeviceProfile dp, int currentRotation) {
+                int canvasWidth, int canvasHeight, DeviceProfile dp, int currentRotation,
+                boolean isRtl) {
             boolean isRotated = false;
             boolean isOrientationDifferent;
 
             int thumbnailRotation = thumbnailData.rotation;
             int deltaRotate = getRotationDelta(currentRotation, thumbnailRotation);
-            RectF thumbnailClipHint = new RectF(thumbnailData.insets);
+            RectF thumbnailClipHint = TaskView.CLIP_STATUS_AND_NAV_BARS
+                    ? new RectF(thumbnailData.insets) : new RectF();
 
             float scale = thumbnailData.scale;
             final float thumbnailScale;
@@ -502,6 +502,17 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
                         - (thumbnailClipHint.left + thumbnailClipHint.right);
                 float availableHeight = surfaceHeight
                         - (thumbnailClipHint.top + thumbnailClipHint.bottom);
+
+                if (isRotated) {
+                    float canvasAspect = canvasWidth / (float) canvasHeight;
+                    float availableAspect = availableHeight / availableWidth;
+                    // Do not rotate thumbnail if it would not improve fit
+                    if (Utilities.isRelativePercentDifferenceGreaterThan(canvasAspect,
+                            availableAspect, 0.1f)) {
+                        isRotated = false;
+                        isOrientationDifferent = false;
+                    }
+                }
 
                 final float targetW, targetH;
                 if (isOrientationDifferent) {
@@ -538,21 +549,21 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
                     }
                 }
 
-                // Update the clip hints
-                float halfExtraW = (availableWidth - croppedWidth) / 2;
-                thumbnailClipHint.left += halfExtraW;
-                thumbnailClipHint.right += halfExtraW;
-                if (thumbnailClipHint.left < 0) {
-                    thumbnailClipHint.right += thumbnailClipHint.left;
-                    thumbnailClipHint.left = 0;
-                } else if (thumbnailClipHint.right < 0) {
-                    thumbnailClipHint.left += thumbnailClipHint.right;
-                    thumbnailClipHint.right = 0;
+                // Update the clip hints. Align to 0,0, crop the remaining.
+                if (isRtl) {
+                    thumbnailClipHint.left += availableWidth - croppedWidth;
+                    if (thumbnailClipHint.right < 0) {
+                        thumbnailClipHint.left += thumbnailClipHint.right;
+                        thumbnailClipHint.right = 0;
+                    }
+                } else {
+                    thumbnailClipHint.right += availableWidth - croppedWidth;
+                    if (thumbnailClipHint.left < 0) {
+                        thumbnailClipHint.right += thumbnailClipHint.left;
+                        thumbnailClipHint.left = 0;
+                    }
                 }
-
-                float halfExtraH = (availableHeight - croppedHeight) / 2;
-                thumbnailClipHint.top += halfExtraH;
-                thumbnailClipHint.bottom += halfExtraH;
+                thumbnailClipHint.bottom += availableHeight - croppedHeight;
                 if (thumbnailClipHint.top < 0) {
                     thumbnailClipHint.bottom += thumbnailClipHint.top;
                     thumbnailClipHint.top = 0;

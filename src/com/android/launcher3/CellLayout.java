@@ -19,7 +19,6 @@ package com.android.launcher3;
 import static android.animation.ValueAnimator.areAnimatorsEnabled;
 
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_5;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_FOUR_COLUMNS;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -53,12 +52,14 @@ import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
 
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.accessibility.DragAndDropAccessibilityDelegate;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.dragndrop.AppWidgetHostViewDrawable;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.PreviewBackground;
 import com.android.launcher3.graphics.DragPreviewProvider;
@@ -179,6 +180,7 @@ public class CellLayout extends ViewGroup {
     private final ArrayList<View> mIntersectingViews = new ArrayList<>();
     private final Rect mOccupiedRect = new Rect();
     private final int[] mDirectionVector = new int[2];
+
     final int[] mPreviousReorderDirection = new int[2];
     private static final int INVALID_DIRECTION = -100;
 
@@ -208,15 +210,14 @@ public class CellLayout extends ViewGroup {
         setWillNotDraw(false);
         setClipToPadding(false);
         mActivity = ActivityContext.lookupContext(context);
+        DeviceProfile deviceProfile = mActivity.getDeviceProfile();
 
-        DeviceProfile grid = mActivity.getDeviceProfile();
-
-        mBorderSpacing = grid.cellLayoutBorderSpacingPx;
+        mBorderSpacing = deviceProfile.cellLayoutBorderSpacingPx;
         mCellWidth = mCellHeight = -1;
         mFixedCellWidth = mFixedCellHeight = -1;
 
-        mCountX = grid.inv.numColumns;
-        mCountY = grid.inv.numRows;
+        mCountX = deviceProfile.inv.numColumns;
+        mCountY = deviceProfile.inv.numRows;
         mOccupied =  new GridOccupancy(mCountX, mCountY);
         mTmpOccupied = new GridOccupancy(mCountX, mCountY);
 
@@ -233,7 +234,7 @@ public class CellLayout extends ViewGroup {
         mBackground.setCallback(this);
         mBackground.setAlpha(0);
 
-        mReorderPreviewAnimationMagnitude = (REORDER_PREVIEW_MAGNITUDE * grid.iconSizePx);
+        mReorderPreviewAnimationMagnitude = (REORDER_PREVIEW_MAGNITUDE * deviceProfile.iconSizePx);
 
         // Initialize the data structures used for the drag visualization.
         mEaseOutInterpolator = Interpolators.DEACCEL_2_5; // Quint ease out
@@ -600,7 +601,7 @@ public class CellLayout extends ViewGroup {
         if (child instanceof BubbleTextView) {
             BubbleTextView bubbleChild = (BubbleTextView) child;
             bubbleChild.setTextVisibility(mContainerType != HOTSEAT);
-            if (ENABLE_FOUR_COLUMNS.get()) {
+            if (mActivity.getDeviceProfile().isScalableGrid) {
                 bubbleChild.setCenterVertically(mContainerType != HOTSEAT);
             }
         }
@@ -960,14 +961,17 @@ public class CellLayout extends ViewGroup {
         final int oldDragCellX = mDragCell[0];
         final int oldDragCellY = mDragCell[1];
 
-        if (outlineProvider == null || outlineProvider.generatedDragOutline == null) {
-            return;
-        }
-
-        Bitmap dragOutline = outlineProvider.generatedDragOutline;
         if (cellX != oldDragCellX || cellY != oldDragCellY) {
             mDragCell[0] = cellX;
             mDragCell[1] = cellY;
+
+            applyColorExtraction(dragObject, mDragCell, spanX, spanY);
+
+            if (outlineProvider == null || outlineProvider.generatedDragOutline == null) {
+                return;
+            }
+
+            Bitmap dragOutline = outlineProvider.generatedDragOutline;
 
             final int oldIndex = mDragOutlineCurrent;
             mDragOutlineAnims[oldIndex].animateOut();
@@ -1007,6 +1011,22 @@ public class CellLayout extends ViewGroup {
             if (dragObject.stateAnnouncer != null) {
                 dragObject.stateAnnouncer.announce(getItemMoveDescription(cellX, cellY));
             }
+        }
+    }
+
+    /** Applies the local color extraction to a dragging widget object. */
+    private void applyColorExtraction(DropTarget.DragObject dragObject, int[] targetCell, int spanX,
+            int spanY) {
+        // Apply local extracted color if the DragView is an AppWidgetHostViewDrawable.
+        Drawable drawable = dragObject.dragView.getDrawable();
+        if (drawable instanceof AppWidgetHostViewDrawable) {
+            Workspace workspace =
+                    Launcher.getLauncher(dragObject.dragView.getContext()).getWorkspace();
+            int screenId = workspace.getIdForScreen(this);
+            int pageId = workspace.getPageIndexForScreenId(screenId);
+            AppWidgetHostViewDrawable hostViewDrawable = ((AppWidgetHostViewDrawable) drawable);
+            cellToRect(targetCell[0], targetCell[1], spanX, spanY, mTempRect);
+            hostViewDrawable.getAppWidgetHostView().handleDrag(mTempRect, pageId);
         }
     }
 
@@ -2663,20 +2683,21 @@ public class CellLayout extends ViewGroup {
         }
 
         public void setup(int cellWidth, int cellHeight, boolean invertHorizontally, int colCount,
-                int rowCount, int borderSpacing) {
+                int rowCount, int borderSpacing, @Nullable Rect inset) {
             setup(cellWidth, cellHeight, invertHorizontally, colCount, rowCount, 1.0f, 1.0f,
-                    borderSpacing);
+                    borderSpacing, inset);
         }
 
         /**
-         * Use this method, as opposed to {@link #setup(int, int, boolean, int, int, int)},
+         * Use this method, as opposed to {@link #setup(int, int, boolean, int, int, int, Rect)},
          * if the view needs to be scaled.
          *
          * ie. In multi-window mode, we setup widgets so that they are measured and laid out
          * using their full/invariant device profile sizes.
          */
         public void setup(int cellWidth, int cellHeight, boolean invertHorizontally, int colCount,
-                int rowCount, float cellScaleX, float cellScaleY, int borderSpacing) {
+                int rowCount, float cellScaleX, float cellScaleY, int borderSpacing,
+                @Nullable Rect inset) {
             if (isLockedToGrid) {
                 final int myCellHSpan = cellHSpan;
                 final int myCellVSpan = cellVSpan;
@@ -2697,6 +2718,13 @@ public class CellLayout extends ViewGroup {
                 height = Math.round(myCellHeight) - topMargin - bottomMargin;
                 x = leftMargin + (myCellX * cellWidth) + (myCellX * borderSpacing);
                 y = topMargin + (myCellY * cellHeight) + (myCellY * borderSpacing);
+
+                if (inset != null) {
+                    x -= inset.left;
+                    y -= inset.top;
+                    width += inset.left + inset.right;
+                    height += inset.top + inset.bottom;
+                }
             }
         }
 

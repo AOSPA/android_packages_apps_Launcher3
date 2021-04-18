@@ -57,7 +57,7 @@ public class TaskbarDragController {
      * generate the ClipDescription and Intent.
      * @return Whether {@link View#startDragAndDrop} started successfully.
      */
-    protected boolean startDragOnLongClick(View view) {
+    protected boolean startSystemDragOnLongClick(View view) {
         if (!(view instanceof BubbleTextView)) {
             return false;
         }

@@ -15,7 +15,7 @@
  */
 package com.android.quickstep.inputconsumers;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
+import static com.android.quickstep.util.NavigationModeFeatureFlag.LIVE_TILE;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 
 import android.view.KeyEvent;
@@ -24,6 +24,7 @@ import android.view.MotionEvent;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.Utilities;
+import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
@@ -38,7 +39,7 @@ import com.android.systemui.shared.system.InputMonitorCompat;
 /**
  * Input consumer for handling touch on the recents/Launcher activity.
  */
-public class OverviewInputConsumer<T extends StatefulActivity<?>>
+public class OverviewInputConsumer<S extends BaseState<S>, T extends StatefulActivity<S>>
         implements InputConsumer {
 
     private final T mActivity;
@@ -99,7 +100,7 @@ public class OverviewInputConsumer<T extends StatefulActivity<?>>
 
     @Override
     public void onKeyEvent(KeyEvent ev) {
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+        if (LIVE_TILE.get()) {
             mActivity.dispatchKeyEvent(ev);
         }
     }

@@ -33,7 +33,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
-import com.android.launcher3.Launcher.OnResumeCallback;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.logging.FileLog;
@@ -45,7 +44,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.util.PackageManagerHelper;
-import com.android.launcher3.util.Themes;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 
 import java.net.URISyntaxException;
 
@@ -109,15 +108,12 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
         mCurrentAccessibilityAction = action;
 
         if (action == UNINSTALL) {
-            mHoverColor = getResources().getColor(R.color.uninstall_target_hover_tint);
             setDrawable(R.drawable.ic_uninstall_shadow);
             updateText(R.string.uninstall_drop_target_label);
         } else if (action == DISMISS_PREDICTION) {
-            mHoverColor = Themes.getColorAccent(getContext());
             setDrawable(R.drawable.ic_block_shadow);
             updateText(R.string.dismiss_prediction_label);
         } else if (action == RECONFIGURE) {
-            mHoverColor = Themes.getColorAccent(getContext());
             setDrawable(R.drawable.ic_setup_shadow);
             updateText(R.string.gadget_setup_text);
         }
@@ -227,7 +223,7 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
             DeferredOnComplete deferred = (DeferredOnComplete) d.dragSource;
             if (target != null) {
                 deferred.mPackageName = target.getPackageName();
-                mLauncher.addOnResumeCallback(deferred);
+                mLauncher.addOnResumeCallback(deferred::onLauncherResume);
             } else {
                 deferred.sendFailure();
             }
@@ -310,7 +306,7 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
      * A wrapper around {@link DragSource} which delays the {@link #onDropCompleted} action until
      * {@link #onLauncherResume}
      */
-    private class DeferredOnComplete implements DragSource, OnResumeCallback {
+    private class DeferredOnComplete implements DragSource {
 
         private final DragSource mOriginal;
         private final Context mContext;
@@ -329,7 +325,6 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
             mDragObject = d;
         }
 
-        @Override
         public void onLauncherResume() {
             // We use MATCH_UNINSTALLED_PACKAGES as the app can be on SD card as well.
             if (new PackageManagerHelper(mContext).getApplicationInfo(mPackageName,

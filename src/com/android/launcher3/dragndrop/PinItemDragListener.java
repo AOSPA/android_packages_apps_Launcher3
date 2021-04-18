@@ -30,8 +30,8 @@ import android.widget.RemoteViews;
 
 import com.android.launcher3.DragSource;
 import com.android.launcher3.Launcher;
-import com.android.launcher3.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.PendingAddItemInfo;
+import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
 import com.android.launcher3.widget.PendingItemDragHelper;
@@ -96,7 +96,7 @@ public class PinItemDragListener extends BaseItemDragListener {
 
         PendingItemDragHelper dragHelper = new PendingItemDragHelper(view);
         if (mRequest.getRequestType() == PinItemRequest.REQUEST_TYPE_APPWIDGET) {
-            dragHelper.setPreview(getPreview(mRequest));
+            dragHelper.setRemoteViewsPreview(getPreview(mRequest));
         }
         return dragHelper;
     }
