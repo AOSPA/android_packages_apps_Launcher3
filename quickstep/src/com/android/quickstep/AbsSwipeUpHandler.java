@@ -65,11 +65,14 @@ import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.Build;
+import android.os.Handler;
+import android.os.IBinder;
 import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnApplyWindowInsetsListener;
 import android.view.ViewTreeObserver.OnDrawListener;
+import android.view.ViewTreeObserver.OnScrollChangedListener;
 import android.view.WindowInsets;
 import android.view.animation.Interpolator;
 import android.widget.Toast;
@@ -135,8 +138,11 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     protected final BaseActivityInterface<S, T> mActivityInterface;
     protected final InputConsumerProxy mInputConsumerProxy;
     protected final ActivityInitListener mActivityInitListener;
+    private final Handler mHandler = new Handler();
     // Callbacks to be made once the recents animation starts
     private final ArrayList<Runnable> mRecentsAnimationStartCallbacks = new ArrayList<>();
+    private final OnScrollChangedListener mOnRecentsScrollListener = this::onRecentsViewScroll;
+
     protected RecentsAnimationController mRecentsAnimationController;
     protected RecentsAnimationTargets mRecentsAnimationTargets;
     protected T mActivity;
@@ -621,7 +627,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         final boolean passed = mCurrentShift.value >= MIN_PROGRESS_FOR_OVERVIEW;
         if (passed != mPassedOverviewThreshold) {
             mPassedOverviewThreshold = passed;
-            if (mDeviceState.isTwoButtonNavMode()) {
+            if (mDeviceState.isTwoButtonNavMode() && !mGestureState.isHandlingAtomicEvent()) {
                 performHapticFeedback();
             }
         }
@@ -801,11 +807,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             }
         }
         if (mParallelRunningAnim != null) {
-            if (cancel) {
-                mParallelRunningAnim.cancel();
-            } else {
-                mParallelRunningAnim.end();
-            }
+            // Unlike the above animation, the parallel animation won't have anything to take up
+            // the work if it's canceled, so just end it instead.
+            mParallelRunningAnim.end();
         }
     }
 
@@ -856,7 +860,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     private GestureEndTarget calculateEndTarget(PointF velocity, float endVelocity, boolean isFling,
             boolean isCancel) {
-        if (mDeviceState.isButtonNavMode()) {
+        if (mGestureState.isHandlingAtomicEvent()) {
             // Button mode, this is only used to go to recents
             return RECENTS;
         }
@@ -968,6 +972,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             if (mRecentsView != null) {
                 int nearestPage = mRecentsView.getDestinationPage();
                 boolean isScrolling = false;
+                // Update page scroll before snapping to page to make sure we snapped to the
+                // position calculated with target gesture in mind.
+                mRecentsView.updateScrollSynchronously();
                 if (mRecentsView.getNextPage() != nearestPage) {
                     // We shouldn't really scroll to the next page when swiping up to recents.
                     // Only allow settling on the next page if it's nearest to the center.
@@ -978,7 +985,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     mRecentsView.snapToPage(mRecentsView.getNextPage(), (int) MAX_SWIPE_DURATION);
                     isScrolling = true;
                 }
-                if (!mDeviceState.isButtonNavMode() || isScrolling) {
+                if (!mGestureState.isHandlingAtomicEvent() || isScrolling) {
                     duration = Math.max(duration, mRecentsView.getScroller().getDuration());
                 }
             }
@@ -1040,7 +1047,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 interpolator, target, velocityPxPerMs));
     }
 
-    protected abstract HomeAnimationFactory createHomeAnimationFactory(long duration);
+    protected abstract HomeAnimationFactory createHomeAnimationFactory(
+            ArrayList<IBinder> launchCookies, long duration);
 
     private final TaskStackChangeListener mActivityRestartListener = new TaskStackChangeListener() {
         @Override
@@ -1081,7 +1089,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             final RemoteAnimationTargetCompat runningTaskTarget = mRecentsAnimationTargets != null
                     ? mRecentsAnimationTargets.findTask(mGestureState.getRunningTaskId())
                     : null;
-            HomeAnimationFactory homeAnimFactory = createHomeAnimationFactory(duration);
+            HomeAnimationFactory homeAnimFactory = createHomeAnimationFactory(
+                    runningTaskTarget.taskInfo.launchCookies, duration);
             mIsSwipingPipToHome = homeAnimFactory.supportSwipePipToHome()
                     && runningTaskTarget != null
                     && runningTaskTarget.taskInfo.pictureInPictureParams != null
@@ -1249,7 +1258,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             HomeAnimationFactory homeAnimationFactory) {
         RectFSpringAnim anim =
                 super.createWindowAnimationToHome(startProgress, homeAnimationFactory);
-        anim.addOnUpdateListener((r, p) -> {
+        anim.addOnUpdateListener((v, r, p) -> {
             updateSysUiFlags(Math.max(p, mCurrentShift.value));
         });
         anim.addAnimatorListener(new AnimationSuccessListener() {
@@ -1356,11 +1365,16 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         mActivityInitListener.unregister();
         ActivityManagerWrapper.getInstance().unregisterTaskStackListener(mActivityRestartListener);
         mTaskSnapshot = null;
+        mHandler.post(() -> {
+            // Defer clearing the activity since invalidation can happen over multiple callbacks
+            mActivity = null;
+        });
     }
 
     private void invalidateHandlerWithLauncher() {
         endLauncherTransitionController();
 
+        mRecentsView.removeOnScrollChangedListener(mOnRecentsScrollListener);
         mRecentsView.onGestureAnimationEnd();
         resetLauncherListeners();
     }
@@ -1388,7 +1402,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         mActivityInterface.onTransitionCancelled(wasVisible);
 
         // Leave the pending invisible flag, as it may be used by wallpaper open animation.
-        mActivity.clearForceInvisibleFlag(INVISIBLE_BY_STATE_HANDLER);
+        if (mActivity != null) {
+            mActivity.clearForceInvisibleFlag(INVISIBLE_BY_STATE_HANDLER);
+        }
     }
 
     protected void switchToScreenshot() {
@@ -1496,9 +1512,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             SystemUiProxy.INSTANCE.get(mContext).stopSwipePipToHome(
                     mSwipePipToHomeAnimator.getComponentName(),
                     mSwipePipToHomeAnimator.getDestinationBounds());
-            mRecentsAnimationController.setFinishTaskBounds(
+            mRecentsAnimationController.setFinishTaskTransaction(
                     mSwipePipToHomeAnimator.getTaskId(),
-                    mSwipePipToHomeAnimator.getDestinationBounds(),
                     mSwipePipToHomeAnimator.getFinishTransaction());
             mIsSwipingPipToHome = false;
         }
@@ -1553,15 +1568,17 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     mRecentsAnimationTargets.addReleaseCheck(applier));
         });
 
-        mRecentsView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            if (moveWindowWithRecentsScroll()) {
-                updateFinalShift();
-            }
-        });
+        mRecentsView.addOnScrollChangedListener(mOnRecentsScrollListener);
         runOnRecentsAnimationStart(() ->
                 mRecentsView.setRecentsAnimationTargets(mRecentsAnimationController,
                         mRecentsAnimationTargets));
         mRecentsViewScrollLinked = true;
+    }
+
+    private void onRecentsViewScroll() {
+        if (moveWindowWithRecentsScroll()) {
+            updateFinalShift();
+        }
     }
 
     protected void startNewTask(Consumer<Boolean> resultCallback) {

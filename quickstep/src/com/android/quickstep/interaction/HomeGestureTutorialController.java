@@ -15,12 +15,9 @@
  */
 package com.android.quickstep.interaction;
 
-import static com.android.quickstep.interaction.TutorialController.TutorialType.HOME_NAVIGATION_COMPLETE;
-
 import android.annotation.TargetApi;
 import android.graphics.PointF;
 import android.os.Build;
-import android.view.View;
 
 import com.android.launcher3.R;
 import com.android.quickstep.interaction.EdgeBackGestureHandler.BackGestureResult;
@@ -35,35 +32,13 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
     }
 
     @Override
-    Integer getTitleStringId() {
-        switch (mTutorialType) {
-            case HOME_NAVIGATION:
-                return R.string.home_gesture_intro_title;
-            case HOME_NAVIGATION_COMPLETE:
-                return R.string.gesture_tutorial_confirm_title;
-        }
-        return null;
+    public Integer getIntroductionTitle() {
+        return R.string.home_gesture_intro_title;
     }
 
     @Override
-    Integer getSubtitleStringId() {
-        if (mTutorialType == TutorialType.HOME_NAVIGATION) {
-            return R.string.home_gesture_intro_subtitle;
-        }
-        return null;
-    }
-
-    @Override
-    Integer getActionButtonStringId() {
-        if (mTutorialType == HOME_NAVIGATION_COMPLETE) {
-            return R.string.gesture_tutorial_action_button_label_done;
-        }
-        return null;
-    }
-
-    @Override
-    void onActionButtonClicked(View button) {
-        mTutorialFragment.closeTutorial();
+    public Integer getIntroductionSubtitle() {
+        return R.string.home_gesture_intro_subtitle;
     }
 
     @Override
@@ -90,17 +65,17 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
 
     @Override
     public void onNavBarGestureAttempted(NavBarGestureResult result, PointF finalVelocity) {
+        if (mHideFeedbackEndAction != null) {
+            return;
+        }
         switch (mTutorialType) {
             case HOME_NAVIGATION:
                 switch (result) {
                     case HOME_GESTURE_COMPLETED: {
-                        animateFakeTaskViewHome(finalVelocity, () -> {
-                            if (mTutorialFragment.isTutorialComplete()) {
-                                mTutorialFragment.changeController(HOME_NAVIGATION_COMPLETE);
-                            } else {
-                                mTutorialFragment.continueTutorial();
-                            }
-                        });
+                        animateFakeTaskViewHome(finalVelocity, null);
+                        showActionButton();
+                        showFeedback(R.string.home_gesture_feedback_complete,
+                                true);
                         break;
                     }
                     case HOME_NOT_STARTED_TOO_FAR_FROM_EDGE:
@@ -108,12 +83,12 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
                         showFeedback(R.string.home_gesture_feedback_swipe_too_far_from_edge);
                         break;
                     case OVERVIEW_GESTURE_COMPLETED:
-                        fadeOutFakeTaskView(true, () ->
+                        fadeOutFakeTaskView(true, true, () ->
                                 showFeedback(R.string.home_gesture_feedback_overview_detected));
                         break;
                     case HOME_OR_OVERVIEW_NOT_STARTED_WRONG_SWIPE_DIRECTION:
                     case HOME_OR_OVERVIEW_CANCELLED:
-                        fadeOutFakeTaskView(false, null);
+                        fadeOutFakeTaskView(false, true, null);
                         showFeedback(R.string.home_gesture_feedback_wrong_swipe_direction);
                         break;
                 }

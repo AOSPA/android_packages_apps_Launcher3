@@ -168,7 +168,15 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_SMARTSPACE_ENHANCED = new DeviceFlag(
             "ENABLE_SMARTSPACE_ENHANCED", false,
             "Replace Smartspace with the enhanced version. "
-              + "Ignored if ENABLE_SMARTSPACE_UNIVERSAL is enabled.");
+                    + "Ignored if ENABLE_SMARTSPACE_UNIVERSAL is enabled.");
+
+    public static final BooleanFlag ENABLE_SMARTSPACE_FEEDBACK = new DeviceFlag(
+            "ENABLE_SMARTSPACE_FEEDBACK", true,
+            "Adds a menu option to send feedback for Enhanced Smartspace.");
+
+    public static final BooleanFlag ENABLE_SMARTSPACE_DISMISS = new DeviceFlag(
+            "ENABLE_SMARTSPACE_DISMISS", false,
+            "Adds a menu option to dismiss the current Enhanced Smartspace card.");
 
     public static final BooleanFlag ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS =
             getDebugFlag(
@@ -190,10 +198,6 @@ public final class FeatureFlags {
     public static final BooleanFlag EXPANDED_SMARTSPACE = new DeviceFlag(
             "EXPANDED_SMARTSPACE", false, "Expands smartspace height to two rows. "
               + "Any apps occupying the first row will be removed from workspace.");
-
-    public static final DeviceFlag ENABLE_FOUR_COLUMNS = new DeviceFlag(
-            "ENABLE_FOUR_COLUMNS", false, "Uses 4 columns in launcher grid."
-            + "Warning: This will permanently alter your home screen items and is not reversible.");
 
     // TODO: b/172467144 Remove ENABLE_LAUNCHER_ACTIVITY_THEME_CROSSFADE feature flag.
     public static final BooleanFlag ENABLE_LAUNCHER_ACTIVITY_THEME_CROSSFADE = new DeviceFlag(
@@ -225,18 +229,15 @@ public final class FeatureFlags {
     public static final BooleanFlag NOTIFY_CRASHES = getDebugFlag("NOTIFY_CRASHES", false,
             "Sends a notification whenever launcher encounters an uncaught exception.");
 
+    public static final BooleanFlag PROTOTYPE_APP_CLOSE = getDebugFlag(
+            "PROTOTYPE_APP_CLOSE", false, "Enables new app close");
+
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
             for (DebugFlag flag : sDebugFlags) {
                 flag.initialize(context);
             }
             sDebugFlags.sort((f1, f2) -> f1.key.compareToIgnoreCase(f2.key));
-        }
-    }
-
-    public static void removeFlag(DebugFlag flag) {
-        synchronized (sDebugFlags) {
-            sDebugFlags.remove(flag);
         }
     }
 
@@ -315,15 +316,6 @@ public final class FeatureFlags {
         public void initialize(Context context) {
             mCurrentValue = context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE)
                     .getBoolean(key, defaultValue);
-        }
-
-        /**
-         * Resets value to default value.
-         */
-        public void reset(Context context) {
-            mCurrentValue = defaultValue;
-            context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE)
-                    .edit().putBoolean(key, defaultValue).apply();
         }
 
         @Override

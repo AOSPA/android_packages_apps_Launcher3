@@ -42,8 +42,8 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
     private static final String TAG = "WidgetsRecommendationTableLayout";
     private static final float DOWN_SCALE_RATIO = 0.9f;
     private static final float MAX_DOWN_SCALE_RATIO = 0.5f;
-    private final DeviceProfile mDeviceProfile;
     private final float mWidgetCellTextViewsHeight;
+    private final float mWidgetPreviewPadding;
 
     private float mRecommendationTableMaxHeight = Float.MAX_VALUE;
     @Nullable private OnLongClickListener mWidgetCellOnLongClickListener;
@@ -56,9 +56,10 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
 
     public WidgetsRecommendationTableLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mDeviceProfile = Launcher.getLauncher(context).getDeviceProfile();
         // There are 1 row for title, 1 row for dimension and 2 rows for description.
         mWidgetCellTextViewsHeight = 4 * getResources().getDimension(R.dimen.widget_cell_font_size);
+        mWidgetPreviewPadding = 2 * getResources()
+                .getDimensionPixelSize(R.dimen.widget_preview_shortcut_padding);
     }
 
     /** Sets a {@link android.view.View.OnLongClickListener} for all widget cells in this table. */
@@ -89,6 +90,9 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
         mRecommendationTableMaxHeight = recommendationTableMaxHeight;
         RecommendationTableData data = fitRecommendedWidgetsToTableSpace(/* previewScale= */ 1f,
                 recommendedWidgets);
+        // TODO(b/185508758): Revert the following logs after debugging.
+        Log.d(TAG, "Recommended widgets section max height: " + recommendationTableMaxHeight);
+        Log.d(TAG, "Recommended widget down scale: " + data.mPreviewScale);
         bindData(data);
     }
 
@@ -140,12 +144,13 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
         }
         // A naive estimation of the widgets recommendation table height without inflation.
         float totalHeight = 0;
+        DeviceProfile deviceProfile = Launcher.getLauncher(getContext()).getDeviceProfile();
         for (int i = 0; i < recommendedWidgetsInTable.size(); i++) {
             List<WidgetItem> widgetItems = recommendedWidgetsInTable.get(i);
             float rowHeight = 0;
             for (int j = 0; j < widgetItems.size(); j++) {
-                float previewHeight = widgetItems.get(j).spanY * mDeviceProfile.allAppsCellHeightPx
-                        * previewScale;
+                float previewHeight = widgetItems.get(j).spanY * deviceProfile.cellHeightPx
+                        * previewScale + mWidgetPreviewPadding;
                 rowHeight = Math.max(rowHeight, previewHeight + mWidgetCellTextViewsHeight);
             }
             totalHeight += rowHeight;
