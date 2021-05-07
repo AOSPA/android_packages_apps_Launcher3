@@ -126,7 +126,7 @@
 
     <!-- Feedback shown during interactive parts of Overview gesture tutorial when the gesture is started too far from the edge. [CHAR LIMIT=100] -->
     <string name="overview_gesture_feedback_swipe_too_far_from_edge">Make sure you swipe up from the bottom edge of the screen.</string>
-    <!-- Feedback shown during interactive parts of Overview gesture tutorial when the Home gesture is detected. [CHAR LIMIT=100] -->
+    <!-- Feedback shown during interactive parts of Overview gesture tutorial when the Home gesture is detected. The window refers to the current app's window during the gesture. [CHAR LIMIT=100] -->
     <string name="overview_gesture_feedback_home_detected">Try holding the window for longer before releasing.</string>
     <!-- Feedback shown during interactive parts of Overview gesture tutorial when the gesture is horizontal instead of vertical. [CHAR LIMIT=100] -->
     <string name="overview_gesture_feedback_wrong_swipe_direction">Make sure you swipe straight up, then pause.</string>
@@ -188,8 +188,8 @@
     <!-- ******* Skip tutorial dialog ******* -->
     <!-- Title for the dialog that allows the user to skip the gesture navigation tutorial. [CHAR_LIMIT=40] -->
     <string name="skip_tutorial_dialog_title">Skip navigation tutorial?</string>
-    <!-- Subtitle for the dialog that allows the user to skip the gesture navigation tutorial. [CHAR_LIMIT=40] -->
-    <string name="skip_tutorial_dialog_subtitle">You can find this later in the Tips app</string>
+    <!-- Subtitle for the dialog that allows the user to skip the gesture navigation tutorial. This directs the user to where they can find the gesture tutorial again. [CHAR_LIMIT=100] -->
+    <string name="skip_tutorial_dialog_subtitle">You can find this later in the <xliff:g id="name">%1$s</xliff:g> app</string>
     <!-- Button text shown on a button on the tutorial skip dialog to return to the tutorial. [CHAR LIMIT=14] -->
     <string name="gesture_tutorial_action_button_label_cancel">Cancel</string>
     <!-- Button text shown on a button on the tutorial skip dialog to exit the tutorial. [CHAR LIMIT=14] -->
