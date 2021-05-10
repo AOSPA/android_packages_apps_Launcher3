@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.widget.picker;
 
+import android.graphics.Point;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup.MarginLayoutParams;
 import android.widget.RelativeLayout;
@@ -33,9 +35,11 @@ final class SearchAndRecommendationsScrollController implements
         RecyclerViewFastScroller.OnFastScrollChangeListener {
     private final boolean mHasWorkProfile;
     private final SearchAndRecommendationViewHolder mViewHolder;
+    private final View mSearchAndRecommendationViewParent;
     private final WidgetsRecyclerView mPrimaryRecyclerView;
     private final WidgetsRecyclerView mSearchRecyclerView;
     private final int mTabsHeight;
+    private final Point mTempOffset = new Point();
 
     // The following are only non null if mHasWorkProfile is true.
     @Nullable private final WidgetsRecyclerView mWorkRecyclerView;
@@ -43,6 +47,8 @@ final class SearchAndRecommendationsScrollController implements
     @Nullable private final PersonalWorkPagedView mPrimaryWorkViewPager;
 
     private WidgetsRecyclerView mCurrentRecyclerView;
+
+    private OnContentChangeListener mOnContentChangeListener = () -> applyVerticalTransition();
 
     /**
      * The vertical distance, in pixels, until the search is pinned at the top of the screen when
@@ -62,6 +68,8 @@ final class SearchAndRecommendationsScrollController implements
      */
     private int mCollapsibleHeightForTabs = 0;
 
+    private boolean mShouldForwardToRecyclerView = false;
+
     SearchAndRecommendationsScrollController(
             boolean hasWorkProfile,
             int tabsHeight,
@@ -73,20 +81,24 @@ final class SearchAndRecommendationsScrollController implements
             @Nullable PersonalWorkPagedView primaryWorkViewPager) {
         mHasWorkProfile = hasWorkProfile;
         mViewHolder = viewHolder;
+        mViewHolder.mContainer.setSearchAndRecommendationScrollController(this);
+        mSearchAndRecommendationViewParent = (View) mViewHolder.mContainer.getParent();
         mPrimaryRecyclerView = primaryRecyclerView;
-        mCurrentRecyclerView = mPrimaryRecyclerView;
         mWorkRecyclerView = workRecyclerView;
         mSearchRecyclerView = searchRecyclerView;
         mPrimaryWorkTabsView = personalWorkTabsView;
         mPrimaryWorkViewPager = primaryWorkViewPager;
-        mCurrentRecyclerView = mPrimaryRecyclerView;
         mTabsHeight = tabsHeight;
+        setCurrentRecyclerView(mPrimaryRecyclerView);
     }
 
     /** Sets the current active {@link WidgetsRecyclerView}. */
     public void setCurrentRecyclerView(WidgetsRecyclerView currentRecyclerView) {
+        if (mCurrentRecyclerView != null) {
+            mCurrentRecyclerView.setOnContentChangeListener(null);
+        }
         mCurrentRecyclerView = currentRecyclerView;
-        mCurrentRecyclerView = currentRecyclerView;
+        mCurrentRecyclerView.setOnContentChangeListener(mOnContentChangeListener);
         mViewHolder.mHeaderTitle.setTranslationY(0);
         mViewHolder.mRecommendedWidgetsTable.setTranslationY(0);
         mViewHolder.mSearchBar.setTranslationY(0);
@@ -208,12 +220,16 @@ final class SearchAndRecommendationsScrollController implements
         return hasMarginOrPaddingUpdated;
     }
 
+    @Override
+    public void onScrollChanged() {
+        applyVerticalTransition();
+    }
+
     /**
      * Changes the displacement of collapsible views (e.g. title & widget recommendations) and fixed
-     * views (e.g. recycler views, tabs) upon scrolling.
+     * views (e.g. recycler views, tabs) upon scrolling / content changes in the recycler view.
      */
-    @Override
-    public void onThumbOffsetYChanged(int unused) {
+    private void applyVerticalTransition() {
         // Always use the recycler view offset because fast scroller offset has a different scale.
         int recyclerViewYOffset = mCurrentRecyclerView.getCurrentScrollY();
         if (recyclerViewYOffset < 0) return;
@@ -245,6 +261,43 @@ final class SearchAndRecommendationsScrollController implements
         }
     }
 
+    /**
+     * Returns {@code true} if a touch event should be intercepted by this controller.
+     */
+    public boolean onInterceptTouchEvent(MotionEvent event) {
+        calculateMotionEventOffset(mTempOffset);
+        event.offsetLocation(mTempOffset.x, mTempOffset.y);
+        try {
+            mShouldForwardToRecyclerView = mCurrentRecyclerView.onInterceptTouchEvent(event);
+            return mShouldForwardToRecyclerView;
+        } finally {
+            event.offsetLocation(-mTempOffset.x, -mTempOffset.y);
+        }
+    }
+
+    /**
+     * Returns {@code true} if this controller has intercepted and consumed a touch event.
+     */
+    public boolean onTouchEvent(MotionEvent event) {
+        if (mShouldForwardToRecyclerView) {
+            calculateMotionEventOffset(mTempOffset);
+            event.offsetLocation(mTempOffset.x, mTempOffset.y);
+            try {
+                return mCurrentRecyclerView.onTouchEvent(event);
+            } finally {
+                event.offsetLocation(-mTempOffset.x, -mTempOffset.y);
+            }
+        }
+        return false;
+    }
+
+    private void calculateMotionEventOffset(Point p) {
+        p.x = mViewHolder.mContainer.getLeft() - mCurrentRecyclerView.getLeft()
+                - mSearchAndRecommendationViewParent.getLeft();
+        p.y = mViewHolder.mContainer.getTop() - mCurrentRecyclerView.getTop()
+                - mSearchAndRecommendationViewParent.getTop();
+    }
+
     /** private the height, in pixel, + the vertical margins of a given view. */
     private static int measureHeightWithVerticalMargins(View view) {
         if (view.getVisibility() != View.VISIBLE) {
@@ -253,5 +306,14 @@ final class SearchAndRecommendationsScrollController implements
         MarginLayoutParams marginLayoutParams = (MarginLayoutParams) view.getLayoutParams();
         return view.getMeasuredHeight() + marginLayoutParams.bottomMargin
                 + marginLayoutParams.topMargin;
+    }
+
+    /**
+     * A listener to be notified when there is a content change in the recycler view that may affect
+     * the relative position of the search and recommendation container.
+     */
+    public interface OnContentChangeListener {
+        /** Notifies a content change in the recycler view. */
+        void onContentChanged();
     }
 }

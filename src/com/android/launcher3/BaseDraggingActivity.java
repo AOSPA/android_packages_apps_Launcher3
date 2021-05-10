@@ -18,9 +18,14 @@ package com.android.launcher3;
 
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
 import static com.android.launcher3.util.DisplayController.CHANGE_ROTATION;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import android.app.ActivityOptions;
+import android.app.WallpaperColors;
+import android.app.WallpaperManager;
+import android.app.WallpaperManager.OnColorsChangedListener;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.LauncherApps;
 import android.content.res.Configuration;
@@ -53,7 +58,6 @@ import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.touch.ItemClickHandler;
-import com.android.launcher3.uioverrides.WallpaperColorInfo;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
@@ -67,8 +71,9 @@ import com.android.launcher3.util.WindowBounds;
 /**
  * Extension of BaseActivity allowing support for drag-n-drop
  */
+@SuppressWarnings("NewApi")
 public abstract class BaseDraggingActivity extends BaseActivity
-        implements WallpaperColorInfo.OnChangeListener, DisplayInfoChangeListener {
+        implements OnColorsChangedListener, DisplayInfoChangeListener {
 
     private static final String TAG = "BaseDraggingActivity";
 
@@ -88,13 +93,15 @@ public abstract class BaseDraggingActivity extends BaseActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-
         mIsSafeModeEnabled = TraceHelper.allowIpcs("isSafeMode",
                 () -> getPackageManager().isSafeMode());
         DisplayController.INSTANCE.get(this).addChangeListener(this);
 
         // Update theme
-        WallpaperColorInfo.INSTANCE.get(this).addOnChangeListener(this);
+        if (Utilities.ATLEAST_P) {
+            getSystemService(WallpaperManager.class)
+                    .addOnColorsChangedListener(this, MAIN_EXECUTOR.getHandler());
+        }
         int themeRes = Themes.getActivityThemeRes(this);
         if (themeRes != mThemeRes) {
             mThemeRes = themeRes;
@@ -113,7 +120,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
     }
 
     @Override
-    public void onExtractedColorsChanged(WallpaperColorInfo wallpaperColorInfo) {
+    public void onColorsChanged(WallpaperColors wallpaperColors, int which) {
         updateTheme();
     }
 
@@ -277,7 +284,9 @@ public abstract class BaseDraggingActivity extends BaseActivity
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        WallpaperColorInfo.INSTANCE.get(this).removeOnChangeListener(this);
+        if (Utilities.ATLEAST_P) {
+            getSystemService(WallpaperManager.class).removeOnColorsChangedListener(this);
+        }
         DisplayController.INSTANCE.get(this).removeChangeListener(this);
     }
 
@@ -296,7 +305,7 @@ public abstract class BaseDraggingActivity extends BaseActivity
     }
 
     @Override
-    public void onDisplayInfoChanged(Info info, int flags) {
+    public void onDisplayInfoChanged(Context context, Info info, int flags) {
         if ((flags & CHANGE_ROTATION) != 0 && mDeviceProfile.updateIsSeascape(this)) {
             reapplyUi();
         }

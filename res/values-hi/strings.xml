@@ -32,8 +32,8 @@
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"किसी विजेट को एक से दूसरी जगह ले जाने के लिए, उस पर दो बार टैप करके दबाकर रखें या पसंद के मुताबिक कार्रवाइयां इस्तेमाल करें."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d चौड़ाई गुणा %2$d ऊंचाई"</string>
-    <string name="add_item_request_drag_hint" msgid="5899764264480397019">"खुद जोड़ने के लिए दबाकर रखें"</string>
-    <string name="place_automatically" msgid="8064208734425456485">"अपने-आप जुड़ जाए"</string>
+    <string name="add_item_request_drag_hint" msgid="5653291305078645405">"होम स्क्रीन पर यहां-वहां ले जाने के लिए विजेट को दबाकर रखें"</string>
+    <string name="add_to_home_screen" msgid="8631549138215492708">"होम स्क्रीन पर जोड़ें"</string>
     <plurals name="widgets_count" formatted="false" msgid="656794749266073027">
       <item quantity="one"><xliff:g id="WIDGETS_COUNT_1">%1$d</xliff:g> विजेट</item>
       <item quantity="other"><xliff:g id="WIDGETS_COUNT_1">%1$d</xliff:g> विजेट</item>
@@ -97,7 +97,8 @@
     <string name="folder_name_format_exact" msgid="8626242716117004803">"फ़ोल्डर: <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> आइटम"</string>
     <string name="folder_name_format_overflow" msgid="4270108890534995199">"फ़ोल्डर: <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> या इससे ज़्यादा आइटम"</string>
     <string name="wallpaper_button_text" msgid="8404103075899945851">"वॉलपेपर"</string>
-    <string name="styles_wallpaper_button_text" msgid="4342122323125579619">"स्टाइल और वॉलपेपर"</string>
+    <!-- no translation found for styles_wallpaper_button_text (8216961355289236794) -->
+    <skip />
     <string name="settings_button_text" msgid="8873672322605444408">"होम पेज की सेटिंग"</string>
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"आपके एडमिन ने बंद किया हुआ है"</string>
     <string name="allow_rotation_title" msgid="7728578836261442095">"होमस्क्रीन घुमाने की अनुमति दें"</string>
