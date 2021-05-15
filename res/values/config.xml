@@ -35,7 +35,7 @@
     <!-- Workspace -->
     <!-- The duration (in ms) of the fade animation on the object outlines, used when
          we are dragging objects around on the home screen. -->
-    <integer name="config_dragOutlineFadeTime">900</integer>
+    <integer name="config_dragOutlineFadeTime">500</integer>
 
     <!-- The alpha value at which to show the most recent drop visualization outline. -->
     <integer name="config_dragOutlineMaxAlpha">255</integer>
@@ -54,9 +54,6 @@
 
     <!-- The duration of the caret animation -->
     <integer name="config_caretAnimationDuration">200</integer>
-
-    <!-- Hotseat -->
-    <bool name="hotseat_transpose_layout_with_orientation">true</bool>
 
     <!-- Various classes overriden by projects/build flavors. -->
     <string name="folder_name_provider_class" translatable="false"></string>
@@ -79,11 +76,6 @@
 
     <!-- Menu id for feature flags -->
     <item type="id" name="menu_apply_flags" />
-
-    <!-- Popup items -->
-    <integer name="config_popupOpenCloseDuration">150</integer>
-    <integer name="config_popupArrowOpenCloseDuration">40</integer>
-    <integer name="config_removeNotificationViewDuration">300</integer>
 
     <!-- Default packages -->
     <string name="wallpaper_picker_package" translatable="false"></string>
@@ -215,9 +207,6 @@
         <item>@dimen/c2_c</item>
         <item>@dimen/c2_d</item>
     </array>
-
-    <string-array name="live_wallpapers_remove_sysui_scrims">
-    </string-array>
 
     <string-array name="filtered_components" ></string-array>
 

@@ -41,18 +41,19 @@ import android.util.FloatProperty;
 import android.view.View;
 import android.view.WindowInsets;
 
-import androidx.core.graphics.ColorUtils;
-
+import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.R;
 import com.android.launcher3.ResourceUtils;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.uioverrides.WallpaperColorInfo;
+import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.util.DynamicResource;
 import com.android.launcher3.util.Themes;
+import com.android.systemui.plugins.ResourceProvider;
 
 /**
  * View scrim which draws behind hotseat and workspace
  */
-public class SysUiScrim extends Scrim {
+public class SysUiScrim implements View.OnAttachStateChangeListener {
 
     public static final FloatProperty<SysUiScrim> SYSUI_PROGRESS =
             new FloatProperty<SysUiScrim>("sysUiProgress") {
@@ -83,7 +84,6 @@ public class SysUiScrim extends Scrim {
 
     /**
      * Receiver used to get a signal that the user unlocked their device.
-     * @see KEYGUARD_ANIMATION For proper signal.
      */
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -99,19 +99,22 @@ public class SysUiScrim extends Scrim {
         }
     };
 
-    private static final int DARK_SCRIM_COLOR = 0x55000000;
     private static final int MAX_HOTSEAT_SCRIM_ALPHA = 100;
     private static final int ALPHA_MASK_HEIGHT_DP = 500;
     private static final int ALPHA_MASK_BITMAP_DP = 200;
     private static final int ALPHA_MASK_WIDTH_DP = 2;
 
-    private boolean mDrawTopScrim, mDrawBottomScrim;
+    private boolean mDrawTopScrim, mDrawBottomScrim, mDrawWallpaperScrim;
 
+    private final RectF mWallpaperScrimRect = new RectF();
+    private final Paint mWallpaperScrimPaint = new Paint();
     private final RectF mFinalMaskRect = new RectF();
     private final Paint mBottomMaskPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Bitmap mBottomMask;
     private final int mMaskHeight;
 
+    private final View mRoot;
+    private final BaseDraggingActivity mActivity;
     private final Drawable mTopScrim;
 
     private float mSysUiProgress = 1;
@@ -119,16 +122,26 @@ public class SysUiScrim extends Scrim {
 
     private boolean mAnimateScrimOnNextDraw = false;
     private float mSysUiAnimMultiplier = 1;
+    private int mWallpaperScrimMaxAlpha;
 
     public SysUiScrim(View view) {
-        super(view);
+        mRoot = view;
+        mActivity = BaseDraggingActivity.fromContext(view.getContext());
         mMaskHeight = ResourceUtils.pxFromDp(ALPHA_MASK_BITMAP_DP,
                 view.getResources().getDisplayMetrics());
         mTopScrim = Themes.getAttrDrawable(view.getContext(), R.attr.workspaceStatusBarScrim);
         mBottomMask = mTopScrim == null ? null : createDitheredAlphaMask();
         mHideSysUiScrim = mTopScrim == null;
 
-        onExtractedColorsChanged(mWallpaperColorInfo);
+        mDrawWallpaperScrim = FeatureFlags.ENABLE_WALLPAPER_SCRIM.get()
+                && !Themes.getAttrBoolean(view.getContext(), R.attr.isMainColorDark)
+                && !Themes.getAttrBoolean(view.getContext(), R.attr.isWorkspaceDarkText);
+        ResourceProvider rp = DynamicResource.provider(view.getContext());
+        int wallpaperScrimColor = rp.getColor(R.color.wallpaper_scrim_color);
+        mWallpaperScrimMaxAlpha = Color.alpha(wallpaperScrimColor);
+        mWallpaperScrimPaint.setColor(wallpaperScrimColor);
+
+        view.addOnAttachStateChangeListener(this);
     }
 
     /**
@@ -147,11 +160,14 @@ public class SysUiScrim extends Scrim {
 
                 ObjectAnimator oa = createSysuiMultiplierAnim(1);
                 oa.setDuration(600);
-                oa.setStartDelay(mLauncher.getWindow().getTransitionBackgroundFadeDuration());
+                oa.setStartDelay(mActivity.getWindow().getTransitionBackgroundFadeDuration());
                 oa.start();
                 mAnimateScrimOnNextDraw = false;
             }
 
+            if (mDrawWallpaperScrim) {
+                canvas.drawRect(mWallpaperScrimRect, mWallpaperScrimPaint);
+            }
             if (mDrawTopScrim) {
                 mTopScrim.draw(canvas);
             }
@@ -173,20 +189,17 @@ public class SysUiScrim extends Scrim {
     /**
      * Determines whether to draw the top and/or bottom scrim based on new insets.
      */
-    public void onInsetsChanged(Rect insets, boolean allowSysuiScrims) {
-        mDrawTopScrim = allowSysuiScrims
-                && mTopScrim != null
-                && insets.top > 0;
-        mDrawBottomScrim = allowSysuiScrims
-                && mBottomMask != null
-                && !mLauncher.getDeviceProfile().isVerticalBarLayout()
+    public void onInsetsChanged(Rect insets) {
+        mDrawTopScrim = mTopScrim != null && insets.top > 0;
+        mDrawBottomScrim = mBottomMask != null
+                && !mActivity.getDeviceProfile().isVerticalBarLayout()
                 && hasBottomNavButtons();
     }
 
     private boolean hasBottomNavButtons() {
-        if (Utilities.ATLEAST_Q && mLauncher.getRootView() != null
-                && mLauncher.getRootView().getRootWindowInsets() != null) {
-            WindowInsets windowInsets = mLauncher.getRootView().getRootWindowInsets();
+        if (Utilities.ATLEAST_Q && mActivity.getRootView() != null
+                && mActivity.getRootView().getRootWindowInsets() != null) {
+            WindowInsets windowInsets = mActivity.getRootView().getRootWindowInsets();
             return windowInsets.getTappableElementInsets().bottom > 0;
         }
         return true;
@@ -194,8 +207,6 @@ public class SysUiScrim extends Scrim {
 
     @Override
     public void onViewAttachedToWindow(View view) {
-        super.onViewAttachedToWindow(view);
-
         if (!KEYGUARD_ANIMATION.get() && mTopScrim != null) {
             IntentFilter filter = new IntentFilter(ACTION_SCREEN_OFF);
             filter.addAction(ACTION_USER_PRESENT); // When the device wakes up + keyguard is gone
@@ -205,20 +216,9 @@ public class SysUiScrim extends Scrim {
 
     @Override
     public void onViewDetachedFromWindow(View view) {
-        super.onViewDetachedFromWindow(view);
         if (!KEYGUARD_ANIMATION.get() && mTopScrim != null) {
             mRoot.getContext().unregisterReceiver(mReceiver);
         }
-    }
-
-    @Override
-    public void onExtractedColorsChanged(WallpaperColorInfo wallpaperColorInfo) {
-        // for super light wallpaper it needs to be darken for contrast to workspace
-        // for dark wallpapers the text is white so darkening works as well
-        mBottomMaskPaint.setColor(ColorUtils.compositeColors(DARK_SCRIM_COLOR,
-                wallpaperColorInfo.getMainColor()));
-        reapplySysUiAlpha();
-        super.onExtractedColorsChanged(wallpaperColorInfo);
     }
 
     /**
@@ -231,6 +231,7 @@ public class SysUiScrim extends Scrim {
             mTopScrim.setBounds(0, 0, w, h);
             mFinalMaskRect.set(0, h - mMaskHeight, w, h);
         }
+        mWallpaperScrimRect.set(0, 0, w, h);
     }
 
     private void setSysUiProgress(float progress) {
@@ -243,7 +244,7 @@ public class SysUiScrim extends Scrim {
     private void reapplySysUiAlpha() {
         reapplySysUiAlphaNoInvalidate();
         if (!mHideSysUiScrim) {
-            invalidate();
+            mRoot.invalidate();
         }
     }
 
@@ -253,10 +254,11 @@ public class SysUiScrim extends Scrim {
         if (mTopScrim != null) {
             mTopScrim.setAlpha(Math.round(255 * factor));
         }
+        mWallpaperScrimPaint.setAlpha(Math.round(mWallpaperScrimMaxAlpha * factor));
     }
 
     private Bitmap createDitheredAlphaMask() {
-        DisplayMetrics dm = mLauncher.getResources().getDisplayMetrics();
+        DisplayMetrics dm = mActivity.getResources().getDisplayMetrics();
         int width = ResourceUtils.pxFromDp(ALPHA_MASK_WIDTH_DP, dm);
         int gradientHeight = ResourceUtils.pxFromDp(ALPHA_MASK_HEIGHT_DP, dm);
         Bitmap dst = Bitmap.createBitmap(width, mMaskHeight, Bitmap.Config.ALPHA_8);
