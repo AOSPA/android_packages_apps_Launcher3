@@ -149,6 +149,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
         @BinderThread
         public void onInitialize(Bundle bundle) {
+            Log.d(TAG + " b/182478748", "TouchInteractionService.onInitialize: user="
+                    + getUserId());
             ISystemUiProxy proxy = ISystemUiProxy.Stub.asInterface(
                     bundle.getBinder(KEY_EXTRA_SYSUI_PROXY));
             IPip pip = IPip.Stub.asInterface(bundle.getBinder(KEY_EXTRA_SHELL_PIP));
@@ -239,8 +241,9 @@ public class TouchInteractionService extends Service implements PluginListener<O
         @BinderThread
         public void onSystemUiStateChanged(int stateFlags) {
             MAIN_EXECUTOR.execute(() -> {
+                int lastFlags = mDeviceState.getSystemUiStateFlags();
                 mDeviceState.setSystemUiFlags(stateFlags);
-                TouchInteractionService.this.onSystemUiFlagsChanged();
+                TouchInteractionService.this.onSystemUiFlagsChanged(lastFlags);
             });
         }
 
@@ -309,6 +312,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
     }
 
     private void disposeEventHandlers() {
+        Log.d(TAG + " b/182478748", "TouchInteractionService.disposeEventHandlers: user="
+                + getUserId());
         if (mInputEventReceiver != null) {
             mInputEventReceiver.dispose();
             mInputEventReceiver = null;
@@ -320,6 +325,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
     }
 
     private void initInputMonitor() {
+        Log.d(TAG + " b/182478748", "TouchInteractionService.initInputMonitor: user="
+                + getUserId());
         disposeEventHandlers();
 
         if (TestProtocol.sDebugTracing) {
@@ -328,9 +335,11 @@ public class TouchInteractionService extends Service implements PluginListener<O
         }
 
         if (mDeviceState.isButtonNavMode()) {
+            Log.d(TAG + " b/182478748", "isButtonNav: user=" + getUserId());
             return;
         }
 
+        Log.d(TAG + " b/182478748", "create swipe-up input monitor: user=" + getUserId());
         mInputMonitorCompat = new InputMonitorCompat("swipe-up", mDeviceState.getDisplayId());
         mInputEventReceiver = mInputMonitorCompat.getInputReceiver(Looper.getMainLooper(),
                 mMainChoreographer, this::onInputEvent);
@@ -362,7 +371,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         mResetGestureInputConsumer = new ResetGestureInputConsumer(mTaskAnimationManager);
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
         mInputConsumer.registerInputConsumer();
-        onSystemUiFlagsChanged();
+        onSystemUiFlagsChanged(mDeviceState.getSystemUiStateFlags());
         onAssistantVisibilityChanged();
 
         // Temporarily disable model preload
@@ -414,7 +423,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
     }
 
     @UiThread
-    private void onSystemUiFlagsChanged() {
+    private void onSystemUiFlagsChanged(int lastSysUIFlags) {
         if (mDeviceState.isUserUnlocked()) {
             int systemUiStateFlags = mDeviceState.getSystemUiStateFlags();
             SystemUiProxy.INSTANCE.get(this).setLastSystemUiStateFlags(systemUiStateFlags);
@@ -422,14 +431,17 @@ public class TouchInteractionService extends Service implements PluginListener<O
             mOverviewComponentObserver.getActivityInterface().onSystemUiFlagsChanged(
                     systemUiStateFlags);
 
-            // Update the tracing state
-            if ((systemUiStateFlags & SYSUI_STATE_TRACING_ENABLED) != 0) {
-                Log.d(TAG, "Starting tracing.");
-                ProtoTracer.INSTANCE.get(this).start();
-            } else {
-                Log.d(TAG, "Stopping tracing. Dumping to file="
-                    + ProtoTracer.INSTANCE.get(this).getTraceFile());
-                ProtoTracer.INSTANCE.get(this).stop();
+            if ((lastSysUIFlags & SYSUI_STATE_TRACING_ENABLED) !=
+                    (systemUiStateFlags & SYSUI_STATE_TRACING_ENABLED)) {
+                // Update the tracing state
+                if ((systemUiStateFlags & SYSUI_STATE_TRACING_ENABLED) != 0) {
+                    Log.d(TAG, "Starting tracing.");
+                    ProtoTracer.INSTANCE.get(this).start();
+                } else {
+                    Log.d(TAG, "Stopping tracing. Dumping to file="
+                            + ProtoTracer.INSTANCE.get(this).getTraceFile());
+                    ProtoTracer.INSTANCE.get(this).stop();
+                }
             }
         }
     }
@@ -444,6 +456,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
     @Override
     public void onDestroy() {
+        Log.d(TAG, "Touch service destroyed: user=" + getUserId());
         sIsInitialized = false;
         if (mDeviceState.isUserUnlocked()) {
             mInputConsumer.unregisterInputConsumer();
@@ -465,7 +478,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
     @Override
     public IBinder onBind(Intent intent) {
-        Log.d(TAG, "Touch service connected");
+        Log.d(TAG, "Touch service connected: user=" + getUserId());
         return mMyBinder;
     }
 
@@ -502,7 +515,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
             }
             mRotationTouchHelper.setOrientationTransformIfNeeded(event);
 
-            if (mRotationTouchHelper.isInSwipeUpTouchRegion(event)) {
+            if (!mDeviceState.isOneHandedModeActive()
+                    && mRotationTouchHelper.isInSwipeUpTouchRegion(event)) {
                 if (TestProtocol.sDebugTracing) {
                     Log.d(TestProtocol.NO_SWIPE_TO_HOME,
                             "TouchInteractionService.onInputEvent:isInSwipeUpTouchRegion");
@@ -531,8 +545,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
                             InputConsumer.NO_OP, mInputMonitorCompat,
                             mDeviceState,
                             event);
-                } else if (mDeviceState.canTriggerOneHandedAction(event)
-                    && !mDeviceState.isOneHandedModeActive()) {
+                } else if (mDeviceState.canTriggerOneHandedAction(event)) {
                     // Consume gesture event for triggering one handed feature.
                     mUncheckedConsumer = new OneHandedModeInputConsumer(this, mDeviceState,
                         InputConsumer.NO_OP, mInputMonitorCompat);

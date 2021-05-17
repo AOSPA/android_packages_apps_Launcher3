@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.uioverrides.touchcontrollers;
 
+import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.LauncherAnimUtils.newCancelListener;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
@@ -22,7 +23,7 @@ import static com.android.launcher3.LauncherState.OVERVIEW_ACTIONS;
 import static com.android.launcher3.LauncherState.QUICK_SWITCH;
 import static com.android.launcher3.anim.AlphaUpdateListener.ALPHA_CUTOFF_THRESHOLD;
 import static com.android.launcher3.anim.Interpolators.ACCEL_0_75;
-import static com.android.launcher3.anim.Interpolators.DEACCEL_5;
+import static com.android.launcher3.anim.Interpolators.DEACCEL_3;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.Interpolators.scrollInterpolatorForVelocity;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -30,9 +31,11 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_UNKNOWN_SWIPEUP;
 import static com.android.launcher3.logging.StatsLogManager.getLauncherAtomEvent;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_DEPTH;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_VERTICAL_PROGRESS;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_FADE;
-import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_TRANSLATE;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_SCALE;
+import static com.android.launcher3.states.StateAnimationConfig.SKIP_ALL_ANIMATIONS;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_OVERVIEW;
 import static com.android.launcher3.touch.BothAxesSwipeDetector.DIRECTION_RIGHT;
 import static com.android.launcher3.touch.BothAxesSwipeDetector.DIRECTION_UP;
@@ -58,7 +61,6 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.launcher3.graphics.OverviewScrim;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.BaseSwipeDetector;
 import com.android.launcher3.touch.BothAxesSwipeDetector;
@@ -79,9 +81,8 @@ import com.android.quickstep.views.LauncherRecentsView;
 public class NoButtonQuickSwitchTouchController implements TouchController,
         BothAxesSwipeDetector.Listener {
 
-    /** The minimum progress of the scale/translationY animation until drag end. */
     private static final float Y_ANIM_MIN_PROGRESS = 0.25f;
-    private static final Interpolator FADE_OUT_INTERPOLATOR = DEACCEL_5;
+    private static final Interpolator FADE_OUT_INTERPOLATOR = DEACCEL_3;
     private static final Interpolator TRANSLATE_OUT_INTERPOLATOR = ACCEL_0_75;
     private static final Interpolator SCALE_DOWN_INTERPOLATOR = LINEAR;
     private static final long ATOMIC_DURATION_FROM_PAUSED_TO_OVERVIEW = 300;
@@ -186,7 +187,8 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         StateAnimationConfig nonOverviewBuilder = new StateAnimationConfig();
         nonOverviewBuilder.setInterpolator(ANIM_WORKSPACE_FADE, FADE_OUT_INTERPOLATOR);
         nonOverviewBuilder.setInterpolator(ANIM_ALL_APPS_FADE, FADE_OUT_INTERPOLATOR);
-        nonOverviewBuilder.setInterpolator(ANIM_WORKSPACE_TRANSLATE, TRANSLATE_OUT_INTERPOLATOR);
+        nonOverviewBuilder.setInterpolator(ANIM_WORKSPACE_SCALE, FADE_OUT_INTERPOLATOR);
+        nonOverviewBuilder.setInterpolator(ANIM_DEPTH, FADE_OUT_INTERPOLATOR);
         nonOverviewBuilder.setInterpolator(ANIM_VERTICAL_PROGRESS, TRANSLATE_OUT_INTERPOLATOR);
         updateNonOverviewAnim(QUICK_SWITCH, nonOverviewBuilder);
         mNonOverviewAnim.dispatchOnStart();
@@ -206,7 +208,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
     /** Create state animation to control non-overview components. */
     private void updateNonOverviewAnim(LauncherState toState, StateAnimationConfig config) {
         config.duration = (long) (Math.max(mXRange, mYRange) * 2);
-        config.animFlags = config.animFlags | SKIP_OVERVIEW;
+        config.animFlags |= SKIP_OVERVIEW;
         mNonOverviewAnim = mLauncher.getStateManager()
                 .createAnimationToNewWorkspace(toState, config);
         mNonOverviewAnim.getTarget().addListener(mClearStateOnCancelListener);
@@ -230,8 +232,8 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         //   - OverviewScrim
         PendingAnimation xAnim = new PendingAnimation((long) (mXRange * 2));
         xAnim.setFloat(mRecentsView, ADJACENT_PAGE_OFFSET, scaleAndOffset[1], LINEAR);
-        xAnim.setFloat(mLauncher.getDragLayer().getOverviewScrim(), OverviewScrim.SCRIM_PROGRESS,
-                toState.getOverviewScrimAlpha(mLauncher), LINEAR);
+        xAnim.setFloat(mLauncher.getScrimView(), VIEW_ALPHA,
+                toState.getWorkspaceScrimAlpha(mLauncher), LINEAR);
         mXOverviewAnim = xAnim.createPlaybackController();
         mXOverviewAnim.dispatchOnStart();
 
@@ -372,7 +374,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
             // animation as from an app.
             StateAnimationConfig config = new StateAnimationConfig();
             // Update mNonOverviewAnim to do nothing so it doesn't interfere.
-            config.animFlags = 0;
+            config.animFlags = SKIP_ALL_ANIMATIONS;
             updateNonOverviewAnim(targetState, config);
             nonOverviewAnim = mNonOverviewAnim.getAnimationPlayer();
 

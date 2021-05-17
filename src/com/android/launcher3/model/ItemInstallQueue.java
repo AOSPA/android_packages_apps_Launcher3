@@ -63,6 +63,8 @@ import java.util.stream.Stream;
  */
 public class ItemInstallQueue {
 
+    private static final String LOG = "ItemInstallQueue";
+
     public static final int FLAG_ACTIVITY_PAUSED = 1;
     public static final int FLAG_LOADER_RUNNING = 2;
     public static final int FLAG_DRAG_AND_DROP = 4;
@@ -128,6 +130,7 @@ public class ItemInstallQueue {
 
         // Add the items and clear queue
         if (!installQueue.isEmpty()) {
+            // add log
             launcher.getModel().addAndBindAddedWorkspaceItems(installQueue);
         }
         mItems.clear();
@@ -182,8 +185,24 @@ public class ItemInstallQueue {
     }
 
     private void queuePendingShortcutInfo(PendingInstallShortcutInfo info) {
+        final Exception stackTrace = new Exception();
+
         // Queue the item up for adding if launcher has not loaded properly yet
-        MODEL_EXECUTOR.post(() -> addToQueue(info));
+        MODEL_EXECUTOR.post(() -> {
+            Pair<ItemInfo, Object> itemInfo = info.getItemInfo(mContext);
+            if (itemInfo == null) {
+                Log.d(LOG,
+                        "Adding PendingInstallShortcutInfo with no attached info to queue.",
+                        stackTrace);
+            } else {
+                Log.d(LOG,
+                        "Adding PendingInstallShortcutInfo to queue. Attached info: "
+                                + itemInfo.first,
+                        stackTrace);
+            }
+
+            addToQueue(info);
+        });
         flushInstallQueue();
     }
 

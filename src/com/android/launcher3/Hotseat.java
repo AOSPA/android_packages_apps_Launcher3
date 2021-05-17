@@ -92,11 +92,10 @@ public class Hotseat extends CellLayout implements Insettable {
         mHasVerticalHotseat = hasVerticalHotseat;
         InvariantDeviceProfile idp = mActivity.getDeviceProfile().inv;
         if (hasVerticalHotseat) {
-            setGridSize(1, idp.numHotseatIcons);
+            setGridSize(1, idp.numShownHotseatIcons);
         } else {
-            setGridSize(idp.numHotseatIcons, 1);
+            setGridSize(idp.numShownHotseatIcons, 1);
         }
-        showInlineQsb();
     }
 
     @Override
@@ -181,10 +180,6 @@ public class Hotseat extends CellLayout implements Insettable {
         mOnVisibilityAggregatedCallback = callback;
     }
 
-    protected void showInlineQsb() {
-        //Does nothing
-    }
-
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
@@ -204,29 +199,35 @@ public class Hotseat extends CellLayout implements Insettable {
         int left = (r - l - qsbWidth) / 2;
         int right = left + qsbWidth;
 
-        DeviceProfile dp = mActivity.getDeviceProfile();
-        int freeSpace = dp.isTaskbarPresent
-                ? dp.workspacePadding.bottom
-                : dp.hotseatBarSizePx - dp.hotseatCellHeightPx - mQsbHeight;
-        int bottom = b - t
-                - (int) (freeSpace * QSB_CENTER_FACTOR)
-                - (dp.isTaskbarPresent ? dp.taskbarSize : dp.getInsets().bottom);
+        int bottom = b - t - getQsbOffsetY();
         int top = bottom - mQsbHeight;
         mQsb.layout(left, top, right, bottom);
 
         int taskbarWidth = mTaskbarView.getMeasuredWidth();
         left = (r - l - taskbarWidth) / 2;
         right = left + taskbarWidth;
-        bottom = b - t;
+        bottom = b - t - getTaskbarOffsetY();
         top = bottom - mTaskbarViewHeight;
         mTaskbarView.layout(left, top, right, bottom);
     }
 
     /**
-     * Returns the first View for which the given itemOperator returns true, or null.
+     * Returns the number of pixels the QSB is translated from the bottom of the screen.
      */
-    public View getFirstItemMatch(Workspace.ItemOperator itemOperator) {
-        return mWorkspace.getFirstMatch(new CellLayout[] { this }, itemOperator);
+    private int getQsbOffsetY() {
+        DeviceProfile dp = mActivity.getDeviceProfile();
+        int freeSpace = dp.isTaskbarPresent
+                ? dp.workspacePadding.bottom
+                : dp.hotseatBarSizePx - dp.hotseatCellHeightPx - mQsbHeight;
+        return (int) (freeSpace * QSB_CENTER_FACTOR)
+                + (dp.isTaskbarPresent ? dp.taskbarSize : dp.getInsets().bottom);
+    }
+
+    /**
+     * Returns the number of pixels the taskbar is translated from the bottom of the screen.
+     */
+    public int getTaskbarOffsetY() {
+        return (getQsbOffsetY() - mTaskbarViewHeight) / 2;
     }
 
     /**

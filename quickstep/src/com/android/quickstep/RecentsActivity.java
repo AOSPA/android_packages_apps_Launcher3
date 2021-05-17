@@ -37,6 +37,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
@@ -48,6 +50,7 @@ import com.android.launcher3.WrappedLauncherAnimationRunner;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
@@ -56,7 +59,6 @@ import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ActivityTracker;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SystemUiController;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.fallback.FallbackRecentsStateController;
 import com.android.quickstep.fallback.FallbackRecentsView;
@@ -109,8 +111,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
 
         SplitPlaceholderView splitPlaceholderView = findViewById(R.id.split_placeholder);
         splitPlaceholderView.init(
-                new SplitSelectStateController(
-                        SystemUiProxy.INSTANCE.get(this))
+                new SplitSelectStateController(mUiHandler, SystemUiProxy.INSTANCE.get(this))
         );
 
         mDragLayer.recreateControllers();
@@ -179,9 +180,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     }
 
     @Override
-    public ActivityOptionsWrapper getActivityLaunchOptions(final View v) {
+    public ActivityOptionsWrapper getActivityLaunchOptions(final View v, @Nullable ItemInfo item) {
         if (!(v instanceof TaskView)) {
-            return super.getActivityLaunchOptions(v);
+            return super.getActivityLaunchOptions(v, item);
         }
 
         final TaskView taskView = (TaskView) v;
@@ -193,7 +194,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                     RemoteAnimationTargetCompat[] nonAppTargets,
                     AnimationResult result) -> {
             AnimatorSet anim = composeRecentsLaunchAnimator(taskView, appTargets,
-                    wallpaperTargets);
+                    wallpaperTargets, nonAppTargets);
             anim.addListener(resetStateListener());
             result.setAnimation(anim, RecentsActivity.this, onEndCallback::executeAllAndDestroy);
         };
@@ -214,12 +215,13 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
      */
     private AnimatorSet  composeRecentsLaunchAnimator(TaskView taskView,
             RemoteAnimationTargetCompat[] appTargets,
-            RemoteAnimationTargetCompat[] wallpaperTargets) {
+            RemoteAnimationTargetCompat[] wallpaperTargets,
+            RemoteAnimationTargetCompat[] nonAppTargets) {
         AnimatorSet target = new AnimatorSet();
         boolean activityClosing = taskIsATargetWithMode(appTargets, getTaskId(), MODE_CLOSING);
         PendingAnimation pa = new PendingAnimation(RECENTS_LAUNCH_DURATION);
         createRecentsWindowAnimator(taskView, !activityClosing, appTargets,
-                wallpaperTargets, null /* depthController */, pa);
+                wallpaperTargets, nonAppTargets, null /* depthController */, pa);
         target.play(pa.buildAnim());
 
         // Found a visible recents task that matches the opening app, lets launch the app from there
@@ -267,7 +269,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         setupViews();
 
         getSystemUiController().updateUiState(SystemUiController.UI_STATE_BASE_WINDOW,
-                Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText));
+                mFallbackRecentsView.hasLightBackground());
         ACTIVITY_TRACKER.handleCreate(this);
     }
 

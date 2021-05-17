@@ -24,7 +24,6 @@ import static com.android.launcher3.touch.SingleAxisSwipeDetector.HORIZONTAL;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
-import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_SIDE;
 
 import android.content.res.Resources;
 import android.graphics.PointF;
@@ -39,13 +38,11 @@ import android.view.accessibility.AccessibilityEvent;
 import android.widget.LinearLayout;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.PagedView;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.util.OverScroller;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class LandscapePagedViewHandler implements PagedOrientationHandler {
@@ -61,26 +58,23 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public void delegateScrollTo(PagedView pagedView, int secondaryScroll, int minMaxScroll) {
-        pagedView.superScrollTo(secondaryScroll, minMaxScroll);
+    public int getPrimaryValue(int x, int y) {
+        return y;
     }
 
     @Override
-    public void delegateScrollBy(PagedView pagedView, int unboundedScroll, int x, int y) {
-        pagedView.scrollTo(pagedView.getScrollX() + x, unboundedScroll + y);
+    public int getSecondaryValue(int x, int y) {
+        return x;
     }
 
     @Override
-    public void scrollerStartScroll(OverScroller scroller, int newPosition) {
-        scroller.startScroll(scroller.getCurrPos(), newPosition - scroller.getCurrPos());
+    public float getPrimaryValue(float x, float y) {
+        return y;
     }
 
     @Override
-    public void getCurveProperties(PagedView view, Rect insets, CurveProperties out) {
-        out.scroll = view.getScrollY();
-        out.halfPageSize = view.getNormalChildHeight() / 2;
-        out.halfScreenSize = view.getMeasuredHeight() / 2;
-        out.screenCenter = insets.top + view.getPaddingTop() + out.scroll + out.halfPageSize;
+    public float getSecondaryValue(float x, float y) {
+        return x;
     }
 
     @Override
@@ -93,11 +87,6 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
         float oldX = velocity.x;
         float oldY = velocity.y;
         velocity.set(-oldY, oldX);
-    }
-
-    @Override
-    public void delegateScrollTo(PagedView pagedView, int primaryScroll) {
-        pagedView.superScrollTo(pagedView.getScrollX(), primaryScroll);
     }
 
     @Override
@@ -131,8 +120,23 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
+    public int getPrimarySize(View view) {
+        return view.getHeight();
+    }
+
+    @Override
     public float getPrimarySize(RectF rect) {
         return rect.height();
+    }
+
+    @Override
+    public float getStart(RectF rect) {
+        return rect.top;
+    }
+
+    @Override
+    public float getEnd(RectF rect) {
+        return rect.bottom;
     }
 
     @Override
@@ -235,13 +239,13 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public float getTaskMenuX(float x, View thumbnailView) {
+    public float getTaskMenuX(float x, View thumbnailView, int overScroll) {
         return thumbnailView.getMeasuredWidth() + x;
     }
 
     @Override
-    public float getTaskMenuY(float y, View thumbnailView) {
-        return y;
+    public float getTaskMenuY(float y, View thumbnailView, int overScroll) {
+        return y + overScroll;
     }
 
     @Override
@@ -308,15 +312,10 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp) {
-        List<SplitPositionOption> options = new ArrayList<>(2);
-        // Add left/right options where left => position top, right => position bottom
-        options.add(new SplitPositionOption(
+        // Add "left" side of phone which is actually the top
+        return Collections.singletonList(new SplitPositionOption(
                 R.drawable.ic_split_screen, R.string.split_screen_position_left,
                 STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
-        options.add(new SplitPositionOption(
-                R.drawable.ic_split_screen, R.string.split_screen_position_right,
-                STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_SIDE));
-        return options;
     }
 
     @Override

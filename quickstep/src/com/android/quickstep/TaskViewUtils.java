@@ -15,9 +15,17 @@
  */
 package com.android.quickstep;
 
+import static android.view.WindowManager.TRANSIT_OPEN;
+import static android.view.WindowManager.TRANSIT_TO_FRONT;
+
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.QuickstepTransitionManager.ANIMATION_DELAY_NAV_FADE_IN;
+import static com.android.launcher3.QuickstepTransitionManager.ANIMATION_NAV_FADE_IN_DURATION;
+import static com.android.launcher3.QuickstepTransitionManager.ANIMATION_NAV_FADE_OUT_DURATION;
+import static com.android.launcher3.QuickstepTransitionManager.NAV_FADE_IN_INTERPOLATOR;
+import static com.android.launcher3.QuickstepTransitionManager.NAV_FADE_OUT_INTERPOLATOR;
 import static com.android.launcher3.QuickstepTransitionManager.RECENTS_LAUNCH_DURATION;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
@@ -42,7 +50,9 @@ import android.graphics.Matrix.ScaleToFit;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
+import android.view.SurfaceControl;
 import android.view.View;
+import android.window.TransitionInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -58,6 +68,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.util.DisplayController;
+import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.quickstep.util.SurfaceTransactionApplier;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TransformParams;
@@ -67,6 +78,7 @@ import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
+import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams;
 
 /**
  * Utility class for helpful methods related to {@link TaskView} objects and their tasks.
@@ -137,7 +149,8 @@ public final class TaskViewUtils {
 
     public static void createRecentsWindowAnimator(TaskView v, boolean skipViewChanges,
             RemoteAnimationTargetCompat[] appTargets,
-            RemoteAnimationTargetCompat[] wallpaperTargets, DepthController depthController,
+            RemoteAnimationTargetCompat[] wallpaperTargets,
+            RemoteAnimationTargetCompat[] nonAppTargets, DepthController depthController,
             PendingAnimation out) {
         boolean isRunningTask = v.isRunningTask();
         TransformParams params = null;
@@ -146,7 +159,7 @@ public final class TaskViewUtils {
             params = v.getRecentsView().getLiveTileParams();
             tsv = v.getRecentsView().getLiveTileTaskViewSimulator();
         }
-        createRecentsWindowAnimator(v, skipViewChanges, appTargets, wallpaperTargets,
+        createRecentsWindowAnimator(v, skipViewChanges, appTargets, wallpaperTargets, nonAppTargets,
                 depthController, out, params, tsv);
     }
 
@@ -156,7 +169,8 @@ public final class TaskViewUtils {
      */
     public static void createRecentsWindowAnimator(TaskView v, boolean skipViewChanges,
             RemoteAnimationTargetCompat[] appTargets,
-            RemoteAnimationTargetCompat[] wallpaperTargets, DepthController depthController,
+            RemoteAnimationTargetCompat[] wallpaperTargets,
+            RemoteAnimationTargetCompat[] nonAppTargets, DepthController depthController,
             PendingAnimation out, @Nullable TransformParams params,
             @Nullable TaskViewSimulator tsv) {
         boolean isQuickSwitch = v.isEndQuickswitchCuj();
@@ -164,8 +178,9 @@ public final class TaskViewUtils {
 
         boolean inLiveTileMode = LIVE_TILE.get() && v.getRecentsView().getRunningTaskIndex() != -1;
         final RemoteAnimationTargets targets =
-                new RemoteAnimationTargets(appTargets, wallpaperTargets,
+                new RemoteAnimationTargets(appTargets, wallpaperTargets, nonAppTargets,
                         inLiveTileMode ? MODE_CLOSING : MODE_OPENING);
+        final RemoteAnimationTargetCompat navBarTarget = targets.getNavBarRemoteAnimationTarget();
 
         if (params == null) {
             SurfaceTransactionApplier applier = new SurfaceTransactionApplier(v);
@@ -180,10 +195,9 @@ public final class TaskViewUtils {
         int taskIndex = recentsView.indexOfChild(v);
         Context context = v.getContext();
         DeviceProfile dp = BaseActivity.fromContext(context).getDeviceProfile();
+        boolean showAsGrid = dp.isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get();
         boolean parallaxCenterAndAdjacentTask =
-                taskIndex != recentsView.getCurrentPage() && !(dp.isTablet
-                        && FeatureFlags.ENABLE_OVERVIEW_GRID.get());
-        float gridProgress = recentsView.getGridProgress();
+                taskIndex != recentsView.getCurrentPage() && !showAsGrid;
         float gridTranslationSecondary = recentsView.getGridTranslationSecondary(taskIndex);
         int startScroll = recentsView.getScrollOffset(taskIndex);
 
@@ -195,13 +209,15 @@ public final class TaskViewUtils {
 
             // RecentsView never updates the display rotation until swipe-up so the value may
             // be stale. Use the display value instead.
-            int displayRotation = DisplayController.getDefaultDisplay(context).getInfo().rotation;
+            int displayRotation = DisplayController.INSTANCE.get(context).getInfo().rotation;
             tsv.getOrientationState().update(displayRotation, displayRotation);
 
             tsv.setPreview(targets.apps[targets.apps.length - 1]);
             tsv.fullScreenProgress.value = 0;
             tsv.recentsViewScale.value = 1;
-            tsv.taskSecondaryTranslation.value = gridTranslationSecondary;
+            if (showAsGrid) {
+                tsv.taskSecondaryTranslation.value = gridTranslationSecondary;
+            }
             tsv.setScroll(startScroll);
 
             // Fade in the task during the initial 20% of the animation
@@ -214,13 +230,40 @@ public final class TaskViewUtils {
                     AnimatedFloat.VALUE, 1, TOUCH_RESPONSE_INTERPOLATOR);
             out.setFloat(tsv.recentsViewScale,
                     AnimatedFloat.VALUE, tsv.getFullScreenScale(), TOUCH_RESPONSE_INTERPOLATOR);
-            out.setFloat(tsv.taskSecondaryTranslation, AnimatedFloat.VALUE, 0,
-                    TOUCH_RESPONSE_INTERPOLATOR_ACCEL_DEACCEL);
-            out.setInt(tsv, TaskViewSimulator.SCROLL, 0, TOUCH_RESPONSE_INTERPOLATOR);
+            if (showAsGrid) {
+                out.setFloat(tsv.taskSecondaryTranslation, AnimatedFloat.VALUE, 0,
+                        TOUCH_RESPONSE_INTERPOLATOR_ACCEL_DEACCEL);
+            }
+            out.setFloat(tsv.recentsViewScroll, AnimatedFloat.VALUE, 0,
+                    TOUCH_RESPONSE_INTERPOLATOR);
 
             TaskViewSimulator finalTsv = tsv;
             TransformParams finalParams = params;
             out.addOnFrameCallback(() -> finalTsv.apply(finalParams));
+            if (navBarTarget != null) {
+                final Rect cropRect = new Rect();
+                out.addOnFrameListener(new MultiValueUpdateListener() {
+                    FloatProp mNavFadeOut = new FloatProp(1f, 0f, 0,
+                            ANIMATION_NAV_FADE_OUT_DURATION, NAV_FADE_OUT_INTERPOLATOR);
+                    FloatProp mNavFadeIn = new FloatProp(0f, 1f, ANIMATION_DELAY_NAV_FADE_IN,
+                            ANIMATION_NAV_FADE_IN_DURATION, NAV_FADE_IN_INTERPOLATOR);
+
+                    @Override
+                    public void onUpdate(float percent) {
+                        final SurfaceParams.Builder navBuilder =
+                                new SurfaceParams.Builder(navBarTarget.leash);
+                        if (mNavFadeIn.value > mNavFadeIn.getStartValue()) {
+                            finalTsv.getCurrentCropRect().round(cropRect);
+                            navBuilder.withMatrix(finalTsv.getCurrentMatrix())
+                                    .withWindowCrop(cropRect)
+                                    .withAlpha(mNavFadeIn.value);
+                        } else {
+                            navBuilder.withAlpha(mNavFadeOut.value);
+                        }
+                        finalParams.applySurfaceParams(navBuilder.build());
+                    }
+                });
+            }
             topMostSimulator = tsv;
         }
 
@@ -314,9 +357,50 @@ public final class TaskViewUtils {
      * device is considered in multiWindowMode and things like insets and stuff change
      * and calculations have to be adjusted in the animations for that
      */
-    public static void composeRecentsSplitLaunchAnimator(@NonNull AnimatorSet anim,
+    public static void composeRecentsSplitLaunchAnimator(@NonNull TaskView initialView,
+            @NonNull TaskView v, @NonNull TransitionInfo transitionInfo,
+            SurfaceControl.Transaction t, @NonNull Runnable finishCallback) {
+
+        final TransitionInfo.Change[] splitRoots = new TransitionInfo.Change[2];
+        for (int i = 0; i < transitionInfo.getChanges().size(); ++i) {
+            final TransitionInfo.Change change = transitionInfo.getChanges().get(i);
+            final int taskId = change.getTaskInfo() != null ? change.getTaskInfo().taskId : -1;
+            final int mode = change.getMode();
+            // Find the target tasks' root tasks since those are the split stages that need to
+            // be animated (the tasks themselves are children and thus inherit animation).
+            if (taskId == initialView.getTask().key.id || taskId == v.getTask().key.id) {
+                if (!(mode == TRANSIT_OPEN || mode == TRANSIT_TO_FRONT)) {
+                    throw new IllegalStateException(
+                            "Expected task to be showing, but it is " + mode);
+                }
+                if (change.getParent() == null) {
+                    throw new IllegalStateException("Initiating multi-split launch but the split"
+                            + "root of " + taskId + " is already visible or has broken hierarchy.");
+                }
+                splitRoots[taskId == initialView.getTask().key.id ? 0 : 1] =
+                        transitionInfo.getChange(change.getParent());
+            }
+        }
+
+        // This is where we should animate the split roots. For now, though, just make them visible.
+        for (int i = 0; i < 2; ++i) {
+            t.show(splitRoots[i].getLeash());
+            t.setAlpha(splitRoots[i].getLeash(), 1.f);
+        }
+
+        // This contains the initial state (before animation), so apply this at the beginning of
+        // the animation.
+        t.apply();
+
+        // Once there is an animation, this should be called AFTER the animation completes.
+        finishCallback.run();
+    }
+
+    /** Legacy version (until shell transitions are enabled) */
+    public static void composeRecentsSplitLaunchAnimatorLegacy(@NonNull AnimatorSet anim,
             @NonNull TaskView v, @NonNull RemoteAnimationTargetCompat[] appTargets,
-            @NonNull RemoteAnimationTargetCompat[] wallpaperTargets, boolean launcherClosing,
+            @NonNull RemoteAnimationTargetCompat[] wallpaperTargets,
+            @NonNull RemoteAnimationTargetCompat[] nonAppTargets, boolean launcherClosing,
             @NonNull StateManager stateManager, @NonNull DepthController depthController,
             int targetStage) {
         PendingAnimation out = new PendingAnimation(RECENTS_LAUNCH_DURATION);
@@ -332,7 +416,7 @@ public final class TaskViewUtils {
         boolean inLiveTileMode =
                 ENABLE_QUICKSTEP_LIVE_TILE.get() && recentsView.getRunningTaskIndex() != -1;
         final RemoteAnimationTargets targets =
-                new RemoteAnimationTargets(appTargets, wallpaperTargets,
+                new RemoteAnimationTargets(appTargets, wallpaperTargets, nonAppTargets,
                         inLiveTileMode ? MODE_CLOSING : MODE_OPENING);
 
         if (params == null) {
@@ -353,7 +437,7 @@ public final class TaskViewUtils {
 
             // RecentsView never updates the display rotation until swipe-up so the value may
             // be stale. Use the display value instead.
-            int displayRotation = DisplayController.getDefaultDisplay(recentsView.getContext())
+            int displayRotation = DisplayController.INSTANCE.get(recentsView.getContext())
                     .getInfo().rotation;
             tvs.getOrientationState().update(displayRotation, displayRotation);
 
@@ -374,7 +458,8 @@ public final class TaskViewUtils {
                     AnimatedFloat.VALUE, 1, TOUCH_RESPONSE_INTERPOLATOR);
             out.setFloat(tvs.recentsViewScale,
                     AnimatedFloat.VALUE, tvs.getFullScreenScale(), TOUCH_RESPONSE_INTERPOLATOR);
-            out.setInt(tvs, TaskViewSimulator.SCROLL, 0, TOUCH_RESPONSE_INTERPOLATOR);
+            out.setFloat(tvs.recentsViewScroll,
+                    AnimatedFloat.VALUE, 0, TOUCH_RESPONSE_INTERPOLATOR);
 
             TaskViewSimulator finalTsv = tvs;
             TransformParams finalParams = params;
@@ -387,7 +472,8 @@ public final class TaskViewUtils {
 
     public static void composeRecentsLaunchAnimator(@NonNull AnimatorSet anim, @NonNull View v,
             @NonNull RemoteAnimationTargetCompat[] appTargets,
-            @NonNull RemoteAnimationTargetCompat[] wallpaperTargets, boolean launcherClosing,
+            @NonNull RemoteAnimationTargetCompat[] wallpaperTargets,
+            @NonNull RemoteAnimationTargetCompat[] nonAppTargets, boolean launcherClosing,
             @NonNull StateManager stateManager, @NonNull RecentsView recentsView,
             @NonNull DepthController depthController) {
         boolean skipLauncherChanges = !launcherClosing;
@@ -395,7 +481,7 @@ public final class TaskViewUtils {
         TaskView taskView = findTaskViewToLaunch(recentsView, v, appTargets);
         PendingAnimation pa = new PendingAnimation(RECENTS_LAUNCH_DURATION);
         createRecentsWindowAnimator(taskView, skipLauncherChanges, appTargets, wallpaperTargets,
-                depthController, pa);
+                nonAppTargets, depthController, pa);
 
         Animator childStateAnimation = null;
         // Found a visible recents task that matches the opening app, lets launch the app from there
@@ -414,23 +500,25 @@ public final class TaskViewUtils {
             windowAnimEndListener = new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    recentsView.post(() -> {
-                        stateManager.moveToRestState();
-                        stateManager.reapplyState();
+                    recentsView.finishRecentsAnimation(false /* toRecents */, () -> {
+                        recentsView.post(() -> {
+                            stateManager.moveToRestState();
+                            stateManager.reapplyState();
+                        });
                     });
                 }
             };
         } else {
             AnimatorPlaybackController controller =
-                    stateManager.createAnimationToNewWorkspace(NORMAL,
-                            RECENTS_LAUNCH_DURATION);
+                    stateManager.createAnimationToNewWorkspace(NORMAL, RECENTS_LAUNCH_DURATION);
             controller.dispatchOnStart();
             childStateAnimation = controller.getTarget();
             launcherAnim = controller.getAnimationPlayer().setDuration(RECENTS_LAUNCH_DURATION);
             windowAnimEndListener = new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    stateManager.goToState(NORMAL, false);
+                    recentsView.finishRecentsAnimation(false /* toRecents */,
+                            () -> stateManager.goToState(NORMAL, false));
                 }
             };
         }

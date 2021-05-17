@@ -46,9 +46,8 @@ import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.folder.Folder;
-import com.android.launcher3.graphics.OverviewScrim;
+import com.android.launcher3.graphics.Scrim;
 import com.android.launcher3.graphics.SysUiScrim;
-import com.android.launcher3.graphics.WorkspaceDragScrim;
 import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.BaseDragLayer;
@@ -84,8 +83,7 @@ public class DragLayer extends BaseDragLayer<Launcher> {
 
     // Related to adjacent page hints
     private final ViewGroupFocusHelper mFocusIndicatorHelper;
-    private final OverviewScrim mOverviewScrim;
-    private WorkspaceDragScrim mWorkspaceDragScrim;
+    private Scrim mWorkspaceDragScrim;
     private SysUiScrim mSysUiScrim;
     private LauncherRootView mRootView;
 
@@ -103,17 +101,12 @@ public class DragLayer extends BaseDragLayer<Launcher> {
         setChildrenDrawingOrderEnabled(true);
 
         mFocusIndicatorHelper = new ViewGroupFocusHelper(this);
-        mOverviewScrim = new OverviewScrim(this);
     }
 
     public void setup(DragController dragController, Workspace workspace) {
         mDragController = dragController;
         recreateControllers();
-
-        mOverviewScrim.setup();
-
-        mWorkspaceDragScrim = new WorkspaceDragScrim((this));
-        mWorkspaceDragScrim.setWorkspace(workspace);
+        mWorkspaceDragScrim = new Scrim(this);
 
         // We delegate drawing of the workspace scrim to LauncherRootView (one level up), so as
         // to avoid artifacts when translating the entire drag layer in the -1 transition.
@@ -529,20 +522,8 @@ public class DragLayer extends BaseDragLayer<Launcher> {
     protected void dispatchDraw(Canvas canvas) {
         // Draw the background below children.
         mWorkspaceDragScrim.draw(canvas);
-        mOverviewScrim.updateCurrentScrimmedView(this);
         mFocusIndicatorHelper.draw(canvas);
         super.dispatchDraw(canvas);
-        if (mOverviewScrim.getScrimmedView() == null) {
-            mOverviewScrim.draw(canvas);
-        }
-    }
-
-    @Override
-    protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-        if (child == mOverviewScrim.getScrimmedView()) {
-            mOverviewScrim.draw(canvas);
-        }
-        return super.drawChild(canvas, child, drawingTime);
     }
 
     @Override
@@ -557,15 +538,11 @@ public class DragLayer extends BaseDragLayer<Launcher> {
         mSysUiScrim.onInsetsChanged(insets, mAllowSysuiScrims);
     }
 
-    public WorkspaceDragScrim getWorkspaceDragScrim() {
+    public Scrim getWorkspaceDragScrim() {
         return mWorkspaceDragScrim;
     }
 
     public SysUiScrim getSysUiScrim() {
         return mSysUiScrim;
-    }
-
-    public OverviewScrim getOverviewScrim() {
-        return mOverviewScrim;
     }
 }

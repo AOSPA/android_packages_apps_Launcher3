@@ -43,6 +43,7 @@
     <attr name="folderTextColor" format="color" />
     <attr name="folderHintColor" format="color" />
     <attr name="workProfileOverlayTextColor" format="color" />
+    <attr name="gridColor" format="color" />
 
     <!-- BubbleTextView specific attributes. -->
     <declare-styleable name="BubbleTextView">
@@ -162,6 +163,8 @@
         <!-- landscapeIconSize defaults to iconSize, if not specified -->
         <attr name="landscapeIconSize" format="float" />
         <attr name="iconTextSize" format="float" />
+        <!-- landscapeIconTextSize defaults to iconTextSize, if not specified -->
+        <attr name="landscapeIconTextSize" format="float" />
         <!-- If true, this display option is used to determine the default grid -->
         <attr name="canBeDefault" format="boolean" />
 
@@ -173,6 +176,9 @@
 
         <!-- numAllAppsColumns defaults to GridDisplayOption.numColumns, if not specified -->
         <attr name="numAllAppsColumns" format="integer" />
+
+        <!-- numShownHotseatIcons defaults to GridDisplayOption.numHotseatIcons, if not specified -->
+        <attr name="numShownHotseatIcons" format="integer" />
     </declare-styleable>
 
     <declare-styleable name="CellLayout">

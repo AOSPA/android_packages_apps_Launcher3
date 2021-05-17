@@ -64,8 +64,6 @@ import com.android.launcher3.keyboard.FocusedItemDecorator;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.ItemInfoMatcher;
-import com.android.launcher3.util.MultiValueAlpha;
-import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 import com.android.launcher3.views.SpringRelativeLayout;
@@ -77,10 +75,10 @@ import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.OnActivePag
 public class AllAppsContainerView extends SpringRelativeLayout implements DragSource,
         Insettable, OnDeviceProfileChangeListener, OnActivePageChangedListener {
 
-    private static final float FLING_VELOCITY_MULTIPLIER = 1000 * .8f;
-    // Starts the springs after at least 55% of the animation has passed.
-    private static final float FLING_ANIMATION_THRESHOLD = 0.55f;
-    private static final int ALPHA_CHANNEL_COUNT = 2;
+    private static final float FLING_VELOCITY_MULTIPLIER = 1800f;
+
+    // Starts the springs after at least 25% of the animation has passed.
+    private static final float FLING_ANIMATION_THRESHOLD = 0.25f;
 
     protected final BaseDraggingActivity mLauncher;
     protected final AdapterHolder[] mAH;
@@ -106,8 +104,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
     protected RecyclerViewFastScroller mTouchHandler;
     protected final Point mFastScrollerOffset = new Point();
-
-    private final MultiValueAlpha mMultiValueAlpha;
 
     private Rect mInsets = new Rect();
 
@@ -139,8 +135,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         mNavBarScrimPaint.setColor(Themes.getAttrColor(context, R.attr.allAppsNavBarScrimColor));
 
         mAllAppsStore.addUpdateListener(this::onAppsUpdated);
-
-        mMultiValueAlpha = new MultiValueAlpha(this, ALPHA_CHANNEL_COUNT);
     }
 
     /**
@@ -154,10 +148,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
     public AllAppsStore getAppsStore() {
         return mAllAppsStore;
-    }
-
-    public AlphaProperty getAlphaProperty(int index) {
-        return mMultiValueAlpha.getProperty(index);
     }
 
     public WorkModeSwitch getWorkModeSwitch() {
@@ -621,7 +611,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             public void onAnimationUpdate(ValueAnimator valueAnimator) {
                 if (shouldSpring
                         && valueAnimator.getAnimatedFraction() >= FLING_ANIMATION_THRESHOLD) {
-                    absorbSwipeUpVelocity(Math.abs(
+                    absorbSwipeUpVelocity(-Math.abs(
                             Math.round(velocity * FLING_VELOCITY_MULTIPLIER)));
                     shouldSpring = false;
                 }

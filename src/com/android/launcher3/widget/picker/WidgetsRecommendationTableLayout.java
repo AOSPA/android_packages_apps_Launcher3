@@ -17,8 +17,10 @@ package com.android.launcher3.widget.picker;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TableLayout;
 import android.widget.TableRow;
@@ -31,16 +33,17 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.widget.WidgetCell;
-import com.android.launcher3.widget.WidgetImageView;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /** A {@link TableLayout} for showing recommended widgets. */
 public final class WidgetsRecommendationTableLayout extends TableLayout {
-    private static final float SCALE_DOWN_RATIO = 0.9f;
-    private final DeviceProfile mDeviceProfile;
+    private static final String TAG = "WidgetsRecommendationTableLayout";
+    private static final float DOWN_SCALE_RATIO = 0.9f;
+    private static final float MAX_DOWN_SCALE_RATIO = 0.5f;
     private final float mWidgetCellTextViewsHeight;
+    private final float mWidgetPreviewPadding;
 
     private float mRecommendationTableMaxHeight = Float.MAX_VALUE;
     @Nullable private OnLongClickListener mWidgetCellOnLongClickListener;
@@ -53,9 +56,10 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
 
     public WidgetsRecommendationTableLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mDeviceProfile = Launcher.getLauncher(context).getDeviceProfile();
         // There are 1 row for title, 1 row for dimension and 2 rows for description.
         mWidgetCellTextViewsHeight = 4 * getResources().getDimension(R.dimen.widget_cell_font_size);
+        mWidgetPreviewPadding = 2 * getResources()
+                .getDimensionPixelSize(R.dimen.widget_preview_shortcut_padding);
     }
 
     /** Sets a {@link android.view.View.OnLongClickListener} for all widget cells in this table. */
@@ -86,6 +90,9 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
         mRecommendationTableMaxHeight = recommendationTableMaxHeight;
         RecommendationTableData data = fitRecommendedWidgetsToTableSpace(/* previewScale= */ 1f,
                 recommendedWidgets);
+        // TODO(b/185508758): Revert the following logs after debugging.
+        Log.d(TAG, "Recommended widgets section max height: " + recommendationTableMaxHeight);
+        Log.d(TAG, "Recommended widget down scale: " + data.mPreviewScale);
         bindData(data);
     }
 
@@ -119,9 +126,9 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
                 getContext()).inflate(R.layout.widget_cell, parent, false);
 
         widget.setOnTouchListener(mWidgetCellOnTouchListener);
-        WidgetImageView preview = widget.findViewById(R.id.widget_preview);
-        preview.setOnClickListener(mWidgetCellOnClickListener);
-        preview.setOnLongClickListener(mWidgetCellOnLongClickListener);
+        View previewContainer = widget.findViewById(R.id.widget_preview_container);
+        previewContainer.setOnClickListener(mWidgetCellOnClickListener);
+        previewContainer.setOnLongClickListener(mWidgetCellOnLongClickListener);
         widget.setAnimatePreview(false);
 
         parent.addView(widget);
@@ -131,14 +138,19 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
     private RecommendationTableData fitRecommendedWidgetsToTableSpace(
             float previewScale,
             List<ArrayList<WidgetItem>> recommendedWidgetsInTable) {
+        if (previewScale < MAX_DOWN_SCALE_RATIO) {
+            Log.w(TAG, "Hide recommended widgets. Can't down scale previews to " + previewScale);
+            return new RecommendationTableData(List.of(), previewScale);
+        }
         // A naive estimation of the widgets recommendation table height without inflation.
         float totalHeight = 0;
+        DeviceProfile deviceProfile = Launcher.getLauncher(getContext()).getDeviceProfile();
         for (int i = 0; i < recommendedWidgetsInTable.size(); i++) {
             List<WidgetItem> widgetItems = recommendedWidgetsInTable.get(i);
             float rowHeight = 0;
             for (int j = 0; j < widgetItems.size(); j++) {
-                float previewHeight = widgetItems.get(j).spanY * mDeviceProfile.allAppsCellHeightPx
-                        * previewScale;
+                float previewHeight = widgetItems.get(j).spanY * deviceProfile.cellHeightPx
+                        * previewScale + mWidgetPreviewPadding;
                 rowHeight = Math.max(rowHeight, previewHeight + mWidgetCellTextViewsHeight);
             }
             totalHeight += rowHeight;
@@ -157,7 +169,7 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
                             /* toIndex= */recommendedWidgetsInTable.size() - 1));
         }
 
-        float nextPreviewScale = previewScale * SCALE_DOWN_RATIO;
+        float nextPreviewScale = previewScale * DOWN_SCALE_RATIO;
         return fitRecommendedWidgetsToTableSpace(nextPreviewScale, recommendedWidgetsInTable);
     }
 
