@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (C) 2011 The Android Open Source Project
+<!--
+     Copyright (C) 2021 The Android Open Source Project
 
      Licensed under the Apache License, Version 2.0 (the "License");
      you may not use this file except in compliance with the License.
@@ -13,16 +14,7 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-
-<resources>
-    <!-- All Apps -->
-    <dimen name="all_apps_empty_search_message_top_offset">64dp</dimen>
-    <dimen name="all_apps_empty_search_bg_top_offset">180dp</dimen>
-
-    <!-- Fast scroll -->
-    <dimen name="fastscroll_popup_width">75dp</dimen>
-    <dimen name="fastscroll_popup_height">62dp</dimen>
-    <dimen name="fastscroll_popup_padding">13dp</dimen>
-    <dimen name="fastscroll_popup_text_size">32dp</dimen>
-
-</resources>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+       android:shape="rectangle">
+    <corners android:radius="@dimen/go_button_corner_radius" />
+</shape>

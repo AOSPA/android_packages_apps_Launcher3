@@ -491,7 +491,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
             List<View> viewsToAnimate = new ArrayList<>();
 
             Workspace workspace = mLauncher.getWorkspace();
-            workspace.getVisiblePages().forEach(
+            workspace.forEachVisiblePage(
                     view -> viewsToAnimate.add(((CellLayout) view).getShortcutsAndWidgets()));
 
             viewsToAnimate.add(mLauncher.getHotseat());
@@ -783,7 +783,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         final FloatingWidgetView floatingView = FloatingWidgetView.getFloatingWidgetView(mLauncher,
                 v, widgetBackgroundBounds,
                 new Size(windowTargetBounds.width(), windowTargetBounds.height()),
-                finalWindowRadius);
+                finalWindowRadius, appTargetsAreTranslucent);
         final float initialWindowRadius = supportsRoundedCornersOnWindows(mLauncher.getResources())
                 ? floatingView.getInitialCornerRadius() : 0;
 
