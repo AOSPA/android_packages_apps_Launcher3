@@ -105,7 +105,7 @@ public final class LauncherInstrumentation {
     static final Pattern EVENT_TOUCH_DOWN_TIS = getTouchEventPatternTIS("ACTION_DOWN");
     static final Pattern EVENT_TOUCH_UP_TIS = getTouchEventPatternTIS("ACTION_UP");
     private final String mLauncherPackage;
-    private final boolean mIsLauncher3;
+    private Boolean mIsLauncher3;
     private long mTestStartTime = -1;
 
     // Types for launcher containers that the user is interacting with. "Background" is a
@@ -206,7 +206,6 @@ public final class LauncherInstrumentation {
     public LauncherInstrumentation(Instrumentation instrumentation) {
         mInstrumentation = instrumentation;
         mDevice = UiDevice.getInstance(instrumentation);
-        mIsLauncher3 = "com.android.launcher3".equals(getLauncherPackageName());
 
         // Launcher should run in test harness so that custom accessibility protocol between
         // Launcher and TAPL is enabled. In-process tests enable this protocol with a direct call
@@ -496,13 +495,14 @@ public final class LauncherInstrumentation {
     private void fail(String message) {
         checkForAnomaly();
         Assert.fail(formatSystemHealthMessage(formatErrorWithEvents(
-                "http://go/tapl test failure:\nOverview: " + getContextDescription()
+                "http://go/tapl test failure:\nSummary: " + getContextDescription()
                         + " - visible state is " + getVisibleStateMessage()
                         + ";\nDetails: " + message, true)));
     }
 
     private String getContextDescription() {
-        return mDiagnosticContext.isEmpty() ? "" : String.join(", ", mDiagnosticContext);
+        return mDiagnosticContext.isEmpty()
+                ? "(no context)" : String.join(", ", mDiagnosticContext);
     }
 
     void assertTrue(String message, boolean condition) {
@@ -1358,24 +1358,15 @@ public final class LauncherInstrumentation {
         getTestInfo(TestProtocol.REQUEST_DISABLE_DEBUG_TRACING);
     }
 
-    public int getTotalPssKb() {
+    public void forceGc() {
         // GC the system & sysui first before gc'ing launcher
         logShellCommand("cmd statusbar run-gc");
-        return getTestInfo(TestProtocol.REQUEST_TOTAL_PSS_KB).
-                getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+        getTestInfo(TestProtocol.REQUEST_FORCE_GC);
     }
 
     public Integer getPid() {
         final Bundle testInfo = getTestInfo(TestProtocol.REQUEST_PID);
         return testInfo != null ? testInfo.getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD) : null;
-    }
-
-    public void produceJavaLeak() {
-        getTestInfo(TestProtocol.REQUEST_JAVA_LEAK);
-    }
-
-    public void produceNativeLeak() {
-        getTestInfo(TestProtocol.REQUEST_NATIVE_LEAK);
     }
 
     public void produceViewLeak() {
@@ -1430,6 +1421,9 @@ public final class LauncherInstrumentation {
     }
 
     boolean isLauncher3() {
+        if (mIsLauncher3 == null) {
+            mIsLauncher3 = "com.android.launcher3".equals(getLauncherPackageName());
+        }
         return mIsLauncher3;
     }
 

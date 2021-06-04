@@ -25,7 +25,9 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.os.IBinder;
 import android.util.FloatProperty;
+import android.view.SurfaceControl;
 import android.view.View;
+import android.view.ViewRootImpl;
 import android.view.ViewTreeObserver;
 
 import com.android.launcher3.BaseActivity;
@@ -37,9 +39,6 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.systemui.shared.system.BlurUtils;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
-import com.android.systemui.shared.system.SurfaceControlCompat;
-import com.android.systemui.shared.system.TransactionCompat;
 import com.android.systemui.shared.system.WallpaperManagerCompat;
 
 /**
@@ -91,7 +90,8 @@ public class DepthController implements StateHandler<LauncherState>,
                 @Override
                 public void onDraw() {
                     View view = mLauncher.getDragLayer();
-                    setSurface(new SurfaceControlCompat(view));
+                    ViewRootImpl viewRootImpl = view.getViewRootImpl();
+                    setSurface(viewRootImpl != null ? viewRootImpl.getSurfaceControl() : null);
                     view.post(() -> view.getViewTreeObserver().removeOnDrawListener(this));
                 }
             };
@@ -102,7 +102,7 @@ public class DepthController implements StateHandler<LauncherState>,
      */
     private int mMaxBlurRadius;
     private WallpaperManagerCompat mWallpaperManager;
-    private SurfaceControlCompat mSurface;
+    private SurfaceControl mSurface;
     /**
      * Ratio from 0 to 1, where 0 is fully zoomed out, and 1 is zoomed in.
      * @see android.service.wallpaper.WallpaperService.Engine#onZoomChanged(float)
@@ -157,11 +157,7 @@ public class DepthController implements StateHandler<LauncherState>,
     /**
      * Sets the specified app target surface to apply the blur to.
      */
-    public void setSurfaceToApp(RemoteAnimationTargetCompat target) {
-        setSurface(target == null ? null : target.leash);
-    }
-
-    private void setSurface(SurfaceControlCompat surface) {
+    public void setSurface(SurfaceControl surface) {
         if (mSurface != surface) {
             mSurface = surface;
             if (surface != null) {
@@ -217,17 +213,11 @@ public class DepthController implements StateHandler<LauncherState>,
         }
 
         if (supportsBlur) {
-            final int blur;
-            if (mLauncher.isInState(LauncherState.ALL_APPS) && mDepth == 1) {
-                // All apps has a solid background. We don't need to draw blurs after it's fully
-                // visible. This will take us out of GPU composition, saving battery and increasing
-                // performance.
-                blur = 0;
-            } else {
-                blur = (int) (mDepth * mMaxBlurRadius);
-            }
-            new TransactionCompat()
+            boolean isOpaque = mLauncher.getScrimView().isFullyOpaque();
+            int blur = isOpaque ? 0 : (int) (mDepth * mMaxBlurRadius);
+            new SurfaceControl.Transaction()
                     .setBackgroundBlurRadius(mSurface, blur)
+                    .setOpaque(mSurface, isOpaque)
                     .apply();
         }
     }

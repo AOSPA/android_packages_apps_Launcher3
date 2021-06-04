@@ -57,6 +57,11 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         @Override
         public void onActivityRestartAttempt(ActivityManager.RunningTaskInfo task,
                 boolean homeTaskVisible, boolean clearedTask, boolean wasVisible) {
+            if (mLastGestureState == null) {
+                ActivityManagerWrapper.getInstance().unregisterTaskStackListener(
+                        mLiveTileRestartListener);
+                return;
+            }
             BaseActivityInterface activityInterface = mLastGestureState.getActivityInterface();
             if (LIVE_TILE.get() && activityInterface.isInLiveTileMode()
                     && activityInterface.getCreatedActivity() != null) {
@@ -163,7 +168,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         if (ENABLE_SHELL_TRANSITIONS) {
             RemoteTransitionCompat transition = new RemoteTransitionCompat(mCallbacks,
                     mController != null ? mController.getController() : null);
-            Bundle options = ActivityOptionsCompat.makeRemoteTransition(transition).toBundle();
+            Bundle options = ActivityOptionsCompat.makeRemoteTransition(transition)
+                    .setTransientLaunch().toBundle();
             mCtx.startActivity(intent, options);
         } else {
             UI_HELPER_EXECUTOR.execute(() -> ActivityManagerWrapper.getInstance()

@@ -13,9 +13,15 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<shape android:shape="rectangle"
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:androidprv="http://schemas.android.com/apk/prv/res/android">
-    <solid android:color="?androidprv:attr/colorSurfaceVariant" />
-    <corners android:radius="@dimen/all_apps_header_pill_corner_radius" />
-</shape>
+    <item
+        android:top="@dimen/all_apps_tabs_vertical_padding"
+        android:bottom="@dimen/all_apps_tabs_vertical_padding
+">
+        <shape android:shape="rectangle">
+            <solid android:color="?androidprv:attr/colorSurface" />
+            <corners android:radius="@dimen/all_apps_header_pill_corner_radius" />
+        </shape>
+    </item>
+</layer-list>
