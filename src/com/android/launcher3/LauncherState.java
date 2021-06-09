@@ -30,6 +30,7 @@ import static com.android.launcher3.testing.TestProtocol.QUICK_SWITCH_STATE_ORDI
 import static com.android.launcher3.testing.TestProtocol.SPRING_LOADED_STATE_ORDINAL;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.animation.Interpolator;
 
 import com.android.launcher3.statemanager.BaseState;
@@ -171,10 +172,12 @@ public abstract class LauncherState implements BaseState<LauncherState> {
     }
 
     /**
-     * Returns an array of two elements.
+     * Returns an array of three elements.
      * The first specifies the scale for the overview
      * The second is the factor ([0, 1], 0 => center-screen; 1 => offscreen) by which overview
      * should be shifted horizontally.
+     * The third is the factor ([0, 1], 0 => center-screen; 1 => offscreen) by which overview
+     * should be shifted vertically.
      */
     public float[] getOverviewScaleAndOffset(Launcher launcher) {
         return launcher.getNormalOverviewScaleAndOffset();
@@ -217,8 +220,12 @@ public abstract class LauncherState implements BaseState<LauncherState> {
         return 0;
     }
 
-    public float getWorkspaceScrimAlpha(Launcher launcher) {
-        return 0;
+    /**
+     * What color should the workspace scrim be in when at rest in this state.
+     * Return {@link Color#TRANSPARENT} for no scrim.
+     */
+    public int getWorkspaceScrimColor(Launcher launcher) {
+        return Color.TRANSPARENT;
     }
 
     /**
@@ -230,10 +237,10 @@ public abstract class LauncherState implements BaseState<LauncherState> {
     }
 
     /**
-     * For this state, how much additional vertical translation there should be for each of the
-     * child TaskViews.
+     * For this state, how much additional translation there should be for each of the
+     * child TaskViews. Note that the translation can be its primary or secondary dimension.
      */
-    public float getOverviewSecondaryTranslation(Launcher launcher) {
+    public float getSplitSelectTranslation(Launcher launcher) {
         return 0;
     }
 

@@ -89,8 +89,7 @@ public class StaggeredWorkspaceAnim {
         int totalRows = grid.inv.numRows + (grid.isVerticalBarLayout() ? 0 : 2);
 
         // Add animation for all the visible workspace pages
-        workspace.getVisiblePages()
-                .forEach(page -> addAnimationForPage((CellLayout) page, totalRows));
+        workspace.forEachVisiblePage(page -> addAnimationForPage((CellLayout) page, totalRows));
 
         boolean workspaceClipChildren = workspace.getClipChildren();
         boolean workspaceClipToPadding = workspace.getClipToPadding();
@@ -140,7 +139,7 @@ public class StaggeredWorkspaceAnim {
 
         addDepthAnimationForState(launcher, NORMAL, DURATION_MS);
 
-        mAnimators.play(launcher.getDragLayer().getSysUiScrim().createSysuiMultiplierAnim(0f, 1f)
+        mAnimators.play(launcher.getRootView().getSysUiScrim().createSysuiMultiplierAnim(0f, 1f)
                 .setDuration(DURATION_MS));
         mAnimators.addListener(new AnimatorListenerAdapter() {
             @Override

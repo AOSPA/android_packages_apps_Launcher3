@@ -36,6 +36,8 @@ import android.view.accessibility.AccessibilityEvent;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
+import androidx.appcompat.content.res.AppCompatResources;
+
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragLayer;
@@ -72,7 +74,6 @@ public abstract class ButtonDropTarget extends TextView
 
     protected final Launcher mLauncher;
 
-    private int mBottomDragPadding;
     protected DropTargetBar mDropTargetBar;
 
     /** Whether this drop target is active for the current drag */
@@ -101,7 +102,6 @@ public abstract class ButtonDropTarget extends TextView
         mLauncher = Launcher.getLauncher(context);
 
         Resources resources = getResources();
-        mBottomDragPadding = resources.getDimensionPixelSize(R.dimen.drop_target_drag_padding);
         mDragDistanceThreshold = resources.getDimensionPixelSize(R.dimen.drag_distanceThreshold);
     }
 
@@ -142,6 +142,11 @@ public abstract class ButtonDropTarget extends TextView
         }
     }
 
+    private void setBackgroundDrawable(int resId) {
+        Drawable bd = AppCompatResources.getDrawable(getContext(), resId);
+        setBackground(bd);
+    }
+
     @Override
     public final void onDragEnter(DragObject d) {
         if (!mAccessibleDrag && !mTextVisible) {
@@ -167,6 +172,7 @@ public abstract class ButtonDropTarget extends TextView
         }
 
         d.dragView.setAlpha(DRAG_VIEW_HOVER_OVER_OPACITY);
+        setBackgroundDrawable(R.drawable.drop_target_frame_hover);
         if (d.stateAnnouncer != null) {
             d.stateAnnouncer.cancel();
         }
@@ -184,6 +190,7 @@ public abstract class ButtonDropTarget extends TextView
 
         if (!d.dragComplete) {
             d.dragView.setAlpha(1f);
+            setBackgroundDrawable(R.drawable.drop_target_frame);
         } else {
             d.dragView.setAlpha(DRAG_VIEW_HOVER_OVER_OPACITY);
         }
@@ -267,7 +274,7 @@ public abstract class ButtonDropTarget extends TextView
     @Override
     public void getHitRectRelativeToDragLayer(android.graphics.Rect outRect) {
         super.getHitRect(outRect);
-        outRect.bottom += mBottomDragPadding;
+        outRect.bottom += mLauncher.getDeviceProfile().dropTargetDragPaddingPx;
 
         sTempCords[0] = sTempCords[1] = 0;
         mLauncher.getDragLayer().getDescendantCoordRelativeToSelf(this, sTempCords);

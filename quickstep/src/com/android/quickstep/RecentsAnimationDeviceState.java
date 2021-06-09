@@ -18,7 +18,7 @@ package com.android.quickstep;
 import static android.content.Intent.ACTION_USER_UNLOCKED;
 
 import static com.android.launcher3.util.DisplayController.CHANGE_ALL;
-import static com.android.launcher3.util.DisplayController.CHANGE_FRAME_DELAY;
+import static com.android.launcher3.util.DisplayController.CHANGE_ROTATION;
 import static com.android.launcher3.util.SettingsCache.ONE_HANDED_ENABLED;
 import static com.android.launcher3.util.SettingsCache.ONE_HANDED_SWIPE_BOTTOM_TO_NOTIFICATION_ENABLED;
 import static com.android.quickstep.SysUINavigationMode.Mode.NO_BUTTON;
@@ -31,6 +31,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_GLOBAL_ACTIONS_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_MAGNIFICATION_OVERLAP;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_ONE_HANDED_ACTIVE;
@@ -54,6 +55,7 @@ import android.os.UserManager;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.Surface;
 
@@ -61,6 +63,7 @@ import androidx.annotation.BinderThread;
 
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
 import com.android.launcher3.util.DisplayController.Info;
@@ -127,14 +130,27 @@ public class RecentsAnimationDeviceState implements
     private boolean mIsUserSetupComplete;
 
     public RecentsAnimationDeviceState(Context context) {
+        this(context, false);
+    }
+
+    /**
+     * @param isInstanceForTouches {@code true} if this is the persistent instance being used for
+     *                                   gesture touch handling
+     */
+    public RecentsAnimationDeviceState(Context context, boolean isInstanceForTouches) {
         mContext = context;
         mDisplayController = DisplayController.INSTANCE.get(context);
         mSysUiNavMode = SysUINavigationMode.INSTANCE.get(context);
         mDisplayId = mDisplayController.getInfo().id;
         mIsOneHandedModeSupported = SystemProperties.getBoolean(SUPPORT_ONE_HANDED_MODE, false);
         runOnDestroy(() -> mDisplayController.removeChangeListener(this));
-        mRotationTouchHelper = new RotationTouchHelper(context, mDisplayController);
-        runOnDestroy(mRotationTouchHelper::destroy);
+        mRotationTouchHelper = RotationTouchHelper.INSTANCE.get(context);
+        if (isInstanceForTouches) {
+            // rotationTouchHelper doesn't get initialized after being destroyed, so only destroy
+            // if primary TouchInteractionService instance needs to be destroyed.
+            mRotationTouchHelper.init();
+            runOnDestroy(mRotationTouchHelper::destroy);
+        }
 
         // Register for user unlocked if necessary
         mIsUserUnlocked = context.getSystemService(UserManager.class)
@@ -241,7 +257,7 @@ public class RecentsAnimationDeviceState implements
     public void onNavigationModeChanged(SysUINavigationMode.Mode newMode) {
         mDisplayController.removeChangeListener(this);
         mDisplayController.addChangeListener(this);
-        onDisplayInfoChanged(mDisplayController.getInfo(), CHANGE_ALL);
+        onDisplayInfoChanged(mContext, mDisplayController.getInfo(), CHANGE_ALL);
 
         if (newMode == NO_BUTTON) {
             mExclusionListener.register();
@@ -254,16 +270,10 @@ public class RecentsAnimationDeviceState implements
     }
 
     @Override
-    public void onDisplayInfoChanged(Info info, int flags) {
-        if (info.id != getDisplayId() || flags == CHANGE_FRAME_DELAY) {
-            // ignore displays that aren't running launcher and frame refresh rate changes
-            return;
+    public void onDisplayInfoChanged(Context context, Info info, int flags) {
+        if ((flags & CHANGE_ROTATION) != 0) {
+            mNavBarPosition = new NavBarPosition(mMode, info);
         }
-
-        if (!mMode.hasGestures) {
-            return;
-        }
-        mNavBarPosition = new NavBarPosition(mMode, info);
     }
 
     @Override
@@ -395,6 +405,7 @@ public class RecentsAnimationDeviceState implements
         return canStartWithNavHidden
                 && (mSystemUiStateFlags & SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED) == 0
                 && (mSystemUiStateFlags & SYSUI_STATE_QUICK_SETTINGS_EXPANDED) == 0
+                && (mSystemUiStateFlags & SYSUI_STATE_MAGNIFICATION_OVERLAP) == 0
                 && ((mSystemUiStateFlags & SYSUI_STATE_HOME_DISABLED) == 0
                         || (mSystemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) == 0);
     }

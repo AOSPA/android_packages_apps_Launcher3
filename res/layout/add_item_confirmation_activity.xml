@@ -21,6 +21,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="24dp"
+    android:theme="?attr/widgetsTheme"
     android:orientation="vertical">
 
     <TextView
@@ -35,6 +36,17 @@
         android:fadingEdge="horizontal"
         android:singleLine="true"
         android:maxLines="1" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:paddingVertical="8dp"
+        android:text="@string/add_item_request_drag_hint"
+        android:textSize="14sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:alpha="0.7"
+        android:importantForAccessibility="no"/>
 
     <include layout="@layout/widget_cell"
         android:id="@+id/widget_cell"
@@ -53,6 +65,7 @@
             style="@style/Widget.DeviceDefault.Button.Rounded.Colored"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
             android:onClick="onCancelClick"
             android:text="@android:string/cancel" />
 
@@ -64,7 +77,8 @@
             style="@style/Widget.DeviceDefault.Button.Rounded.Colored"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
             android:onClick="onPlaceAutomaticallyClick"
-            android:text="@string/place_automatically" />
+            android:text="@string/add_to_home_screen" />
     </LinearLayout>
 </LinearLayout>

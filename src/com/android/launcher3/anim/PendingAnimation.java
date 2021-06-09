@@ -15,16 +15,16 @@
  */
 package com.android.launcher3.anim;
 
-import static com.android.launcher3.LauncherAnimUtils.SUCCESS_TRANSITION_PROGRESS;
+import static com.android.launcher3.LauncherAnimUtils.VIEW_BACKGROUND_COLOR;
 import static com.android.launcher3.anim.AnimatorPlaybackController.addAnimationHoldersRecur;
 
 import android.animation.Animator;
 import android.animation.Animator.AnimatorListener;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
+import android.graphics.drawable.ColorDrawable;
 import android.util.FloatProperty;
 import android.util.IntProperty;
 import android.view.View;
@@ -80,6 +80,17 @@ public class PendingAnimation implements PropertySetter {
         }
         ObjectAnimator anim = ObjectAnimator.ofFloat(view, View.ALPHA, alpha);
         anim.addListener(new AlphaUpdateListener(view));
+        anim.setInterpolator(interpolator);
+        add(anim);
+    }
+
+    @Override
+    public void setViewBackgroundColor(View view, int color, TimeInterpolator interpolator) {
+        if (view == null || (view.getBackground() instanceof ColorDrawable
+                && ((ColorDrawable) view.getBackground()).getColor() == color)) {
+            return;
+        }
+        ObjectAnimator anim = ObjectAnimator.ofArgb(view, VIEW_BACKGROUND_COLOR, color);
         anim.setInterpolator(interpolator);
         add(anim);
     }
@@ -169,32 +180,6 @@ public class PendingAnimation implements PropertySetter {
         if (mProgressAnimator == null) {
             mProgressAnimator = ValueAnimator.ofFloat(0, 1);
         }
-        mProgressAnimator.addListener(new EndStateCallbackWrapper(listener));
-    }
-
-    private static class EndStateCallbackWrapper extends AnimatorListenerAdapter {
-
-        private final Consumer<Boolean> mListener;
-        private boolean mCalled = false;
-
-        EndStateCallbackWrapper(Consumer<Boolean> listener) {
-            mListener = listener;
-        }
-
-        @Override
-        public void onAnimationCancel(Animator animation) {
-            if (!mCalled) {
-                mCalled = true;
-                mListener.accept(false);
-            }
-        }
-
-        @Override
-        public void onAnimationEnd(Animator animation) {
-            if (!mCalled) {
-                ValueAnimator anim = (ValueAnimator) animation;
-                mListener.accept(anim.getAnimatedFraction() > SUCCESS_TRANSITION_PROGRESS);
-            }
-        }
+        mProgressAnimator.addListener(AnimatorListeners.forEndCallback(listener));
     }
 }

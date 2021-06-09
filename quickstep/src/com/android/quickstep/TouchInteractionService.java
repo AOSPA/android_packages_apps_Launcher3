@@ -52,6 +52,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.util.Log;
@@ -145,12 +146,25 @@ public class TouchInteractionService extends Service implements PluginListener<O
     @Nullable
     private OverscrollPlugin mOverscrollPlugin;
 
-    private final IBinder mMyBinder = new IOverviewProxy.Stub() {
+    /**
+     * Extension of OverviewProxy aidl interface without needing to modify the actual interface.
+     * This is for methods that need only need local access and not intended to make IPC calls.
+     */
+    public abstract static class TISBinder extends IOverviewProxy.Stub {
+        public abstract void setTaskbarOverviewProxyDelegate(
+                @Nullable TaskbarOverviewProxyDelegate i);
+    }
+
+
+    private final TISBinder mMyBinder = new TISBinder() {
+
+        public void setTaskbarOverviewProxyDelegate(
+                @Nullable TaskbarOverviewProxyDelegate delegate) {
+            mTaskbarOverviewProxyDelegate = delegate;
+        }
 
         @BinderThread
         public void onInitialize(Bundle bundle) {
-            Log.d(TAG + " b/182478748", "TouchInteractionService.onInitialize: user="
-                    + getUserId());
             ISystemUiProxy proxy = ISystemUiProxy.Stub.asInterface(
                     bundle.getBinder(KEY_EXTRA_SYSUI_PROXY));
             IPip pip = IPip.Stub.asInterface(bundle.getBinder(KEY_EXTRA_SHELL_PIP));
@@ -252,18 +266,47 @@ public class TouchInteractionService extends Service implements PluginListener<O
             MAIN_EXECUTOR.execute(() -> mDeviceState.setDeferredGestureRegion(region));
         }
 
+        @Override
         public void onSplitScreenSecondaryBoundsChanged(Rect bounds, Rect insets)  {
             WindowBounds wb = new WindowBounds(bounds, insets);
             MAIN_EXECUTOR.execute(() -> SplitScreenBounds.INSTANCE.setSecondaryWindowBounds(wb));
         }
+
+        @Override
+        public void onImeWindowStatusChanged(int displayId, IBinder token, int vis,
+                int backDisposition, boolean showImeSwitcher) throws RemoteException {
+            if (mTaskbarOverviewProxyDelegate == null) {
+                return;
+            }
+            MAIN_EXECUTOR.execute(() -> {
+                if (mTaskbarOverviewProxyDelegate == null) {
+                    return;
+                }
+                mTaskbarOverviewProxyDelegate
+                        .updateImeStatus(displayId, vis, backDisposition, showImeSwitcher);
+            });
+        }
     };
 
+    public interface TaskbarOverviewProxyDelegate {
+        void updateImeStatus(int displayId, int vis, int backDisposition,
+                boolean showImeSwitcher);
+    }
+
     private static boolean sConnected = false;
+    private static TouchInteractionService sInstance;
     private static boolean sIsInitialized = false;
     private RotationTouchHelper mRotationTouchHelper;
+    @Nullable
+    private TaskbarOverviewProxyDelegate mTaskbarOverviewProxyDelegate;
 
     public static boolean isConnected() {
         return sConnected;
+    }
+
+    @Nullable
+    public static TouchInteractionService getInstance() {
+        return sInstance;
     }
 
     public static boolean isInitialized() {
@@ -293,6 +336,10 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
     private DisplayManager mDisplayManager;
 
+    public TouchInteractionService() {
+        sInstance = this;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -300,7 +347,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         // Everything else should be initialized in onUserUnlocked() below.
         mMainChoreographer = Choreographer.getInstance();
         mAM = ActivityManagerWrapper.getInstance();
-        mDeviceState = new RecentsAnimationDeviceState(this);
+        mDeviceState = new RecentsAnimationDeviceState(this, true);
         mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
         mDeviceState.addNavigationModeChangedCallback(this::onNavigationModeChanged);
         mDeviceState.addOneHandedModeChangedCallback(this::onOneHandedModeOverlayChanged);
@@ -312,8 +359,6 @@ public class TouchInteractionService extends Service implements PluginListener<O
     }
 
     private void disposeEventHandlers() {
-        Log.d(TAG + " b/182478748", "TouchInteractionService.disposeEventHandlers: user="
-                + getUserId());
         if (mInputEventReceiver != null) {
             mInputEventReceiver.dispose();
             mInputEventReceiver = null;
@@ -325,21 +370,12 @@ public class TouchInteractionService extends Service implements PluginListener<O
     }
 
     private void initInputMonitor() {
-        Log.d(TAG + " b/182478748", "TouchInteractionService.initInputMonitor: user="
-                + getUserId());
         disposeEventHandlers();
 
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.TIS_NO_EVENTS, "initInputMonitor: isButtonMode? "
-                    + mDeviceState.isButtonNavMode());
-        }
-
         if (mDeviceState.isButtonNavMode()) {
-            Log.d(TAG + " b/182478748", "isButtonNav: user=" + getUserId());
             return;
         }
 
-        Log.d(TAG + " b/182478748", "create swipe-up input monitor: user=" + getUserId());
         mInputMonitorCompat = new InputMonitorCompat("swipe-up", mDeviceState.getDisplayId());
         mInputEventReceiver = mInputMonitorCompat.getInputReceiver(Looper.getMainLooper(),
                 mMainChoreographer, this::onInputEvent);
@@ -385,6 +421,10 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
         mOverviewComponentObserver.setOverviewChangeListener(this::onOverviewTargetChange);
         onOverviewTargetChange(mOverviewComponentObserver.isHomeAndOverviewSame());
+    }
+
+    public OverviewCommandHelper getOverviewCommandHelper() {
+        return mOverviewCommandHelper;
     }
 
     private void resetHomeBounceSeenOnQuickstepEnabledFirstTime() {
@@ -510,17 +550,10 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
         final int action = event.getAction();
         if (action == ACTION_DOWN) {
-            if (TestProtocol.sDebugTracing) {
-                Log.d(TestProtocol.NO_SWIPE_TO_HOME, "TouchInteractionService.onInputEvent:DOWN");
-            }
             mRotationTouchHelper.setOrientationTransformIfNeeded(event);
 
             if (!mDeviceState.isOneHandedModeActive()
                     && mRotationTouchHelper.isInSwipeUpTouchRegion(event)) {
-                if (TestProtocol.sDebugTracing) {
-                    Log.d(TestProtocol.NO_SWIPE_TO_HOME,
-                            "TouchInteractionService.onInputEvent:isInSwipeUpTouchRegion");
-                }
                 // Clone the previous gesture state since onConsumerAboutToBeSwitched might trigger
                 // onConsumerInactive and wipe the previous gesture state
                 GestureState prevGestureState = new GestureState(mGestureState);
@@ -616,9 +649,6 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
     private InputConsumer newConsumer(GestureState previousGestureState,
             GestureState newGestureState, MotionEvent event) {
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.NO_SWIPE_TO_HOME, "newConsumer");
-        }
         boolean canStartSystemGesture = mDeviceState.canStartSystemGesture();
 
         if (!mDeviceState.isUserUnlocked()) {
@@ -629,9 +659,6 @@ public class TouchInteractionService extends Service implements PluginListener<O
             } else {
                 return mResetGestureInputConsumer;
             }
-        }
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.NO_SWIPE_TO_HOME, "newConsumer:user is unlocked");
         }
 
         // When there is an existing recents animation running, bypass systemState check as this is

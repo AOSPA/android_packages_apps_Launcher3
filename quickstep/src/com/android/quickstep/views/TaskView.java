@@ -32,7 +32,6 @@ import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
-import static com.android.launcher3.anim.Interpolators.EXAGGERATED_EASE;
 import static com.android.launcher3.anim.Interpolators.FAST_OUT_SLOW_IN;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASK_ICON_TAP_OR_LONGPRESS;
@@ -65,6 +64,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.animation.Interpolator;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
@@ -88,7 +88,6 @@ import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.TransformingTouchDelegate;
 import com.android.launcher3.util.ViewPool.Reusable;
 import com.android.quickstep.RecentsModel;
@@ -147,6 +146,9 @@ public class TaskView extends FrameLayout implements Reusable {
 
     public static final long SCALE_ICON_DURATION = 120;
     private static final long DIM_ANIM_DURATION = 700;
+
+    private static final Interpolator FULLSCREEN_INTERPOLATOR = ACCEL_DEACCEL;
+
     /**
      * This technically can be a vanilla {@link TouchDelegate} class, however that class requires
      * setting the touch bounds at construction, so we'd repeatedly be created many instances
@@ -169,6 +171,32 @@ public class TaskView extends FrameLayout implements Reusable {
                 @Override
                 public Float get(TaskView taskView) {
                     return taskView.mFocusTransitionProgress;
+                }
+            };
+
+    private static final FloatProperty<TaskView> SPLIT_SELECT_TRANSLATION_X =
+            new FloatProperty<TaskView>("splitSelectTranslationX") {
+                @Override
+                public void setValue(TaskView taskView, float v) {
+                    taskView.setSplitSelectTranslationX(v);
+                }
+
+                @Override
+                public Float get(TaskView taskView) {
+                    return taskView.mSplitSelectTranslationX;
+                }
+            };
+
+    private static final FloatProperty<TaskView> SPLIT_SELECT_TRANSLATION_Y =
+            new FloatProperty<TaskView>("splitSelectTranslationY") {
+                @Override
+                public void setValue(TaskView taskView, float v) {
+                    taskView.setSplitSelectTranslationY(v);
+                }
+
+                @Override
+                public Float get(TaskView taskView) {
+                    return taskView.mSplitSelectTranslationY;
                 }
             };
 
@@ -250,16 +278,55 @@ public class TaskView extends FrameLayout implements Reusable {
                 }
             };
 
-    private static final FloatProperty<TaskView> COLOR_TINT =
-            new FloatProperty<TaskView>("colorTint") {
+    private static final FloatProperty<TaskView> FULLSCREEN_TRANSLATION_X =
+            new FloatProperty<TaskView>("fullscreenTranslationX") {
                 @Override
                 public void setValue(TaskView taskView, float v) {
-                    taskView.setColorTint(v);
+                    taskView.setFullscreenTranslationX(v);
                 }
 
                 @Override
                 public Float get(TaskView taskView) {
-                    return taskView.getColorTint();
+                    return taskView.mFullscreenTranslationX;
+                }
+            };
+
+    private static final FloatProperty<TaskView> FULLSCREEN_TRANSLATION_Y =
+            new FloatProperty<TaskView>("fullscreenTranslationY") {
+                @Override
+                public void setValue(TaskView taskView, float v) {
+                    taskView.setFullscreenTranslationY(v);
+                }
+
+                @Override
+                public Float get(TaskView taskView) {
+                    return taskView.mFullscreenTranslationY;
+                }
+            };
+
+    private static final FloatProperty<TaskView> NON_FULLSCREEN_TRANSLATION_X =
+            new FloatProperty<TaskView>("nonFullscreenTranslationX") {
+                @Override
+                public void setValue(TaskView taskView, float v) {
+                    taskView.setNonFullscreenTranslationX(v);
+                }
+
+                @Override
+                public Float get(TaskView taskView) {
+                    return taskView.mNonFullscreenTranslationX;
+                }
+            };
+
+    private static final FloatProperty<TaskView> NON_FULLSCREEN_TRANSLATION_Y =
+            new FloatProperty<TaskView>("nonFullscreenTranslationY") {
+                @Override
+                public void setValue(TaskView taskView, float v) {
+                    taskView.setNonFullscreenTranslationY(v);
+                }
+
+                @Override
+                public Float get(TaskView taskView) {
+                    return taskView.mNonFullscreenTranslationY;
                 }
             };
 
@@ -284,13 +351,18 @@ public class TaskView extends FrameLayout implements Reusable {
     private float mTaskResistanceTranslationY;
     // The following translation variables should only be used in the same orientation as Launcher.
     private float mFullscreenTranslationX;
+    private float mFullscreenTranslationY;
     // Applied as a complement to fullscreenTranslation, for adjusting the carousel overview, or the
     // in transition carousel before forming the grid on tablets.
     private float mNonFullscreenTranslationX;
+    private float mNonFullscreenTranslationY;
     private float mBoxTranslationY;
     // The following grid translations scales with mGridProgress.
     private float mGridTranslationX;
     private float mGridTranslationY;
+    // Used when in SplitScreenSelectState
+    private float mSplitSelectTranslationY;
+    private float mSplitSelectTranslationX;
 
     private ObjectAnimator mIconAndDimAnimator;
     private float mIconScaleAnimStartProgress = 0;
@@ -309,11 +381,6 @@ public class TaskView extends FrameLayout implements Reusable {
     private View mContextualChipWrapper;
     private final float[] mIconCenterCoords = new float[2];
     private final float[] mChipCenterCoords = new float[2];
-
-    // Colored tint for the task view and all its supplementary views (like the task icon and well
-    // being banner.
-    private final int mTintingColor;
-    private float mTintAmount;
 
     private boolean mIsClickableAsLiveTile = true;
 
@@ -336,8 +403,6 @@ public class TaskView extends FrameLayout implements Reusable {
         mOutlineProvider = new TaskOutlineProvider(getContext(), mCurrentFullscreenParams,
                 mActivity.getDeviceProfile().overviewTaskThumbnailTopMarginPx);
         setOutlineProvider(mOutlineProvider);
-
-        mTintingColor = Themes.getColorBackgroundFloating(context);
     }
 
     /**
@@ -499,6 +564,7 @@ public class TaskView extends FrameLayout implements Reusable {
 
                 @Override
                 public void onAnimationEnd(Animator animator) {
+                    recentsView.getLiveTileTaskViewSimulator().setDrawsBelowRecents(true);
                     mIsClickableAsLiveTile = true;
                 }
             });
@@ -723,8 +789,7 @@ public class TaskView extends FrameLayout implements Reusable {
         float upperClamp = invert ? 1 : iconScalePercentage;
         float scale = Interpolators.clampToProgress(FAST_OUT_SLOW_IN, lowerClamp, upperClamp)
                 .getInterpolation(progress);
-        mIconView.setScaleX(scale);
-        mIconView.setScaleY(scale);
+        mIconView.setAlpha(scale);
         if (mContextualChipWrapper != null && mContextualChipWrapper != null) {
             mContextualChipWrapper.setAlpha(scale);
             mContextualChipWrapper.setScaleX(Math.min(scale, comp(mModalness)));
@@ -740,6 +805,8 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     public void animateIconScaleAndDimIntoView() {
+        Log.d("b/186444448", "animateIconScaleAndDimIntoView: startProgress="
+                + mIconScaleAnimStartProgress);
         if (mIconAndDimAnimator != null) {
             mIconAndDimAnimator.cancel();
         }
@@ -749,6 +816,7 @@ public class TaskView extends FrameLayout implements Reusable {
         mIconAndDimAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
+                Log.d("b/186444448", "animateIconScaleAndDimIntoView: end");
                 mIconAndDimAnimator = null;
             }
         });
@@ -769,14 +837,16 @@ public class TaskView extends FrameLayout implements Reusable {
     protected void resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
         // resetViewTransforms is called during Quickswitch scrolling.
-        mDismissTranslationX = mTaskOffsetTranslationX = mTaskResistanceTranslationX = 0f;
-        mDismissTranslationY = mTaskOffsetTranslationY = mTaskResistanceTranslationY = 0f;
+        mDismissTranslationX = mTaskOffsetTranslationX = mTaskResistanceTranslationX =
+                mSplitSelectTranslationX = 0f;
+        mDismissTranslationY = mTaskOffsetTranslationY = mTaskResistanceTranslationY =
+                mSplitSelectTranslationY = 0f;
         applyTranslationX();
         applyTranslationY();
         setTranslationZ(0);
         setAlpha(mStableAlpha);
         setIconScaleAndDim(1);
-        setColorTint(0);
+        setColorTint(0, 0);
     }
 
     public void setStableAlpha(float parentAlpha) {
@@ -786,8 +856,9 @@ public class TaskView extends FrameLayout implements Reusable {
 
     @Override
     public void onRecycle() {
-        mFullscreenTranslationX = mNonFullscreenTranslationX =
-                mGridTranslationX = mGridTranslationY = mBoxTranslationY = 0f;
+        mFullscreenTranslationX = mFullscreenTranslationY = mNonFullscreenTranslationX =
+                mNonFullscreenTranslationY = mGridTranslationX = mGridTranslationY =
+                        mBoxTranslationY = 0f;
         resetViewTransforms();
         // Clear any references to the thumbnail (it will be re-read either from the cache or the
         // system on next bind)
@@ -893,12 +964,21 @@ public class TaskView extends FrameLayout implements Reusable {
 
     private void applyScale() {
         float scale = 1;
-        float fullScreenProgress = EXAGGERATED_EASE.getInterpolation(mFullscreenProgress);
+        float fullScreenProgress = FULLSCREEN_INTERPOLATOR.getInterpolation(mFullscreenProgress);
         scale *= Utilities.mapRange(fullScreenProgress, 1f, mFullscreenScale);
         setScaleX(scale);
         setScaleY(scale);
     }
 
+    private void setSplitSelectTranslationX(float x) {
+        mSplitSelectTranslationX = x;
+        applyTranslationX();
+    }
+
+    private void setSplitSelectTranslationY(float y) {
+        mSplitSelectTranslationY = y;
+        applyTranslationY();
+    }
     private void setDismissTranslationX(float x) {
         mDismissTranslationX = x;
         applyTranslationX();
@@ -929,14 +1009,24 @@ public class TaskView extends FrameLayout implements Reusable {
         applyTranslationY();
     }
 
-    public void setFullscreenTranslationX(float fullscreenTranslationX) {
+    private void setFullscreenTranslationX(float fullscreenTranslationX) {
         mFullscreenTranslationX = fullscreenTranslationX;
         applyTranslationX();
     }
 
-    public void setNonFullscreenTranslationX(float nonFullscreenTranslationX) {
+    private void setFullscreenTranslationY(float fullscreenTranslationY) {
+        mFullscreenTranslationY = fullscreenTranslationY;
+        applyTranslationY();
+    }
+
+    private void setNonFullscreenTranslationX(float nonFullscreenTranslationX) {
         mNonFullscreenTranslationX = nonFullscreenTranslationX;
         applyTranslationX();
+    }
+
+    private void setNonFullscreenTranslationY(float nonFullscreenTranslationY) {
+        mNonFullscreenTranslationY = nonFullscreenTranslationY;
+        applyTranslationY();
     }
 
     public void setGridTranslationX(float gridTranslationX) {
@@ -960,9 +1050,9 @@ public class TaskView extends FrameLayout implements Reusable {
     public float getScrollAdjustment(boolean fullscreenEnabled, boolean gridEnabled) {
         float scrollAdjustment = 0;
         if (fullscreenEnabled) {
-            scrollAdjustment += mFullscreenTranslationX;
+            scrollAdjustment += getPrimaryFullscreenTranslationProperty().get(this);
         } else {
-            scrollAdjustment += mNonFullscreenTranslationX;
+            scrollAdjustment += getPrimaryNonFullscreenTranslationProperty().get(this);
         }
         if (gridEnabled) {
             scrollAdjustment += mGridTranslationX;
@@ -989,12 +1079,12 @@ public class TaskView extends FrameLayout implements Reusable {
 
     private void applyTranslationX() {
         setTranslationX(mDismissTranslationX + mTaskOffsetTranslationX + mTaskResistanceTranslationX
-                + getPersistentTranslationX());
+                + mSplitSelectTranslationX + getPersistentTranslationX());
     }
 
     private void applyTranslationY() {
         setTranslationY(mDismissTranslationY + mTaskOffsetTranslationY + mTaskResistanceTranslationY
-                + getPersistentTranslationY());
+                + mSplitSelectTranslationY + getPersistentTranslationY());
     }
 
     /**
@@ -1012,7 +1102,20 @@ public class TaskView extends FrameLayout implements Reusable {
      * change according to a temporary state (e.g. task offset).
      */
     public float getPersistentTranslationY() {
-        return getGridTrans(mGridTranslationY) + mBoxTranslationY;
+        return mBoxTranslationY
+                + getFullscreenTrans(mFullscreenTranslationY)
+                + getNonFullscreenTrans(mNonFullscreenTranslationY)
+                + getGridTrans(mGridTranslationY);
+    }
+
+    public FloatProperty<TaskView> getPrimarySplitTranslationProperty() {
+        return getPagedOrientationHandler().getPrimaryValue(
+                SPLIT_SELECT_TRANSLATION_X, SPLIT_SELECT_TRANSLATION_Y);
+    }
+
+    public FloatProperty<TaskView> getSecondarySplitTranslationProperty() {
+        return getPagedOrientationHandler().getSecondaryValue(
+                SPLIT_SELECT_TRANSLATION_X, SPLIT_SELECT_TRANSLATION_Y);
     }
 
     public FloatProperty<TaskView> getPrimaryDismissTranslationProperty() {
@@ -1030,9 +1133,34 @@ public class TaskView extends FrameLayout implements Reusable {
                 TASK_OFFSET_TRANSLATION_X, TASK_OFFSET_TRANSLATION_Y);
     }
 
+    public FloatProperty<TaskView> getSecondaryTaskOffsetTranslationProperty() {
+        return getPagedOrientationHandler().getSecondaryValue(
+                TASK_OFFSET_TRANSLATION_X, TASK_OFFSET_TRANSLATION_Y);
+    }
+
     public FloatProperty<TaskView> getTaskResistanceTranslationProperty() {
         return getPagedOrientationHandler().getSecondaryValue(
                 TASK_RESISTANCE_TRANSLATION_X, TASK_RESISTANCE_TRANSLATION_Y);
+    }
+
+    public FloatProperty<TaskView> getPrimaryFullscreenTranslationProperty() {
+        return getPagedOrientationHandler().getPrimaryValue(
+                FULLSCREEN_TRANSLATION_X, FULLSCREEN_TRANSLATION_Y);
+    }
+
+    public FloatProperty<TaskView> getSecondaryFullscreenTranslationProperty() {
+        return getPagedOrientationHandler().getSecondaryValue(
+                FULLSCREEN_TRANSLATION_X, FULLSCREEN_TRANSLATION_Y);
+    }
+
+    public FloatProperty<TaskView> getPrimaryNonFullscreenTranslationProperty() {
+        return getPagedOrientationHandler().getPrimaryValue(
+                NON_FULLSCREEN_TRANSLATION_X, NON_FULLSCREEN_TRANSLATION_Y);
+    }
+
+    public FloatProperty<TaskView> getSecondaryNonFullscreenTranslationProperty() {
+        return getPagedOrientationHandler().getSecondaryValue(
+                NON_FULLSCREEN_TRANSLATION_X, NON_FULLSCREEN_TRANSLATION_Y);
     }
 
     @Override
@@ -1279,7 +1407,7 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     private float getFullscreenTrans(float endTranslation) {
-        float progress = ACCEL_DEACCEL.getInterpolation(mFullscreenProgress);
+        float progress = FULLSCREEN_INTERPOLATOR.getInterpolation(mFullscreenProgress);
         return Utilities.mapRange(progress, 0, endTranslation);
     }
 
@@ -1326,24 +1454,13 @@ public class TaskView extends FrameLayout implements Reusable {
         getRecentsView().initiateSplitSelect(this, splitPositionOption);
     }
 
-    private void setColorTint(float amount) {
-        mSnapshotView.setDimAlpha(amount);
-        mIconView.setIconColorTint(mTintingColor, amount);
-        mDigitalWellBeingToast.setBannerColorTint(mTintingColor, amount);
-    }
-
-    private float getColorTint() {
-        return mTintAmount;
-    }
-
     /**
-     * Show the task view with a color tint (animates value).
+     * Set a color tint on the snapshot and supporting views.
      */
-    public void showColorTint(boolean enable) {
-        ObjectAnimator tintAnimator = ObjectAnimator.ofFloat(
-                this, COLOR_TINT, enable ? MAX_PAGE_SCRIM_ALPHA : 0);
-        tintAnimator.setAutoCancel(true);
-        tintAnimator.start();
+    public void setColorTint(float amount, int tintColor) {
+        mSnapshotView.setDimAlpha(amount);
+        mIconView.setIconColorTint(tintColor, amount);
+        mDigitalWellBeingToast.setBannerColorTint(tintColor, amount);
     }
 
     /**

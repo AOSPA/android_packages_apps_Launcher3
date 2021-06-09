@@ -25,6 +25,7 @@ import static com.android.launcher3.LauncherState.FLAG_WORKSPACE_INACCESSIBLE;
 import static com.android.launcher3.LauncherState.HINT_STATE;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
+import static com.android.launcher3.anim.AnimatorListeners.forSuccessCallback;
 import static com.android.launcher3.config.FeatureFlags.ADAPTIVE_ICON_WINDOW_ANIM;
 import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_OVERLAY;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -456,7 +457,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     }
 
     private boolean isTwoPanelEnabled() {
-        return mLauncher.mDeviceProfile.isTablet && FeatureFlags.ENABLE_TWO_PANEL_HOME.get();
+        return mLauncher.mDeviceProfile.isTwoPanels;
     }
 
     @Override
@@ -1161,10 +1162,6 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
     public void computeScroll() {
         super.computeScroll();
         mWallpaperOffset.syncWithScroll();
-    }
-
-    public void computeScrollWithoutInvalidation() {
-        computeScrollHelper(false);
     }
 
     @Override
@@ -1950,8 +1947,8 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
             }
             parent.onDropChild(cell);
 
-            mLauncher.getStateManager().goToState(
-                    NORMAL, SPRING_LOADED_EXIT_DELAY, onCompleteRunnable);
+            mLauncher.getStateManager().goToState(NORMAL, SPRING_LOADED_EXIT_DELAY,
+                    onCompleteRunnable == null ? null : forSuccessCallback(onCompleteRunnable));
             mStatsLogManager.logger().withItemInfo(d.dragInfo).withInstanceId(d.logInstanceId)
                     .log(LauncherEvent.LAUNCHER_ITEM_DROP_COMPLETED);
         }
@@ -2066,9 +2063,6 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
         if (mDragOverlappingLayout != null) {
             mDragOverlappingLayout.setIsDragOverlapping(true);
         }
-        // Invalidating the scrim will also force this CellLayout
-        // to be invalidated so that it is highlighted if necessary.
-        mLauncher.getDragLayer().getWorkspaceDragScrim().invalidate();
     }
 
     public CellLayout getCurrentDragOverlappingLayout() {
@@ -2977,7 +2971,7 @@ public class Workspace extends PagedView<WorkspacePageIndicator>
 
         List<CellLayout> cellLayouts = new ArrayList<>(getPanelCount() + 1);
         cellLayouts.add(getHotseat());
-        getVisiblePages().forEach(page -> cellLayouts.add((CellLayout) page));
+        forEachVisiblePage(page -> cellLayouts.add((CellLayout) page));
 
         // Order: App icons, app in folder. Items in hotseat get returned first.
         if (ADAPTIVE_ICON_WINDOW_ANIM.get()) {

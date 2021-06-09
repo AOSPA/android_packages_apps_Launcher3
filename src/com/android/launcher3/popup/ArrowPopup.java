@@ -16,22 +16,18 @@
 
 package com.android.launcher3.popup;
 
-import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
-import static com.android.launcher3.popup.PopupPopulator.MAX_SHORTCUTS;
+import static com.android.launcher3.anim.Interpolators.ACCELERATED_EASE;
+import static com.android.launcher3.anim.Interpolators.DECELERATED_EASE;
+import static com.android.launcher3.anim.Interpolators.LINEAR;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
-import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
-import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Outline;
 import android.graphics.Rect;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
 import android.util.Pair;
@@ -39,7 +35,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewOutlineProvider;
+import android.view.animation.Interpolator;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -47,13 +43,12 @@ import androidx.annotation.NonNull;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.InsettableFrameLayout;
-import com.android.launcher3.LauncherAnimUtils;
+import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.anim.RevealOutlineAnimation;
-import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.shortcuts.DeepShortcutView;
+import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.BaseDragLayer;
 
@@ -65,10 +60,21 @@ import java.util.Collections;
  *
  * @param <T> The activity on with the popup shows
  */
-public abstract class ArrowPopup<T extends BaseDraggingActivity> extends AbstractFloatingView {
+public abstract class ArrowPopup<T extends StatefulActivity<LauncherState>>
+        extends AbstractFloatingView {
 
-    // +1 for system shortcut view
-    private static final int MAX_NUM_CHILDREN = MAX_SHORTCUTS + 1;
+    // Duration values (ms) for popup open and close animations.
+    private static final int OPEN_DURATION = 276;
+    private static final int OPEN_FADE_START_DELAY = 0;
+    private static final int OPEN_FADE_DURATION = 38;
+    private static final int OPEN_CHILD_FADE_START_DELAY = 38;
+    private static final int OPEN_CHILD_FADE_DURATION = 76;
+
+    private static final int CLOSE_DURATION = 200;
+    private static final int CLOSE_FADE_START_DELAY = 140;
+    private static final int CLOSE_FADE_DURATION = 50;
+    private static final int CLOSE_CHILD_FADE_START_DELAY = 0;
+    private static final int CLOSE_CHILD_FADE_DURATION = 140;
 
     private final Rect mTempRect = new Rect();
 
@@ -90,18 +96,16 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
     protected boolean mIsAboveIcon;
     private int mGravity;
 
-    protected Animator mOpenCloseAnimator;
+    protected AnimatorSet mOpenCloseAnimator;
     protected boolean mDeferContainerRemoval;
-    private final Rect mStartRect = new Rect();
-    private final Rect mEndRect = new Rect();
 
     private final GradientDrawable mRoundedTop;
     private final GradientDrawable mRoundedBottom;
 
     private Runnable mOnCloseCallback = () -> { };
 
-    private int mArrowColor;
-    private final int[] mColors;
+    private final float mElevation;
+    private final int mBackgroundColor;
 
     public ArrowPopup(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -110,13 +114,8 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
         mLauncher = BaseDraggingActivity.fromContext(context);
         mIsRtl = Utilities.isRtl(getResources());
 
-        setClipToOutline(true);
-        setOutlineProvider(new ViewOutlineProvider() {
-            @Override
-            public void getOutline(View view, Outline outline) {
-                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), mOutlineRadius);
-            }
-        });
+        mBackgroundColor = Themes.getAttrColor(context, R.attr.popupColorPrimary);
+        mElevation = getResources().getDimension(R.dimen.deep_shortcuts_elevation);
 
         // Initialize arrow view
         final Resources resources = getResources();
@@ -132,22 +131,14 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
 
         int smallerRadius = resources.getDimensionPixelSize(R.dimen.popup_smaller_radius);
         mRoundedTop = new GradientDrawable();
+        mRoundedTop.setColor(mBackgroundColor);
         mRoundedTop.setCornerRadii(new float[] { mOutlineRadius, mOutlineRadius, mOutlineRadius,
                 mOutlineRadius, smallerRadius, smallerRadius, smallerRadius, smallerRadius});
 
         mRoundedBottom = new GradientDrawable();
+        mRoundedBottom.setColor(mBackgroundColor);
         mRoundedBottom.setCornerRadii(new float[] { smallerRadius, smallerRadius, smallerRadius,
                 smallerRadius, mOutlineRadius, mOutlineRadius, mOutlineRadius, mOutlineRadius});
-
-        int primaryColor = Themes.getAttrColor(context, R.attr.popupColorPrimary);
-        int secondaryColor = Themes.getAttrColor(context, R.attr.popupColorSecondary);
-        ArgbEvaluator argb = new ArgbEvaluator();
-        mColors = new int[MAX_NUM_CHILDREN];
-        // Interpolate between the two colors, exclusive.
-        float step = 1f / (MAX_NUM_CHILDREN + 1);
-        for (int i = 0; i < mColors.length; ++i) {
-            mColors[i] = (int) argb.evaluate((i + 1) * step, primaryColor, secondaryColor);
-        }
     }
 
     public ArrowPopup(Context context, AttributeSet attrs) {
@@ -205,7 +196,6 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
 
         int numVisibleShortcut = 0;
         View lastView = null;
-        int numVisibleChild = 0;
         for (int i = 0; i < count; i++) {
             View view = getChildAt(i);
             boolean isShortcut = view instanceof DeepShortcutView;
@@ -232,33 +222,9 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
                         numVisibleShortcut++;
                     }
                 }
-
-                int color = mColors[numVisibleChild % mColors.length];
-                setChildColor(view, color);
-
-                // Arrow color matches the first child or the last child.
-                if (!mIsAboveIcon && numVisibleChild == 0) {
-                    mArrowColor = color;
-                } else if (mIsAboveIcon) {
-                    mArrowColor = color;
-                }
-
-                numVisibleChild++;
             }
         }
         measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
-    }
-
-    /**
-     * Sets the background color of the child.
-     */
-    protected void setChildColor(View view, int color) {
-        Drawable bg = view.getBackground();
-        if (bg instanceof GradientDrawable) {
-            ((GradientDrawable) bg.mutate()).setColor(color);
-        } else if (bg instanceof ColorDrawable) {
-            ((ColorDrawable) bg.mutate()).setColor(color);
-        }
     }
 
     /**
@@ -336,8 +302,9 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
                     mOutlineRadius, getMeasuredWidth(), getMeasuredHeight(),
                     mArrowOffsetHorizontal, -mArrowOffsetVertical,
                     !mIsAboveIcon, mIsLeftAligned,
-                    mArrowColor));
-            mArrow.setElevation(getElevation());
+                    mBackgroundColor));
+            // TODO: Remove elevation when arrow is above as it casts a shadow on the container
+            mArrow.setElevation(mIsAboveIcon ? mElevation : 0);
         }
 
         mArrow.setPivotX(mArrowWidth / 2.0f);
@@ -393,7 +360,7 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
         }
         int childMargins = (numVisibleChildren - 1) * mMargin;
         int height = getMeasuredHeight() + extraVerticalSpace + childMargins;
-        int width = getMeasuredWidth();
+        int width = getMeasuredWidth() + getPaddingLeft() + getPaddingRight();
 
         getTargetObjectLocation(mTempRect);
         InsettableFrameLayout dragLayer = getPopupContainer();
@@ -519,48 +486,13 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
         return getChildCount() > 0 ? getChildAt(0) : this;
     }
 
-    private int getArrowDuration() {
-        return shouldAddArrow()
-                ? getResources().getInteger(R.integer.config_popupArrowOpenCloseDuration)
-                : 0;
-    }
-
     private void animateOpen() {
         setVisibility(View.VISIBLE);
 
-        final AnimatorSet openAnim = new AnimatorSet();
-        final Resources res = getResources();
-        final long revealDuration = (long) res.getInteger(R.integer.config_popupOpenCloseDuration);
-        final long arrowDuration = getArrowDuration();
-        final TimeInterpolator revealInterpolator = ACCEL_DEACCEL;
-
-        // Rectangular reveal.
-        mEndRect.set(0, 0, getMeasuredWidth(), getMeasuredHeight());
-        final ValueAnimator revealAnim = createOpenCloseOutlineProvider()
-                .createRevealAnimator(this, false);
-        revealAnim.setDuration(revealDuration);
-        revealAnim.setInterpolator(revealInterpolator);
-        // Clip the popup to the initial outline while the notification dot and arrow animate.
-        revealAnim.start();
-        revealAnim.pause();
-
-        ValueAnimator fadeIn = ValueAnimator.ofFloat(0, 1);
-        fadeIn.setDuration(revealDuration + arrowDuration);
-        fadeIn.setInterpolator(revealInterpolator);
-        fadeIn.addUpdateListener(anim -> {
-            float alpha = (float) anim.getAnimatedValue();
-            mArrow.setAlpha(alpha);
-            setAlpha(revealAnim.isStarted() ? alpha : 0);
-        });
-        openAnim.play(fadeIn);
-
-        // Animate the arrow.
-        mArrow.setScaleX(0);
-        mArrow.setScaleY(0);
-        Animator arrowScale = ObjectAnimator.ofFloat(mArrow, LauncherAnimUtils.SCALE_PROPERTY, 1)
-                .setDuration(arrowDuration);
-
-        openAnim.addListener(new AnimatorListenerAdapter() {
+        mOpenCloseAnimator = getOpenCloseAnimator(true, OPEN_DURATION, OPEN_FADE_START_DELAY,
+                OPEN_FADE_DURATION, OPEN_CHILD_FADE_START_DELAY, OPEN_CHILD_FADE_DURATION,
+                DECELERATED_EASE);
+        mOpenCloseAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
                 setAlpha(1f);
@@ -568,56 +500,68 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
                 mOpenCloseAnimator = null;
             }
         });
-
-        mOpenCloseAnimator = openAnim;
-        openAnim.playSequentially(arrowScale, revealAnim);
-        openAnim.start();
+        mOpenCloseAnimator.start();
     }
+
+    private AnimatorSet getOpenCloseAnimator(boolean isOpening, int totalDuration,
+            int fadeStartDelay, int fadeDuration, int childFadeStartDelay,
+            int childFadeDuration, Interpolator interpolator) {
+        final AnimatorSet openAnim = new AnimatorSet();
+        float[] alphaValues = isOpening ? new float[] {0, 1} : new float[] {1, 0};
+        float[] scaleValues = isOpening ? new float[] {0.5f, 1} : new float[] {1, 0.5f};
+
+        ValueAnimator fade = ValueAnimator.ofFloat(alphaValues);
+        fade.setStartDelay(fadeStartDelay);
+        fade.setDuration(fadeDuration);
+        fade.setInterpolator(LINEAR);
+        fade.addUpdateListener(anim -> {
+            float alpha = (float) anim.getAnimatedValue();
+            mArrow.setAlpha(alpha);
+            setAlpha(alpha);
+        });
+        openAnim.play(fade);
+
+        setPivotX(mIsLeftAligned ? 0 : getMeasuredWidth());
+        setPivotY(mIsAboveIcon ? getMeasuredHeight() : 0);
+        Animator scale = ObjectAnimator.ofFloat(this, View.SCALE_Y, scaleValues);
+        scale.setDuration(totalDuration);
+        scale.setInterpolator(interpolator);
+        openAnim.play(scale);
+
+        for (int i = getChildCount() - 1; i >= 0; --i) {
+            View view = getChildAt(i);
+            if (view.getVisibility() == VISIBLE && view instanceof ViewGroup) {
+                for (int j = ((ViewGroup) view).getChildCount() - 1; j >= 0; --j) {
+                    View childView = ((ViewGroup) view).getChildAt(j);
+
+                    childView.setAlpha(alphaValues[0]);
+                    ValueAnimator childFade = ObjectAnimator.ofFloat(childView, ALPHA, alphaValues);
+                    childFade.setStartDelay(childFadeStartDelay);
+                    childFade.setDuration(childFadeDuration);
+                    childFade.setInterpolator(LINEAR);
+
+                    openAnim.play(childFade);
+                }
+            }
+        }
+        return openAnim;
+    }
+
 
     protected void animateClose() {
         if (!mIsOpen) {
             return;
-        }
-        if (getOutlineProvider() instanceof RevealOutlineAnimation) {
-            ((RevealOutlineAnimation) getOutlineProvider()).getOutline(mEndRect);
-        } else {
-            mEndRect.set(0, 0, getMeasuredWidth(), getMeasuredHeight());
         }
         if (mOpenCloseAnimator != null) {
             mOpenCloseAnimator.cancel();
         }
         mIsOpen = false;
 
-
-        final AnimatorSet closeAnim = new AnimatorSet();
-        final Resources res = getResources();
-        final TimeInterpolator revealInterpolator = ACCEL_DEACCEL;
-        final long revealDuration = res.getInteger(R.integer.config_popupOpenCloseDuration);
-        final long arrowDuration = getArrowDuration();
-
-        // Hide the arrow
-        Animator scaleArrow = ObjectAnimator.ofFloat(mArrow, LauncherAnimUtils.SCALE_PROPERTY, 0)
-                .setDuration(arrowDuration);
-
-        // Rectangular reveal (reversed).
-        final ValueAnimator revealAnim = createOpenCloseOutlineProvider()
-                .createRevealAnimator(this, true);
-        revealAnim.setDuration(revealDuration);
-        revealAnim.setInterpolator(revealInterpolator);
-        closeAnim.playSequentially(revealAnim, scaleArrow);
-
-        ValueAnimator fadeOut = ValueAnimator.ofFloat(getAlpha(), 0);
-        fadeOut.setDuration(revealDuration + arrowDuration);
-        fadeOut.setInterpolator(revealInterpolator);
-        fadeOut.addUpdateListener(anim -> {
-            float alpha = (float) anim.getAnimatedValue();
-            mArrow.setAlpha(alpha);
-            setAlpha(scaleArrow.isStarted() ? 0 : alpha);
-        });
-        closeAnim.play(fadeOut);
-
-        onCreateCloseAnimation(closeAnim);
-        closeAnim.addListener(new AnimatorListenerAdapter() {
+        mOpenCloseAnimator = getOpenCloseAnimator(false, CLOSE_DURATION, CLOSE_FADE_START_DELAY,
+                CLOSE_FADE_DURATION, CLOSE_CHILD_FADE_START_DELAY, CLOSE_CHILD_FADE_DURATION,
+                ACCELERATED_EASE);
+        onCreateCloseAnimation(mOpenCloseAnimator);
+        mOpenCloseAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
                 mOpenCloseAnimator = null;
@@ -628,24 +572,13 @@ public abstract class ArrowPopup<T extends BaseDraggingActivity> extends Abstrac
                 }
             }
         });
-        mOpenCloseAnimator = closeAnim;
-        closeAnim.start();
+        mOpenCloseAnimator.start();
     }
 
     /**
      * Called when creating the close transition allowing subclass can add additional animations.
      */
     protected void onCreateCloseAnimation(AnimatorSet anim) { }
-
-    private RoundedRectRevealOutlineProvider createOpenCloseOutlineProvider() {
-        int arrowLeft = getArrowLeft();
-        int arrowCenterY = mIsAboveIcon ? getMeasuredHeight() : 0;
-
-        mStartRect.set(arrowLeft, arrowCenterY, arrowLeft + mArrowWidth, arrowCenterY);
-
-        return new RoundedRectRevealOutlineProvider(
-                mArrowPointRadius, mOutlineRadius, mStartRect, mEndRect);
-    }
 
     /**
      * Closes the popup without animation.

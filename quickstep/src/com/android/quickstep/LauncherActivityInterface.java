@@ -19,10 +19,13 @@ import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.QUICK_SWITCH;
+import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 
 import android.animation.Animator;
+import android.animation.AnimatorSet;
 import android.content.Context;
 import android.graphics.Rect;
 import android.view.MotionEvent;
@@ -82,9 +85,13 @@ public final class LauncherActivityInterface extends
         if (launcher == null) {
             return;
         }
-        // Ensure recents is at the correct position for NORMAL state. For example, when we detach
-        // recents, we assume the first task is invisible, making translation off by one task.
-        launcher.getStateManager().reapplyState();
+        // When going to home, the state animator we use has SKIP_OVERVIEW because we assume that
+        // setRecentsAttachedToAppWindow() will handle animating Overview instead. Thus, at the end
+        // of the animation, we should ensure recents is at the correct position for NORMAL state.
+        // For example, when doing a long swipe to home, RecentsView may be scaled down. This is
+        // relatively expensive, so do it on the next frame instead of critical path.
+        MAIN_EXECUTOR.getHandler().post(launcher.getStateManager()::reapplyState);
+
         launcher.getRootView().setForceHideBackArrow(false);
         notifyRecentsOfOrientation(deviceState.getRotationTouchHelper());
     }
@@ -191,7 +198,8 @@ public final class LauncherActivityInterface extends
 
         closeOverlay();
         launcher.getStateManager().goToState(OVERVIEW,
-                launcher.getStateManager().shouldAnimateStateChange(), onCompleteCallback);
+                launcher.getStateManager().shouldAnimateStateChange(),
+                onCompleteCallback == null ? null : forEndCallback(onCompleteCallback));
         return true;
     }
 
@@ -271,11 +279,25 @@ public final class LauncherActivityInterface extends
     public @Nullable Animator getParallelAnimationToLauncher(GestureEndTarget endTarget,
             long duration) {
         TaskbarController taskbarController = getTaskbarController();
+        Animator superAnimator = super.getParallelAnimationToLauncher(endTarget, duration);
         if (taskbarController == null) {
-            return null;
+            return superAnimator;
         }
         LauncherState toState = stateFromGestureEndTarget(endTarget);
-        return taskbarController.createAnimToLauncher(toState, duration);
+        Animator taskbarAnimator = taskbarController.createAnimToLauncher(toState, duration);
+        if (superAnimator == null) {
+            return taskbarAnimator;
+        } else {
+            AnimatorSet animatorSet = new AnimatorSet();
+            animatorSet.playTogether(superAnimator, taskbarAnimator);
+            return animatorSet;
+        }
+    }
+
+    @Override
+    protected int getOverviewScrimColorForState(BaseQuickstepLauncher launcher,
+            LauncherState state) {
+        return state.getWorkspaceScrimColor(launcher);
     }
 
     @Override

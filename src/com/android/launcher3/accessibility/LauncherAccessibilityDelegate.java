@@ -3,6 +3,7 @@ package com.android.launcher3.accessibility;
 import static android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK;
 
 import static com.android.launcher3.LauncherState.NORMAL;
+import static com.android.launcher3.anim.AnimatorListeners.forSuccessCallback;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.IGNORE;
 
 import android.appwidget.AppWidgetProviderInfo;
@@ -32,6 +33,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.dragndrop.DragController.DragListener;
 import com.android.launcher3.dragndrop.DragOptions;
+import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.keyboard.KeyboardDragAndDropView;
 import com.android.launcher3.model.data.AppInfo;
@@ -219,27 +221,26 @@ public class LauncherAccessibilityDelegate extends AccessibilityDelegate impleme
         } else if (action == ADD_TO_WORKSPACE) {
             final int[] coordinates = new int[2];
             final int screenId = findSpaceOnWorkspace(item, coordinates);
-            mLauncher.getStateManager().goToState(NORMAL, true, new Runnable() {
+            mLauncher.getStateManager().goToState(NORMAL, true, forSuccessCallback(() -> {
+                if (item instanceof AppInfo) {
+                    WorkspaceItemInfo info = ((AppInfo) item).makeWorkspaceItem();
+                    mLauncher.getModelWriter().addItemToDatabase(info,
+                            Favorites.CONTAINER_DESKTOP,
+                            screenId, coordinates[0], coordinates[1]);
 
-                @Override
-                public void run() {
-                    if (item instanceof AppInfo) {
-                        WorkspaceItemInfo info = ((AppInfo) item).makeWorkspaceItem();
-                        mLauncher.getModelWriter().addItemToDatabase(info,
-                                Favorites.CONTAINER_DESKTOP,
-                                screenId, coordinates[0], coordinates[1]);
-
-                        mLauncher.bindItems(Collections.singletonList(info), true);
-                        announceConfirmation(R.string.item_added_to_workspace);
-                    } else if (item instanceof PendingAddItemInfo) {
-                        PendingAddItemInfo info = (PendingAddItemInfo) item;
-                        Workspace workspace = mLauncher.getWorkspace();
-                        workspace.snapToPage(workspace.getPageIndexForScreenId(screenId));
-                        mLauncher.addPendingItem(info, Favorites.CONTAINER_DESKTOP,
-                                screenId, coordinates, info.spanX, info.spanY);
-                    }
+                    mLauncher.bindItems(
+                            Collections.singletonList(info),
+                            /* forceAnimateIcons= */ true,
+                            /* focusFirstItemForAccessibility= */ true);
+                    announceConfirmation(R.string.item_added_to_workspace);
+                } else if (item instanceof PendingAddItemInfo) {
+                    PendingAddItemInfo info = (PendingAddItemInfo) item;
+                    Workspace workspace = mLauncher.getWorkspace();
+                    workspace.snapToPage(workspace.getPageIndexForScreenId(screenId));
+                    mLauncher.addPendingItem(info, Favorites.CONTAINER_DESKTOP,
+                            screenId, coordinates, info.spanX, info.spanY);
                 }
-            });
+            }));
             return true;
         } else if (action == MOVE_TO_WORKSPACE) {
             Folder folder = Folder.getOpen(mLauncher);
@@ -290,7 +291,12 @@ public class LauncherAccessibilityDelegate extends AccessibilityDelegate impleme
             return actions;
         }
 
-        CellLayout layout = (CellLayout) host.getParent().getParent();
+        CellLayout layout;
+        if (host.getParent() instanceof DragView) {
+            layout = (CellLayout) ((DragView) host.getParent()).getContentViewParent().getParent();
+        } else {
+            layout = (CellLayout) host.getParent().getParent();
+        }
         if ((providerInfo.resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0) {
             if (layout.isRegionVacant(info.cellX + info.spanX, info.cellY, 1, info.spanY) ||
                     layout.isRegionVacant(info.cellX - 1, info.cellY, 1, info.spanY)) {

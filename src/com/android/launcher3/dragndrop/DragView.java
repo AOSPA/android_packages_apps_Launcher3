@@ -33,11 +33,13 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Path;
+import android.graphics.Picture;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.PictureDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -51,7 +53,6 @@ import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 
-import com.android.launcher3.FirstFrameAnimatorHelper;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherState;
@@ -62,6 +63,7 @@ import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statemanager.StateManager.StateListener;
+import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.BaseDragLayer;
 
@@ -85,12 +87,13 @@ public class DragView extends FrameLayout implements StateListener<LauncherState
     private final float mScaleOnDrop;
     private final int[] mTempLoc = new int[2];
 
+    private final RunnableList mOnDragStartCallback = new RunnableList();
+
     private Point mDragVisualizeOffset = null;
     private Rect mDragRegion = null;
     private final Launcher mLauncher;
     private final DragLayer mDragLayer;
     @Thunk final DragController mDragController;
-    final FirstFrameAnimatorHelper mFirstFrameAnimatorHelper;
     private boolean mHasDrawn = false;
 
     final ValueAnimator mAnim;
@@ -136,7 +139,6 @@ public class DragView extends FrameLayout implements StateListener<LauncherState
         mLauncher = launcher;
         mDragLayer = launcher.getDragLayer();
         mDragController = launcher.getDragController();
-        mFirstFrameAnimatorHelper = new FirstFrameAnimatorHelper(this);
 
         mContent = content;
         mWidth = width;
@@ -276,7 +278,8 @@ public class DragView extends FrameLayout implements StateListener<LauncherState
                 }
                 mFgSpringDrawable.setBounds(bounds);
 
-                new Handler(Looper.getMainLooper()).post(() -> {
+                new Handler(Looper.getMainLooper()).post(() -> mOnDragStartCallback.add(() -> {
+                    // TODO: Consider fade-in animation
                     // Assign the variable on the UI thread to avoid race conditions.
                     mScaledMaskPath = mask;
                     // Avoid relayout as we do not care about children affecting layout
@@ -290,9 +293,16 @@ public class DragView extends FrameLayout implements StateListener<LauncherState
                         mBadge.setColorFilter(d.getColorFilter());
                     }
                     invalidate();
-                });
+                }));
             }
         });
+    }
+
+    /**
+     * Called when pre-drag finishes for an icon
+     */
+    public void onDragStart() {
+        mOnDragStartCallback.executeAllAndDestroy();
     }
 
     // TODO(b/183609936): This is only for LauncherAppWidgetHostView that is rendered in a drawable.
@@ -449,7 +459,6 @@ public class DragView extends FrameLayout implements StateListener<LauncherState
         setTranslationY(mLastTouchY - mRegistrationY + mAnimatedShiftY);
     }
 
-
     /**
      * Detaches {@link #mContent}, if previously attached, from this view.
      *
@@ -458,7 +467,20 @@ public class DragView extends FrameLayout implements StateListener<LauncherState
      */
     public void detachContentView(boolean reattachToPreviousParent) {
         if (mContent != null && mContentViewParent != null && mContentViewInParentViewIndex >= 0) {
-            removeView(mContent);
+            Picture picture = new Picture();
+            mContent.draw(picture.beginRecording(mWidth, mHeight));
+            picture.endRecording();
+            View view = new View(mLauncher);
+            view.setClipToOutline(mContent.getClipToOutline());
+            view.setOutlineProvider(mContent.getOutlineProvider());
+            view.setBackground(new PictureDrawable(picture));
+            view.measure(makeMeasureSpec(mWidth, EXACTLY), makeMeasureSpec(mHeight, EXACTLY));
+            view.layout(mContent.getLeft(), mContent.getTop(),
+                    mContent.getRight(), mContent.getBottom());
+            addViewInLayout(view, indexOfChild(mContent), mContent.getLayoutParams(), true);
+
+            removeViewInLayout(mContent);
+            mContent.setVisibility(INVISIBLE);
             mContent.setLayoutParams(mContentViewLayoutParams);
             if (reattachToPreviousParent) {
                 mContentViewParent.addView(mContent, mContentViewInParentViewIndex);

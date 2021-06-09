@@ -65,12 +65,6 @@ public final class FallbackActivityInterface extends
         }
     }
 
-    /** 4 */
-    @Override
-    public void onSwipeUpToHomeComplete(RecentsAnimationDeviceState deviceState) {
-        onSwipeUpToRecentsComplete();
-    }
-
     /** 5 */
     @Override
     public void onAssistantVisibilityChanged(float visibility) {
@@ -163,7 +157,9 @@ public final class FallbackActivityInterface extends
 
     @Override
     public boolean isInLiveTileMode() {
-        return false;
+        RecentsActivity activity = getCreatedActivity();
+        return activity != null && activity.getStateManager().getState() == DEFAULT &&
+                activity.isStarted();
     }
 
     @Override
@@ -195,5 +191,10 @@ public final class FallbackActivityInterface extends
         RecentsView recentsView = getCreatedActivity().getOverviewPanel();
         recentsView.setLayoutRotation(rotationTouchHelper.getCurrentActiveRotation(),
                 rotationTouchHelper.getDisplayRotation());
+    }
+
+    @Override
+    protected int getOverviewScrimColorForState(RecentsActivity activity, RecentsState state) {
+        return state.getScrimColor(activity);
     }
 }

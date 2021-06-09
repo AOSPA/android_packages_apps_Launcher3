@@ -87,6 +87,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_QUICKSTEP_LIVE_TILE = getDebugFlag(
             "ENABLE_QUICKSTEP_LIVE_TILE", true, "Enable live tile in Quickstep overview");
 
+    public static final BooleanFlag ENABLE_QUICKSTEP_WIDGET_APP_START = getDebugFlag(
+            "ENABLE_QUICKSTEP_WIDGET_APP_START", true,
+            "Enable Quickstep animation when launching activities from an app widget");
+
     // Keep as DeviceFlag to allow remote disable in emergency.
     public static final BooleanFlag ENABLE_SUGGESTED_ACTIONS_OVERVIEW = new DeviceFlag(
             "ENABLE_SUGGESTED_ACTIONS_OVERVIEW", true, "Show chip hints on the overview screen");
@@ -137,8 +141,8 @@ public final class FeatureFlags {
     public static final BooleanFlag MULTI_DB_GRID_MIRATION_ALGO = getDebugFlag(
             "MULTI_DB_GRID_MIRATION_ALGO", true, "Use the multi-db grid migration algorithm");
 
-    public static final BooleanFlag ENABLE_LAUNCHER_PREVIEW_IN_GRID_PICKER = getDebugFlag(
-            "ENABLE_LAUNCHER_PREVIEW_IN_GRID_PICKER", true, "Show launcher preview in grid picker");
+    public static final BooleanFlag ENABLE_THEMED_ICONS = getDebugFlag(
+            "ENABLE_THEMED_ICONS", false, "Enable themed icons on workspace");
 
     // Keep as DeviceFlag for remote disable in emergency.
     public static final BooleanFlag ENABLE_OVERVIEW_SELECTIONS = new DeviceFlag(
@@ -151,7 +155,7 @@ public final class FeatureFlags {
             "ENABLE_OVERVIEW_SHARE", false, "Show Share button in Overview Actions");
 
     public static final BooleanFlag ENABLE_OVERVIEW_SHARING_TO_PEOPLE = getDebugFlag(
-            "ENABLE_OVERVIEW_SHARING_TO_PEOPLE", false,
+            "ENABLE_OVERVIEW_SHARING_TO_PEOPLE", true,
             "Show indicators for content on Overview to share with top people. ");
 
     public static final BooleanFlag ENABLE_OVERVIEW_CONTENT_PUSH = getDebugFlag(
@@ -170,12 +174,12 @@ public final class FeatureFlags {
             "Replace Smartspace with the enhanced version. "
                     + "Ignored if ENABLE_SMARTSPACE_UNIVERSAL is enabled.");
 
-    public static final BooleanFlag ENABLE_SMARTSPACE_FEEDBACK = new DeviceFlag(
+    public static final BooleanFlag ENABLE_SMARTSPACE_FEEDBACK = getDebugFlag(
             "ENABLE_SMARTSPACE_FEEDBACK", true,
             "Adds a menu option to send feedback for Enhanced Smartspace.");
 
-    public static final BooleanFlag ENABLE_SMARTSPACE_DISMISS = new DeviceFlag(
-            "ENABLE_SMARTSPACE_DISMISS", false,
+    public static final BooleanFlag ENABLE_SMARTSPACE_DISMISS = getDebugFlag(
+            "ENABLE_SMARTSPACE_DISMISS", true,
             "Adds a menu option to dismiss the current Enhanced Smartspace card.");
 
     public static final BooleanFlag ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS =
@@ -226,11 +230,19 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ENFORCED_ROUNDED_CORNERS = new DeviceFlag(
             "ENABLE_ENFORCED_ROUNDED_CORNERS", true, "Enforce rounded corners on all App Widgets");
 
+    public static final BooleanFlag ENABLE_LOCAL_RECOMMENDED_WIDGETS_FILTER = new DeviceFlag(
+            "ENABLE_LOCAL_RECOMMENDED_WIDGETS_FILTER", true,
+            "Enables a local filter for recommended widgets.");
+
     public static final BooleanFlag NOTIFY_CRASHES = getDebugFlag("NOTIFY_CRASHES", false,
             "Sends a notification whenever launcher encounters an uncaught exception.");
 
     public static final BooleanFlag PROTOTYPE_APP_CLOSE = getDebugFlag(
             "PROTOTYPE_APP_CLOSE", false, "Enables new app close");
+
+    public static final BooleanFlag ENABLE_WALLPAPER_SCRIM = getDebugFlag(
+            "ENABLE_WALLPAPER_SCRIM", false,
+            "Enables scrim over wallpaper for text protection.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

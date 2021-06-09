@@ -16,15 +16,11 @@
 package com.android.quickstep.interaction;
 
 import static com.android.launcher3.anim.Interpolators.ACCEL;
-import static com.android.quickstep.interaction.TutorialController.TutorialType.OVERVIEW_NAVIGATION_COMPLETE;
 
 import android.animation.AnimatorSet;
 import android.annotation.TargetApi;
 import android.graphics.PointF;
 import android.os.Build;
-import android.view.View;
-
-import androidx.annotation.Nullable;
 
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
@@ -52,10 +48,9 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
         return R.string.overview_gesture_intro_subtitle;
     }
 
-    @Nullable
     @Override
-    public View getMockLauncherView() {
-        return null;
+    protected int getMockAppTaskThumbnailResId() {
+        return R.drawable.mock_conversations_list;
     }
 
     @Override
@@ -100,6 +95,7 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
                         showFeedback(R.string.overview_gesture_feedback_swipe_too_far_from_edge);
                         break;
                     case OVERVIEW_GESTURE_COMPLETED:
+                        mTutorialFragment.releaseGestureVideoView();
                         PendingAnimation anim = new PendingAnimation(300);
                         anim.setFloat(mTaskViewSwipeUpAnimation
                                 .getCurrentShift(), AnimatedFloat.VALUE, 1, ACCEL);
@@ -107,7 +103,10 @@ final class OverviewGestureTutorialController extends SwipeUpGestureTutorialCont
                         animset.start();
                         mRunningWindowAnim = SwipeUpAnimationLogic.RunningWindowAnim.wrap(animset);
                         onMotionPaused(true /*arbitrary value*/);
-                        showFeedback(R.string.overview_gesture_feedback_complete, true);
+                        int subtitleResId = mTutorialFragment.getNumSteps() == 1
+                                ? R.string.overview_gesture_feedback_complete_without_follow_up
+                                : R.string.overview_gesture_feedback_complete_with_follow_up;
+                        showFeedback(subtitleResId, true);
                         break;
                     case HOME_OR_OVERVIEW_NOT_STARTED_WRONG_SWIPE_DIRECTION:
                     case HOME_OR_OVERVIEW_CANCELLED:

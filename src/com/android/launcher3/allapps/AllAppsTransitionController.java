@@ -15,18 +15,17 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.ALL_APPS_CONTENT;
-import static com.android.launcher3.LauncherState.OVERVIEW;
-import static com.android.launcher3.anim.Interpolators.FAST_OUT_SLOW_IN;
+import static com.android.launcher3.anim.Interpolators.DEACCEL_1_7;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
-import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_VERTICAL_PROGRESS;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_ALLAPPS;
 
 import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
+import android.animation.Animator.AnimatorListener;
 import android.animation.ObjectAnimator;
 import android.util.FloatProperty;
 import android.view.View;
@@ -37,12 +36,13 @@ import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.anim.AnimationSuccessListener;
+import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
+import com.android.launcher3.views.ScrimView;
 
 /**
  * Handles AllApps view transition.
@@ -86,6 +86,7 @@ public class AllAppsTransitionController
     private float mProgress;        // [0, 1], mShiftRange * mProgress = shiftCurrent
 
     private float mScrollRangeDelta = 0;
+    private ScrimView mScrimView;
 
     public AllAppsTransitionController(Launcher l) {
         mLauncher = l;
@@ -154,9 +155,8 @@ public class AllAppsTransitionController
             return;
         }
 
-        Interpolator interpolator = config.userControlled ? LINEAR : toState == OVERVIEW
-                ? config.getInterpolator(ANIM_OVERVIEW_SCALE, FAST_OUT_SLOW_IN)
-                : FAST_OUT_SLOW_IN;
+        // need to decide depending on the release velocity
+        Interpolator interpolator = (config.userControlled ? LINEAR : DEACCEL_1_7);
 
         Animator anim = createSpringAnimation(mProgress, targetProgress);
         anim.setInterpolator(config.getInterpolator(ANIM_VERTICAL_PROGRESS, interpolator));
@@ -179,19 +179,28 @@ public class AllAppsTransitionController
 
         Interpolator allAppsFade = config.getInterpolator(ANIM_ALL_APPS_FADE, LINEAR);
         setter.setViewAlpha(mAppsView, hasAllAppsContent ? 1 : 0, allAppsFade);
+
+        boolean shouldProtectHeader =
+                ALL_APPS == state || mLauncher.getStateManager().getState() == ALL_APPS;
+        mScrimView.setDrawingController(shouldProtectHeader ? mAppsView : null);
     }
 
-    public AnimatorListenerAdapter getProgressAnimatorListener() {
-        return AnimationSuccessListener.forRunnable(this::onProgressAnimationEnd);
+    public AnimatorListener getProgressAnimatorListener() {
+        return AnimatorListeners.forSuccessCallback(this::onProgressAnimationEnd);
     }
 
-    public void setupViews(AllAppsContainerView appsView) {
+    /**
+     * see Launcher#setupViews
+     */
+    public void setupViews(ScrimView scrimView, AllAppsContainerView appsView) {
+        mScrimView = scrimView;
         mAppsView = appsView;
         if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && Utilities.ATLEAST_R) {
             mLauncher.getSystemUiController().updateUiState(UI_STATE_ALLAPPS,
                     View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
+        mAppsView.setScrimView(scrimView);
     }
 
     /**

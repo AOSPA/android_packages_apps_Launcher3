@@ -35,7 +35,6 @@ import android.view.Surface;
 
 import com.android.launcher3.R;
 import com.android.launcher3.ResourceUtils;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.DisplayController.Info;
 
 import java.io.PrintWriter;
@@ -161,8 +160,10 @@ class OrientationTouchTransformer {
         resetSwipeRegions(info);
     }
 
-    void setNavigationMode(SysUINavigationMode.Mode newMode, Info info,
-            Resources newRes) {
+    void setNavigationMode(SysUINavigationMode.Mode newMode, Info info, Resources newRes) {
+        if (DEBUG) {
+            Log.d(TAG, "setNavigationMode new: " + newMode + " oldMode: " + mMode + " " + this);
+        }
         if (mMode == newMode) {
             return;
         }
@@ -187,7 +188,7 @@ class OrientationTouchTransformer {
      * @see #enableMultipleRegions(boolean, Info)
      */
     void createOrAddTouchRegion(Info info) {
-        mCurrentDisplay = new CurrentDisplay(info.realSize, info.rotation);
+        mCurrentDisplay = new CurrentDisplay(info.currentSize, info.rotation);
 
         if (mQuickStepStartingRotation > QUICKSTEP_ROTATION_UNINITIALIZED
                 && mCurrentDisplay.rotation == mQuickStepStartingRotation) {
@@ -252,7 +253,7 @@ class OrientationTouchTransformer {
             Log.d(TAG, "clearing all regions except rotation: " + mCurrentDisplay.rotation);
         }
 
-        mCurrentDisplay = new CurrentDisplay(region.realSize, region.rotation);
+        mCurrentDisplay = new CurrentDisplay(region.currentSize, region.rotation);
         OrientationRectF regionToKeep = mSwipeTouchRegions.get(mCurrentDisplay);
         if (regionToKeep == null) {
             regionToKeep = createRegionForDisplay(region);
@@ -273,10 +274,11 @@ class OrientationTouchTransformer {
 
     private OrientationRectF createRegionForDisplay(Info display) {
         if (DEBUG) {
-            Log.d(TAG, "creating rotation region for: " + mCurrentDisplay.rotation);
+            Log.d(TAG, "creating rotation region for: " + mCurrentDisplay.rotation
+            + " with mode: " + mMode + " displayRotation: " + display.rotation);
         }
 
-        Point size = display.realSize;
+        Point size = display.currentSize;
         int rotation = display.rotation;
         int touchHeight = mNavBarGesturalHeight;
         OrientationRectF orientationRectF =
@@ -287,14 +289,15 @@ class OrientationTouchTransformer {
         } else {
             mAssistantLeftRegion.setEmpty();
             mAssistantRightRegion.setEmpty();
+            int navbarSize = getNavbarSize(ResourceUtils.NAVBAR_LANDSCAPE_LEFT_RIGHT_SIZE);
             switch (rotation) {
                 case Surface.ROTATION_90:
                     orientationRectF.left = orientationRectF.right
-                            - getNavbarSize(ResourceUtils.NAVBAR_LANDSCAPE_LEFT_RIGHT_SIZE);
+                            - navbarSize;
                     break;
                 case Surface.ROTATION_270:
                     orientationRectF.right = orientationRectF.left
-                            + getNavbarSize(ResourceUtils.NAVBAR_LANDSCAPE_LEFT_RIGHT_SIZE);
+                            + navbarSize;
                     break;
                 default:
                     orientationRectF.top = orientationRectF.bottom - touchHeight;
@@ -337,9 +340,9 @@ class OrientationTouchTransformer {
     }
 
     boolean touchInValidSwipeRegions(float x, float y) {
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.NO_SWIPE_TO_HOME, "touchInValidSwipeRegions " + x + "," + y + " in "
-                    + mLastRectTouched);
+        if (DEBUG) {
+            Log.d(TAG, "touchInValidSwipeRegions " + x + "," + y + " in "
+                    + mLastRectTouched + " this: " + this);
         }
         if (mLastRectTouched != null) {
             return mLastRectTouched.contains(x, y);
@@ -381,16 +384,10 @@ class OrientationTouchTransformer {
                 }
 
                 for (OrientationRectF rect : mSwipeTouchRegions.values()) {
-                    if (TestProtocol.sDebugTracing) {
-                        Log.d(TestProtocol.NO_SWIPE_TO_HOME, "transform:DOWN, rect=" + rect);
-                    }
                     if (rect == null) {
                         continue;
                     }
                     if (rect.applyTransform(event, false)) {
-                        if (TestProtocol.sDebugTracing) {
-                            Log.d(TestProtocol.NO_SWIPE_TO_HOME, "setting mLastRectTouched");
-                        }
                         mLastRectTouched = rect;
                         mActiveTouchRotation = rect.mRotation;
                         if (mEnableMultipleRegions
@@ -462,7 +459,8 @@ class OrientationTouchTransformer {
                 if (DEBUG) {
                     Log.d(TAG, "Transforming rotation due to forceTransform, "
                             + "mCurrentRotation: " + mCurrentDisplay.rotation
-                            + "mRotation: " + mRotation);
+                            + "mRotation: " + mRotation
+                            + " this: " + this);
                 }
                 event.transform(mTmpMatrix);
                 return true;
@@ -473,9 +471,10 @@ class OrientationTouchTransformer {
 
             if (DEBUG) {
                 Log.d(TAG, "original: " + event.getX() + ", " + event.getY()
-                                + " new: " + mTmpPoint[0] + ", " + mTmpPoint[1]
-                                + " rect: " + this + " forceTransform: " + forceTransform
-                                + " contains: " + contains(mTmpPoint[0], mTmpPoint[1]));
+                        + " new: " + mTmpPoint[0] + ", " + mTmpPoint[1]
+                        + " rect: " + this + " forceTransform: " + forceTransform
+                        + " contains: " + contains(mTmpPoint[0], mTmpPoint[1])
+                        + " this: " + this);
             }
 
             if (contains(mTmpPoint[0], mTmpPoint[1])) {
