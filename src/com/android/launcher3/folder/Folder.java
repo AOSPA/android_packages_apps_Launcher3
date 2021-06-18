@@ -30,17 +30,14 @@ import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.appwidget.AppWidgetHostView;
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Insets;
 import android.graphics.Path;
 import android.graphics.Rect;
-import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.text.InputType;
@@ -49,7 +46,6 @@ import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Pair;
-import android.util.SparseIntArray;
 import android.util.TypedValue;
 import android.view.FocusFinder;
 import android.view.KeyEvent;
@@ -67,7 +63,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
-import androidx.core.graphics.ColorUtils;
+import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Alarm;
@@ -102,12 +98,10 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pageindicators.PageIndicatorDots;
 import com.android.launcher3.util.Executors;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.views.ClipPathView;
-import com.android.launcher3.widget.LocalColorExtractor;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
 import java.util.ArrayList;
@@ -166,11 +160,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     private static final int ON_EXIT_CLOSE_DELAY = 400;
     private static final Rect sTempRect = new Rect();
     private static final int MIN_FOLDERS_FOR_HARDWARE_OPTIMIZATION = 10;
-
-    // Index used to get background color when using local wallpaper color extraction,
-    private static final int DARK_COLOR_EXTRACTION_INDEX = android.R.color.system_neutral1_900;
-    private static final int LIGHT_COLOR_EXTRACTION_INDEX = android.R.color.system_neutral2_500;
-    private static final int LIGHT_COLOR_L_STAR = 98;
 
     private final Alarm mReorderAlarm = new Alarm();
     private final Alarm mOnExitAlarm = new Alarm();
@@ -239,16 +228,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     @Nullable private FolderWindowInsetsAnimationCallback mFolderWindowInsetsAnimationCallback;
 
-    // Wallpaper local color extraction
-    @Nullable private LocalColorExtractor mColorExtractor;
-    @Nullable private LocalColorExtractor.Listener mColorListener;
-
-    // For simplicity, we start the color change only after the open animation has started.
-    private Runnable mColorChangeRunnable;
-    private Animator mColorChangeAnimator;
-    // The background color animator used in the folder open animation. We keep a reference to this,
-    // so that we can cancel it when starting mColorChangeAnimator.
-    private ObjectAnimator mOpenAnimationColorChangeAnimator;
+    private GradientDrawable mBackground;
 
     /**
      * Used to inflate the Workspace from XML.
@@ -268,6 +248,12 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         // name is complete, we have something to focus on, thus hiding the cursor and giving
         // reliable behavior when clicking the text field (since it will always gain focus on click).
         setFocusableInTouchMode(true);
+
+    }
+
+    @Override
+    public Drawable getBackground() {
+        return mBackground;
     }
 
     @Override
@@ -275,6 +261,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         super.onFinishInflate();
         final DeviceProfile dp = mActivityContext.getDeviceProfile();
         final int paddingLeftRight = dp.folderContentPaddingLeftRight;
+
+        mBackground = (GradientDrawable) ResourcesCompat.getDrawable(getResources(),
+                R.drawable.round_rect_folder, getContext().getTheme());
 
         mContent = findViewById(R.id.folder_content);
         mContent.setPadding(paddingLeftRight, dp.folderContentPaddingTop, paddingLeftRight, 0);
@@ -302,64 +291,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
             setWindowInsetsAnimationCallback(mFolderWindowInsetsAnimationCallback);
         }
-
-        if (Utilities.ATLEAST_S) {
-            boolean isFolderDarkText = Themes.getAttrBoolean(getContext(), R.attr.isFolderDarkText);
-            mColorExtractor = LocalColorExtractor.newInstance(getContext());
-            mColorListener = (RectF rect, SparseIntArray extractedColors) -> {
-                mColorChangeRunnable = () -> {
-                    mColorChangeRunnable = null;
-                    int duration = FOLDER_COLOR_ANIMATION_DURATION;
-
-                    // Cancel the open animation color change animator.
-                    ObjectAnimator existingAnim = mOpenAnimationColorChangeAnimator;
-                    if (existingAnim != null && existingAnim.isRunning()) {
-                        duration = (int) Math.max(FOLDER_COLOR_ANIMATION_DURATION,
-                                existingAnim.getDuration() * (1f - existingAnim.getDuration()));
-                        existingAnim.cancel();
-                        mOpenAnimationColorChangeAnimator = null;
-                    }
-
-                    // Start a new animator to the extracted color. Clamp down on the alpha
-                    // to prevent folder from being transparent for too long.
-                    GradientDrawable bg = (GradientDrawable) getBackground();
-                    int currentColor = ColorUtils.setAlphaComponent(bg.getColor().getDefaultColor(),
-                            255);
-                    int newColor = getExtractedColor(extractedColors, isFolderDarkText);
-                    mColorChangeAnimator = ObjectAnimator.ofArgb(bg, "color", currentColor,
-                            newColor).setDuration(duration);
-                    mColorChangeAnimator.addListener(new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            mColorChangeAnimator = null;
-                        }
-                    });
-                    mColorChangeAnimator.start();
-                };
-
-                // If the folder open animation has started, we can start the color change now.
-                // Otherwise we wait for it to start.
-                if (mOpenAnimationColorChangeAnimator != null
-                        && mOpenAnimationColorChangeAnimator.isStarted()) {
-                    post(mColorChangeRunnable);
-                }
-            };
-        }
-    }
-
-    /**
-     * Returns an index used to query the color of interest from the list of extracted colors.
-     * @param hasDarkText True when dark index is wanted, False when light index is wanted.
-     */
-    @TargetApi(Build.VERSION_CODES.S)
-    private int getExtractedColor(SparseIntArray colors, boolean hasDarkText) {
-        int color = colors.get(hasDarkText
-                ? LIGHT_COLOR_EXTRACTION_INDEX
-                : DARK_COLOR_EXTRACTION_INDEX);
-        if (hasDarkText) {
-            color = ColorStateList.valueOf(color).withLStar(LIGHT_COLOR_L_STAR).getDefaultColor();
-        }
-        return color;
     }
 
     public boolean onLongClick(View v) {
@@ -730,7 +661,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         }
 
         mContent.completePendingPageChanges();
-        mContent.snapToPageImmediately(pageNo);
+        mContent.setCurrentPage(pageNo);
 
         // This is set to true in close(), but isn't reset to false until onDropCompleted(). This
         // leads to an inconsistent state if you drag out of the folder and drag back in without
@@ -740,15 +671,11 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         cancelRunningAnimations();
         FolderAnimationManager fam = new FolderAnimationManager(this, true /* isOpening */);
         AnimatorSet anim = fam.getAnimator();
-        mOpenAnimationColorChangeAnimator = fam.getBgColorAnimator();
         anim.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
                 mFolderIcon.setIconVisible(false);
                 mFolderIcon.drawLeaveBehindIfExists();
-                if (mColorChangeRunnable != null) {
-                    mColorChangeRunnable.run();
-                }
             }
             @Override
             public void onAnimationEnd(Animator animation) {
@@ -844,9 +771,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         if (mCurrentAnimator != null && mCurrentAnimator.isRunning()) {
             mCurrentAnimator.cancel();
         }
-        if (mColorChangeAnimator != null && mColorChangeAnimator.isRunning()) {
-            mColorChangeAnimator.cancel();
-        }
     }
 
     private void animateClosed() {
@@ -932,19 +856,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         clearDragInfo();
         mState = STATE_SMALL;
         mContent.setCurrentPage(0);
-
-        mOpenAnimationColorChangeAnimator = null;
-        mColorChangeRunnable = null;
-        if (mColorChangeAnimator != null) {
-            mColorChangeAnimator.cancel();
-            mColorChangeAnimator = null;
-        }
-        if (mColorExtractor != null) {
-            mColorExtractor.removeLocations();
-            mColorExtractor.setListener(null);
-        }
-        GradientDrawable bg = (GradientDrawable) getBackground();
-        bg.setColor(Themes.getAttrColor(getContext(), R.attr.folderFillColor));
     }
 
     @Override
@@ -1213,11 +1124,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         lp.x = left;
         lp.y = top;
 
-        if (mColorExtractor != null) {
-            mColorExtractor.removeLocations();
-            mColorExtractor.setListener(mColorListener);
-            mLauncherDelegate.addRectForColorExtraction(lp, mColorExtractor);
-        }
+        mBackground.setBounds(0, 0, width, height);
     }
 
     protected int getContentAreaHeight() {
@@ -1714,14 +1621,16 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     }
 
     @Override
-    public void draw(Canvas canvas) {
+    protected void dispatchDraw(Canvas canvas) {
         if (mClipPath != null) {
             int count = canvas.save();
             canvas.clipPath(mClipPath);
-            super.draw(canvas);
+            mBackground.draw(canvas);
             canvas.restoreToCount(count);
+            super.dispatchDraw(canvas);
         } else {
-            super.draw(canvas);
+            mBackground.draw(canvas);
+            super.dispatchDraw(canvas);
         }
     }
 

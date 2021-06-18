@@ -117,6 +117,7 @@ import com.android.systemui.shared.system.LatencyTrackerCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.system.TaskInfoCompat;
 import com.android.systemui.shared.system.TaskStackChangeListener;
+import com.android.systemui.shared.system.TaskStackChangeListeners;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;
@@ -348,6 +349,13 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         }
 
         if (mActivity != null) {
+            if (mStateCallback.hasStates(STATE_GESTURE_COMPLETED)) {
+                // If the activity has restarted between setting the page scroll settling callback
+                // and actually receiving the callback, just mark the gesture completed
+                mGestureState.setState(STATE_RECENTS_SCROLLING_FINISHED);
+                return true;
+            }
+
             // The launcher may have been recreated as a result of device rotation.
             int oldState = mStateCallback.getState() & ~LAUNCHER_UI_STATES;
             initStateCallbacks();
@@ -745,10 +753,25 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
 
         if (mRecentsView != null) {
-            InteractionJankMonitorWrapper.begin(mRecentsView,
-                    InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH, 2000 /* ms timeout */);
-            InteractionJankMonitorWrapper.begin(mRecentsView,
-                    InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
+            mRecentsView.getViewTreeObserver().addOnDrawListener(new OnDrawListener() {
+                boolean mHandled = false;
+
+                @Override
+                public void onDraw() {
+                    if (mHandled) {
+                        return;
+                    }
+                    mHandled = true;
+
+                    InteractionJankMonitorWrapper.begin(mRecentsView,
+                            InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH, 2000 /* ms timeout */);
+                    InteractionJankMonitorWrapper.begin(mRecentsView,
+                            InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
+
+                    mRecentsView.post(() ->
+                            mRecentsView.getViewTreeObserver().removeOnDrawListener(this));
+                }
+            });
         }
         notifyGestureStartedAsync();
         setIsLikelyToStartNewTask(isLikelyToStartNewTask, false /* animate */);
@@ -1056,7 +1079,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     protected abstract HomeAnimationFactory createHomeAnimationFactory(
-            ArrayList<IBinder> launchCookies, long duration, boolean isTargetTranslucent);
+            ArrayList<IBinder> launchCookies, long duration, boolean isTargetTranslucent,
+            boolean appCanEnterPip, RemoteAnimationTargetCompat runningTaskTarget);
 
     private final TaskStackChangeListener mActivityRestartListener = new TaskStackChangeListener() {
         @Override
@@ -1067,7 +1091,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 // Since this is an edge case, just cancel and relaunch with default activity
                 // options (since we don't know if there's an associated app icon to launch from)
                 endRunningWindowAnim(true /* cancel */);
-                ActivityManagerWrapper.getInstance().unregisterTaskStackListener(
+                TaskStackChangeListeners.getInstance().unregisterTaskStackListener(
                         mActivityRestartListener);
                 ActivityManagerWrapper.getInstance().startActivityFromRecents(task.taskId, null);
             }
@@ -1082,7 +1106,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         // If we are transitioning to launcher, then listen for the activity to be restarted while
         // the transition is in progress
         if (mGestureState.getEndTarget().isLauncher) {
-            ActivityManagerWrapper.getInstance().registerTaskStackListener(
+            TaskStackChangeListeners.getInstance().registerTaskStackListener(
                     mActivityRestartListener);
 
             mParallelRunningAnim = mActivityInterface.getParallelAnimationToLauncher(
@@ -1101,13 +1125,15 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     ? runningTaskTarget.taskInfo.launchCookies
                     : new ArrayList<>();
             boolean isTranslucent = runningTaskTarget != null && runningTaskTarget.isTranslucent;
-            HomeAnimationFactory homeAnimFactory =
-                    createHomeAnimationFactory(cookies, duration, isTranslucent);
-            mIsSwipingPipToHome = homeAnimFactory.supportSwipePipToHome()
+            boolean appCanEnterPip = !mDeviceState.isPipActive()
                     && runningTaskTarget != null
                     && runningTaskTarget.taskInfo.pictureInPictureParams != null
                     && TaskInfoCompat.isAutoEnterPipEnabled(
                             runningTaskTarget.taskInfo.pictureInPictureParams);
+            HomeAnimationFactory homeAnimFactory =
+                    createHomeAnimationFactory(cookies, duration, isTranslucent, appCanEnterPip,
+                            runningTaskTarget);
+            mIsSwipingPipToHome = homeAnimFactory.supportSwipePipToHome() && appCanEnterPip;
             if (mIsSwipingPipToHome) {
                 mSwipePipToHomeAnimator = getSwipePipToHomeAnimator(
                         homeAnimFactory, runningTaskTarget, start);
@@ -1383,7 +1409,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         }
 
         mActivityInitListener.unregister();
-        ActivityManagerWrapper.getInstance().unregisterTaskStackListener(mActivityRestartListener);
+        TaskStackChangeListeners.getInstance().unregisterTaskStackListener(
+                mActivityRestartListener);
         mTaskSnapshot = null;
     }
 
@@ -1697,13 +1724,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     /**
      * Registers a callback to run when the activity is ready.
-     * @param intent The intent that will be used to start the activity if it doesn't exist already.
      */
-    public void initWhenReady(Intent intent) {
+    public void initWhenReady() {
         // Preload the plan
         RecentsModel.INSTANCE.get(mContext).getTasks(null);
 
-        mActivityInitListener.register(intent);
+        mActivityInitListener.register();
     }
 
     /**
