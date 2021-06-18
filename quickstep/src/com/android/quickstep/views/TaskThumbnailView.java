@@ -335,11 +335,16 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
     public void setOverlayEnabled(boolean overlayEnabled) {
         if (mOverlayEnabled != overlayEnabled) {
             mOverlayEnabled = overlayEnabled;
-            updateOverlay();
+
+            refreshOverlay();
         }
     }
 
-    private void updateOverlay() {
+    /**
+     * Potentially re-init the task overlay. Be cautious when calling this as the overlay may
+     * do processing on initialization.
+     */
+    private void refreshOverlay() {
         if (mOverlayEnabled) {
             getTaskOverlay().initOverlay(mTask, mThumbnailData, mPreviewPositionHelper.mMatrix,
                     mPreviewPositionHelper.mIsOrientationChanged);
@@ -379,16 +384,14 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         }
         getTaskView().updateCurrentFullscreenParams(mPreviewPositionHelper);
         invalidate();
-
-        // Update can be called from {@link #onSizeChanged} during layout, post handling of overlay
-        // as overlay could modify the views in the overlay as a side effect of its update.
-        post(this::updateOverlay);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         updateThumbnailMatrix();
+
+        refreshOverlay();
     }
 
     private ColorFilter getColorFilter(float dimAmount) {

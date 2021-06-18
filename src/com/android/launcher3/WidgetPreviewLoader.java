@@ -21,9 +21,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
-import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.CancellationSignal;
@@ -35,9 +33,7 @@ import android.util.LongSparseArray;
 import android.util.Pair;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.UiThread;
 
-import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.icons.LauncherIcons;
@@ -91,51 +87,6 @@ public class WidgetPreviewLoader {
         mIconCache = iconCache;
         mUserCache = UserCache.INSTANCE.get(context);
         mDb = new CacheDb(context);
-    }
-
-    /**
-     * Returns a drawable that can be used as a badge for the user or null.
-     */
-    @UiThread
-    public Drawable getBadgeForUser(UserHandle user, int badgeSize) {
-        if (mMyUser.equals(user)) {
-            return null;
-        }
-
-        Bitmap badgeBitmap = getUserBadge(user, badgeSize);
-        FastBitmapDrawable d = new FastBitmapDrawable(badgeBitmap);
-        d.setFilterBitmap(true);
-        d.setBounds(0, 0, badgeBitmap.getWidth(), badgeBitmap.getHeight());
-        return d;
-    }
-
-    private Bitmap getUserBadge(UserHandle user, int badgeSize) {
-        synchronized (mUserBadges) {
-            Bitmap badgeBitmap = mUserBadges.get(user);
-            if (badgeBitmap != null) {
-                return badgeBitmap;
-            }
-
-            final Resources res = mContext.getResources();
-            badgeBitmap = Bitmap.createBitmap(badgeSize, badgeSize, Bitmap.Config.ARGB_8888);
-
-            Drawable drawable = mContext.getPackageManager().getUserBadgedDrawableForDensity(
-                    new BitmapDrawable(res, badgeBitmap), user,
-                    new Rect(0, 0, badgeSize, badgeSize),
-                    0);
-            if (drawable instanceof BitmapDrawable) {
-                badgeBitmap = ((BitmapDrawable) drawable).getBitmap();
-            } else {
-                badgeBitmap.eraseColor(Color.TRANSPARENT);
-                Canvas c = new Canvas(badgeBitmap);
-                drawable.setBounds(0, 0, badgeSize, badgeSize);
-                drawable.draw(c);
-                c.setBitmap(null);
-            }
-
-            mUserBadges.put(user, badgeBitmap);
-            return badgeBitmap;
-        }
     }
 
     /**
@@ -434,27 +385,29 @@ public class WidgetPreviewLoader {
             previewHeight = Math.max((int)(scale * previewHeight), 1);
         }
 
-        // If a bitmap is passed in, we use it; otherwise, we create a bitmap of the right size
         final Canvas c = new Canvas();
         if (preview == null) {
+            // If no bitmap was provided, then allocate a new one with the right size.
             preview = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);
             c.setBitmap(preview);
         } else {
-            // We use the preview bitmap height to determine where the badge will be drawn in the
-            // UI. If its larger than what we need, resize the preview bitmap so that there are
-            // no transparent pixels between the preview and the badge.
-            if (preview.getHeight() > previewHeight) {
-                preview.reconfigure(preview.getWidth(), previewHeight, preview.getConfig());
+            // If a bitmap was passed in, attempt to reconfigure the bitmap to the same dimensions
+            // as the preview.
+            try {
+                preview.reconfigure(previewWidth, previewHeight, preview.getConfig());
+            } catch (IllegalArgumentException e) {
+                // This occurs if the preview can't be reconfigured for any reason. In this case,
+                // allocate a new bitmap with the right size.
+                preview = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);
             }
-            // Reusing bitmap. Clear it.
+
             c.setBitmap(preview);
             c.drawColor(0, PorterDuff.Mode.CLEAR);
         }
 
         // Draw the scaled preview into the final bitmap
-        int x = (preview.getWidth() - previewWidth) / 2;
         if (widgetPreviewExists) {
-            drawable.setBounds(x, 0, x + previewWidth, previewHeight);
+            drawable.setBounds(0, 0, previewWidth, previewHeight);
             drawable.draw(c);
         } else {
             RectF boxRect;
@@ -614,6 +567,7 @@ public class WidgetPreviewLoader {
         @Thunk long[] mVersions;
         @Thunk Bitmap mBitmapToRecycle;
 
+        @Nullable private Bitmap mUnusedPreviewBitmap;
         private boolean mSaveToDB = false;
 
         PreviewLoadTask(WidgetCacheKey key, WidgetItem info, int previewWidth,
@@ -674,6 +628,11 @@ public class WidgetPreviewLoader {
                 Pair<Bitmap, Boolean> pair = generatePreview(mActivity, mInfo, unusedBitmap,
                         mPreviewWidth, mPreviewHeight);
                 preview = pair.first;
+
+                if (preview != unusedBitmap) {
+                    mUnusedPreviewBitmap = unusedBitmap;
+                }
+
                 this.mSaveToDB = pair.second;
             }
             return preview;
@@ -688,6 +647,14 @@ public class WidgetPreviewLoader {
                 MODEL_EXECUTOR.post(new Runnable() {
                     @Override
                     public void run() {
+                        if (mUnusedPreviewBitmap != null) {
+                            // If we didn't end up using the bitmap, it can be added back into the
+                            // recycled set.
+                            synchronized (mUnusedBitmaps) {
+                                mUnusedBitmaps.add(mUnusedPreviewBitmap);
+                            }
+                        }
+
                         if (!isCancelled() && mSaveToDB) {
                             // If we are still using this preview, then write it to the DB and then
                             // let the normal clear mechanism recycle the bitmap
