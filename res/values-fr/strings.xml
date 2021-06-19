@@ -48,8 +48,8 @@
     <string name="widgets_full_sheet_cancel_button_description" msgid="5766167035728653605">"Effacer le texte du champ de recherche"</string>
     <string name="no_widgets_available" msgid="9140948620298620513">"Aucun widget disponible"</string>
     <string name="no_search_results" msgid="6518732304311458580">"Aucun résultat de recherche"</string>
-    <string name="widgets_full_sheet_personal_tab" msgid="2743540105607120182">"Widgets personnels"</string>
-    <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"Widgets professionnels"</string>
+    <string name="widgets_full_sheet_personal_tab" msgid="2743540105607120182">"Personnels"</string>
+    <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"Professionnels"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"Conversations"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"Rechercher dans les applications"</string>
     <string name="all_apps_loading_message" msgid="5813968043155271636">"Chargement des applications…"</string>
@@ -97,8 +97,7 @@
     <string name="folder_name_format_exact" msgid="8626242716117004803">"Dossier : <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> éléments"</string>
     <string name="folder_name_format_overflow" msgid="4270108890534995199">"Dossier : <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> éléments ou plus"</string>
     <string name="wallpaper_button_text" msgid="8404103075899945851">"Fonds d\'écran"</string>
-    <!-- no translation found for styles_wallpaper_button_text (8216961355289236794) -->
-    <skip />
+    <string name="styles_wallpaper_button_text" msgid="8216961355289236794">"Fond d\'écran et style"</string>
     <string name="settings_button_text" msgid="8873672322605444408">"Paramètres de l\'accueil"</string>
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"Désactivé par votre administrateur"</string>
     <string name="allow_rotation_title" msgid="7728578836261442095">"Autoriser la rotation de l\'écran d\'accueil"</string>

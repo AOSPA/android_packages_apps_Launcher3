@@ -1307,8 +1307,15 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             appWidgetInfo = mAppWidgetManager.getLauncherAppWidgetInfo(appWidgetId);
         }
 
+        if (hostView == null) {
+            // Perform actual inflation because we're live
+            hostView = mAppWidgetHost.createView(this, appWidgetId, appWidgetInfo);
+        }
+
         LauncherAppWidgetInfo launcherInfo;
-        launcherInfo = new LauncherAppWidgetInfo(appWidgetId, appWidgetInfo.provider);
+        launcherInfo =
+                new LauncherAppWidgetInfo(
+                        appWidgetId, appWidgetInfo.provider, appWidgetInfo, hostView);
         launcherInfo.spanX = itemInfo.spanX;
         launcherInfo.spanY = itemInfo.spanY;
         launcherInfo.minSpanX = itemInfo.minSpanX;
@@ -1318,10 +1325,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         getModelWriter().addItemToDatabase(launcherInfo,
                 itemInfo.container, itemInfo.screenId, itemInfo.cellX, itemInfo.cellY);
 
-        if (hostView == null) {
-            // Perform actual inflation because we're live
-            hostView = mAppWidgetHost.createView(this, appWidgetId, appWidgetInfo);
-        }
         hostView.setVisibility(View.VISIBLE);
         prepareAppWidget(hostView, launcherInfo);
         mWorkspace.addInScreen(hostView, launcherInfo);
@@ -1939,13 +1942,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     @Override
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
-        if (isViewInTaskbar(v)) {
-            // Start the activity without the hacky workarounds below, which assume the View was
-            // clicked when Launcher was resumed and will be hidden until Launcher is re-resumed
-            // (this isn't the case for Taskbar).
-            return super.startActivitySafely(v, intent, item);
-        }
-
         if (!hasBeenResumed()) {
             // Workaround an issue where the WM launch animation is clobbered when finishing the
             // recents animation into launcher. Defer launching the activity until Launcher is
@@ -2801,7 +2797,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      * @see LauncherState#getOverviewScaleAndOffset(Launcher)
      */
     public float[] getNormalOverviewScaleAndOffset() {
-        return new float[] {NO_SCALE, NO_OFFSET, NO_OFFSET};
+        return new float[] {NO_SCALE, NO_OFFSET};
     }
 
     /**
@@ -2855,13 +2851,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 .alpha(0f)
                 .withEndAction(() -> getRootView().removeView(crossFadeHelper))
                 .start();
-    }
-
-    /**
-     * @return Whether the View is in the same window as the Taskbar window.
-     */
-    public boolean isViewInTaskbar(View v) {
-        return false;
     }
 
     public boolean supportsAdaptiveIconAnimation(View clickedView) {

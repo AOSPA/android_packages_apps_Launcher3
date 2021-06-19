@@ -52,6 +52,7 @@ import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.dragndrop.FolderAdaptiveIcon;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.graphics.PreloadIconDrawable;
+import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
@@ -63,7 +64,7 @@ import com.android.launcher3.shortcuts.DeepShortcutView;
  */
 @TargetApi(Build.VERSION_CODES.Q)
 public class FloatingIconView extends FrameLayout implements
-        Animator.AnimatorListener, OnGlobalLayoutListener {
+        Animator.AnimatorListener, OnGlobalLayoutListener, FloatingView {
 
     private static final String TAG = FloatingIconView.class.getSimpleName();
 
@@ -250,27 +251,12 @@ public class FloatingIconView extends FrameLayout implements
     @WorkerThread
     @SuppressWarnings("WrongThread")
     private static void getIconResult(Launcher l, View originalView, ItemInfo info, RectF pos,
-            IconLoadResult iconLoadResult) {
+            Drawable btvIcon, IconLoadResult iconLoadResult) {
         Drawable drawable;
-        Drawable btvIcon;
-        Drawable badge = null;
         boolean supportsAdaptiveIcons = ADAPTIVE_ICON_WINDOW_ANIM.get()
                 && !info.isDisabled(); // Use original icon for disabled icons.
 
-        if (originalView instanceof BubbleTextView) {
-            BubbleTextView btv = (BubbleTextView) originalView;
-
-            if (info instanceof ItemInfoWithIcon
-                    && (((ItemInfoWithIcon) info).runtimeStatusFlags
-                        & ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK) != 0) {
-                btvIcon = btv.makePreloadIcon();
-            } else {
-                btvIcon = btv.getIcon();
-            }
-        } else {
-            btvIcon = null;
-        }
-
+        Drawable badge = null;
         if (info instanceof SystemShortcut) {
             if (originalView instanceof ImageView) {
                 drawable = ((ImageView) originalView).getDrawable();
@@ -368,6 +354,13 @@ public class FloatingIconView extends FrameLayout implements
     }
 
     /**
+     * Returns true if the icon is different from main app icon
+     */
+    public boolean isDifferentFromAppIcon() {
+        return mIconLoadResult == null ? false : mIconLoadResult.isThemed;
+    }
+
+    /**
      * Checks if the icon result is loaded. If true, we set the icon immediately. Else, we add a
      * callback to set the icon once the icon result is loaded.
      */
@@ -443,6 +436,7 @@ public class FloatingIconView extends FrameLayout implements
         mFastFinishRunnable = runnable;
     }
 
+    @Override
     public void fastFinish() {
         if (mFastFinishRunnable != null) {
             mFastFinishRunnable.run();
@@ -475,9 +469,7 @@ public class FloatingIconView extends FrameLayout implements
     @Override
     public void onAnimationRepeat(Animator animator) {}
 
-    /**
-     * Offsets and updates the position of this view by {@param y}.
-     */
+    @Override
     public void setPositionOffsetY(float y) {
         mIconOffsetY = y;
         onGlobalLayout();
@@ -506,12 +498,28 @@ public class FloatingIconView extends FrameLayout implements
      */
     @UiThread
     public static IconLoadResult fetchIcon(Launcher l, View v, ItemInfo info, boolean isOpening) {
-        IconLoadResult result = new IconLoadResult(info);
-        MODEL_EXECUTOR.getHandler().postAtFrontOfQueue(() -> {
-            RectF position = new RectF();
-            getLocationBoundsForView(l, v, isOpening, position);
-            getIconResult(l, v, info, position, result);
-        });
+        RectF position = new RectF();
+        getLocationBoundsForView(l, v, isOpening, position);
+
+        final FastBitmapDrawable btvIcon;
+        if (v instanceof BubbleTextView) {
+            BubbleTextView btv = (BubbleTextView) v;
+            if (info instanceof ItemInfoWithIcon
+                    && (((ItemInfoWithIcon) info).runtimeStatusFlags
+                    & ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK) != 0) {
+                btvIcon = btv.makePreloadIcon();
+            } else {
+                btvIcon = btv.getIcon();
+            }
+        } else {
+            btvIcon = null;
+        }
+
+        IconLoadResult result = new IconLoadResult(info,
+                btvIcon == null ? false : btvIcon.isThemed());
+
+        MODEL_EXECUTOR.getHandler().postAtFrontOfQueue(() ->
+                getIconResult(l, v, info, position, btvIcon, result));
 
         sIconLoadResult = result;
         return result;
@@ -627,6 +635,7 @@ public class FloatingIconView extends FrameLayout implements
 
     private static class IconLoadResult {
         final ItemInfo itemInfo;
+        final boolean isThemed;
         Drawable btvDrawable;
         Drawable drawable;
         Drawable badge;
@@ -634,8 +643,9 @@ public class FloatingIconView extends FrameLayout implements
         Runnable onIconLoaded;
         boolean isIconLoaded;
 
-        IconLoadResult(ItemInfo itemInfo) {
+        IconLoadResult(ItemInfo itemInfo, boolean isThemed) {
             this.itemInfo = itemInfo;
+            this.isThemed = isThemed;
         }
     }
 }
