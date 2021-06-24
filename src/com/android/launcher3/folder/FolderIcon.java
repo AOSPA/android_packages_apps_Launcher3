@@ -614,10 +614,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
         if (mCurrentPreviewItems.isEmpty() && !mAnimating) return;
 
-        final int saveCount = canvas.save();
-        canvas.clipPath(mBackground.getClipPath());
         mPreviewItemManager.draw(canvas);
-        canvas.restoreToCount(saveCount);
 
         if (!mBackground.drawingDelegated()) {
             mBackground.drawBackgroundStroke(canvas);
@@ -630,6 +627,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
         if (!mForceHideDot && ((mDotInfo != null && mDotInfo.hasDot()) || mDotScale > 0)) {
             Rect iconBounds = mDotParams.iconBounds;
             BubbleTextView.getIconBounds(this, iconBounds, mActivity.getDeviceProfile().iconSizePx);
+            iconBounds.offset(0, mBackground.paddingY);
             float iconScale = (float) mBackground.previewSize / iconBounds.width();
             Utilities.scaleRectAboutCenter(iconBounds, iconScale);
 

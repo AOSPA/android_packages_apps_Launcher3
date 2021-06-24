@@ -93,7 +93,7 @@ public final class FeatureFlags {
 
     // Keep as DeviceFlag to allow remote disable in emergency.
     public static final BooleanFlag ENABLE_SUGGESTED_ACTIONS_OVERVIEW = new DeviceFlag(
-            "ENABLE_SUGGESTED_ACTIONS_OVERVIEW", true, "Show chip hints on the overview screen");
+            "ENABLE_SUGGESTED_ACTIONS_OVERVIEW", false, "Show chip hints on the overview screen");
 
 
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = new DeviceFlag(
@@ -110,10 +110,6 @@ public final class FeatureFlags {
     public static final BooleanFlag FOLDER_NAME_MAJORITY_RANKING = getDebugFlag(
             "FOLDER_NAME_MAJORITY_RANKING", true,
             "Suggests folder names based on majority based ranking.");
-
-    public static final BooleanFlag APP_SEARCH_IMPROVEMENTS = new DeviceFlag(
-            "APP_SEARCH_IMPROVEMENTS", true,
-            "Adds localized title and keyword search and ranking");
 
     public static final BooleanFlag ENABLE_PREDICTION_DISMISS = getDebugFlag(
             "ENABLE_PREDICTION_DISMISS", true, "Allow option to dimiss apps from predicted list");

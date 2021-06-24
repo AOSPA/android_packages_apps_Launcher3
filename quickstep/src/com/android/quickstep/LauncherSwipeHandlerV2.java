@@ -20,6 +20,9 @@ import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.Utilities.boundToRange;
 import static com.android.launcher3.Utilities.dpToPx;
+import static com.android.launcher3.Utilities.mapBoundToRange;
+import static com.android.launcher3.anim.Interpolators.EXAGGERATED_EASE;
+import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.config.FeatureFlags.PROTOTYPE_APP_CLOSE;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.views.FloatingIconView.SHAPE_PROGRESS_DURATION;
@@ -65,6 +68,7 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.plugins.ResourceProvider;
 import com.android.systemui.shared.system.InputConsumerController;
+import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.ArrayList;
 
@@ -84,7 +88,8 @@ public class LauncherSwipeHandlerV2 extends
 
     @Override
     protected HomeAnimationFactory createHomeAnimationFactory(ArrayList<IBinder> launchCookies,
-            long duration, boolean isTargetTranslucent) {
+            long duration, boolean isTargetTranslucent, boolean appCanEnterPip,
+            RemoteAnimationTargetCompat runningTaskTarget) {
         if (mActivity == null) {
             mStateCallback.addChangeListener(STATE_LAUNCHER_PRESENT | STATE_HANDLER_INVALIDATED,
                     isPresent -> mRecentsView.startHome());
@@ -103,12 +108,12 @@ public class LauncherSwipeHandlerV2 extends
         mActivity.getRootView().setForceHideBackArrow(true);
         mActivity.setHintUserWillBeActive();
 
-        if (!canUseWorkspaceView) {
+        if (!canUseWorkspaceView || appCanEnterPip) {
             return new LauncherHomeAnimationFactory();
         }
         if (workspaceView instanceof LauncherAppWidgetHostView) {
             return createWidgetHomeAnimationFactory((LauncherAppWidgetHostView) workspaceView,
-                    isTargetTranslucent);
+                    isTargetTranslucent, runningTaskTarget);
         }
         return createIconHomeAnimationFactory(workspaceView);
     }
@@ -169,17 +174,27 @@ public class LauncherSwipeHandlerV2 extends
     }
 
     private HomeAnimationFactory createWidgetHomeAnimationFactory(
-            LauncherAppWidgetHostView hostView, boolean isTargetTranslucent) {
-
+            LauncherAppWidgetHostView hostView, boolean isTargetTranslucent,
+            RemoteAnimationTargetCompat runningTaskTarget) {
+        final float floatingWidgetAlpha = isTargetTranslucent ? 0 : 1;
         RectF backgroundLocation = new RectF();
         Rect crop = new Rect();
         mTaskViewSimulator.getCurrentCropRect().roundOut(crop);
         Size windowSize = new Size(crop.width(), crop.height());
+        int fallbackBackgroundColor =
+                FloatingWidgetView.getDefaultBackgroundColor(mContext, runningTaskTarget);
         FloatingWidgetView floatingWidgetView = FloatingWidgetView.getFloatingWidgetView(mActivity,
                 hostView, backgroundLocation, windowSize,
-                mTaskViewSimulator.getCurrentCornerRadius(), isTargetTranslucent);
+                mTaskViewSimulator.getCurrentCornerRadius(), isTargetTranslucent,
+                fallbackBackgroundColor);
 
         return new FloatingViewHomeAnimationFactory(floatingWidgetView) {
+
+            @Override
+            @Nullable
+            protected View getViewIgnoredInWorkspaceRevealAnimation() {
+                return hostView;
+            }
 
             @Override
             public RectF getWindowTargetRect() {
@@ -207,12 +222,20 @@ public class LauncherSwipeHandlerV2 extends
             }
 
             @Override
-            public void update(@Nullable AppCloseConfig config, RectF currentRect,
-                    float progress, float radius) {
+            public void update(@Nullable AppCloseConfig config, RectF currentRect, float progress,
+                    float radius) {
                 super.update(config, currentRect, progress, radius);
-                floatingWidgetView.update(currentRect, 1 /* floatingWidgetAlpha */,
-                        config != null ? config.getFgAlpha() : 1f /* foregroundAlpha */,
-                        0 /* fallbackBackgroundAlpha */, 1 - progress);
+                final float fallbackBackgroundAlpha =
+                        1 - mapBoundToRange(progress, 0.8f, 1, 0, 1, EXAGGERATED_EASE);
+                final float foregroundAlpha =
+                        mapBoundToRange(progress, 0.5f, 1, 0, 1, EXAGGERATED_EASE);
+                floatingWidgetView.update(currentRect, floatingWidgetAlpha, foregroundAlpha,
+                        fallbackBackgroundAlpha, 1 - progress);
+            }
+
+            @Override
+            protected float getWindowAlpha(float progress) {
+                return 1 - mapBoundToRange(progress, 0, 0.5f, 0, 1, LINEAR);
             }
         };
     }
@@ -370,6 +393,16 @@ public class LauncherSwipeHandlerV2 extends
     }
 
     private class LauncherHomeAnimationFactory extends HomeAnimationFactory {
+
+        /**
+         * Returns a view which should be excluded from the Workspace animation, or null if there
+         * is no view to exclude.
+         */
+        @Nullable
+        protected View getViewIgnoredInWorkspaceRevealAnimation() {
+            return null;
+        }
+
         @NonNull
         @Override
         public AnimatorPlaybackController createActivityAnimationToHome() {
@@ -383,7 +416,8 @@ public class LauncherSwipeHandlerV2 extends
         @Override
         public void playAtomicAnimation(float velocity) {
             if (!PROTOTYPE_APP_CLOSE.get()) {
-                new StaggeredWorkspaceAnim(mActivity, velocity, true /* animateOverviewScrim */)
+                new StaggeredWorkspaceAnim(mActivity, velocity, true /* animateOverviewScrim */,
+                        getViewIgnoredInWorkspaceRevealAnimation())
                         .start();
             } else if (shouldPlayAtomicWorkspaceReveal()) {
                 new WorkspaceRevealAnim(mActivity, true).start();
