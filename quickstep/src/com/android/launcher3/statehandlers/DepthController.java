@@ -25,6 +25,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.os.IBinder;
 import android.util.FloatProperty;
+import android.view.CrossWindowBlurListeners;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.view.ViewRootImpl;
@@ -40,6 +41,8 @@ import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.systemui.shared.system.BlurUtils;
 import com.android.systemui.shared.system.WallpaperManagerCompat;
+
+import java.util.function.Consumer;
 
 /**
  * Controls blur and wallpaper zoom, for the Launcher surface only.
@@ -96,11 +99,17 @@ public class DepthController implements StateHandler<LauncherState>,
                 }
             };
 
+    private final Consumer<Boolean> mCrossWindowBlurListener = (enabled) -> {
+        mCrossWindowBlursEnabled = enabled;
+        dispatchTransactionSurface();
+    };
+
     private final Launcher mLauncher;
     /**
      * Blur radius when completely zoomed out, in pixels.
      */
     private int mMaxBlurRadius;
+    private boolean mCrossWindowBlursEnabled;
     private WallpaperManagerCompat mWallpaperManager;
     private SurfaceControl mSurface;
     /**
@@ -123,6 +132,7 @@ public class DepthController implements StateHandler<LauncherState>,
             mMaxBlurRadius = mLauncher.getResources().getInteger(R.integer.max_depth_blur_radius);
             mWallpaperManager = new WallpaperManagerCompat(mLauncher);
         }
+
         if (mLauncher.getRootView() != null && mOnAttachListener == null) {
             mOnAttachListener = new View.OnAttachStateChangeListener() {
                 @Override
@@ -132,13 +142,20 @@ public class DepthController implements StateHandler<LauncherState>,
                     if (windowToken != null) {
                         mWallpaperManager.setWallpaperZoomOut(windowToken, mDepth);
                     }
+                    CrossWindowBlurListeners.getInstance().addListener(mLauncher.getMainExecutor(),
+                            mCrossWindowBlurListener);
                 }
 
                 @Override
                 public void onViewDetachedFromWindow(View view) {
+                    CrossWindowBlurListeners.getInstance().removeListener(mCrossWindowBlurListener);
                 }
             };
             mLauncher.getRootView().addOnAttachStateChangeListener(mOnAttachListener);
+            if (mLauncher.getRootView().isAttachedToWindow()) {
+                CrossWindowBlurListeners.getInstance().addListener(mLauncher.getMainExecutor(),
+                        mCrossWindowBlurListener);
+            }
         }
     }
 
@@ -161,14 +178,14 @@ public class DepthController implements StateHandler<LauncherState>,
         if (mSurface != surface) {
             mSurface = surface;
             if (surface != null) {
-                dispatchTransactionSurface(mDepth);
+                dispatchTransactionSurface();
             }
         }
     }
 
     @Override
     public void setState(LauncherState toState) {
-        if (mSurface == null || mIgnoreStateChangesDuringMultiWindowAnimation) {
+        if (mIgnoreStateChangesDuringMultiWindowAnimation) {
             return;
         }
 
@@ -176,7 +193,7 @@ public class DepthController implements StateHandler<LauncherState>,
         if (Float.compare(mDepth, toDepth) != 0) {
             setDepth(toDepth);
         } else if (toState == LauncherState.OVERVIEW) {
-            dispatchTransactionSurface(mDepth);
+            dispatchTransactionSurface();
         }
     }
 
@@ -202,35 +219,31 @@ public class DepthController implements StateHandler<LauncherState>,
         if (Float.compare(mDepth, depthF) == 0) {
             return;
         }
-        if (dispatchTransactionSurface(depthF)) {
-            mDepth = depthF;
-        }
+        mDepth = depthF;
+        dispatchTransactionSurface();
     }
 
-    private boolean dispatchTransactionSurface(float depth) {
+    private void dispatchTransactionSurface() {
         boolean supportsBlur = BlurUtils.supportsBlursOnWindows();
-        if (supportsBlur && (mSurface == null || !mSurface.isValid())) {
-            return false;
-        }
         ensureDependencies();
         IBinder windowToken = mLauncher.getRootView().getWindowToken();
         if (windowToken != null) {
-            mWallpaperManager.setWallpaperZoomOut(windowToken, depth);
+            mWallpaperManager.setWallpaperZoomOut(windowToken, mDepth);
         }
 
-        if (supportsBlur) {
+        if (supportsBlur && (mSurface != null && mSurface.isValid())) {
             // We cannot mark the window as opaque in overview because there will be an app window
             // below the launcher layer, and we need to draw it -- without blurs.
             boolean isOverview = mLauncher.isInState(LauncherState.OVERVIEW);
             boolean opaque = mLauncher.getScrimView().isFullyOpaque() && !isOverview;
 
-            int blur = opaque || isOverview ? 0 : (int) (depth * mMaxBlurRadius);
+            int blur = opaque || isOverview || !mCrossWindowBlursEnabled
+                    ? 0 : (int) (mDepth * mMaxBlurRadius);
             new SurfaceControl.Transaction()
                     .setBackgroundBlurRadius(mSurface, blur)
                     .setOpaque(mSurface, opaque)
                     .apply();
         }
-        return true;
     }
 
     @Override
