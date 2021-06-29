@@ -51,7 +51,6 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.BaseActivityInterface;
-import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.views.TaskView;
 
 import java.lang.annotation.Retention;
@@ -288,9 +287,8 @@ public final class RecentsOrientedState implements
     }
 
     private void updateHomeRotationSetting() {
-        boolean homeRotationEnabled = mSharedPrefs.getBoolean(ALLOW_ROTATION_PREFERENCE_KEY, false);
-        setFlag(FLAG_HOME_ROTATION_ALLOWED_IN_PREFS, homeRotationEnabled);
-        SystemUiProxy.INSTANCE.get(mContext).setHomeRotationEnabled(homeRotationEnabled);
+        setFlag(FLAG_HOME_ROTATION_ALLOWED_IN_PREFS,
+                mSharedPrefs.getBoolean(ALLOW_ROTATION_PREFERENCE_KEY, false));
     }
 
     private void initFlags() {

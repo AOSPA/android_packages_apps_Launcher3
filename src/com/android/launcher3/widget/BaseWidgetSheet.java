@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.widget;
 
+import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
+
 import android.content.Context;
 import android.graphics.Point;
 import android.graphics.Rect;
@@ -24,12 +26,8 @@ import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.widget.Toast;
 
-import androidx.annotation.Nullable;
-import androidx.core.view.ViewCompat;
-
 import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget.DragObject;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.dragndrop.DragOptions;
@@ -40,17 +38,14 @@ import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.SystemUiController;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.AbstractSlideInView;
-import com.android.launcher3.views.ArrowTipView;
 
 /**
  * Base class for various widgets popup
  */
-public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
+public abstract class BaseWidgetSheet extends AbstractSlideInView
         implements OnClickListener, OnLongClickListener, DragSource,
         PopupDataProvider.PopupDataChangeListener {
 
-    protected static final String KEY_WIDGETS_EDUCATION_TIP_SEEN =
-            "launcher.widgets_education_tip_seen";
 
     /* Touch handling related member variables. */
     private Toast mWidgetInstructionToast;
@@ -60,19 +55,20 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
     }
 
     protected int getScrimColor(Context context) {
-        return context.getResources().getColor(R.color.widgets_picker_scrim);
+        int alpha = context.getResources().getInteger(R.integer.extracted_color_gradient_alpha);
+        return setColorAlphaBound(context.getColor(R.color.wallpaper_popup_scrim), alpha);
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        mActivityContext.getPopupDataProvider().setChangeListener(this);
+        mLauncher.getPopupDataProvider().setChangeListener(this);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        mActivityContext.getPopupDataProvider().setChangeListener(null);
+        mLauncher.getPopupDataProvider().setChangeListener(null);
     }
 
     @Override
@@ -95,7 +91,7 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
     public boolean onLongClick(View v) {
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "Widgets.onLongClick");
         v.cancelLongPress();
-        if (!ItemLongClickListener.canStartDrag(mActivityContext)) return false;
+        if (!ItemLongClickListener.canStartDrag(mLauncher)) return false;
 
         if (v instanceof WidgetCell) {
             return beginDraggingWidget((WidgetCell) v);
@@ -164,7 +160,7 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
     }
 
     protected SystemUiController getSystemUiController() {
-        return mActivityContext.getSystemUiController();
+        return mLauncher.getSystemUiController();
     }
 
     /**
@@ -199,31 +195,5 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<Launcher>
         toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
         toast.show();
         return toast;
-    }
-
-    /** Shows education tip on top center of {@code view} if view is laid out. */
-    @Nullable
-    protected ArrowTipView showEducationTipOnViewIfPossible(@Nullable View view) {
-        if (view == null || !ViewCompat.isLaidOut(view)) {
-            return null;
-        }
-        int[] coords = new int[2];
-        view.getLocationOnScreen(coords);
-        ArrowTipView arrowTipView =
-                new ArrowTipView(mActivityContext,  /* isPointingUp= */ false).showAtLocation(
-                        getContext().getString(R.string.long_press_widget_to_add),
-                        /* arrowXCoord= */coords[0] + view.getWidth() / 2,
-                        /* yCoord= */coords[1]);
-        if (arrowTipView != null) {
-            mActivityContext.getSharedPrefs().edit()
-                    .putBoolean(KEY_WIDGETS_EDUCATION_TIP_SEEN, true).apply();
-        }
-        return arrowTipView;
-    }
-
-    /** Returns {@code true} if tip has previously been shown on any of {@link BaseWidgetSheet}. */
-    protected boolean hasSeenEducationTip() {
-        return mActivityContext.getSharedPrefs().getBoolean(KEY_WIDGETS_EDUCATION_TIP_SEEN, false)
-                || Utilities.IS_RUNNING_IN_TEST_HARNESS;
     }
 }

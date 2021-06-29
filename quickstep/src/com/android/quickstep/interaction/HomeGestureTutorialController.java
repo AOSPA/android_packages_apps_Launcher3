@@ -42,15 +42,12 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
     }
 
     @Override
-    protected int getMockAppTaskThumbnailResId(boolean forDarkMode) {
-        return forDarkMode ? R.drawable.mock_webpage_dark_mode : R.drawable.mock_webpage_light_mode;
+    protected int getMockAppTaskThumbnailResId() {
+        return R.drawable.mock_webpage;
     }
 
     @Override
     public void onBackGestureAttempted(BackGestureResult result) {
-        if (mGestureCompleted) {
-            return;
-        }
         switch (mTutorialType) {
             case HOME_NAVIGATION:
                 switch (result) {
@@ -73,7 +70,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
 
     @Override
     public void onNavBarGestureAttempted(NavBarGestureResult result, PointF finalVelocity) {
-        if (mGestureCompleted) {
+        if (mHideFeedbackEndAction != null) {
             return;
         }
         switch (mTutorialType) {
@@ -83,7 +80,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
                         mTutorialFragment.releaseGestureVideoView();
                         animateFakeTaskViewHome(finalVelocity, null);
                         showActionButton();
-                        int subtitleResId = mTutorialFragment.isAtFinalStep()
+                        int subtitleResId = mTutorialFragment.getNumSteps() == 1
                                 ? R.string.home_gesture_feedback_complete_without_follow_up
                                 : R.string.home_gesture_feedback_complete_with_follow_up;
                         showFeedback(subtitleResId, true);

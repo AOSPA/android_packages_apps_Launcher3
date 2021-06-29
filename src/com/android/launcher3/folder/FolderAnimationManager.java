@@ -16,8 +16,6 @@
 
 package com.android.launcher3.folder;
 
-import static android.view.View.ALPHA;
-
 import static com.android.launcher3.BubbleTextView.TEXT_ALPHA_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW;
@@ -39,7 +37,6 @@ import android.view.animation.AnimationUtils;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.CellLayout;
-import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Utilities;
@@ -59,7 +56,6 @@ import java.util.List;
 public class FolderAnimationManager {
 
     private static final int FOLDER_NAME_ALPHA_DURATION = 32;
-    private static final int LARGE_FOLDER_FOOTER_DURATION = 128;
 
     private Folder mFolder;
     private FolderPagedView mContent;
@@ -79,12 +75,10 @@ public class FolderAnimationManager {
     private final TimeInterpolator mLargeFolderPreviewItemOpenInterpolator;
     private final TimeInterpolator mLargeFolderPreviewItemCloseInterpolator;
 
-    private final PreviewItemDrawingParams mTmpParams = new PreviewItemDrawingParams(0, 0, 0);
+    private final PreviewItemDrawingParams mTmpParams = new PreviewItemDrawingParams(0, 0, 0, 0);
     private final FolderGridOrganizer mPreviewVerifier;
 
     private ObjectAnimator mBgColorAnimator;
-
-    private DeviceProfile mDeviceProfile;
 
     public FolderAnimationManager(Folder folder, boolean isOpening) {
         mFolder = folder;
@@ -95,8 +89,7 @@ public class FolderAnimationManager {
         mPreviewBackground = mFolderIcon.mBackground;
 
         mContext = folder.getContext();
-        mDeviceProfile = folder.mActivityContext.getDeviceProfile();
-        mPreviewVerifier = new FolderGridOrganizer(mDeviceProfile.inv);
+        mPreviewVerifier = new FolderGridOrganizer(folder.mActivityContext.getDeviceProfile().inv);
 
         mIsOpening = isOpening;
 
@@ -217,41 +210,9 @@ public class FolderAnimationManager {
         play(a, getAnimator(mFolder, View.TRANSLATION_Y, yDistance, 0f));
         play(a, getAnimator(mFolder.mContent, SCALE_PROPERTY, initialScale, finalScale));
         play(a, getAnimator(mFolder.mFooter, SCALE_PROPERTY, initialScale, finalScale));
-
-        final int footerAlphaDuration;
-        final int footerStartDelay;
-        if (isLargeFolder()) {
-            if (mIsOpening) {
-                footerAlphaDuration = LARGE_FOLDER_FOOTER_DURATION;
-                footerStartDelay = mDuration - footerAlphaDuration;
-            } else {
-                footerAlphaDuration = 0;
-                footerStartDelay = 0;
-            }
-        } else {
-            footerStartDelay = 0;
-            footerAlphaDuration = mDuration;
-        }
-        play(a, getAnimator(mFolder.mFooter, ALPHA, 0, 1f), footerStartDelay, footerAlphaDuration);
-
-        // Create reveal animator for the folder background
+        play(a, mFolderIcon.mFolderName.createTextAlphaAnimator(!mIsOpening));
         play(a, getShape().createRevealAnimator(
                 mFolder, startRect, endRect, finalRadius, !mIsOpening));
-
-        // Create reveal animator for the folder content (capture the top 4 icons 2x2)
-        int width = mDeviceProfile.folderCellLayoutBorderSpacingPx
-                + mDeviceProfile.folderCellWidthPx * 2;
-        int height = mDeviceProfile.folderCellLayoutBorderSpacingPx
-                + mDeviceProfile.folderCellHeightPx * 2;
-        int page = mIsOpening ? mContent.getCurrentPage() : mContent.getDestinationPage();
-        int left = mContent.getPaddingLeft() + page * lp.width;
-        Rect contentStart = new Rect(0, 0, width, height);
-        Rect contentEnd = new Rect(endRect.left + left, endRect.top, endRect.right + left,
-                endRect.bottom);
-        play(a, getShape().createRevealAnimator(
-                mFolder.getContent(), contentStart, contentEnd, finalRadius, !mIsOpening));
-
-
         // Fade in the folder name, as the text can overlap the icons when grid size is small.
         mFolder.mFolderName.setAlpha(mIsOpening ? 0f : 1f);
         play(a, getAnimator(mFolder.mFolderName, View.ALPHA, 0, 1),
@@ -442,12 +403,8 @@ public class FolderAnimationManager {
         as.play(a);
     }
 
-    private boolean isLargeFolder() {
-        return mFolder.getItemCount() > MAX_NUM_ITEMS_IN_PREVIEW;
-    }
-
     private TimeInterpolator getPreviewItemInterpolator() {
-        if (isLargeFolder()) {
+        if (mFolder.getItemCount() > MAX_NUM_ITEMS_IN_PREVIEW) {
             // With larger folders, we want the preview items to reach their final positions faster
             // (when opening) and later (when closing) so that they appear aligned with the rest of
             // the folder items when they are both visible.

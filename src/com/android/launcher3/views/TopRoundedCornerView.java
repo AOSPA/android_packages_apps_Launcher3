@@ -21,6 +21,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.widget.FrameLayout;
 
 import com.android.launcher3.R;
 import com.android.launcher3.util.Themes;
@@ -40,7 +41,7 @@ public class TopRoundedCornerView extends SpringRelativeLayout {
     public TopRoundedCornerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
 
-        float radius = Themes.getDialogCornerRadius(context);
+        int radius = getResources().getDimensionPixelSize(R.dimen.bg_round_rect_radius);
         mRadii = new float[] {radius, radius, radius, radius, 0, 0, 0, 0};
 
         mNavBarScrimPaint = new Paint();

@@ -102,8 +102,6 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
 
     private int mScrollDirections;
 
-    private float mTouchSlopMultiplier = 1f;
-
     public SingleAxisSwipeDetector(@NonNull Context context, @NonNull Listener l,
             @NonNull Direction dir) {
         this(ViewConfiguration.get(context), l, dir, Utilities.isRtl(context.getResources()));
@@ -115,19 +113,6 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
         super(config, isRtl);
         mListener = l;
         mDir = dir;
-    }
-
-    /**
-     * Provides feasibility to adjust touch slop when visible window size changed. When visible
-     * bounds translate become smaller, multiply a larger multiplier could ensure the UX
-     * more consistent.
-     *
-     * @see #shouldScrollStart(PointF)
-     *
-     * @param touchSlopMultiplier the value to multiply original touch slop.
-     */
-    public void setTouchSlopMultiplier(float touchSlopMultiplier) {
-        mTouchSlopMultiplier = touchSlopMultiplier;
     }
 
     public void setDetectableScrollConditions(int scrollDirectionFlags, boolean ignoreSlop) {
@@ -148,7 +133,7 @@ public class SingleAxisSwipeDetector extends BaseSwipeDetector {
     @Override
     protected boolean shouldScrollStart(PointF displacement) {
         // Reject cases where the angle or slop condition is not met.
-        float minDisplacement = Math.max(mTouchSlop * mTouchSlopMultiplier,
+        float minDisplacement = Math.max(mTouchSlop,
                 Math.abs(mDir.extractOrthogonalDirection(displacement)));
         if (Math.abs(mDir.extractDirection(displacement)) < minDisplacement) {
             return false;

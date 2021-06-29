@@ -32,9 +32,6 @@ public interface WidgetsSearchBar {
      */
     void reset();
 
-    /** Returns {@code true} if the search bar is in focus. */
-    boolean isSearchBarFocused();
-
     /**
      * Clears focus from search bar.
      */

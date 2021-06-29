@@ -28,8 +28,6 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Path;
-import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.util.FloatProperty;
@@ -83,10 +81,6 @@ public class PreviewItemManager {
     // These hold the current page preview items. It is empty if the current page is the first page.
     private ArrayList<PreviewItemDrawingParams> mCurrentPageParams = new ArrayList<>();
 
-    // We clip the preview items during the middle of the animation, so that it does not go outside
-    // of the visual shape. We stop clipping at this threshold, since the preview items ultimately
-    // do not get cropped in their resting state.
-    private final float mClipThreshold;
     private float mCurrentPageItemsTransX = 0;
     private boolean mShouldSlideInFirstPage;
 
@@ -102,7 +96,6 @@ public class PreviewItemManager {
         mIcon = icon;
         mIconSize = ActivityContext.lookupContext(
                 mContext).getDeviceProfile().folderChildIconSizePx;
-        mClipThreshold = Utilities.dpToPx(1f);
     }
 
     /**
@@ -170,60 +163,41 @@ public class PreviewItemManager {
     }
 
     public void drawParams(Canvas canvas, ArrayList<PreviewItemDrawingParams> params,
-            PointF offset, boolean shouldClipPath, Path clipPath) {
+            float transX) {
+        canvas.translate(transX, 0);
         // The first item should be drawn last (ie. on top of later items)
         for (int i = params.size() - 1; i >= 0; i--) {
             PreviewItemDrawingParams p = params.get(i);
             if (!p.hidden) {
-                // Exiting param should always be clipped.
-                boolean isExiting = p.index == EXIT_INDEX;
-                drawPreviewItem(canvas, p, offset, isExiting | shouldClipPath, clipPath);
+                drawPreviewItem(canvas, p);
             }
         }
+        canvas.translate(-transX, 0);
     }
 
-    /**
-     * Draws the preview items on {@param canvas}.
-     */
     public void draw(Canvas canvas) {
-        int saveCount = canvas.getSaveCount();
         // The items are drawn in coordinates relative to the preview offset
         PreviewBackground bg = mIcon.getFolderBackground();
-        Path clipPath = bg.getClipPath();
+        canvas.translate(bg.basePreviewOffsetX, bg.basePreviewOffsetY);
+
         float firstPageItemsTransX = 0;
         if (mShouldSlideInFirstPage) {
-            PointF firstPageOffset = new PointF(bg.basePreviewOffsetX + mCurrentPageItemsTransX,
-                    bg.basePreviewOffsetY);
-            boolean shouldClip = mCurrentPageItemsTransX > mClipThreshold;
-            drawParams(canvas, mCurrentPageParams, firstPageOffset, shouldClip, clipPath);
+            drawParams(canvas, mCurrentPageParams, mCurrentPageItemsTransX);
+
             firstPageItemsTransX = -ITEM_SLIDE_IN_OUT_DISTANCE_PX + mCurrentPageItemsTransX;
         }
 
-        PointF firstPageOffset = new PointF(bg.basePreviewOffsetX + firstPageItemsTransX,
-                bg.basePreviewOffsetY);
-        boolean shouldClipFirstPage = firstPageItemsTransX < -mClipThreshold;
-        drawParams(canvas, mFirstPageParams, firstPageOffset, shouldClipFirstPage, clipPath);
-        canvas.restoreToCount(saveCount);
+        drawParams(canvas, mFirstPageParams, firstPageItemsTransX);
+        canvas.translate(-bg.basePreviewOffsetX, -bg.basePreviewOffsetY);
     }
 
     public void onParamsChanged() {
         mIcon.invalidate();
     }
 
-    /**
-     * Draws each preview item.
-     *
-     * @param offset The offset needed to draw the preview items.
-     * @param shouldClipPath Iff true, clip path using {@param clipPath}.
-     * @param clipPath The clip path of the folder icon.
-     */
-    private void drawPreviewItem(Canvas canvas, PreviewItemDrawingParams params, PointF offset,
-            boolean shouldClipPath, Path clipPath) {
+    private void drawPreviewItem(Canvas canvas, PreviewItemDrawingParams params) {
         canvas.save();
-        if (shouldClipPath) {
-            canvas.clipPath(clipPath);
-        }
-        canvas.translate(offset.x + params.transX, offset.y + params.transY);
+        canvas.translate(params.transX, params.transY);
         canvas.scale(params.scale, params.scale);
         Drawable d = params.drawable;
 
@@ -260,7 +234,7 @@ public class PreviewItemManager {
             params.remove(params.size() - 1);
         }
         while (items.size() > params.size()) {
-            params.add(new PreviewItemDrawingParams(0, 0, 0));
+            params.add(new PreviewItemDrawingParams(0, 0, 0, 0));
         }
 
         int numItemsInFirstPagePreview = page == 0 ? items.size() : MAX_NUM_ITEMS_IN_PREVIEW;

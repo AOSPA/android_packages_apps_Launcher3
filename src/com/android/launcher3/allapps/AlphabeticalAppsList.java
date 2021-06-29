@@ -44,7 +44,6 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
     private static final int FAST_SCROLL_FRACTION_DISTRIBUTE_BY_NUM_SECTIONS = 1;
 
     private final int mFastScrollDistributionMode = FAST_SCROLL_FRACTION_DISTRIBUTE_BY_NUM_SECTIONS;
-    private final WorkAdapterProvider mWorkAdapterProvider;
 
     /**
      * Info about a fast scroller section, depending if sections are merged, the fast scroller
@@ -76,6 +75,8 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
     private final ArrayList<AdapterItem> mAdapterItems = new ArrayList<>();
     // The set of sections that we allow fast-scrolling to (includes non-merged sections)
     private final List<FastScrollSectionInfo> mFastScrollerSections = new ArrayList<>();
+    // Is it the work profile app list.
+    private final boolean mIsWork;
 
     // The of ordered component names as a result of a search query
     private ArrayList<AdapterItem> mSearchResults;
@@ -85,12 +86,11 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
     private int mNumAppRowsInAdapter;
     private ItemInfoMatcher mItemFilter;
 
-    public AlphabeticalAppsList(Context context, AllAppsStore appsStore,
-            WorkAdapterProvider adapterProvider) {
+    public AlphabeticalAppsList(Context context, AllAppsStore appsStore, boolean isWork) {
         mAllAppsStore = appsStore;
         mLauncher = BaseDraggingActivity.fromContext(context);
         mAppNameComparator = new AppInfoComparator(context);
-        mWorkAdapterProvider = adapterProvider;
+        mIsWork = isWork;
         mNumAppsPerRow = mLauncher.getDeviceProfile().inv.numColumns;
         mAllAppsStore.addUpdateListener(this);
     }
@@ -265,7 +265,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
      * Updates the set of filtered apps with the current filter. At this point, we expect
      * mCachedSectionNames to have been calculated for the set of all apps in mApps.
      */
-    public void updateAdapterItems() {
+    private void updateAdapterItems() {
         refillAdapterItems();
         refreshRecyclerView();
     }
@@ -292,12 +292,6 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
 
         if (!hasFilter()) {
             mAccessibilityResultsCount = mApps.size();
-            if (mWorkAdapterProvider != null) {
-                position += mWorkAdapterProvider.addWorkItems(mAdapterItems);
-                if (!mWorkAdapterProvider.shouldShowWorkApps()) {
-                    return;
-                }
-            }
             for (AppInfo info : mApps) {
                 String sectionName = info.sectionName;
 
@@ -309,8 +303,7 @@ public class AlphabeticalAppsList implements AllAppsStore.OnUpdateListener {
                 }
 
                 // Create an app item
-                AdapterItem appItem = AdapterItem.asApp(position++, sectionName, info,
-                        appIndex++);
+                AdapterItem appItem = AdapterItem.asApp(position++, sectionName, info, appIndex++);
                 if (lastFastScrollerSectionInfo.fastScrollToItem == null) {
                     lastFastScrollerSectionInfo.fastScrollToItem = appItem;
                 }

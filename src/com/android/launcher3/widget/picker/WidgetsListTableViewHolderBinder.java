@@ -15,9 +15,6 @@
  */
 package com.android.launcher3.widget.picker;
 
-import static com.android.launcher3.widget.picker.WidgetsListDrawableState.LAST;
-import static com.android.launcher3.widget.picker.WidgetsListDrawableState.MIDDLE;
-
 import android.content.Context;
 import android.util.Log;
 import android.view.Gravity;
@@ -53,7 +50,6 @@ public final class WidgetsListTableViewHolderBinder
     private final OnClickListener mIconClickListener;
     private final OnLongClickListener mIconLongClickListener;
     private final WidgetPreviewLoader mWidgetPreviewLoader;
-    private final WidgetsListDrawableFactory mListDrawableFactory;
     private final WidgetsListAdapter mWidgetsListAdapter;
     private boolean mApplyBitmapDeferred = false;
 
@@ -63,13 +59,11 @@ public final class WidgetsListTableViewHolderBinder
             OnClickListener iconClickListener,
             OnLongClickListener iconLongClickListener,
             WidgetPreviewLoader widgetPreviewLoader,
-            WidgetsListDrawableFactory listDrawableFactory,
             WidgetsListAdapter listAdapter) {
         mLayoutInflater = layoutInflater;
         mIconClickListener = iconClickListener;
         mIconLongClickListener = iconLongClickListener;
         mWidgetPreviewLoader = widgetPreviewLoader;
-        mListDrawableFactory = listDrawableFactory;
         mWidgetsListAdapter = listAdapter;
     }
 
@@ -92,25 +86,27 @@ public final class WidgetsListTableViewHolderBinder
             Log.v(TAG, "\nonCreateViewHolder");
         }
 
-        WidgetsRowViewHolder viewHolder =
-                new WidgetsRowViewHolder(mLayoutInflater.inflate(
-                        R.layout.widgets_table_container, parent, false));
-        viewHolder.mTableContainer.setBackgroundDrawable(
-                mListDrawableFactory.createContentBackgroundDrawable());
-        return viewHolder;
+        ViewGroup container = (ViewGroup) mLayoutInflater.inflate(
+                R.layout.widgets_table_container, parent, false);
+        return new WidgetsRowViewHolder(container);
     }
 
     @Override
     public void bindViewHolder(WidgetsRowViewHolder holder, WidgetsListContentEntry entry,
             int position) {
-        WidgetsListTableView table = holder.mTableContainer;
+        TableLayout table = holder.mTableContainer;
         if (DEBUG) {
             Log.d(TAG, String.format("onBindViewHolder [widget#=%d, table.getChildCount=%d]",
                     entry.mWidgets.size(), table.getChildCount()));
         }
 
-        table.setListDrawableState(
-                position == mWidgetsListAdapter.getItemCount() - 1 ? LAST : MIDDLE);
+        if (position == mWidgetsListAdapter.getItemCount() - 1) {
+            table.setBackgroundResource(R.drawable.widgets_list_bottom_ripple);
+        } else {
+            // WidgetsListContentEntry is never shown in position 0. There must be a header above
+            // it.
+            table.setBackgroundResource(R.drawable.widgets_list_middle_ripple);
+        }
 
         List<ArrayList<WidgetItem>> widgetItemsTable =
                 WidgetsTableUtils.groupWidgetItemsIntoTable(entry.mWidgets, mMaxSpansPerRow);

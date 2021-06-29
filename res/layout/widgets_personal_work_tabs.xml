@@ -20,9 +20,9 @@
     android:id="@+id/tabs"
     android:layout_width="match_parent"
     android:layout_height="@dimen/all_apps_header_pill_height"
-    android:layout_marginHorizontal="32dp"
+    android:layout_marginHorizontal="16dp"
     android:orientation="horizontal"
-    android:background="@drawable/all_apps_tabs_background"
+    android:elevation="2dp"
     style="@style/TextHeadline">
 
     <Button
@@ -30,7 +30,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="@drawable/personal_work_tabs_ripple"
+        android:background="?android:attr/selectableItemBackground"
         android:text="@string/widgets_full_sheet_personal_tab"
         android:textColor="@color/all_apps_tab_text"
         android:textSize="14sp" />
@@ -40,7 +40,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="@drawable/personal_work_tabs_ripple"
+        android:background="?android:attr/selectableItemBackground"
         android:text="@string/widgets_full_sheet_work_tab"
         android:textColor="@color/all_apps_tab_text"
         android:textSize="14sp" />

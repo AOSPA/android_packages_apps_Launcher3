@@ -25,9 +25,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.os.IBinder;
 import android.util.FloatProperty;
-import android.view.SurfaceControl;
 import android.view.View;
-import android.view.ViewRootImpl;
 import android.view.ViewTreeObserver;
 
 import com.android.launcher3.BaseActivity;
@@ -39,6 +37,9 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.systemui.shared.system.BlurUtils;
+import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
+import com.android.systemui.shared.system.SurfaceControlCompat;
+import com.android.systemui.shared.system.TransactionCompat;
 import com.android.systemui.shared.system.WallpaperManagerCompat;
 
 /**
@@ -90,8 +91,7 @@ public class DepthController implements StateHandler<LauncherState>,
                 @Override
                 public void onDraw() {
                     View view = mLauncher.getDragLayer();
-                    ViewRootImpl viewRootImpl = view.getViewRootImpl();
-                    setSurface(viewRootImpl != null ? viewRootImpl.getSurfaceControl() : null);
+                    setSurface(new SurfaceControlCompat(view));
                     view.post(() -> view.getViewTreeObserver().removeOnDrawListener(this));
                 }
             };
@@ -102,7 +102,7 @@ public class DepthController implements StateHandler<LauncherState>,
      */
     private int mMaxBlurRadius;
     private WallpaperManagerCompat mWallpaperManager;
-    private SurfaceControl mSurface;
+    private SurfaceControlCompat mSurface;
     /**
      * Ratio from 0 to 1, where 0 is fully zoomed out, and 1 is zoomed in.
      * @see android.service.wallpaper.WallpaperService.Engine#onZoomChanged(float)
@@ -157,11 +157,15 @@ public class DepthController implements StateHandler<LauncherState>,
     /**
      * Sets the specified app target surface to apply the blur to.
      */
-    public void setSurface(SurfaceControl surface) {
+    public void setSurfaceToApp(RemoteAnimationTargetCompat target) {
+        setSurface(target == null ? null : target.leash);
+    }
+
+    private void setSurface(SurfaceControlCompat surface) {
         if (mSurface != surface) {
             mSurface = surface;
             if (surface != null) {
-                dispatchTransactionSurface(mDepth);
+                setDepth(mDepth);
             }
         }
     }
@@ -175,8 +179,6 @@ public class DepthController implements StateHandler<LauncherState>,
         float toDepth = toState.getDepth(mLauncher);
         if (Float.compare(mDepth, toDepth) != 0) {
             setDepth(toDepth);
-        } else if (toState == LauncherState.OVERVIEW) {
-            dispatchTransactionSurface(mDepth);
         }
     }
 
@@ -202,35 +204,32 @@ public class DepthController implements StateHandler<LauncherState>,
         if (Float.compare(mDepth, depthF) == 0) {
             return;
         }
-        if (dispatchTransactionSurface(depthF)) {
-            mDepth = depthF;
-        }
-    }
 
-    private boolean dispatchTransactionSurface(float depth) {
         boolean supportsBlur = BlurUtils.supportsBlursOnWindows();
         if (supportsBlur && (mSurface == null || !mSurface.isValid())) {
-            return false;
+            return;
         }
+        mDepth = depthF;
         ensureDependencies();
         IBinder windowToken = mLauncher.getRootView().getWindowToken();
         if (windowToken != null) {
-            mWallpaperManager.setWallpaperZoomOut(windowToken, depth);
+            mWallpaperManager.setWallpaperZoomOut(windowToken, mDepth);
         }
 
         if (supportsBlur) {
-            // We cannot mark the window as opaque in overview because there will be an app window
-            // below the launcher layer, and we need to draw it -- without blurs.
-            boolean isOverview = mLauncher.isInState(LauncherState.OVERVIEW);
-            boolean opaque = mLauncher.getScrimView().isFullyOpaque() && !isOverview;
-
-            int blur = opaque || isOverview ? 0 : (int) (depth * mMaxBlurRadius);
-            new SurfaceControl.Transaction()
+            final int blur;
+            if (mLauncher.isInState(LauncherState.ALL_APPS) && mDepth == 1) {
+                // All apps has a solid background. We don't need to draw blurs after it's fully
+                // visible. This will take us out of GPU composition, saving battery and increasing
+                // performance.
+                blur = 0;
+            } else {
+                blur = (int) (mDepth * mMaxBlurRadius);
+            }
+            new TransactionCompat()
                     .setBackgroundBlurRadius(mSurface, blur)
-                    .setOpaque(mSurface, opaque)
                     .apply();
         }
-        return true;
     }
 
     @Override

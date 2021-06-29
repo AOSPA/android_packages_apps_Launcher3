@@ -34,17 +34,14 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.dragndrop.DragLayer;
-import com.android.launcher3.util.Themes;
-import com.android.launcher3.views.FloatingView;
 import com.android.launcher3.views.ListenerView;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.RoundedCornerEnforcement;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 /** A view that mimics an App Widget through a launch animation. */
 @TargetApi(Build.VERSION_CODES.S)
 public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
-        OnGlobalLayoutListener, FloatingView {
+        OnGlobalLayoutListener {
     private static final Matrix sTmpMatrix = new Matrix();
 
     private final Launcher mLauncher;
@@ -61,8 +58,6 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
     private Runnable mFastFinishRunnable;
     private Runnable mOnTargetChangeRunnable;
     private boolean mAppTargetIsTranslucent;
-
-    private float mIconOffsetY;
 
     public FloatingWidgetView(Context context) {
         this(context, null);
@@ -134,7 +129,6 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
     }
 
     /** Callback at the end or early exit of the animation. */
-    @Override
     public void fastFinish() {
         if (isUninitialized()) return;
         Runnable fastFinishRunnable = mFastFinishRunnable;
@@ -150,7 +144,7 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
 
     private void init(DragLayer dragLayer, LauncherAppWidgetHostView originalView,
             RectF widgetBackgroundPosition, Size windowSize, float windowCornerRadius,
-            boolean appTargetIsTranslucent, int fallbackBackgroundColor) {
+            boolean appTargetIsTranslucent) {
         mAppWidgetView = originalView;
         mAppWidgetView.beginDeferringUpdates();
         mBackgroundPosition = widgetBackgroundPosition;
@@ -165,8 +159,7 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
         getRelativePosition(mAppWidgetBackgroundView, dragLayer, mBackgroundPosition);
         getRelativePosition(mAppWidgetBackgroundView, mAppWidgetView, mBackgroundOffset);
         if (!mAppTargetIsTranslucent) {
-            mBackgroundView.init(mAppWidgetView, mAppWidgetBackgroundView, windowCornerRadius,
-                    fallbackBackgroundColor);
+            mBackgroundView.init(mAppWidgetView, mAppWidgetBackgroundView, windowCornerRadius);
             // Layout call before GhostView creation so that the overlaid view isn't clipped
             layout(0, 0, windowSize.getWidth(), windowSize.getHeight());
             mForegroundOverlayView = GhostView.addGhost(mAppWidgetView, this);
@@ -199,12 +192,6 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
         positionViews();
     }
 
-    @Override
-    public void setPositionOffsetY(float y) {
-        mIconOffsetY = y;
-        onGlobalLayout();
-    }
-
     /** Sets the layout parameters of the floating view and its background view child. */
     private void positionViews() {
         LayoutParams layoutParams = (LayoutParams) getLayoutParams();
@@ -213,7 +200,7 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
 
         // FloatingWidgetView layout is forced LTR
         mBackgroundView.setTranslationX(mBackgroundPosition.left);
-        mBackgroundView.setTranslationY(mBackgroundPosition.top + mIconOffsetY);
+        mBackgroundView.setTranslationY(mBackgroundPosition.top);
         LayoutParams backgroundParams = (LayoutParams) mBackgroundView.getLayoutParams();
         backgroundParams.leftMargin = 0;
         backgroundParams.topMargin = 0;
@@ -228,8 +215,7 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
             sTmpMatrix.setTranslate(-mBackgroundOffset.left - mAppWidgetView.getLeft(),
                     -mBackgroundOffset.top - mAppWidgetView.getTop());
             sTmpMatrix.postScale(foregroundScale, foregroundScale);
-            sTmpMatrix.postTranslate(mBackgroundPosition.left, mBackgroundPosition.top
-                    + mIconOffsetY);
+            sTmpMatrix.postTranslate(mBackgroundPosition.left, mBackgroundPosition.top);
             mForegroundOverlayView.setMatrix(sTmpMatrix);
         }
     }
@@ -254,7 +240,6 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
     }
 
     private void recycle() {
-        mIconOffsetY = 0;
         mEndRunnable = null;
         mFastFinishRunnable = null;
         mOnTargetChangeRunnable = null;
@@ -277,8 +262,7 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
      */
     public static FloatingWidgetView getFloatingWidgetView(Launcher launcher,
             LauncherAppWidgetHostView originalView, RectF widgetBackgroundPosition,
-            Size windowSize, float windowCornerRadius, boolean appTargetsAreTranslucent,
-            int fallbackBackgroundColor) {
+            Size windowSize, float windowCornerRadius, boolean appTargetsAreTranslucent) {
         final DragLayer dragLayer = launcher.getDragLayer();
         ViewGroup parent = (ViewGroup) dragLayer.getParent();
         FloatingWidgetView floatingView =
@@ -286,20 +270,9 @@ public class FloatingWidgetView extends FrameLayout implements AnimatorListener,
         floatingView.recycle();
 
         floatingView.init(dragLayer, originalView, widgetBackgroundPosition, windowSize,
-                windowCornerRadius, appTargetsAreTranslucent, fallbackBackgroundColor);
+                windowCornerRadius, appTargetsAreTranslucent);
         parent.addView(floatingView);
         return floatingView;
-    }
-
-    /**
-     * Extract a background color from a target's task description, or fall back to the given
-     * context's theme background color.
-     */
-    public static int getDefaultBackgroundColor(
-            Context context, RemoteAnimationTargetCompat target) {
-        return (target != null && target.taskInfo.taskDescription != null)
-                ? target.taskInfo.taskDescription.getBackgroundColor()
-                : Themes.getColorBackground(context);
     }
 
     private static void getRelativePosition(View descendant, View ancestor, RectF position) {

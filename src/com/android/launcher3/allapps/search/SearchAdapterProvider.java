@@ -17,18 +17,20 @@
 package com.android.launcher3.allapps.search;
 
 import android.net.Uri;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.allapps.AllAppsContainerView;
-import com.android.launcher3.allapps.BaseAdapterProvider;
+import com.android.launcher3.allapps.AllAppsGridAdapter;
 
 /**
  * A UI expansion wrapper providing for search results
  */
-public abstract class SearchAdapterProvider extends BaseAdapterProvider {
+public abstract class SearchAdapterProvider {
 
     protected final BaseDraggingActivity mLauncher;
 
@@ -37,9 +39,39 @@ public abstract class SearchAdapterProvider extends BaseAdapterProvider {
     }
 
     /**
+     * Called from RecyclerView.Adapter#onBindViewHolder
+     */
+    public abstract void onBindView(AllAppsGridAdapter.ViewHolder holder, int position);
+
+    /**
      * Called from LiveSearchManager to notify slice status updates.
      */
     public void onSliceStatusUpdate(Uri sliceUri) {
+    }
+
+    /**
+     * Returns whether or not viewType can be handled by searchProvider
+     */
+    public abstract boolean isSearchView(int viewType);
+
+    /**
+     * Called from RecyclerView.Adapter#onCreateViewHolder
+     */
+    public abstract AllAppsGridAdapter.ViewHolder onCreateViewHolder(LayoutInflater layoutInflater,
+            ViewGroup parent, int viewType);
+
+    /**
+     * Returns supported item per row combinations supported
+     */
+    public int[] getSupportedItemsPerRowArray() {
+        return new int[]{};
+    }
+
+    /**
+     * Returns how many cells a view should span
+     */
+    public int getItemsPerRow(int viewType, int appsPerRow) {
+        return appsPerRow;
     }
 
     /**

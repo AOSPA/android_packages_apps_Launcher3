@@ -30,7 +30,6 @@ import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHE
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SPLIT_SCREEN;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_STARTING_WINDOW;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SMARTSPACE_TRANSITION_CONTROLLER;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
 
@@ -53,6 +52,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.util.Log;
@@ -75,7 +75,6 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.statemanager.StatefulActivity;
-import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.tracing.LauncherTraceProto;
@@ -108,7 +107,6 @@ import com.android.systemui.shared.system.InputChannelCompat;
 import com.android.systemui.shared.system.InputChannelCompat.InputEventReceiver;
 import com.android.systemui.shared.system.InputConsumerController;
 import com.android.systemui.shared.system.InputMonitorCompat;
-import com.android.systemui.shared.system.smartspace.ISmartspaceTransitionController;
 import com.android.systemui.shared.tracing.ProtoTraceable;
 import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.pip.IPip;
@@ -149,9 +147,21 @@ public class TouchInteractionService extends Service implements PluginListener<O
     private OverscrollPlugin mOverscrollPlugin;
 
     /**
-     * Local IOverviewProxy implementation with some methods for local components
+     * Extension of OverviewProxy aidl interface without needing to modify the actual interface.
+     * This is for methods that need only need local access and not intended to make IPC calls.
      */
-    public class TISBinder extends IOverviewProxy.Stub {
+    public abstract static class TISBinder extends IOverviewProxy.Stub {
+        public abstract void setTaskbarOverviewProxyDelegate(
+                @Nullable TaskbarOverviewProxyDelegate i);
+    }
+
+
+    private final TISBinder mMyBinder = new TISBinder() {
+
+        public void setTaskbarOverviewProxyDelegate(
+                @Nullable TaskbarOverviewProxyDelegate delegate) {
+            mTaskbarOverviewProxyDelegate = delegate;
+        }
 
         @BinderThread
         public void onInitialize(Bundle bundle) {
@@ -166,13 +176,9 @@ public class TouchInteractionService extends Service implements PluginListener<O
                     bundle.getBinder(KEY_EXTRA_SHELL_SHELL_TRANSITIONS));
             IStartingWindow startingWindow = IStartingWindow.Stub.asInterface(
                     bundle.getBinder(KEY_EXTRA_SHELL_STARTING_WINDOW));
-            ISmartspaceTransitionController smartspaceTransitionController =
-                    ISmartspaceTransitionController.Stub.asInterface(
-                            bundle.getBinder(KEY_EXTRA_SMARTSPACE_TRANSITION_CONTROLLER));
             MAIN_EXECUTOR.execute(() -> {
                 SystemUiProxy.INSTANCE.get(TouchInteractionService.this).setProxy(proxy, pip,
-                        splitscreen, onehanded, shellTransitions, startingWindow,
-                        smartspaceTransitionController);
+                        splitscreen, onehanded, shellTransitions, startingWindow);
                 TouchInteractionService.this.initInputMonitor();
                 preloadOverview(true /* fromInit */);
                 mDeviceState.runOnUserUnlocked(() -> {
@@ -268,24 +274,40 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
         @Override
         public void onImeWindowStatusChanged(int displayId, IBinder token, int vis,
-                int backDisposition, boolean showImeSwitcher) {
-            MAIN_EXECUTOR.execute(() -> mTaskbarManager.updateImeStatus(
-                    displayId, vis, backDisposition, showImeSwitcher));
+                int backDisposition, boolean showImeSwitcher) throws RemoteException {
+            if (mTaskbarOverviewProxyDelegate == null) {
+                return;
+            }
+            MAIN_EXECUTOR.execute(() -> {
+                if (mTaskbarOverviewProxyDelegate == null) {
+                    return;
+                }
+                mTaskbarOverviewProxyDelegate
+                        .updateImeStatus(displayId, vis, backDisposition, showImeSwitcher);
+            });
         }
+    };
 
-        public TaskbarManager getTaskbarManager() {
-            return mTaskbarManager;
-        }
+    public interface TaskbarOverviewProxyDelegate {
+        void updateImeStatus(int displayId, int vis, int backDisposition,
+                boolean showImeSwitcher);
     }
 
     private static boolean sConnected = false;
+    private static TouchInteractionService sInstance;
     private static boolean sIsInitialized = false;
     private RotationTouchHelper mRotationTouchHelper;
+    @Nullable
+    private TaskbarOverviewProxyDelegate mTaskbarOverviewProxyDelegate;
 
     public static boolean isConnected() {
         return sConnected;
     }
 
+    @Nullable
+    public static TouchInteractionService getInstance() {
+        return sInstance;
+    }
 
     public static boolean isInitialized() {
         return sIsInitialized;
@@ -314,7 +336,9 @@ public class TouchInteractionService extends Service implements PluginListener<O
 
     private DisplayManager mDisplayManager;
 
-    private TaskbarManager mTaskbarManager;
+    public TouchInteractionService() {
+        sInstance = this;
+    }
 
     @Override
     public void onCreate() {
@@ -324,15 +348,13 @@ public class TouchInteractionService extends Service implements PluginListener<O
         mMainChoreographer = Choreographer.getInstance();
         mAM = ActivityManagerWrapper.getInstance();
         mDeviceState = new RecentsAnimationDeviceState(this, true);
-        mDisplayManager = getSystemService(DisplayManager.class);
-        mTaskbarManager = new TaskbarManager(this);
-
         mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
         mDeviceState.addNavigationModeChangedCallback(this::onNavigationModeChanged);
         mDeviceState.addOneHandedModeChangedCallback(this::onOneHandedModeOverlayChanged);
         mDeviceState.runOnUserUnlocked(this::onUserUnlocked);
-        mDeviceState.runOnUserUnlocked(mTaskbarManager::onUserUnlocked);
         ProtoTracer.INSTANCE.get(this).add(this);
+        mDisplayManager = getSystemService(DisplayManager.class);
+
         sConnected = true;
     }
 
@@ -446,7 +468,8 @@ public class TouchInteractionService extends Service implements PluginListener<O
             int systemUiStateFlags = mDeviceState.getSystemUiStateFlags();
             SystemUiProxy.INSTANCE.get(this).setLastSystemUiStateFlags(systemUiStateFlags);
             mOverviewComponentObserver.onSystemUiStateChanged();
-            mTaskbarManager.onSystemUiFlagsChanged(systemUiStateFlags);
+            mOverviewComponentObserver.getActivityInterface().onSystemUiFlagsChanged(
+                    systemUiStateFlags);
 
             if ((lastSysUIFlags & SYSUI_STATE_TRACING_ENABLED) !=
                     (systemUiStateFlags & SYSUI_STATE_TRACING_ENABLED)) {
@@ -489,7 +512,6 @@ public class TouchInteractionService extends Service implements PluginListener<O
         getSystemService(AccessibilityManager.class)
                 .unregisterSystemAction(SYSTEM_ACTION_ID_ALL_APPS);
 
-        mTaskbarManager.destroy();
         sConnected = false;
         super.onDestroy();
     }
@@ -497,7 +519,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
     @Override
     public IBinder onBind(Intent intent) {
         Log.d(TAG, "Touch service connected: user=" + getUserId());
-        return new TISBinder();
+        return mMyBinder;
     }
 
     private void onInputEvent(InputEvent ev) {

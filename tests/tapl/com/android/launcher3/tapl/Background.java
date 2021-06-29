@@ -163,8 +163,8 @@ public class Background extends LauncherInstrumentation.VisibleContainer {
     @NonNull
     private void quickSwitch(boolean toRight) {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
-             LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
-                     "want to quick switch to the previous app")) {
+            LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                    "want to quick switch to the previous app")) {
             verifyActiveContainer();
             final boolean launcherWasVisible = mLauncher.isLauncherVisible();
             boolean transposeInLandscape = false;
@@ -177,34 +177,33 @@ public class Background extends LauncherInstrumentation.VisibleContainer {
                     final int startY;
                     final int endX;
                     final int endY;
-                    final int cornerRadius = (int) Math.ceil(mLauncher.getWindowCornerRadius());
                     if (toRight) {
                         if (mLauncher.getDevice().isNaturalOrientation() || !transposeInLandscape) {
                             // Swipe from the bottom left to the bottom right of the screen.
-                            startX = cornerRadius;
+                            startX = 0;
                             startY = getSwipeStartY();
-                            endX = mLauncher.getDevice().getDisplayWidth() - cornerRadius;
+                            endX = mLauncher.getDevice().getDisplayWidth();
                             endY = startY;
                         } else {
                             // Swipe from the bottom right to the top right of the screen.
                             startX = getSwipeStartX();
-                            startY = mLauncher.getRealDisplaySize().y - 1 - cornerRadius;
+                            startY = mLauncher.getRealDisplaySize().y - 1;
                             endX = startX;
-                            endY = cornerRadius;
+                            endY = 0;
                         }
                     } else {
                         if (mLauncher.getDevice().isNaturalOrientation() || !transposeInLandscape) {
                             // Swipe from the bottom right to the bottom left of the screen.
-                            startX = mLauncher.getDevice().getDisplayWidth() - cornerRadius;
+                            startX = mLauncher.getDevice().getDisplayWidth();
                             startY = getSwipeStartY();
-                            endX = cornerRadius;
+                            endX = 0;
                             endY = startY;
                         } else {
                             // Swipe from the bottom left to the top left of the screen.
                             startX = getSwipeStartX();
-                            startY = cornerRadius;
+                            startY = 0;
                             endX = startX;
-                            endY = mLauncher.getRealDisplaySize().y - 1 - cornerRadius;
+                            endY = mLauncher.getRealDisplaySize().y - 1;
                         }
                     }
 

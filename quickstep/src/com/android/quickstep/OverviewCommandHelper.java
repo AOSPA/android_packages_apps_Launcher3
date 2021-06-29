@@ -184,7 +184,9 @@ public class OverviewCommandHelper {
                 .newHandler(gestureState, cmd.createTime);
         interactionHandler.setGestureEndCallback(
                 () -> onTransitionComplete(cmd, interactionHandler));
-        interactionHandler.initWhenReady();
+
+        Intent intent = new Intent(interactionHandler.getLaunchIntent());
+        interactionHandler.initWhenReady(intent);
 
         RecentsAnimationListener recentAnimListener = new RecentsAnimationListener() {
             @Override
@@ -210,7 +212,6 @@ public class OverviewCommandHelper {
             cmd.mActiveCallbacks.addListener(recentAnimListener);
             mTaskAnimationManager.notifyRecentsAnimationState(recentAnimListener);
         } else {
-            Intent intent = new Intent(interactionHandler.getLaunchIntent());
             intent.putExtra(INTENT_EXTRA_LOG_TRACE_ID, gestureState.getGestureId());
             cmd.mActiveCallbacks = mTaskAnimationManager.startRecentsAnimation(
                     gestureState, intent, interactionHandler);

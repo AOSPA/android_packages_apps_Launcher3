@@ -131,13 +131,6 @@ public class IconCache extends BaseIconCache {
     }
 
     /**
-     * Closes the cache DB. This will clear any in-memory cache.
-     */
-    public void close() {
-        mIconDb.close();
-    }
-
-    /**
      * Fetches high-res icon for the provided ItemInfo and updates the caller when done.
      *
      * @return a request ID that can be used to cancel the request.
@@ -336,7 +329,8 @@ public class IconCache extends BaseIconCache {
 
     @Override
     protected String getIconSystemState(String packageName) {
-        return mIconProvider.getSystemStateForPackage(mSystemState, packageName);
+        return mIconProvider.getSystemStateForPackage(mSystemState, packageName)
+                + ",flags_asi:" + FeatureFlags.APP_SEARCH_IMPROVEMENTS.get();
     }
 
     /**

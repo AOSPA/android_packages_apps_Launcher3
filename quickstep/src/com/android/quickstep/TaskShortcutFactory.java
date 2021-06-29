@@ -30,7 +30,6 @@ import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import android.window.SplashScreen;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
@@ -166,9 +165,6 @@ public interface TaskShortcutFactory {
             dismissTaskMenuView(mTarget);
 
             ActivityOptions options = mFactory.makeLaunchOptions(mTarget);
-            if (options != null) {
-                options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
-            }
             if (options != null
                     && ActivityManagerWrapper.getInstance().startActivityFromRecents(taskId,
                             options)) {
@@ -235,7 +231,7 @@ public interface TaskShortcutFactory {
         @Override
         public SystemShortcut getShortcut(BaseDraggingActivity activity, TaskView taskView) {
             SystemShortcut shortcut = super.getShortcut(activity, taskView);
-            if (shortcut != null && FeatureFlags.ENABLE_SPLIT_SELECT.get()) {
+            if (FeatureFlags.ENABLE_SPLIT_SELECT.get()) {
                 // Disable if there's only one recent app for split screen
                 shortcut.setEnabled(taskView.getRecentsView().getTaskViewCount() > 1);
             }

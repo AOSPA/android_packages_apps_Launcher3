@@ -74,10 +74,10 @@ import androidx.core.os.BuildCompat;
 import com.android.launcher3.dragndrop.FolderAdaptiveIcon;
 import com.android.launcher3.graphics.GridCustomizationsProvider;
 import com.android.launcher3.graphics.TintedDrawableSpan;
-import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.icons.ShortcutCachingLogic;
+import com.android.launcher3.icons.ThemedIconDrawable.ThemedAdaptiveIcon;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.pm.ShortcutConfigActivityInfo;
@@ -122,8 +122,7 @@ public final class Utilities {
 
     public static final boolean ATLEAST_R = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
 
-    public static final boolean ATLEAST_S = BuildCompat.isAtLeastS()
-            || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+    public static final boolean ATLEAST_S = BuildCompat.isAtLeastS();
 
     /**
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
@@ -325,17 +324,15 @@ public final class Utilities {
     }
 
     public static void scaleRectFAboutCenter(RectF r, float scale) {
-        scaleRectFAboutPivot(r, scale, r.centerX(), r.centerY());
-    }
-
-    public static void scaleRectFAboutPivot(RectF r, float scale, float px, float py) {
         if (scale != 1.0f) {
-            r.offset(-px, -py);
+            float cx = r.centerX();
+            float cy = r.centerY();
+            r.offset(-cx, -cy);
             r.left = r.left * scale;
             r.top = r.top * scale ;
             r.right = r.right * scale;
             r.bottom = r.bottom * scale;
-            r.offset(px, py);
+            r.offset(cx, cy);
         }
     }
 
@@ -396,13 +393,6 @@ public final class Utilities {
         }
         float progress = getProgress(t, fromMin, fromMax);
         return mapRange(interpolator.getInterpolation(progress), toMin, toMax);
-    }
-
-    /** Bounds t between a lower and upper bound and maps the result to a range. */
-    public static float mapBoundToRange(float t, float lowerBound, float upperBound,
-            float toMin, float toMax, Interpolator interpolator) {
-        return mapToRange(boundToRange(t, lowerBound, upperBound), lowerBound, upperBound,
-                toMin, toMax, interpolator);
     }
 
     public static float getProgress(float current, float min, float max) {
@@ -662,8 +652,8 @@ public final class Utilities {
     public static Drawable getFullDrawable(Launcher launcher, ItemInfo info, int width, int height,
             Object[] outObj) {
         Drawable icon = loadFullDrawableWithoutTheme(launcher, info, width, height, outObj);
-        if (icon instanceof BitmapInfo.Extender) {
-            icon = ((BitmapInfo.Extender) icon).getThemedDrawable(launcher);
+        if (icon instanceof ThemedAdaptiveIcon) {
+            icon = ((ThemedAdaptiveIcon) icon).getThemedDrawable(launcher);
         }
         return icon;
     }

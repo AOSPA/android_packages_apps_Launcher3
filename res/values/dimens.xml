@@ -48,7 +48,7 @@
     <dimen name="workspace_page_indicator_overlap_workspace">0dp</dimen>
 
 <!-- Drop target bar -->
-    <dimen name="dynamic_grid_drop_target_size">52dp</dimen>
+    <dimen name="dynamic_grid_drop_target_size">48dp</dimen>
     <dimen name="drop_target_vertical_gap">20dp</dimen>
 
 <!-- App Widget resize frame -->
@@ -61,7 +61,6 @@
     <dimen name="widget_reconfigure_button_padding">6dp</dimen>
     <dimen name="widget_reconfigure_button_margin">32dp</dimen>
     <dimen name="widget_reconfigure_button_size">36dp</dimen>
-    <dimen name="widget_reconfigure_tip_top_margin">16dp</dimen>
 
 <!-- Fast scroll -->
     <dimen name="fastscroll_track_min_width">6dp</dimen>
@@ -92,23 +91,19 @@
     <dimen name="all_apps_empty_search_bg_top_offset">144dp</dimen>
     <dimen name="all_apps_background_canvas_width">700dp</dimen>
     <dimen name="all_apps_background_canvas_height">475dp</dimen>
-    <dimen name="all_apps_header_pill_height">48dp</dimen>
-    <dimen name="all_apps_header_pill_corner_radius">18dp</dimen>
-    <dimen name="all_apps_header_pills_width">348dp</dimen>
+    <dimen name="all_apps_header_pill_height">50dp</dimen>
+    <dimen name="all_apps_header_pill_corner_radius">48dp</dimen>
     <dimen name="all_apps_header_tab_height">48dp</dimen>
     <dimen name="all_apps_tabs_indicator_height">2dp</dimen>
     <dimen name="all_apps_header_top_padding">36dp</dimen>
-    <dimen name="all_apps_header_bottom_padding">6dp</dimen>
     <dimen name="all_apps_work_profile_tab_footer_top_padding">16dp</dimen>
     <dimen name="all_apps_work_profile_tab_footer_bottom_padding">20dp</dimen>
-    <dimen name="all_apps_tabs_vertical_padding">6dp</dimen>
-    <dimen name="all_apps_divider_height">2dp</dimen>
-    <dimen name="all_apps_divider_width">128dp</dimen>
+    <dimen name="all_apps_tabs_side_padding">12dp</dimen>
+    <dimen name="all_apps_divider_height">1dp</dimen>
 
     <dimen name="all_apps_tip_bottom_margin">8dp</dimen>
     <!-- The size of corner radius of the arrow in the arrow toast. -->
     <dimen name="arrow_toast_corner_radius">2dp</dimen>
-    <dimen name="arrow_toast_arrow_width">10dp</dimen>
 
 <!-- Search bar in All Apps -->
     <dimen name="all_apps_header_max_elevation">3dp</dimen>
@@ -117,31 +112,15 @@
 
     <dimen name="all_apps_divider_margin_vertical">8dp</dimen>
 
-<!-- Floating action button inside work tab to toggle work profile -->
-    <dimen name="work_fab_height">48dp</dimen>
-    <dimen name="work_fab_radius">24dp</dimen>
-    <dimen name="work_fab_margin">16dp</dimen>
     <dimen name="work_profile_footer_padding">20dp</dimen>
     <dimen name="work_profile_footer_text_size">16sp</dimen>
-    <dimen name="work_edu_card_margin">16dp</dimen>
 
-    <!-- rounded button shown inside card views, and snack bars  -->
-    <dimen name="rounded_button_height">32dp</dimen>
-    <dimen name="rounded_button_radius">16dp</dimen>
-    <dimen name="rounded_button_padding">8dp</dimen>
-
-
-    <!-- Widget tray -->
+<!-- Widget tray -->
     <dimen name="widget_cell_vertical_padding">8dp</dimen>
     <dimen name="widget_cell_horizontal_padding">16dp</dimen>
     <dimen name="widget_cell_font_size">14sp</dimen>
 
     <dimen name="recommended_widgets_table_vertical_padding">8dp</dimen>
-
-    <!-- Bottom margin for the search and recommended widgets container without work profile -->
-    <dimen name="search_and_recommended_widgets_container_bottom_margin">16dp</dimen>
-    <!-- Bottom margin for the search and recommended widgets container with work profile -->
-    <dimen name="search_and_recommended_widgets_container_small_bottom_margin">10dp</dimen>
 
     <dimen name="widget_list_top_bottom_corner_radius">28dp</dimen>
     <dimen name="widget_list_content_corner_radius">4dp</dimen>
@@ -163,10 +142,8 @@
     <dimen name="widget_row_padding">8dp</dimen>
     <dimen name="widget_row_divider">2dp</dimen>
 
-    <dimen name="widget_picker_education_tip_max_width">308dp</dimen>
+    <dimen name="widget_picker_education_tip_width">120dp</dimen>
     <dimen name="widget_picker_education_tip_min_margin">4dp</dimen>
-
-    <dimen name="widget_picker_view_pager_top_padding">10dp</dimen>
 
     <!-- Padding applied to shortcut previews -->
     <dimen name="shortcut_preview_padding_left">0dp</dimen>
@@ -302,7 +279,6 @@
 
 <!-- Theming related -->
     <dimen name="default_dialog_corner_radius">8dp</dimen>
-    <dimen name="dialogCornerRadius">@dimen/default_dialog_corner_radius</dimen>
 
     <!-- Onboarding bottomsheet related -->
     <dimen name="bottom_sheet_edu_padding">24dp</dimen>
@@ -317,14 +293,9 @@
     <dimen name="task_thumbnail_icon_size">0dp</dimen>
     <dimen name="task_thumbnail_icon_size_grid">0dp</dimen>
     <dimen name="overview_task_margin">0dp</dimen>
-    <dimen name="overview_actions_bottom_margin_gesture">0dp</dimen>
-    <dimen name="overview_actions_bottom_margin_three_button">0dp</dimen>
 
 <!-- Workspace grid visualization parameters -->
     <dimen name="grid_visualization_rounding_radius">22dp</dimen>
     <dimen name="grid_visualization_cell_spacing">6dp</dimen>
 
-<!-- Search results related parameters -->
-    <dimen name="search_row_icon_size">48dp</dimen>
-    <dimen name="search_row_small_icon_size">32dp</dimen>
 </resources>

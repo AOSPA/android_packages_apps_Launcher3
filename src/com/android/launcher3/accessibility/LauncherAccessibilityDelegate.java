@@ -21,6 +21,7 @@ import android.view.View.AccessibilityDelegate;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 
+import com.android.launcher3.AppWidgetResizeFrame;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.ButtonDropTarget;
 import com.android.launcher3.CellLayout;
@@ -50,7 +51,6 @@ import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.OptionsPopupView;
 import com.android.launcher3.views.OptionsPopupView.OptionItem;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
-import com.android.launcher3.widget.util.WidgetSizes;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -367,7 +367,7 @@ public class LauncherAccessibilityDelegate extends AccessibilityDelegate impleme
         }
 
         layout.markCellsAsOccupiedForView(host);
-        WidgetSizes.updateWidgetSizeRanges(((LauncherAppWidgetHostView) host), mLauncher,
+        AppWidgetResizeFrame.updateWidgetSizeRanges(((LauncherAppWidgetHostView) host), mLauncher,
                 info.spanX, info.spanY);
         host.requestLayout();
         mLauncher.getModelWriter().updateItemInDatabase(info);

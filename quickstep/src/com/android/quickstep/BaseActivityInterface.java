@@ -23,8 +23,8 @@ import static com.android.quickstep.AbsSwipeUpHandler.RECENTS_ATTACH_DURATION;
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.SysUINavigationMode.getMode;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_FADE_ANIM;
-import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_TRANSLATE_X_ANIM;
-import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_HORIZONTAL_OFFSET;
+import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_TRANSLATE_Y_ANIM;
+import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_VERTICAL_OFFSET;
 import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
 import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
 import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
@@ -52,6 +52,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
+import com.android.launcher3.taskbar.TaskbarController;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.views.ScrimView;
@@ -59,7 +60,6 @@ import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.SplitScreenBounds;
-import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -86,22 +86,12 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         mBackgroundState = backgroundState;
     }
 
-    /**
-     * Called when the current gesture transition is cancelled.
-     * @param activityVisible Whether the user can see the changes we make here, so try to animate.
-     * @param endTarget If the gesture ended before we got cancelled, where we were headed.
-     */
-    public void onTransitionCancelled(boolean activityVisible,
-            @Nullable GestureState.GestureEndTarget endTarget) {
+    public void onTransitionCancelled(boolean activityVisible) {
         ACTIVITY_TYPE activity = getCreatedActivity();
         if (activity == null) {
             return;
         }
         STATE_TYPE startState = activity.getStateManager().getRestState();
-        if (endTarget != null) {
-            // We were on our way to this state when we got canceled, end there instead.
-            startState = stateFromGestureEndTarget(endTarget);
-        }
         activity.getStateManager().goToState(startState, activityVisible);
     }
 
@@ -113,9 +103,6 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public void onSwipeUpToHomeComplete(RecentsAnimationDeviceState deviceState) {}
 
     public abstract void onAssistantVisibilityChanged(float visibility);
-
-    /** Called when one handed mode activated or deactivated. */
-    public abstract void onOneHandedModeStateChanged(boolean activated);
 
     public abstract AnimationFactory prepareRecentsUI(RecentsAnimationDeviceState deviceState,
             boolean activityVisible, Consumer<AnimatorControllerWithResistance> callback);
@@ -133,6 +120,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     @Nullable
     public DepthController getDepthController() {
+        return null;
+    }
+
+    @Nullable
+    public TaskbarController getTaskbarController() {
         return null;
     }
 
@@ -226,7 +218,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         } else {
             int taskMargin = dp.overviewTaskMarginPx;
             int proactiveRowAndMargin;
-            if (!TaskView.SHOW_PROACTIVE_ACTIONS || dp.isVerticalBarLayout()) {
+            if (dp.isVerticalBarLayout()) {
                 // In Vertical Bar Layout the proactive row doesn't have its own space, it's inside
                 // the actions row.
                 proactiveRowAndMargin = 0;
@@ -237,7 +229,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             }
             calculateTaskSizeInternal(context, dp,
                     dp.overviewTaskThumbnailTopMarginPx,
-                    proactiveRowAndMargin + getOverviewActionsHeight(context, dp),
+                    proactiveRowAndMargin + getOverviewActionsHeight(context) + taskMargin,
                     res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
                     outRect);
         }
@@ -328,16 +320,23 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         calculateTaskSizeInternal(
                 context, dp,
                 dp.overviewTaskMarginPx,
-                getOverviewActionsHeight(context, dp),
+                getOverviewActionsHeight(context) + dp.overviewTaskMarginPx,
                 dp.overviewTaskMarginPx,
                 outRect);
     }
 
     /** Gets the space that the overview actions will take, including bottom margin. */
-    private int getOverviewActionsHeight(Context context, DeviceProfile dp) {
+    public final int getOverviewActionsHeight(Context context) {
         Resources res = context.getResources();
-        return OverviewActionsView.getOverviewActionsBottomMarginPx(getMode(context), dp)
-                + OverviewActionsView.getOverviewActionsTopMarginPx(getMode(context), dp)
+        int actionsBottomMargin = 0;
+        if (getMode(context) == Mode.THREE_BUTTONS) {
+            actionsBottomMargin = res.getDimensionPixelSize(
+                    R.dimen.overview_actions_bottom_margin_three_button);
+        } else {
+            actionsBottomMargin = res.getDimensionPixelSize(
+                    R.dimen.overview_actions_bottom_margin_gesture);
+        }
+        return actionsBottomMargin
                 + res.getDimensionPixelSize(R.dimen.overview_actions_height);
     }
 
@@ -367,6 +366,13 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * Return {@link Color#TRANSPARENT} for no scrim.
      */
     protected abstract int getOverviewScrimColorForState(ACTIVITY_TYPE activity, STATE_TYPE state);
+
+    /**
+     * See {@link com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags}
+     * @param systemUiStateFlags The latest SystemUiStateFlags
+     */
+    public void onSystemUiFlagsChanged(int systemUiStateFlags) {
+    }
 
     /**
      * Returns the expected STATE_TYPE from the provided GestureEndTarget.
@@ -455,17 +461,17 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             float fromTranslation = attached ? 1 : 0;
             float toTranslation = attached ? 0 : 1;
             mActivity.getStateManager()
-                    .cancelStateElementAnimation(INDEX_RECENTS_TRANSLATE_X_ANIM);
+                    .cancelStateElementAnimation(INDEX_RECENTS_TRANSLATE_Y_ANIM);
             if (!recentsView.isShown() && animate) {
-                ADJACENT_PAGE_HORIZONTAL_OFFSET.set(recentsView, fromTranslation);
+                ADJACENT_PAGE_VERTICAL_OFFSET.set(recentsView, fromTranslation);
             } else {
-                fromTranslation = ADJACENT_PAGE_HORIZONTAL_OFFSET.get(recentsView);
+                fromTranslation = ADJACENT_PAGE_VERTICAL_OFFSET.get(recentsView);
             }
             if (!animate) {
-                ADJACENT_PAGE_HORIZONTAL_OFFSET.set(recentsView, toTranslation);
+                ADJACENT_PAGE_VERTICAL_OFFSET.set(recentsView, toTranslation);
             } else {
                 mActivity.getStateManager().createStateElementAnimation(
-                        INDEX_RECENTS_TRANSLATE_X_ANIM,
+                        INDEX_RECENTS_TRANSLATE_Y_ANIM,
                         fromTranslation, toTranslation).start();
             }
 

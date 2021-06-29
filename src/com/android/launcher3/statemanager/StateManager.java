@@ -18,7 +18,6 @@ package com.android.launcher3.statemanager;
 
 import static android.animation.ValueAnimator.areAnimatorsEnabled;
 
-import static com.android.launcher3.anim.AnimatorPlaybackController.callListenerCommandRecursively;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_ALL_ANIMATIONS;
 
 import android.animation.Animator;
@@ -515,15 +514,8 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
                 playbackController.getAnimationPlayer().cancel();
                 playbackController.dispatchOnCancel();
             } else if (currentAnimation != null) {
-                AnimatorSet anim = currentAnimation;
-                anim.setDuration(0);
-                if (!anim.isStarted()) {
-                    // If the animation is not started the listeners do not get notified,
-                    // notify manually.
-                    callListenerCommandRecursively(anim, AnimatorListener::onAnimationCancel);
-                    callListenerCommandRecursively(anim, AnimatorListener::onAnimationEnd);
-                }
-                anim.cancel();
+                currentAnimation.setDuration(0);
+                currentAnimation.cancel();
             }
 
             currentAnimation = null;

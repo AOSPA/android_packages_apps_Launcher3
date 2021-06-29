@@ -21,7 +21,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:paddingTop="@dimen/widget_picker_view_pager_top_padding"
         android:descendantFocusability="afterDescendants"
         launcher:pageIndicator="@+id/tabs">
 

@@ -319,17 +319,12 @@ public final class WellbeingModel extends BgObjectWithLooper {
 
     @WorkerThread
     private void updateActionsWithRetry(int retryCount, @Nullable String packageName) {
-        if (DEBUG || mIsInTest) {
-            Log.i(TAG,
-                    "updateActionsWithRetry(); retryCount: " + retryCount + ", package: "
-                            + packageName);
-        }
         String[] packageNames = TextUtils.isEmpty(packageName)
-                ? mContext.getSystemService(LauncherApps.class)
+                ?  mContext.getSystemService(LauncherApps.class)
                 .getActivityList(null, Process.myUserHandle()).stream()
                 .map(li -> li.getApplicationInfo().packageName).distinct()
                 .toArray(String[]::new)
-                : new String[]{packageName};
+                : new String[] { packageName };
 
         mWorkerHandler.removeCallbacksAndMessages(packageName);
         if (updateActions(packageNames)) {
@@ -340,16 +335,12 @@ public final class WellbeingModel extends BgObjectWithLooper {
             return;
         }
         mWorkerHandler.postDelayed(
-                () -> {
-                    if (DEBUG || mIsInTest) Log.i(TAG, "Retrying; attempt " + (retryCount + 1));
-                    updateActionsWithRetry(retryCount + 1, packageName);
-                },
+                () -> updateActionsWithRetry(retryCount + 1, packageName),
                 packageName, RETRY_TIMES_MS[retryCount]);
     }
 
     @WorkerThread
     private void updateAllPackages() {
-        if (DEBUG || mIsInTest) Log.i(TAG, "updateAllPackages");
         updateActionsWithRetry(0, null);
     }
 

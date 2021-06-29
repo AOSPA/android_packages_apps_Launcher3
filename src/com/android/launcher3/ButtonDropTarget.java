@@ -36,6 +36,8 @@ import android.view.accessibility.AccessibilityEvent;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
+import androidx.appcompat.content.res.AppCompatResources;
+
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragLayer;
@@ -80,8 +82,6 @@ public abstract class ButtonDropTarget extends TextView
     private boolean mAccessibleDrag;
     /** An item must be dragged at least this many pixels before this drop target is enabled. */
     private final int mDragDistanceThreshold;
-    /** The size of the drawable shown in the drop target. */
-    private final int mDrawableSize;
 
     protected CharSequence mText;
     protected ColorStateList mOriginalTextColor;
@@ -103,7 +103,6 @@ public abstract class ButtonDropTarget extends TextView
 
         Resources resources = getResources();
         mDragDistanceThreshold = resources.getDimensionPixelSize(R.dimen.drag_distanceThreshold);
-        mDrawableSize = resources.getDimensionPixelSize(R.dimen.drop_target_text_size);
     }
 
     @Override
@@ -123,9 +122,13 @@ public abstract class ButtonDropTarget extends TextView
     protected void setDrawable(int resId) {
         // We do not set the drawable in the xml as that inflates two drawables corresponding to
         // drawableLeft and drawableStart.
-        mDrawable = getContext().getDrawable(resId).mutate();
-        mDrawable.setBounds(0, 0, mDrawableSize, mDrawableSize);
-        setCompoundDrawablesRelative(mDrawable, null, null, null);
+        if (mTextVisible) {
+            setCompoundDrawablesRelativeWithIntrinsicBounds(resId, 0, 0, 0);
+            mDrawable = getCompoundDrawablesRelative()[0];
+        } else {
+            setCompoundDrawablesRelativeWithIntrinsicBounds(0, resId, 0, 0);
+            mDrawable = getCompoundDrawablesRelative()[1];
+        }
     }
 
     public void setDropTargetBar(DropTargetBar dropTargetBar) {
@@ -137,6 +140,11 @@ public abstract class ButtonDropTarget extends TextView
             mToolTip.dismiss();
             mToolTip = null;
         }
+    }
+
+    private void setBackgroundDrawable(int resId) {
+        Drawable bd = AppCompatResources.getDrawable(getContext(), resId);
+        setBackground(bd);
     }
 
     @Override
@@ -164,7 +172,7 @@ public abstract class ButtonDropTarget extends TextView
         }
 
         d.dragView.setAlpha(DRAG_VIEW_HOVER_OVER_OPACITY);
-        setSelected(true);
+        setBackgroundDrawable(R.drawable.drop_target_frame_hover);
         if (d.stateAnnouncer != null) {
             d.stateAnnouncer.cancel();
         }
@@ -182,7 +190,7 @@ public abstract class ButtonDropTarget extends TextView
 
         if (!d.dragComplete) {
             d.dragView.setAlpha(1f);
-            setSelected(false);
+            setBackgroundDrawable(R.drawable.drop_target_frame);
         } else {
             d.dragView.setAlpha(DRAG_VIEW_HOVER_OVER_OPACITY);
         }
@@ -222,7 +230,6 @@ public abstract class ButtonDropTarget extends TextView
     public void onDragEnd() {
         mActive = false;
         setOnClickListener(null);
-        setSelected(false);
     }
 
     /**
@@ -326,7 +333,11 @@ public abstract class ButtonDropTarget extends TextView
         if (mTextVisible != isVisible || !TextUtils.equals(newText, getText())) {
             mTextVisible = isVisible;
             setText(newText);
-            setCompoundDrawablesRelative(mDrawable, null, null, null);
+            if (mTextVisible) {
+                setCompoundDrawablesRelativeWithIntrinsicBounds(mDrawable, null, null, null);
+            } else {
+                setCompoundDrawablesRelativeWithIntrinsicBounds(null, mDrawable, null, null);
+            }
         }
     }
 

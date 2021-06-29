@@ -37,26 +37,22 @@ final class BackGestureTutorialController extends TutorialController {
     @Override
     public Integer getIntroductionTitle() {
         return mTutorialType == LEFT_EDGE_BACK_NAVIGATION
-                ? R.string.back_left_gesture_intro_title : R.string.back_right_gesture_intro_title;
+                ? R.string.back_gesture_intro_title : null;
     }
 
     @Override
     public Integer getIntroductionSubtitle() {
         return mTutorialType == LEFT_EDGE_BACK_NAVIGATION
-                ? R.string.back_left_gesture_intro_subtitle
-                : R.string.back_right_gesture_intro_subtitle;
+                ? R.string.back_gesture_intro_subtitle : null;
     }
 
     @Override
-    protected int getMockAppTaskThumbnailResId(boolean forDarkMode) {
+    protected int getMockAppTaskThumbnailResId() {
         return R.drawable.mock_conversation;
     }
 
     @Override
     public void onBackGestureAttempted(BackGestureResult result) {
-        if (mGestureCompleted) {
-            return;
-        }
         switch (mTutorialType) {
             case RIGHT_EDGE_BACK_NAVIGATION:
                 handleAttemptFromRight(result);
@@ -80,9 +76,9 @@ final class BackGestureTutorialController extends TutorialController {
                 hideFeedback(true);
                 mFakeTaskView.setBackground(AppCompatResources.getDrawable(mContext,
                         R.drawable.mock_conversations_list));
-                int subtitleResId = mTutorialFragment.isAtFinalStep()
+                int subtitleResId = mTutorialFragment.getNumSteps() == 1
                         ? R.string.back_gesture_feedback_complete_without_follow_up
-                        : R.string.back_gesture_feedback_complete_with_overview_follow_up;
+                        : R.string.back_gesture_feedback_complete_with_follow_up;
                 showFeedback(subtitleResId, true);
                 break;
             case BACK_CANCELLED_FROM_RIGHT:
@@ -106,10 +102,10 @@ final class BackGestureTutorialController extends TutorialController {
                 hideFeedback(true);
                 mFakeTaskView.setBackground(AppCompatResources.getDrawable(mContext,
                         R.drawable.mock_conversations_list));
-                int subtitleResId = mTutorialFragment.isAtFinalStep()
-                        ? R.string.back_gesture_feedback_complete_without_follow_up
-                        : R.string.back_gesture_feedback_complete_with_back_right_follow_up;
-                showFeedback(subtitleResId, true);
+                showFeedback(
+                        R.string.back_gesture_feedback_title_complete_left_edge,
+                        R.string.back_gesture_feedback_subtitle_complete_left_edge,
+                        () -> mTutorialFragment.changeController(RIGHT_EDGE_BACK_NAVIGATION));
                 break;
             case BACK_CANCELLED_FROM_LEFT:
                 showFeedback(R.string.back_gesture_feedback_cancelled_left_edge);
@@ -127,9 +123,6 @@ final class BackGestureTutorialController extends TutorialController {
 
     @Override
     public void onNavBarGestureAttempted(NavBarGestureResult result, PointF finalVelocity) {
-        if (mGestureCompleted) {
-            return;
-        }
         if (mTutorialType == BACK_NAVIGATION_COMPLETE) {
             if (result == NavBarGestureResult.HOME_GESTURE_COMPLETED) {
                 mTutorialFragment.closeTutorial();

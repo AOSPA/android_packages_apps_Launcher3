@@ -290,10 +290,7 @@ public class AnimatorPlaybackController implements ValueAnimator.AnimatorUpdateL
         callAnimatorCommandRecursively(mAnim, a -> a.setInterpolator(interpolator));
     }
 
-    /**
-     * Recursively calls a command on all the listeners of the provided animation
-     */
-    public static void callListenerCommandRecursively(
+    private static void callListenerCommandRecursively(
             Animator anim, BiConsumer<AnimatorListener, Animator> command) {
         callAnimatorCommandRecursively(anim, a-> {
             for (AnimatorListener l : nonNullList(a.getListeners())) {

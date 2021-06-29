@@ -27,6 +27,7 @@ import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.RemoteViews.RemoteViewOutlineProvider;
 
+import com.android.launcher3.util.Themes;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.RoundedCornerEnforcement;
 
@@ -61,8 +62,7 @@ final class FloatingWidgetBackgroundView extends View {
         setClipToOutline(true);
     }
 
-    void init(LauncherAppWidgetHostView hostView, View backgroundView, float finalRadius,
-            int fallbackBackgroundColor) {
+    void init(LauncherAppWidgetHostView hostView, View backgroundView, float finalRadius) {
         mFinalRadius = finalRadius;
         mSourceView = backgroundView;
         mInitialOutlineRadius = getOutlineRadius(hostView, backgroundView);
@@ -81,7 +81,7 @@ final class FloatingWidgetBackgroundView extends View {
             setBackground(mBackgroundProperties.mDrawable);
             mSourceView.setBackground(null);
         } else if (mOriginalForeground == null) {
-            mFallbackDrawable.setColor(fallbackBackgroundColor);
+            mFallbackDrawable.setColor(Themes.getColorBackground(backgroundView.getContext()));
             setBackground(mFallbackDrawable);
             mIsUsingFallback = true;
         }

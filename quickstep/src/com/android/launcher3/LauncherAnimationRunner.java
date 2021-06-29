@@ -152,18 +152,16 @@ public abstract class LauncherAnimationRunner implements RemoteAnimationRunnerCo
 
         @UiThread
         public void setAnimation(AnimatorSet animation, Context context) {
-            setAnimation(animation, context, null, true);
+            setAnimation(animation, context, null);
 
         }
 
         /**
          * Sets the animation to play for this app launch
-         * @param skipFirstFrame Iff true, we skip the first frame of the animation.
-         *                       We set to false when skipping first frame causes jank.
          */
         @UiThread
         public void setAnimation(AnimatorSet animation, Context context,
-                @Nullable Runnable onCompleteCallback, boolean skipFirstFrame) {
+                @Nullable Runnable onCompleteCallback) {
             if (mInitialized) {
                 throw new IllegalStateException("Animation already initialized");
             }
@@ -189,12 +187,10 @@ public abstract class LauncherAnimationRunner implements RemoteAnimationRunnerCo
                 });
                 mAnimator.start();
 
-                if (skipFirstFrame) {
-                    // Because t=0 has the app icon in its original spot, we can skip the
-                    // first frame and have the same movement one frame earlier.
-                    mAnimator.setCurrentPlayTime(
-                            Math.min(getSingleFrameMs(context), mAnimator.getTotalDuration()));
-                }
+                // Because t=0 has the app icon in its original spot, we can skip the
+                // first frame and have the same movement one frame earlier.
+                mAnimator.setCurrentPlayTime(
+                        Math.min(getSingleFrameMs(context), mAnimator.getTotalDuration()));
             }
         }
     }

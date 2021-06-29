@@ -32,7 +32,6 @@ import android.util.TypedValue;
 
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.GraphicsUtils;
 
 /**
@@ -40,8 +39,6 @@ import com.android.launcher3.icons.GraphicsUtils;
  */
 @SuppressWarnings("NewApi")
 public class Themes {
-
-    public static final String KEY_THEMED_ICONS = "themed_icons";
 
     public static int getActivityThemeRes(Context context) {
         final int colorHints;
@@ -70,13 +67,6 @@ public class Themes {
         }
     }
 
-    /**
-     * Returns true if workspace icon theming is enabled
-     */
-    public static boolean isThemedIconEnabled(Context context) {
-        return FeatureFlags.ENABLE_THEMED_ICONS.get()
-                && Utilities.getPrefs(context).getBoolean(KEY_THEMED_ICONS, false);
-    }
 
     public static String getDefaultBodyFont(Context context) {
         TypedArray ta = context.obtainStyledAttributes(android.R.style.TextAppearance_DeviceDefault,
@@ -102,7 +92,7 @@ public class Themes {
         return getAttrColor(context, android.R.attr.colorAccent);
     }
 
-    /** Returns the background color attribute. */
+    /** Returns the floating background color attribute. */
     public static int getColorBackground(Context context) {
         return getAttrColor(context, android.R.attr.colorBackground);
     }

@@ -54,7 +54,6 @@ public class AssistContentRequester {
     private final IActivityTaskManager mActivityTaskManager;
     private final String mPackageName;
     private final Executor mCallbackExecutor;
-    private final Executor mSystemInteractionExecutor;
 
     // If system loses the callback, our internal cache of original callback will also get cleared.
     private final Map<Object, Callback> mPendingCallbacks =
@@ -64,7 +63,6 @@ public class AssistContentRequester {
         mActivityTaskManager = ActivityTaskManager.getService();
         mPackageName = context.getApplicationContext().getPackageName();
         mCallbackExecutor = Executors.MAIN_EXECUTOR;
-        mSystemInteractionExecutor = Executors.UI_HELPER_EXECUTOR;
     }
 
     /**
@@ -73,16 +71,13 @@ public class AssistContentRequester {
      * @param taskId to query for the content.
      * @param callback to call when the content is available, called on the main thread.
      */
-    public void requestAssistContent(final int taskId, final Callback callback) {
-        // ActivityTaskManager interaction here is synchronous, so call off the main thread.
-        mSystemInteractionExecutor.execute(() -> {
-            try {
-                mActivityTaskManager.requestAssistDataForTask(
-                        new AssistDataReceiver(callback, this), taskId, mPackageName);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Requesting assist content failed for task: " + taskId, e);
-            }
-        });
+    public void requestAssistContent(int taskId, Callback callback) {
+        try {
+            mActivityTaskManager.requestAssistDataForTask(
+                    new AssistDataReceiver(callback, this), taskId, mPackageName);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Requesting assist content failed for task: " + taskId, e);
+        }
     }
 
     private void executeOnMainExecutor(Runnable callback) {

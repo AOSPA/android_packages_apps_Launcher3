@@ -24,7 +24,6 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Outline;
-import android.graphics.PointF;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -196,7 +195,7 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
     private void addMenuOptions(TaskView taskView) {
         mTaskName.setText(TaskUtils.getTitle(getContext(), taskView.getTask()));
         mTaskName.setOnClickListener(v -> close(true));
-        
+
         TaskOverlayFactory.getEnabledShortcuts(taskView, mActivity.getDeviceProfile())
                 .forEach(this::addMenuOption);
     }
@@ -216,7 +215,6 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
                 RecentsView recentsView = mTaskView.getRecentsView();
                 recentsView.switchToScreenshot(null,
                         () -> recentsView.finishRecentsAnimation(true /* toRecents */,
-                                false /* shouldPip */,
                                 () -> menuOption.onClick(view)));
             } else {
                 menuOption.onClick(view);
@@ -228,24 +226,18 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
     private void orientAroundTaskView(TaskView taskView) {
         PagedOrientationHandler orientationHandler = taskView.getPagedOrientationHandler();
         measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
-        float taskInsetMargin = getResources().getDimension(R.dimen.task_card_margin);
-        orientationHandler.setTaskMenuAroundTaskView(this, taskInsetMargin);
         mActivity.getDragLayer().getDescendantRectRelativeToSelf(taskView, sTempRect);
         Rect insets = mActivity.getDragLayer().getInsets();
         BaseDragLayer.LayoutParams params = (BaseDragLayer.LayoutParams) getLayoutParams();
-        int padding = getResources()
-                .getDimensionPixelSize(R.dimen.task_menu_vertical_padding);
-        params.width = orientationHandler.getTaskMenuWidth(taskView.getThumbnail()) - (2 * padding);
+        // TODO(b/186583656) Move the entire menu to the center/make smaller than thumbnail width
+        params.width = orientationHandler.getTaskMenuWidth(taskView.getThumbnail());
         // Gravity set to Left instead of Start as sTempRect.left measures Left distance not Start
         params.gravity = Gravity.LEFT;
         setLayoutParams(params);
         setScaleX(taskView.getScaleX());
         setScaleY(taskView.getScaleY());
-        orientationHandler.setTaskOptionsMenuLayoutOrientation(
+        orientationHandler.setTaskMenuLayoutOrientation(
                 mActivity.getDeviceProfile(), mOptionLayout);
-        PointF additionalInset = orientationHandler.getAdditionalInsetForTaskMenu(taskInsetMargin);
-        insets.left += additionalInset.x;
-        insets.top += additionalInset.y;
         setPosition(sTempRect.left - insets.left, sTempRect.top - insets.top, 0);
     }
 

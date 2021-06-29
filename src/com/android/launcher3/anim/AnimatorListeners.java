@@ -50,7 +50,7 @@ public class AnimatorListeners {
     public static AnimatorListener forEndCallback(Runnable callback) {
         return new AnimatorListenerAdapter() {
             @Override
-            public void onAnimationEnd(Animator animation) {
+            public void onAnimationEnd(Animator animation, boolean isReverse) {
                 callback.run();
             }
         };
@@ -74,12 +74,10 @@ public class AnimatorListeners {
         }
 
         @Override
-        public void onAnimationEnd(Animator anim) {
+        public void onAnimationEnd(Animator animation) {
             if (!mListenerCalled) {
-                mListenerCalled = true;
-                mListener.accept(anim instanceof ValueAnimator
-                        ? ((ValueAnimator) anim).getAnimatedFraction() > SUCCESS_TRANSITION_PROGRESS
-                        : true);
+                ValueAnimator anim = (ValueAnimator) animation;
+                mListener.accept(anim.getAnimatedFraction() > SUCCESS_TRANSITION_PROGRESS);
             }
         }
     }

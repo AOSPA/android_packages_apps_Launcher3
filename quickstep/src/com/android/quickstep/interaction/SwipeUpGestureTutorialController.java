@@ -72,7 +72,7 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
     private AnimatorListenerAdapter mResetTaskView = new AnimatorListenerAdapter() {
         @Override
         public void onAnimationEnd(Animator animation) {
-            mFakeHotseatView.setVisibility(View.INVISIBLE);
+            mFakeLauncherView.setVisibility(View.INVISIBLE);
             mFakeIconView.setVisibility(View.INVISIBLE);
             if (mTutorialFragment.getActivity() != null) {
                 DisplayMetrics displayMetrics =
@@ -197,7 +197,7 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
         hideFeedback(true);
         cancelRunningAnimation();
         mFakePreviousTaskView.setVisibility(View.INVISIBLE);
-        mFakeHotseatView.setVisibility(View.VISIBLE);
+        mFakeLauncherView.setVisibility(View.VISIBLE);
         mShowPreviousTasks = false;
         RectFSpringAnim rectAnim =
                 mTaskViewSwipeUpAnimation.handleSwipeUpToHome(finalVelocity);
@@ -214,7 +214,7 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
 
     @Override
     public void setNavBarGestureProgress(@Nullable Float displacement) {
-        if (mGestureCompleted) {
+        if (mHideFeedbackEndAction != null) {
             return;
         }
         if (displacement != null) {
@@ -238,7 +238,7 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
 
     @Override
     public void onMotionPaused(boolean unused) {
-        if (mGestureCompleted) {
+        if (mHideFeedbackEndAction != null) {
             return;
         }
         if (mShowTasks) {
@@ -299,7 +299,7 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
                 @Override
                 public RectF getWindowTargetRect() {
                     int fakeHomeIconSizePx = Utilities.dpToPx(60);
-                    int fakeHomeIconLeft = mFakeHotseatView.getLeft();
+                    int fakeHomeIconLeft = mFakeLauncherView.getLeft();
                     int fakeHomeIconTop = mDp.heightPx - Utilities.dpToPx(216);
                     return new RectF(fakeHomeIconLeft, fakeHomeIconTop,
                             fakeHomeIconLeft + fakeHomeIconSizePx,

@@ -22,7 +22,6 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_FOLDER;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Path;
 import android.graphics.drawable.Drawable;
 import android.util.ArrayMap;
 import android.util.AttributeSet;
@@ -50,7 +49,6 @@ import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.ViewCache;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.views.ClipPathView;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -59,7 +57,7 @@ import java.util.Map;
 import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 
-public class FolderPagedView extends PagedView<PageIndicatorDots> implements ClipPathView {
+public class FolderPagedView extends PagedView<PageIndicatorDots> {
 
     private static final String TAG = "FolderPagedView";
 
@@ -90,8 +88,6 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
     private int mGridCountY;
 
     private Folder mFolder;
-
-    private Path mClipPath;
 
     // If the views are attached to the folder or not. A folder should be bound when its
     // animating or is open.
@@ -132,16 +128,8 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        if (mClipPath != null) {
-            int count = canvas.save();
-            canvas.clipPath(mClipPath);
-            mFocusIndicatorHelper.draw(canvas);
-            super.dispatchDraw(canvas);
-            canvas.restoreToCount(count);
-        } else {
-            mFocusIndicatorHelper.draw(canvas);
-            super.dispatchDraw(canvas);
-        }
+        mFocusIndicatorHelper.draw(canvas);
+        super.dispatchDraw(canvas);
     }
 
     /**
@@ -639,11 +627,5 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
 
     public int itemsPerPage() {
         return mOrganizer.getMaxItemsPerPage();
-    }
-
-    @Override
-    public void setClipPath(Path clipPath) {
-        mClipPath = clipPath;
-        invalidate();
     }
 }

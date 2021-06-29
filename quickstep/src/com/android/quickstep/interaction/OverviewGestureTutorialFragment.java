@@ -24,10 +24,8 @@ import com.android.quickstep.interaction.TutorialController.TutorialType;
 public class OverviewGestureTutorialFragment extends TutorialFragment {
     @Nullable
     @Override
-    Integer getFeedbackVideoResId(boolean forDarkMode) {
-        return forDarkMode
-                ? R.drawable.gesture_tutorial_motion_overview_dark_mode
-                : R.drawable.gesture_tutorial_motion_overview_light_mode;
+    Integer getFeedbackVideoResId() {
+        return R.drawable.gesture_tutorial_motion_overview;
     }
 
     @Nullable

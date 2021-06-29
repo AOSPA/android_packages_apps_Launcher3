@@ -1080,10 +1080,9 @@ public class CellLayout extends ViewGroup {
             cellToRect(targetCell[0], targetCell[1], spanX, spanY, mTempRect);
 
             // Now get the rect in drag layer coordinates.
-            getBoundsForViewInDragLayer(launcher.getDragLayer(), this, mTempRect, true,
+            getBoundsForViewInDragLayer(launcher.getDragLayer(), workspace, mTempRect, false,
                     mTmpFloatArray, mTempRectF);
             Utilities.setRect(mTempRectF, mTempRect);
-
             ((LauncherAppWidgetHostView) view).handleDrag(mTempRect, pageId);
         }
     }
@@ -2595,9 +2594,7 @@ public class CellLayout extends ViewGroup {
         final int cellWidth = mCellWidth;
         final int cellHeight = mCellHeight;
 
-        // We observe a shift of 1 pixel on the x coordinate compared to the actual cell coordinates
-        final int hStartPadding = getPaddingLeft()
-                + (int) Math.ceil(getUnusedHorizontalSpace() / 2f);
+        final int hStartPadding = getPaddingLeft();
         final int vStartPadding = getPaddingTop();
 
         int x = hStartPadding + (cellX * mBorderSpacing) + (cellX * cellWidth);

@@ -40,7 +40,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.SurfaceControl.Transaction;
 import android.view.View;
-import android.window.SplashScreen;
 
 import androidx.annotation.Nullable;
 
@@ -141,7 +140,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        ACTIVITY_TRACKER.handleNewIntent(this);
+        ACTIVITY_TRACKER.handleNewIntent(this, intent);
     }
 
     /**
@@ -214,8 +213,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
             AnimatorSet anim = composeRecentsLaunchAnimator(taskView, appTargets,
                     wallpaperTargets, nonAppTargets);
             anim.addListener(resetStateListener());
-            result.setAnimation(anim, RecentsActivity.this, onEndCallback::executeAllAndDestroy,
-                    true /* skipFirstFrame */);
+            result.setAnimation(anim, RecentsActivity.this, onEndCallback::executeAllAndDestroy);
         };
 
         final LauncherAnimationRunner wrapper = new WrappedLauncherAnimationRunner<>(
@@ -224,11 +222,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                 wrapper, RECENTS_LAUNCH_DURATION,
                 RECENTS_LAUNCH_DURATION - STATUS_BAR_TRANSITION_DURATION
                         - STATUS_BAR_TRANSITION_PRE_DELAY);
-        final ActivityOptionsWrapper activityOptions = new ActivityOptionsWrapper(
+        return new ActivityOptionsWrapper(
                 ActivityOptionsCompat.makeRemoteAnimation(adapterCompat),
                 onEndCallback);
-        activityOptions.options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
-        return activityOptions;
     }
 
     /**
@@ -387,8 +383,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         anim.play(controller.getAnimationPlayer());
         anim.setDuration(HOME_APPEAR_DURATION);
         result.setAnimation(anim, this,
-                () -> getStateManager().goToState(RecentsState.HOME, false),
-                true /* skipFirstFrame */);
+                () -> getStateManager().goToState(RecentsState.HOME, false));
     }
 
     @Override

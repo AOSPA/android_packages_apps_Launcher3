@@ -15,13 +15,11 @@
  */
 package com.android.launcher3.widget.picker;
 
-import android.animation.ValueAnimator;
 import android.graphics.Point;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup.MarginLayoutParams;
 import android.widget.RelativeLayout;
-import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
@@ -34,17 +32,14 @@ import com.android.launcher3.workprofile.PersonalWorkPagedView;
  * vertical displacement upon scrolling.
  */
 final class SearchAndRecommendationsScrollController implements
-        RecyclerViewFastScroller.OnFastScrollChangeListener, ValueAnimator.AnimatorUpdateListener {
+        RecyclerViewFastScroller.OnFastScrollChangeListener {
     private final boolean mHasWorkProfile;
     private final SearchAndRecommendationViewHolder mViewHolder;
     private final View mSearchAndRecommendationViewParent;
     private final WidgetsRecyclerView mPrimaryRecyclerView;
     private final WidgetsRecyclerView mSearchRecyclerView;
-    private final TextView mNoWidgetsView;
     private final int mTabsHeight;
-    private final ValueAnimator mAnimator = ValueAnimator.ofInt(0, 0);
     private final Point mTempOffset = new Point();
-    private int mBottomInset;
 
     // The following are only non null if mHasWorkProfile is true.
     @Nullable private final WidgetsRecyclerView mWorkRecyclerView;
@@ -52,9 +47,8 @@ final class SearchAndRecommendationsScrollController implements
     @Nullable private final PersonalWorkPagedView mPrimaryWorkViewPager;
 
     private WidgetsRecyclerView mCurrentRecyclerView;
-    private int mCurrentRecyclerViewScrollY = 0;
 
-    private OnContentChangeListener mOnContentChangeListener = () -> onScrollChanged();
+    private OnContentChangeListener mOnContentChangeListener = () -> applyVerticalTransition();
 
     /**
      * The vertical distance, in pixels, until the search is pinned at the top of the screen when
@@ -84,8 +78,7 @@ final class SearchAndRecommendationsScrollController implements
             @Nullable WidgetsRecyclerView workRecyclerView,
             WidgetsRecyclerView searchRecyclerView,
             @Nullable View personalWorkTabsView,
-            @Nullable PersonalWorkPagedView primaryWorkViewPager,
-            TextView noWidgetsView) {
+            @Nullable PersonalWorkPagedView primaryWorkViewPager) {
         mHasWorkProfile = hasWorkProfile;
         mViewHolder = viewHolder;
         mViewHolder.mContainer.setSearchAndRecommendationScrollController(this);
@@ -96,35 +89,23 @@ final class SearchAndRecommendationsScrollController implements
         mPrimaryWorkTabsView = personalWorkTabsView;
         mPrimaryWorkViewPager = primaryWorkViewPager;
         mTabsHeight = tabsHeight;
-        mNoWidgetsView = noWidgetsView;
-        setCurrentRecyclerView(mPrimaryRecyclerView, /* animateReset= */ false);
-    }
-
-    public void setCurrentRecyclerView(WidgetsRecyclerView currentRecyclerView) {
-        setCurrentRecyclerView(currentRecyclerView, /* animateReset= */ true);
+        setCurrentRecyclerView(mPrimaryRecyclerView);
     }
 
     /** Sets the current active {@link WidgetsRecyclerView}. */
-    private void setCurrentRecyclerView(WidgetsRecyclerView currentRecyclerView,
-            boolean animateReset) {
-        if (mCurrentRecyclerView == currentRecyclerView) {
-            return;
-        }
+    public void setCurrentRecyclerView(WidgetsRecyclerView currentRecyclerView) {
         if (mCurrentRecyclerView != null) {
             mCurrentRecyclerView.setOnContentChangeListener(null);
         }
         mCurrentRecyclerView = currentRecyclerView;
         mCurrentRecyclerView.setOnContentChangeListener(mOnContentChangeListener);
-        reset(animateReset);
-    }
+        mViewHolder.mHeaderTitle.setTranslationY(0);
+        mViewHolder.mRecommendedWidgetsTable.setTranslationY(0);
+        mViewHolder.mSearchBar.setTranslationY(0);
 
-    /**
-     * Updates padding of {@link WidgetsFullSheet} contents to include {@code bottomInset} wherever
-     * necessary.
-     */
-    public boolean updateBottomInset(int bottomInset) {
-        mBottomInset = bottomInset;
-        return updateMarginAndPadding();
+        if (mHasWorkProfile) {
+            mPrimaryWorkTabsView.setTranslationY(0);
+        }
     }
 
     /**
@@ -139,12 +120,10 @@ final class SearchAndRecommendationsScrollController implements
         mCollapsibleHeightForRecommendation =
                 measureHeightWithVerticalMargins(mViewHolder.mHeaderTitle)
                         + measureHeightWithVerticalMargins(mViewHolder.mCollapseHandle)
-                        + measureHeightWithVerticalMargins((View) mViewHolder.mSearchBarContainer)
+                        + measureHeightWithVerticalMargins((View) mViewHolder.mSearchBar)
                         + measureHeightWithVerticalMargins(mViewHolder.mRecommendedWidgetsTable);
 
         int topContainerHeight = measureHeightWithVerticalMargins(mViewHolder.mContainer);
-        int noWidgetsViewHeight =  topContainerHeight - mBottomInset;
-
         if (mHasWorkProfile) {
             mCollapsibleHeightForTabs = measureHeightWithVerticalMargins(mViewHolder.mHeaderTitle)
                     + measureHeightWithVerticalMargins(mViewHolder.mRecommendedWidgetsTable);
@@ -196,10 +175,6 @@ final class SearchAndRecommendationsScrollController implements
             int topOffsetAfterAllViewsCollapsed =
                     topContainerHeight + mTabsHeight - mCollapsibleHeightForTabs;
 
-            if (mPrimaryWorkTabsView.getVisibility() == View.VISIBLE) {
-                noWidgetsViewHeight += mTabsHeight;
-            }
-
             RelativeLayout.LayoutParams viewPagerLayoutParams =
                     (RelativeLayout.LayoutParams) mPrimaryWorkViewPager.getLayoutParams();
             if (viewPagerLayoutParams.topMargin != topOffsetAfterAllViewsCollapsed) {
@@ -242,25 +217,11 @@ final class SearchAndRecommendationsScrollController implements
                     mSearchRecyclerView.getPaddingBottom());
             hasMarginOrPaddingUpdated = true;
         }
-        if (mNoWidgetsView.getPaddingTop() != noWidgetsViewHeight) {
-            mNoWidgetsView.setPadding(
-                    mNoWidgetsView.getPaddingLeft(),
-                    noWidgetsViewHeight,
-                    mNoWidgetsView.getPaddingRight(),
-                    mNoWidgetsView.getPaddingBottom());
-            hasMarginOrPaddingUpdated = true;
-        }
         return hasMarginOrPaddingUpdated;
     }
 
     @Override
     public void onScrollChanged() {
-        int recyclerViewYOffset = mCurrentRecyclerView.getCurrentScrollY();
-        if (recyclerViewYOffset < 0) return;
-        mCurrentRecyclerViewScrollY = recyclerViewYOffset;
-        if (mAnimator.isStarted()) {
-            mAnimator.cancel();
-        }
         applyVerticalTransition();
     }
 
@@ -269,43 +230,34 @@ final class SearchAndRecommendationsScrollController implements
      * views (e.g. recycler views, tabs) upon scrolling / content changes in the recycler view.
      */
     private void applyVerticalTransition() {
+        // Always use the recycler view offset because fast scroller offset has a different scale.
+        int recyclerViewYOffset = mCurrentRecyclerView.getCurrentScrollY();
+        if (recyclerViewYOffset < 0) return;
+
         if (mCollapsibleHeightForRecommendation > 0) {
-            int yDisplacement = Math.max(-mCurrentRecyclerViewScrollY,
+            int yDisplacement = Math.max(-recyclerViewYOffset,
                     -mCollapsibleHeightForRecommendation);
             mViewHolder.mHeaderTitle.setTranslationY(yDisplacement);
             mViewHolder.mRecommendedWidgetsTable.setTranslationY(yDisplacement);
         }
 
         if (mCollapsibleHeightForSearch > 0) {
-            int searchYDisplacement = Math.max(-mCurrentRecyclerViewScrollY,
-                    -mCollapsibleHeightForSearch);
-            mViewHolder.mSearchBarContainer.setTranslationY(searchYDisplacement);
+            int searchYDisplacement = Math.max(-recyclerViewYOffset, -mCollapsibleHeightForSearch);
+            mViewHolder.mSearchBar.setTranslationY(searchYDisplacement);
         }
 
         if (mHasWorkProfile && mCollapsibleHeightForTabs > 0) {
-            int yDisplacementForTabs = Math.max(-mCurrentRecyclerViewScrollY,
-                    -mCollapsibleHeightForTabs);
+            int yDisplacementForTabs = Math.max(-recyclerViewYOffset, -mCollapsibleHeightForTabs);
             mPrimaryWorkTabsView.setTranslationY(yDisplacementForTabs);
         }
     }
 
     /** Resets any previous view translation. */
-    public void reset(boolean animate) {
-        if (mCurrentRecyclerViewScrollY == 0) {
-            return;
-        }
-        if (mAnimator.isStarted()) {
-            mAnimator.cancel();
-        }
-
-        if (animate) {
-            mAnimator.setIntValues(mCurrentRecyclerViewScrollY, 0);
-            mAnimator.addUpdateListener(this);
-            mAnimator.setDuration(300);
-            mAnimator.start();
-        } else {
-            mCurrentRecyclerViewScrollY = 0;
-            applyVerticalTransition();
+    public void reset() {
+        mViewHolder.mHeaderTitle.setTranslationY(0);
+        mViewHolder.mSearchBar.setTranslationY(0);
+        if (mHasWorkProfile) {
+            mPrimaryWorkTabsView.setTranslationY(0);
         }
     }
 
@@ -354,12 +306,6 @@ final class SearchAndRecommendationsScrollController implements
         MarginLayoutParams marginLayoutParams = (MarginLayoutParams) view.getLayoutParams();
         return view.getMeasuredHeight() + marginLayoutParams.bottomMargin
                 + marginLayoutParams.topMargin;
-    }
-
-    @Override
-    public void onAnimationUpdate(ValueAnimator animation) {
-        mCurrentRecyclerViewScrollY = (Integer) animation.getAnimatedValue();
-        applyVerticalTransition();
     }
 
     /**

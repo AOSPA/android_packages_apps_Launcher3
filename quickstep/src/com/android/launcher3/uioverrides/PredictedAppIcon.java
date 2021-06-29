@@ -35,6 +35,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
+import com.android.launcher3.graphics.IconPalette;
 import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.launcher3.icons.LauncherIcons;
@@ -111,7 +112,8 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
     @Override
     public void applyFromWorkspaceItem(WorkspaceItemInfo info) {
         super.applyFromWorkspaceItem(info);
-        mPlateColor = ColorUtils.setAlphaComponent(mDotParams.color, 200);
+        int color = IconPalette.getMutedColor(info.bitmap.color, 0.54f);
+        mPlateColor = ColorUtils.setAlphaComponent(color, 200);
         if (mIsPinned) {
             setContentDescription(info.contentDescription);
         } else {

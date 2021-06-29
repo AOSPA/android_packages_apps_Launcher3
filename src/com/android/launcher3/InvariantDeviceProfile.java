@@ -140,10 +140,7 @@ public class InvariantDeviceProfile {
     public int defaultLayoutId;
     int demoModeLayoutId;
 
-    /**
-     * An immutable list of supported profiles.
-     */
-    public List<DeviceProfile> supportedProfiles = Collections.EMPTY_LIST;
+    public final List<DeviceProfile> supportedProfiles = new ArrayList<>();
 
     @Nullable public DevicePaddings devicePaddings;
 
@@ -325,10 +322,10 @@ public class InvariantDeviceProfile {
         // Supported overrides: numRows, numColumns, iconSize
         applyPartnerDeviceProfileOverrides(context, metrics);
 
-        final List<DeviceProfile> localSupportedProfiles = new ArrayList<>();
+        supportedProfiles.clear();
         defaultWallpaperSize = new Point(displayInfo.currentSize);
         for (WindowBounds bounds : displayInfo.supportedBounds) {
-            localSupportedProfiles.add(new DeviceProfile.Builder(context, this, displayInfo)
+            supportedProfiles.add(new DeviceProfile.Builder(context, this, displayInfo)
                     .setUseTwoPanels(isSplitDisplay)
                     .setWindowBounds(bounds).build());
 
@@ -346,7 +343,6 @@ public class InvariantDeviceProfile {
             defaultWallpaperSize.x =
                     Math.max(defaultWallpaperSize.x, Math.round(parallaxFactor * displayWidth));
         }
-        supportedProfiles = Collections.unmodifiableList(localSupportedProfiles);
 
         ComponentName cn = new ComponentName(context.getPackageName(), getClass().getName());
         defaultWidgetPadding = AppWidgetHostView.getDefaultPaddingForWidget(context, cn, null);
