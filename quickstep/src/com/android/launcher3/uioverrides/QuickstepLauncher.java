@@ -165,7 +165,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     @Override
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
         // Only pause is taskbar controller is not present
-        mHotseatPredictionController.setPauseUIUpdate(getTaskbarController() == null);
+        mHotseatPredictionController.setPauseUIUpdate(getTaskbarUIController() == null);
         return super.startActivitySafely(v, intent, item);
     }
 
@@ -192,7 +192,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     @Override
     public Stream<SystemShortcut.Factory> getSupportedShortcuts() {
         return Stream.concat(
-                super.getSupportedShortcuts(), Stream.of(mHotseatPredictionController));
+                Stream.of(mHotseatPredictionController), super.getSupportedShortcuts());
     }
 
     /**
@@ -200,14 +200,18 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
      */
     private void onStateOrResumeChanging(boolean inTransition) {
         LauncherState state = getStateManager().getState();
-        DeviceProfile profile = getDeviceProfile();
-        boolean willUserBeActive = (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
-        boolean visible = (state == NORMAL || state == OVERVIEW)
-                && (willUserBeActive || isUserActive())
-                && !profile.isVerticalBarLayout()
-                && profile.isPhone && !profile.isLandscape;
-        UiThreadHelper.runAsyncCommand(this, SET_SHELF_HEIGHT, visible ? 1 : 0,
-                profile.hotseatBarSizePx);
+        boolean started = ((getActivityFlags() & ACTIVITY_STATE_STARTED)) != 0;
+        if (started) {
+            DeviceProfile profile = getDeviceProfile();
+            boolean willUserBeActive =
+                    (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
+            boolean visible = (state == NORMAL || state == OVERVIEW)
+                    && (willUserBeActive || isUserActive())
+                    && !profile.isVerticalBarLayout()
+                    && profile.isPhone && !profile.isLandscape;
+            UiThreadHelper.runAsyncCommand(this, SET_SHELF_HEIGHT, visible ? 1 : 0,
+                    profile.hotseatBarSizePx);
+        }
         if (state == NORMAL && !inTransition) {
             ((RecentsView) getOverviewPanel()).setSwipeDownShouldLaunchApp(false);
         }
@@ -229,9 +233,9 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     @Override
     public void bindWorkspaceItemsChanged(List<WorkspaceItemInfo> updated) {
         super.bindWorkspaceItemsChanged(updated);
-        if (getTaskbarController() != null && updated.stream()
+        if (getTaskbarUIController() != null && updated.stream()
                 .filter(w -> w.container == CONTAINER_HOTSEAT).findFirst().isPresent()) {
-            getTaskbarController().onHotseatUpdated();
+            getTaskbarUIController().onHotseatUpdated();
         }
     }
 

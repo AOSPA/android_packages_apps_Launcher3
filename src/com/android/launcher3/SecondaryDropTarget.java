@@ -3,6 +3,7 @@ package com.android.launcher3;
 import static android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID;
 import static android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_RECONFIGURABLE;
 
+import static com.android.launcher3.Launcher.REQUEST_RECONFIGURE_APPWIDGET;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.DISMISS_PREDICTION;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.RECONFIGURE;
@@ -44,6 +45,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 
 import java.net.URISyntaxException;
@@ -266,7 +268,10 @@ public class SecondaryDropTarget extends ButtonDropTarget implements OnAlarmList
         if (mCurrentAccessibilityAction == RECONFIGURE) {
             int widgetId = getReconfigurableWidgetId(view);
             if (widgetId != INVALID_APPWIDGET_ID) {
-                mLauncher.getAppWidgetHost().startConfigActivity(mLauncher, widgetId, -1);
+                mLauncher.setWaitingForResult(
+                        PendingRequestArgs.forWidgetInfo(widgetId, null, info));
+                mLauncher.getAppWidgetHost().startConfigActivity(mLauncher, widgetId,
+                        REQUEST_RECONFIGURE_APPWIDGET);
             }
             return null;
         }

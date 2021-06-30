@@ -45,6 +45,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_EXIT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONRESUME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONSTOP;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGET_RECONFIGURED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_ACTIVITY_PAUSED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_DRAG_AND_DROP;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_LOADER_RUNNING;
@@ -576,6 +577,14 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         mHotseat.getQsb().setAlpha(1f - visibility);
     }
 
+    /**
+     * Called when one handed mode activated and deactivated.
+     * @param activated true if one handed mode activated, false otherwise.
+     */
+    public void onOneHandedStateChanged(boolean activated) {
+        mDragLayer.onOneHandedModeStateChanged(activated);
+    }
+
     private void initDeviceProfile(InvariantDeviceProfile idp) {
         // Load configuration-specific DeviceProfile
         mDeviceProfile = idp.getDeviceProfile(this);
@@ -675,6 +684,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 completeAddAppWidget(appWidgetId, info, null, null);
                 break;
             case REQUEST_RECONFIGURE_APPWIDGET:
+                mStatsLogManager.logger().withItemInfo(info).log(LAUNCHER_WIDGET_RECONFIGURED);
                 completeRestoreAppWidget(appWidgetId, LauncherAppWidgetInfo.RESTORE_COMPLETED);
                 break;
             case REQUEST_BIND_PENDING_APPWIDGET: {
@@ -1066,10 +1076,17 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             getRotationHelper().setCurrentStateRequest(REQUEST_NONE);
         }
 
-        if (mPrevLauncherState != state && !ALL_APPS.equals(state)
+        if (ALL_APPS.equals(mPrevLauncherState) && !ALL_APPS.equals(state)
                 // Making sure mAllAppsSessionLogId is not null to avoid double logging.
                 && mAllAppsSessionLogId != null) {
-            getStatsLogManager().logger().log(LAUNCHER_ALLAPPS_EXIT);
+            getAppsView().getSearchUiManager().resetSearch();
+            getStatsLogManager().logger()
+                    .withContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
+                            .setWorkspace(
+                                    LauncherAtom.WorkspaceContainer.newBuilder()
+                                            .setPageIndex(getWorkspace().getCurrentPage()))
+                            .build())
+                    .log(LAUNCHER_ALLAPPS_EXIT);
             mAllAppsSessionLogId = null;
         }
     }
@@ -1307,8 +1324,15 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             appWidgetInfo = mAppWidgetManager.getLauncherAppWidgetInfo(appWidgetId);
         }
 
+        if (hostView == null) {
+            // Perform actual inflation because we're live
+            hostView = mAppWidgetHost.createView(this, appWidgetId, appWidgetInfo);
+        }
+
         LauncherAppWidgetInfo launcherInfo;
-        launcherInfo = new LauncherAppWidgetInfo(appWidgetId, appWidgetInfo.provider);
+        launcherInfo =
+                new LauncherAppWidgetInfo(
+                        appWidgetId, appWidgetInfo.provider, appWidgetInfo, hostView);
         launcherInfo.spanX = itemInfo.spanX;
         launcherInfo.spanY = itemInfo.spanY;
         launcherInfo.minSpanX = itemInfo.minSpanX;
@@ -1318,10 +1342,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         getModelWriter().addItemToDatabase(launcherInfo,
                 itemInfo.container, itemInfo.screenId, itemInfo.cellX, itemInfo.cellY);
 
-        if (hostView == null) {
-            // Perform actual inflation because we're live
-            hostView = mAppWidgetHost.createView(this, appWidgetId, appWidgetInfo);
-        }
         hostView.setVisibility(View.VISIBLE);
         prepareAppWidget(hostView, launcherInfo);
         mWorkspace.addInScreen(hostView, launcherInfo);
@@ -1458,7 +1478,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         boolean shouldMoveToDefaultScreen = alreadyOnHome && isInState(NORMAL)
                 && AbstractFloatingView.getTopOpenView(this) == null;
         boolean isActionMain = Intent.ACTION_MAIN.equals(intent.getAction());
-        boolean internalStateHandled = ACTIVITY_TRACKER.handleNewIntent(this, intent);
+        boolean internalStateHandled = ACTIVITY_TRACKER.handleNewIntent(this);
         hideKeyboard();
         if (isActionMain) {
             if (!internalStateHandled) {
@@ -1939,13 +1959,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     @Override
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
-        if (isViewInTaskbar(v)) {
-            // Start the activity without the hacky workarounds below, which assume the View was
-            // clicked when Launcher was resumed and will be hidden until Launcher is re-resumed
-            // (this isn't the case for Taskbar).
-            return super.startActivitySafely(v, intent, item);
-        }
-
         if (!hasBeenResumed()) {
             // Workaround an issue where the WM launch animation is clobbered when finishing the
             // recents animation into launcher. Defer launching the activity until Launcher is
@@ -2801,7 +2814,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
      * @see LauncherState#getOverviewScaleAndOffset(Launcher)
      */
     public float[] getNormalOverviewScaleAndOffset() {
-        return new float[] {NO_SCALE, NO_OFFSET, NO_OFFSET};
+        return new float[] {NO_SCALE, NO_OFFSET};
     }
 
     /**
@@ -2855,13 +2868,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 .alpha(0f)
                 .withEndAction(() -> getRootView().removeView(crossFadeHelper))
                 .start();
-    }
-
-    /**
-     * @return Whether the View is in the same window as the Taskbar window.
-     */
-    public boolean isViewInTaskbar(View v) {
-        return false;
     }
 
     public boolean supportsAdaptiveIconAnimation(View clickedView) {

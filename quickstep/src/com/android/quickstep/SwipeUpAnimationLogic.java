@@ -129,6 +129,7 @@ public abstract class SwipeUpAnimationLogic {
     }
 
     protected abstract class HomeAnimationFactory {
+        protected float mSwipeVelocity;
 
         public @NonNull RectF getWindowTargetRect() {
             PagedOrientationHandler orientationHandler = getOrientationHandler();
@@ -152,8 +153,16 @@ public abstract class SwipeUpAnimationLogic {
 
         public abstract @NonNull AnimatorPlaybackController createActivityAnimationToHome();
 
+        public void setSwipeVelocity(float velocity) {
+            mSwipeVelocity = velocity;
+        }
+
         public void playAtomicAnimation(float velocity) {
             // No-op
+        }
+
+        public boolean shouldPlayAtomicWorkspaceReveal() {
+            return true;
         }
 
         public void setAnimation(RectFSpringAnim anim) { }
@@ -171,6 +180,24 @@ public abstract class SwipeUpAnimationLogic {
          */
         public boolean supportSwipePipToHome() {
             return false;
+        }
+
+        /**
+         * @param progress The progress of the animation to the home screen.
+         * @return The current alpha to set on the animating app window.
+         */
+        protected float getWindowAlpha(float progress) {
+            // Alpha interpolates between [1, 0] between progress values [start, end]
+            final float start = 0f;
+            final float end = 0.85f;
+
+            if (progress <= start) {
+                return 1f;
+            }
+            if (progress >= end) {
+                return 0f;
+            }
+            return Utilities.mapToRange(progress, start, end, 1, 0, ACCEL_1_5);
         }
     }
 
@@ -227,24 +254,6 @@ public abstract class SwipeUpAnimationLogic {
         return anim;
     }
 
-    /**
-     * @param progress The progress of the animation to the home screen.
-     * @return The current alpha to set on the animating app window.
-     */
-    protected float getWindowAlpha(float progress) {
-        // Alpha interpolates between [1, 0] between progress values [start, end]
-        final float start = 0f;
-        final float end = 0.85f;
-
-        if (progress <= start) {
-            return 1f;
-        }
-        if (progress >= end) {
-            return 0f;
-        }
-        return Utilities.mapToRange(progress, start, end, 1, 0, ACCEL_1_5);
-    }
-
     protected class SpringAnimationRunner extends AnimationSuccessListener
             implements RectFSpringAnim.OnUpdateListener, BuilderProxy {
 
@@ -283,7 +292,7 @@ public abstract class SwipeUpAnimationLogic {
 
             mMatrix.setRectToRect(mCropRectF, mWindowCurrentRect, ScaleToFit.FILL);
             float cornerRadius = Utilities.mapRange(progress, mStartRadius, mEndRadius);
-            float alpha = getWindowAlpha(progress);
+            float alpha = mAnimationFactory.getWindowAlpha(progress);
             if (config != null && PROTOTYPE_APP_CLOSE.get()) {
                 alpha = config.getWindowAlpha();
                 cornerRadius = config.getCornerRadius();

@@ -17,7 +17,6 @@
 package com.android.launcher3.folder;
 
 import static android.text.TextUtils.isEmpty;
-import static android.view.WindowInsetsAnimation.Callback.DISPATCH_MODE_STOP;
 
 import static com.android.launcher3.LauncherAnimUtils.SPRING_LOADED_EXIT_DELAY;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -30,7 +29,6 @@ import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.appwidget.AppWidgetHostView;
 import android.content.Context;
@@ -38,16 +36,14 @@ import android.graphics.Canvas;
 import android.graphics.Insets;
 import android.graphics.Path;
 import android.graphics.Rect;
-import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.os.Build;
 import android.text.InputType;
 import android.text.Selection;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Pair;
-import android.util.SparseIntArray;
 import android.util.TypedValue;
 import android.view.FocusFinder;
 import android.view.KeyEvent;
@@ -56,15 +52,13 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewDebug;
 import android.view.WindowInsets;
-import android.view.WindowInsetsAnimation;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.AnimationUtils;
 import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
+import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Alarm;
@@ -84,6 +78,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace.ItemOperator;
 import com.android.launcher3.accessibility.AccessibleDragListenerAdapter;
 import com.android.launcher3.accessibility.FolderAccessibilityHelper;
+import com.android.launcher3.anim.KeyboardInsetAnimationCallback;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragController.DragListener;
@@ -99,12 +94,10 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pageindicators.PageIndicatorDots;
 import com.android.launcher3.util.Executors;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.views.ClipPathView;
-import com.android.launcher3.widget.LocalColorExtractor;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
 import java.util.ArrayList;
@@ -157,7 +150,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     private static final float ICON_OVERSCROLL_WIDTH_FACTOR = 0.45f;
 
     private static final int FOLDER_NAME_ANIMATION_DURATION = 633;
-    private static final int FOLDER_COLOR_ANIMATION_DURATION = 150;
+    private static final int FOLDER_COLOR_ANIMATION_DURATION = 200;
 
     private static final int REORDER_DELAY = 250;
     private static final int ON_EXIT_CLOSE_DELAY = 400;
@@ -167,9 +160,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     private final Alarm mReorderAlarm = new Alarm();
     private final Alarm mOnExitAlarm = new Alarm();
     private final Alarm mOnScrollHintAlarm = new Alarm();
-    @Thunk final Alarm mScrollPauseAlarm = new Alarm();
+    final Alarm mScrollPauseAlarm = new Alarm();
 
-    @Thunk final ArrayList<View> mItemsInReadingOrder = new ArrayList<View>();
+    final ArrayList<View> mItemsInReadingOrder = new ArrayList<View>();
 
     private AnimatorSet mCurrentAnimator;
     private boolean mIsAnimatingClosed = false;
@@ -185,9 +178,11 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     private CharSequence mFromTitle;
     private FromState mFromLabelState;
 
-    @Thunk FolderIcon mFolderIcon;
+    @Thunk
+    FolderIcon mFolderIcon;
 
-    @Thunk FolderPagedView mContent;
+    @Thunk
+    FolderPagedView mContent;
     public FolderNameEditText mFolderName;
     private PageIndicatorDots mPageIndicator;
 
@@ -195,7 +190,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     private int mFooterHeight;
 
     // Cell ranks used for drag and drop
-    @Thunk int mTargetRank, mPrevTargetRank, mEmptyCellRank;
+    @Thunk
+    int mTargetRank, mPrevTargetRank, mEmptyCellRank;
 
     private Path mClipPath;
 
@@ -206,7 +202,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
                     @ViewDebug.IntToString(from = STATE_ANIMATING, to = "STATE_ANIMATING"),
                     @ViewDebug.IntToString(from = STATE_OPEN, to = "STATE_OPEN"),
             })
-    @Thunk int mState = STATE_NONE;
+    @Thunk
+    int mState = STATE_NONE;
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mRearrangeOnClose = false;
     boolean mItemsInvalidated = false;
@@ -224,29 +221,23 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     // Folder scrolling
     private int mScrollAreaOffset;
 
-    @Thunk int mScrollHintDir = SCROLL_NONE;
-    @Thunk int mCurrentScrollDir = SCROLL_NONE;
+    @Thunk
+    int mScrollHintDir = SCROLL_NONE;
+    @Thunk
+    int mCurrentScrollDir = SCROLL_NONE;
 
     private StatsLogManager mStatsLogManager;
 
-    @Nullable private FolderWindowInsetsAnimationCallback mFolderWindowInsetsAnimationCallback;
+    @Nullable
+    private KeyboardInsetAnimationCallback mKeyboardInsetAnimationCallback;
 
-    // Wallpaper local color extraction
-    @Nullable private LocalColorExtractor mColorExtractor;
-    @Nullable private LocalColorExtractor.Listener mColorListener;
-
-    // For simplicity, we start the color change only after the open animation has started.
-    private Runnable mColorChangeRunnable;
-    private Animator mColorChangeAnimator;
-    // The background color animator used in the folder open animation. We keep a reference to this,
-    // so that we can cancel it when starting mColorChangeAnimator.
-    private ObjectAnimator mOpenAnimationColorChangeAnimator;
+    private GradientDrawable mBackground;
 
     /**
      * Used to inflate the Workspace from XML.
      *
      * @param context The application's context.
-     * @param attrs The attributes set containing the Workspace's customization values.
+     * @param attrs   The attributes set containing the Workspace's customization values.
      */
     public Folder(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -258,8 +249,15 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         mStatsLogManager = StatsLogManager.newInstance(context);
         // We need this view to be focusable in touch mode so that when text editing of the folder
         // name is complete, we have something to focus on, thus hiding the cursor and giving
-        // reliable behavior when clicking the text field (since it will always gain focus on click).
+        // reliable behavior when clicking the text field (since it will always gain focus on
+        // click).
         setFocusableInTouchMode(true);
+
+    }
+
+    @Override
+    public Drawable getBackground() {
+        return mBackground;
     }
 
     @Override
@@ -267,6 +265,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         super.onFinishInflate();
         final DeviceProfile dp = mActivityContext.getDeviceProfile();
         final int paddingLeftRight = dp.folderContentPaddingLeftRight;
+
+        mBackground = (GradientDrawable) ResourcesCompat.getDrawable(getResources(),
+                R.drawable.round_rect_folder, getContext().getTheme());
 
         mContent = findViewById(R.id.folder_content);
         mContent.setPadding(paddingLeftRight, dp.folderContentPaddingTop, paddingLeftRight, 0);
@@ -289,51 +290,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         mFooterHeight = getResources().getDimensionPixelSize(R.dimen.folder_label_height);
 
         if (Utilities.ATLEAST_R) {
-            mFolderWindowInsetsAnimationCallback =
-                    new FolderWindowInsetsAnimationCallback(DISPATCH_MODE_STOP, this);
-
-            setWindowInsetsAnimationCallback(mFolderWindowInsetsAnimationCallback);
-        }
-
-        if (Utilities.ATLEAST_S) {
-            mColorExtractionIndex = LocalColorExtractor.getColorIndex(
-                    !Themes.getAttrBoolean(getContext(), R.attr.isFolderDarkText));
-            mColorExtractor = LocalColorExtractor.newInstance(getContext());
-            mColorListener = (RectF rect, SparseIntArray extractedColors) -> {
-                mColorChangeRunnable = () -> {
-                    mColorChangeRunnable = null;
-                    int duration = FOLDER_COLOR_ANIMATION_DURATION;
-
-                    // Cancel the open animation color change animator.
-                    ObjectAnimator existingAnim = mOpenAnimationColorChangeAnimator;
-                    if (existingAnim != null && existingAnim.isRunning()) {
-                        duration = (int) Math.max(FOLDER_COLOR_ANIMATION_DURATION,
-                                existingAnim.getDuration() * (1f - existingAnim.getDuration()));
-                        existingAnim.cancel();
-                        mOpenAnimationColorChangeAnimator = null;
-                    }
-
-                    // Start a new animator to the extracted color.
-                    int newColor = extractedColors.get(mColorExtractionIndex);
-                    GradientDrawable bg = (GradientDrawable) getBackground();
-                    mColorChangeAnimator = ObjectAnimator.ofArgb(bg, "color",
-                            bg.getColor().getDefaultColor(), newColor).setDuration(duration);
-                    mColorChangeAnimator.addListener(new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            mColorChangeAnimator = null;
-                        }
-                    });
-                    mColorChangeAnimator.start();
-                };
-
-                // If the folder open animation has started, we can start the color change now.
-                // Otherwise we wait for it to start.
-                if (mOpenAnimationColorChangeAnimator != null
-                        && mOpenAnimationColorChangeAnimator.isStarted()) {
-                    post(mColorChangeRunnable);
-                }
-            };
+            mKeyboardInsetAnimationCallback = new KeyboardInsetAnimationCallback(this);
+            setWindowInsetsAnimationCallback(mKeyboardInsetAnimationCallback);
         }
     }
 
@@ -355,14 +313,14 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             if (options.isAccessibleDrag) {
                 mDragController.addDragListener(new AccessibleDragListenerAdapter(
                         mContent, FolderAccessibilityHelper::new) {
-                            @Override
-                            protected void enableAccessibleDrag(boolean enable) {
-                                super.enableAccessibleDrag(enable);
-                                mFooter.setImportantForAccessibility(enable
-                                        ? IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                                        : IMPORTANT_FOR_ACCESSIBILITY_AUTO);
-                            }
-                        });
+                    @Override
+                    protected void enableAccessibleDrag(boolean enable) {
+                        super.enableAccessibleDrag(enable);
+                        mFooter.setImportantForAccessibility(enable
+                                ? IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                                : IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+                    }
+                });
             }
 
             mLauncherDelegate.beginDragShared(v, this, options);
@@ -583,7 +541,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
      *
      * @param activityContext The main ActivityContext in which to inflate this Folder. It must also
      *                        be an instance or ContextWrapper around the Launcher activity context.
-     *
      * @return A new UserFolder.
      */
     @SuppressLint("InflateParams")
@@ -705,7 +662,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         }
 
         mContent.completePendingPageChanges();
-        mContent.snapToPageImmediately(pageNo);
+        mContent.setCurrentPage(pageNo);
 
         // This is set to true in close(), but isn't reset to false until onDropCompleted(). This
         // leads to an inconsistent state if you drag out of the folder and drag back in without
@@ -715,16 +672,13 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         cancelRunningAnimations();
         FolderAnimationManager fam = new FolderAnimationManager(this, true /* isOpening */);
         AnimatorSet anim = fam.getAnimator();
-        mOpenAnimationColorChangeAnimator = fam.getBgColorAnimator();
         anim.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
                 mFolderIcon.setIconVisible(false);
                 mFolderIcon.drawLeaveBehindIfExists();
-                if (mColorChangeRunnable != null) {
-                    mColorChangeRunnable.run();
-                }
             }
+
             @Override
             public void onAnimationEnd(Animator animation) {
                 mState = STATE_OPEN;
@@ -739,7 +693,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             int footerWidth = mContent.getDesiredWidth()
                     - mFooter.getPaddingLeft() - mFooter.getPaddingRight();
 
-            float textWidth =  mFolderName.getPaint().measureText(mFolderName.getText().toString());
+            float textWidth = mFolderName.getPaint().measureText(mFolderName.getText().toString());
             float translation = (footerWidth - textWidth) / 2;
             mFolderName.setTranslationX(mContent.mIsRtl ? -translation : translation);
             mPageIndicator.prepareEntryAnimation();
@@ -753,9 +707,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
                 @Override
                 public void onAnimationEnd(Animator animation) {
                     mFolderName.animate().setDuration(FOLDER_NAME_ANIMATION_DURATION)
-                        .translationX(0)
-                        .setInterpolator(AnimationUtils.loadInterpolator(
-                                getContext(), android.R.interpolator.fast_out_slow_in));
+                            .translationX(0)
+                            .setInterpolator(AnimationUtils.loadInterpolator(
+                                    getContext(), android.R.interpolator.fast_out_slow_in));
                     mPageIndicator.playEntryAnimation();
 
                     if (updateAnimationFlag) {
@@ -819,9 +773,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         if (mCurrentAnimator != null && mCurrentAnimator.isRunning()) {
             mCurrentAnimator.cancel();
         }
-        if (mColorChangeAnimator != null && mColorChangeAnimator.isRunning()) {
-            mColorChangeAnimator.cancel();
-        }
     }
 
     private void animateClosed() {
@@ -845,8 +796,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
             @Override
             public void onAnimationEnd(Animator animation) {
-                if (Utilities.ATLEAST_R && mFolderWindowInsetsAnimationCallback != null) {
-                    setWindowInsetsAnimationCallback(mFolderWindowInsetsAnimationCallback);
+                if (Utilities.ATLEAST_R && mKeyboardInsetAnimationCallback != null) {
+                    setWindowInsetsAnimationCallback(mKeyboardInsetAnimationCallback);
                 }
                 closeComplete(true);
                 announceAccessibilityChanges();
@@ -907,19 +858,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         clearDragInfo();
         mState = STATE_SMALL;
         mContent.setCurrentPage(0);
-
-        mOpenAnimationColorChangeAnimator = null;
-        mColorChangeRunnable = null;
-        if (mColorChangeAnimator != null) {
-            mColorChangeAnimator.cancel();
-            mColorChangeAnimator = null;
-        }
-        if (mColorExtractor != null) {
-            mColorExtractor.removeLocations();
-            mColorExtractor.setListener(null);
-        }
-        GradientDrawable bg = (GradientDrawable) getBackground();
-        bg.setColor(Themes.getAttrColor(getContext(), R.attr.folderFillColor));
     }
 
     @Override
@@ -1173,7 +1111,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         sTempRect.set(mActivityContext.getFolderBoundingBox());
         int left = Utilities.boundToRange(centeredLeft, sTempRect.left, sTempRect.right - width);
         int top = Utilities.boundToRange(centeredTop, sTempRect.top, sTempRect.bottom - height);
-        int[] inOutPosition = new int[] {left, top};
+        int[] inOutPosition = new int[]{left, top};
         mActivityContext.updateOpenFolderPosition(inOutPosition, sTempRect, width, height);
         left = inOutPosition[0];
         top = inOutPosition[1];
@@ -1188,11 +1126,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         lp.x = left;
         lp.y = top;
 
-        if (mColorExtractor != null) {
-            mColorExtractor.removeLocations();
-            mColorExtractor.setListener(mColorListener);
-            mLauncherDelegate.addRectForColorExtraction(lp, mColorExtractor);
-        }
+        mBackground.setBounds(0, 0, width, height);
     }
 
     protected int getContentAreaHeight() {
@@ -1261,7 +1195,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         return mInfo.contents.size();
     }
 
-    @Thunk void replaceFolderWithFinalItem() {
+    void replaceFolderWithFinalItem() {
         mLauncherDelegate.replaceFolderWithFinalItem(this);
         mDestroyed = true;
     }
@@ -1420,6 +1354,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             v.setVisibility(INVISIBLE);
         }
     }
+
     public void showItem(WorkspaceItemInfo info) {
         View v = getViewForInfo(info);
         if (v != null) {
@@ -1689,14 +1624,16 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     }
 
     @Override
-    public void draw(Canvas canvas) {
+    protected void dispatchDraw(Canvas canvas) {
         if (mClipPath != null) {
             int count = canvas.save();
             canvas.clipPath(mClipPath);
-            super.draw(canvas);
+            mBackground.draw(canvas);
             canvas.restoreToCount(count);
+            super.dispatchDraw(canvas);
         } else {
-            super.draw(canvas);
+            mBackground.draw(canvas);
+            super.dispatchDraw(canvas);
         }
     }
 
@@ -1711,56 +1648,5 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         int windowBottomPx = mActivityContext.getDeviceProfile().heightPx;
 
         return windowBottomPx - folderBottomPx;
-    }
-
-    /** Callback that animates a folder sliding up above the ime. */
-    @RequiresApi(api = Build.VERSION_CODES.R)
-    private static class FolderWindowInsetsAnimationCallback
-            extends WindowInsetsAnimation.Callback {
-
-        private final Folder mFolder;
-        float mFolderTranslationStart;
-        float mFolderTranslationEnd;
-
-        FolderWindowInsetsAnimationCallback(int dispatchMode, Folder folder) {
-            super(dispatchMode);
-
-            mFolder = folder;
-        }
-
-        @Override
-        public void onPrepare(@NonNull WindowInsetsAnimation animation) {
-            mFolderTranslationStart = mFolder.getTranslationY();
-        }
-
-        @NonNull
-        @Override
-        public WindowInsetsAnimation.Bounds onStart(
-                @NonNull WindowInsetsAnimation animation,
-                @NonNull WindowInsetsAnimation.Bounds bounds) {
-            mFolderTranslationEnd = mFolder.getTranslationY();
-
-            mFolder.setTranslationY(mFolderTranslationStart);
-
-            return super.onStart(animation, bounds);
-        }
-
-        @NonNull
-        @Override
-        public WindowInsets onProgress(@NonNull WindowInsets windowInsets,
-                @NonNull List<WindowInsetsAnimation> list) {
-            if (list.size() == 0) {
-                mFolder.setTranslationY(0);
-
-                return windowInsets;
-            }
-            float progress = list.get(0).getInterpolatedFraction();
-
-            mFolder.setTranslationY(
-                    Utilities.mapRange(progress, mFolderTranslationStart, mFolderTranslationEnd));
-
-            return windowInsets;
-        }
-
     }
 }

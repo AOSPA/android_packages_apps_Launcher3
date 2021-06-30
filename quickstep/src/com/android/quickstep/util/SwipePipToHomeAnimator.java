@@ -20,49 +20,48 @@ import static com.android.systemui.shared.system.InteractionJankMonitorWrapper.C
 
 import android.animation.Animator;
 import android.animation.RectEvaluator;
-import android.animation.ValueAnimator;
 import android.content.ComponentName;
+import android.content.Context;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceControl;
+import android.view.SurfaceSession;
 import android.view.View;
 import android.window.PictureInPictureSurfaceTransaction;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
+import com.android.launcher3.anim.Interpolators;
+import com.android.launcher3.util.Themes;
 import com.android.systemui.shared.pip.PipSurfaceTransactionHelper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
 /**
- * An {@link Animator} that animates an Activity to PiP (picture-in-picture) window when
- * swiping up (in gesture navigation mode). Note that this class is derived from
- * {@link com.android.wm.shell.pip.PipAnimationController.PipTransitionAnimator}.
- *
- * TODO: consider sharing this class including the animator and leash operations between
- * Launcher and SysUI. Also, there should be one source of truth for the corner radius of the
- * PiP window, which would ideally be on SysUI side as well.
+ * Subclass of {@link RectFSpringAnim} that animates an Activity to PiP (picture-in-picture) window
+ * when swiping up (in gesture navigation mode).
  */
-public class SwipePipToHomeAnimator extends ValueAnimator {
+public class SwipePipToHomeAnimator extends RectFSpringAnim {
     private static final String TAG = SwipePipToHomeAnimator.class.getSimpleName();
 
-    public static final float FRACTION_START = 0f;
-    public static final float FRACTION_END = 1f;
+    private static final float END_PROGRESS = 1.0f;
 
     private final int mTaskId;
     private final ComponentName mComponentName;
     private final SurfaceControl mLeash;
     private final Rect mAppBounds = new Rect();
     private final Rect mStartBounds = new Rect();
+    private final Rect mCurrentBounds = new Rect();
     private final Rect mDestinationBounds = new Rect();
     private final PipSurfaceTransactionHelper mSurfaceTransactionHelper;
 
-    /** for calculating the transform in {@link #onAnimationUpdate(ValueAnimator)} */
-    private final RectEvaluator mRectEvaluator = new RectEvaluator(new Rect());
+    /** for calculating transform in {@link #onAnimationUpdate(AppCloseConfig, RectF, float)} */
     private final RectEvaluator mInsetsEvaluator = new RectEvaluator(new Rect());
     private final Rect mSourceHintRectInsets;
     private final Rect mSourceInsets = new Rect();
@@ -79,6 +78,13 @@ public class SwipePipToHomeAnimator extends ValueAnimator {
     private boolean mHasAnimationEnded;
 
     /**
+     * An overlay used to mask changes in content when entering PiP for apps that aren't seamless.
+     */
+    @Nullable
+    private SurfaceControl mContentOverlay;
+
+    /**
+     * @param context {@link Context} provides Launcher resources
      * @param taskId Task id associated with this animator, see also {@link #getTaskId()}
      * @param componentName Component associated with this animator,
      *                      see also {@link #getComponentName()}
@@ -91,27 +97,65 @@ public class SwipePipToHomeAnimator extends ValueAnimator {
      * @param destinationBounds Bounds of the destination this animator ends to
      * @param cornerRadius Corner radius in pixel value for PiP window
      */
-    public SwipePipToHomeAnimator(int taskId,
+    public SwipePipToHomeAnimator(@NonNull Context context,
+            int taskId,
             @NonNull ComponentName componentName,
             @NonNull SurfaceControl leash,
             @Nullable Rect sourceRectHint,
             @NonNull Rect appBounds,
-            @NonNull Rect startBounds,
+            @NonNull RectF startBounds,
             @NonNull Rect destinationBounds,
             int cornerRadius,
             @NonNull View view) {
+        super(startBounds, new RectF(destinationBounds), context);
         mTaskId = taskId;
         mComponentName = componentName;
         mLeash = leash;
         mAppBounds.set(appBounds);
-        mStartBounds.set(startBounds);
+        startBounds.round(mStartBounds);
         mDestinationBounds.set(destinationBounds);
         mDestinationBoundsTransformed.set(mDestinationBounds);
         mDestinationBoundsAnimation.set(mDestinationBounds);
         mSurfaceTransactionHelper = new PipSurfaceTransactionHelper(cornerRadius);
 
+        if (sourceRectHint != null && (sourceRectHint.width() < destinationBounds.width()
+                || sourceRectHint.height() < destinationBounds.height())) {
+            // This is a situation in which the source hint rect on at least one axis is smaller
+            // than the destination bounds, which presents a problem because we would have to scale
+            // up that axis to fit the bounds. So instead, just fallback to the non-source hint
+            // animation in this case.
+            sourceRectHint = null;
+        }
+
         if (sourceRectHint == null) {
             mSourceHintRectInsets = null;
+
+            // Create a new overlay layer
+            SurfaceSession session = new SurfaceSession();
+            mContentOverlay = new SurfaceControl.Builder(session)
+                    .setCallsite("SwipePipToHomeAnimator")
+                    .setName("PipContentOverlay")
+                    .setColorLayer()
+                    .build();
+            SurfaceControl.Transaction t = new SurfaceControl.Transaction();
+            t.show(mContentOverlay);
+            t.setLayer(mContentOverlay, Integer.MAX_VALUE);
+            int color = Themes.getColorBackground(view.getContext());
+            float[] bgColor = new float[] {Color.red(color) / 255f, Color.green(color) / 255f,
+                    Color.blue(color) / 255f};
+            t.setColor(mContentOverlay, bgColor);
+            t.setAlpha(mContentOverlay, 0f);
+            t.reparent(mContentOverlay, mLeash);
+            t.apply();
+
+            addOnUpdateListener((values, currentRect, progress) -> {
+                float alpha = progress < 0.5f
+                        ? 0
+                        : Utilities.mapToRange(Math.min(progress, 1f), 0.5f, 1f,
+                                0f, 1f, Interpolators.FAST_OUT_SLOW_IN);
+                t.setAlpha(mContentOverlay, alpha);
+                t.apply();
+            });
         } else {
             mSourceHintRectInsets = new Rect(sourceRectHint.left - appBounds.left,
                     sourceRectHint.top - appBounds.top,
@@ -119,7 +163,7 @@ public class SwipePipToHomeAnimator extends ValueAnimator {
                     appBounds.bottom - sourceRectHint.bottom);
         }
 
-        addListener(new AnimationSuccessListener() {
+        addAnimatorListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {
                 InteractionJankMonitorWrapper.begin(view, CUJ_APP_CLOSE_TO_PIP);
@@ -144,7 +188,7 @@ public class SwipePipToHomeAnimator extends ValueAnimator {
                 mHasAnimationEnded = true;
             }
         });
-        addUpdateListener(this::onAnimationUpdate);
+        addOnUpdateListener(this::onAnimationUpdate);
     }
 
     /** sets the from rotation if it's different from the target rotation. */
@@ -172,34 +216,34 @@ public class SwipePipToHomeAnimator extends ValueAnimator {
                 mAppBounds.top + mDestinationBounds.height());
     }
 
-    private void onAnimationUpdate(ValueAnimator animator) {
+    private void onAnimationUpdate(@Nullable AppCloseConfig values, RectF currentRect,
+            float progress) {
         if (mHasAnimationEnded) return;
         final SurfaceControl.Transaction tx =
                 PipSurfaceTransactionHelper.newSurfaceControlTransaction();
-        onAnimationUpdate(tx, animator.getAnimatedFraction());
+        onAnimationUpdate(tx, currentRect, progress);
         tx.apply();
     }
 
     private PictureInPictureSurfaceTransaction onAnimationUpdate(SurfaceControl.Transaction tx,
-            float fraction) {
-        final Rect bounds = mRectEvaluator.evaluate(fraction, mStartBounds,
-                mDestinationBoundsAnimation);
+            RectF currentRect, float progress) {
+        currentRect.round(mCurrentBounds);
         final PictureInPictureSurfaceTransaction op;
         if (mSourceHintRectInsets == null) {
             // no source rect hint been set, directly scale the window down
-            op = onAnimationScale(fraction, tx, bounds);
+            op = onAnimationScale(progress, tx, mCurrentBounds);
         } else {
             // scale and crop according to the source rect hint
-            op = onAnimationScaleAndCrop(fraction, tx, bounds);
+            op = onAnimationScaleAndCrop(progress, tx, mCurrentBounds);
         }
         return op;
     }
 
     /** scale the window directly with no source rect hint being set */
     private PictureInPictureSurfaceTransaction onAnimationScale(
-            float fraction, SurfaceControl.Transaction tx, Rect bounds) {
+            float progress, SurfaceControl.Transaction tx, Rect bounds) {
         if (mFromRotation == Surface.ROTATION_90 || mFromRotation == Surface.ROTATION_270) {
-            final RotatedPosition rotatedPosition = getRotatedPosition(fraction);
+            final RotatedPosition rotatedPosition = getRotatedPosition(progress);
             return mSurfaceTransactionHelper.scale(tx, mLeash, mAppBounds, bounds,
                     rotatedPosition.degree, rotatedPosition.positionX, rotatedPosition.positionY);
         } else {
@@ -209,12 +253,12 @@ public class SwipePipToHomeAnimator extends ValueAnimator {
 
     /** scale and crop the window with source rect hint */
     private PictureInPictureSurfaceTransaction onAnimationScaleAndCrop(
-            float fraction, SurfaceControl.Transaction tx,
+            float progress, SurfaceControl.Transaction tx,
             Rect bounds) {
-        final Rect insets = mInsetsEvaluator.evaluate(fraction, mSourceInsets,
+        final Rect insets = mInsetsEvaluator.evaluate(progress, mSourceInsets,
                 mSourceHintRectInsets);
         if (mFromRotation == Surface.ROTATION_90 || mFromRotation == Surface.ROTATION_270) {
-            final RotatedPosition rotatedPosition = getRotatedPosition(fraction);
+            final RotatedPosition rotatedPosition = getRotatedPosition(progress);
             return mSurfaceTransactionHelper.scaleAndRotate(tx, mLeash, mAppBounds, bounds, insets,
                     rotatedPosition.degree, rotatedPosition.positionX, rotatedPosition.positionY);
         } else {
@@ -234,28 +278,33 @@ public class SwipePipToHomeAnimator extends ValueAnimator {
         return mDestinationBounds;
     }
 
+    @Nullable
+    public SurfaceControl getContentOverlay() {
+        return mContentOverlay;
+    }
+
     /** @return {@link PictureInPictureSurfaceTransaction} for the final leash transaction. */
     public PictureInPictureSurfaceTransaction getFinishTransaction() {
         // get the final leash operations but do not apply to the leash.
         final SurfaceControl.Transaction tx =
                 PipSurfaceTransactionHelper.newSurfaceControlTransaction();
-        return onAnimationUpdate(tx, FRACTION_END);
+        return onAnimationUpdate(tx, new RectF(mDestinationBounds), END_PROGRESS);
     }
 
-    private RotatedPosition getRotatedPosition(float fraction) {
+    private RotatedPosition getRotatedPosition(float progress) {
         final float degree, positionX, positionY;
         if (mFromRotation == Surface.ROTATION_90) {
-            degree = -90 * fraction;
-            positionX = fraction * (mDestinationBoundsTransformed.left - mAppBounds.left)
-                    + mAppBounds.left;
-            positionY = fraction * (mDestinationBoundsTransformed.bottom - mAppBounds.top)
-                    + mAppBounds.top;
+            degree = -90 * progress;
+            positionX = progress * (mDestinationBoundsTransformed.left - mStartBounds.left)
+                    + mStartBounds.left;
+            positionY = progress * (mDestinationBoundsTransformed.bottom - mStartBounds.top)
+                    + mStartBounds.top;
         } else {
-            degree = 90 * fraction;
-            positionX = fraction * (mDestinationBoundsTransformed.right - mAppBounds.left)
-                    + mAppBounds.left;
-            positionY = fraction * (mDestinationBoundsTransformed.top - mAppBounds.top)
-                    + mAppBounds.top;
+            degree = 90 * progress;
+            positionX = progress * (mDestinationBoundsTransformed.right - mStartBounds.left)
+                    + mStartBounds.left;
+            positionY = progress * (mDestinationBoundsTransformed.top - mStartBounds.top)
+                    + mStartBounds.top;
         }
         return new RotatedPosition(degree, positionX, positionY);
     }

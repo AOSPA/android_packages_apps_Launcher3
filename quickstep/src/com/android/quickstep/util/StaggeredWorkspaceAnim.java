@@ -20,7 +20,6 @@ import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.PropertySetter.NO_ANIM_PROPERTY_SETTER;
-import static com.android.launcher3.config.FeatureFlags.PROTOTYPE_APP_CLOSE;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_DEPTH_CONTROLLER;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_OVERVIEW;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_SCRIM;
@@ -32,6 +31,8 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.CellLayout;
@@ -69,10 +70,18 @@ public class StaggeredWorkspaceAnim {
     private final float mSpringTransY;
 
     private final AnimatorSet mAnimators = new AnimatorSet();
+    private final @Nullable View mIgnoredView;
 
-    public StaggeredWorkspaceAnim(Launcher launcher, float velocity, boolean animateOverviewScrim) {
+    public StaggeredWorkspaceAnim(Launcher launcher, float velocity, boolean animateOverviewScrim,
+            @Nullable View ignoredView) {
+        this(launcher, velocity, animateOverviewScrim, ignoredView, true);
+    }
+
+    public StaggeredWorkspaceAnim(Launcher launcher, float velocity, boolean animateOverviewScrim,
+            @Nullable View ignoredView, boolean staggerWorkspace) {
         prepareToAnimate(launcher, animateOverviewScrim);
 
+        mIgnoredView = ignoredView;
         mVelocity = velocity;
 
         // Scale the translationY based on the initial velocity to better sync the workspace items
@@ -81,53 +90,62 @@ public class StaggeredWorkspaceAnim {
         mSpringTransY = transFactor * launcher.getResources()
                 .getDimensionPixelSize(R.dimen.swipe_up_max_workspace_trans_y);
 
-        DeviceProfile grid = launcher.getDeviceProfile();
-        Workspace workspace = launcher.getWorkspace();
-        Hotseat hotseat = launcher.getHotseat();
+        if (staggerWorkspace) {
+            DeviceProfile grid = launcher.getDeviceProfile();
+            Workspace workspace = launcher.getWorkspace();
+            Hotseat hotseat = launcher.getHotseat();
 
-        // Hotseat and QSB takes up two additional rows.
-        int totalRows = grid.inv.numRows + (grid.isVerticalBarLayout() ? 0 : 2);
+            // Hotseat and QSB takes up two additional rows.
+            int totalRows = grid.inv.numRows + (grid.isVerticalBarLayout() ? 0 : 2);
 
-        // Add animation for all the visible workspace pages
-        workspace.forEachVisiblePage(page -> addAnimationForPage((CellLayout) page, totalRows));
+            // Add animation for all the visible workspace pages
+            workspace.forEachVisiblePage(page -> addAnimationForPage((CellLayout) page, totalRows));
 
-        boolean workspaceClipChildren = workspace.getClipChildren();
-        boolean workspaceClipToPadding = workspace.getClipToPadding();
-        boolean hotseatClipChildren = hotseat.getClipChildren();
-        boolean hotseatClipToPadding = hotseat.getClipToPadding();
+            boolean workspaceClipChildren = workspace.getClipChildren();
+            boolean workspaceClipToPadding = workspace.getClipToPadding();
+            boolean hotseatClipChildren = hotseat.getClipChildren();
+            boolean hotseatClipToPadding = hotseat.getClipToPadding();
 
-        workspace.setClipChildren(false);
-        workspace.setClipToPadding(false);
-        hotseat.setClipChildren(false);
-        hotseat.setClipToPadding(false);
+            workspace.setClipChildren(false);
+            workspace.setClipToPadding(false);
+            hotseat.setClipChildren(false);
+            hotseat.setClipToPadding(false);
 
-        // Set up springs for the hotseat and qsb.
-        ViewGroup hotseatIcons = hotseat.getShortcutsAndWidgets();
-        if (grid.isVerticalBarLayout()) {
-            for (int i = hotseatIcons.getChildCount() - 1; i >= 0; i--) {
-                View child = hotseatIcons.getChildAt(i);
-                CellLayout.LayoutParams lp = ((CellLayout.LayoutParams) child.getLayoutParams());
-                addStaggeredAnimationForView(child, lp.cellY + 1, totalRows);
-            }
-        } else {
-            final int hotseatRow, qsbRow, taskbarRow;
-            if (grid.isTaskbarPresent) {
-                qsbRow = grid.inv.numRows + 1;
-                hotseatRow = grid.inv.numRows + 2;
+            // Set up springs for the hotseat and qsb.
+            ViewGroup hotseatIcons = hotseat.getShortcutsAndWidgets();
+            if (grid.isVerticalBarLayout()) {
+                for (int i = hotseatIcons.getChildCount() - 1; i >= 0; i--) {
+                    View child = hotseatIcons.getChildAt(i);
+                    CellLayout.LayoutParams lp =
+                            ((CellLayout.LayoutParams) child.getLayoutParams());
+                    addStaggeredAnimationForView(child, lp.cellY + 1, totalRows);
+                }
             } else {
-                hotseatRow = grid.inv.numRows + 1;
-                qsbRow = grid.inv.numRows + 2;
-            }
-            // Taskbar and hotseat overlap.
-            taskbarRow = hotseatRow;
+                final int hotseatRow, qsbRow;
+                if (grid.isTaskbarPresent) {
+                    qsbRow = grid.inv.numRows + 1;
+                    hotseatRow = grid.inv.numRows + 2;
+                } else {
+                    hotseatRow = grid.inv.numRows + 1;
+                    qsbRow = grid.inv.numRows + 2;
+                }
+                for (int i = hotseatIcons.getChildCount() - 1; i >= 0; i--) {
+                    View child = hotseatIcons.getChildAt(i);
+                    addStaggeredAnimationForView(child, hotseatRow, totalRows);
+                }
 
-            for (int i = hotseatIcons.getChildCount() - 1; i >= 0; i--) {
-                View child = hotseatIcons.getChildAt(i);
-                addStaggeredAnimationForView(child, hotseatRow, totalRows);
+                addStaggeredAnimationForView(hotseat.getQsb(), qsbRow, totalRows);
             }
 
-            addStaggeredAnimationForView(hotseat.getQsb(), qsbRow, totalRows);
-            addStaggeredAnimationForView(hotseat.getTaskbarView(), taskbarRow, totalRows);
+            mAnimators.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    workspace.setClipChildren(workspaceClipChildren);
+                    workspace.setClipToPadding(workspaceClipToPadding);
+                    hotseat.setClipChildren(hotseatClipChildren);
+                    hotseat.setClipToPadding(hotseatClipToPadding);
+                }
+            });
         }
 
         if (animateOverviewScrim) {
@@ -141,15 +159,6 @@ public class StaggeredWorkspaceAnim {
 
         mAnimators.play(launcher.getRootView().getSysUiScrim().createSysuiMultiplierAnim(0f, 1f)
                 .setDuration(DURATION_MS));
-        mAnimators.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                workspace.setClipChildren(workspaceClipChildren);
-                workspace.setClipToPadding(workspaceClipToPadding);
-                hotseat.setClipChildren(hotseatClipChildren);
-                hotseat.setClipToPadding(hotseatClipToPadding);
-            }
-        });
     }
 
     private void addAnimationForPage(CellLayout page, int totalRows) {
@@ -220,9 +229,7 @@ public class StaggeredWorkspaceAnim {
      * @param totalRows Total number of rows.
      */
     private void addStaggeredAnimationForView(View v, int row, int totalRows) {
-        if (PROTOTYPE_APP_CLOSE.get()) {
-            return;
-        }
+        if (mIgnoredView != null && mIgnoredView == v) return;
         // Invert the rows, because we stagger starting from the bottom of the screen.
         int invertedRow = totalRows - row;
         // Add 1 to the inverted row so that the bottom most row has a start delay.

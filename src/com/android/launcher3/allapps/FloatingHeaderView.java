@@ -17,6 +17,9 @@ package com.android.launcher3.allapps;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.util.ArrayMap;
@@ -49,27 +52,35 @@ public class FloatingHeaderView extends LinearLayout implements
 
     private final Rect mClip = new Rect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE);
     private final ValueAnimator mAnimator = ValueAnimator.ofInt(0, 0);
+    private final ValueAnimator mHeaderAnimator = ValueAnimator.ofInt(0, 1).setDuration(100);
     private final Point mTempOffset = new Point();
-    private final RecyclerView.OnScrollListener mOnScrollListener = new RecyclerView.OnScrollListener() {
-        @Override
-        public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-        }
+    private final Paint mBGPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RecyclerView.OnScrollListener mOnScrollListener =
+            new RecyclerView.OnScrollListener() {
+                @Override
+                public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
+                }
 
-        @Override
-        public void onScrolled(RecyclerView rv, int dx, int dy) {
-            if (rv != mCurrentRV) {
-                return;
-            }
+                @Override
+                public void onScrolled(RecyclerView rv, int dx, int dy) {
+                    if (rv != mCurrentRV) {
+                        return;
+                    }
 
-            if (mAnimator.isStarted()) {
-                mAnimator.cancel();
-            }
+                    if (mAnimator.isStarted()) {
+                        mAnimator.cancel();
+                    }
 
-            int current = -mCurrentRV.getCurrentScrollY();
-            moved(current);
-            applyVerticalMove();
-        }
-    };
+                    int current = -mCurrentRV.getCurrentScrollY();
+                    boolean headerCollapsed = mHeaderCollapsed;
+                    moved(current);
+                    applyVerticalMove();
+                    if (headerCollapsed != mHeaderCollapsed) {
+                        AllAppsContainerView parent = (AllAppsContainerView) getParent();
+                        parent.invalidateHeader();
+                    }
+                }
+            };
 
     private final int mHeaderTopPadding;
 
@@ -80,9 +91,10 @@ public class FloatingHeaderView extends LinearLayout implements
     private AllAppsRecyclerView mWorkRV;
     private AllAppsRecyclerView mCurrentRV;
     private ViewGroup mParent;
-    private boolean mHeaderCollapsed;
+    public boolean mHeaderCollapsed;
     private int mSnappedScrolledY;
     private int mTranslationY;
+    private int mHeaderColor;
 
     private boolean mForwardToRecyclerView;
 
@@ -126,6 +138,7 @@ public class FloatingHeaderView extends LinearLayout implements
         }
         mFixedRows = rows.toArray(new FloatingHeaderRow[rows.size()]);
         mAllRows = mFixedRows;
+        mHeaderAnimator.addUpdateListener(valueAnimator -> invalidate());
     }
 
     @Override
@@ -211,6 +224,8 @@ public class FloatingHeaderView extends LinearLayout implements
 
         mTabsHidden = tabsHidden;
         mTabLayout.setVisibility(tabsHidden ? View.GONE : View.VISIBLE);
+        mTabLayout.getLayoutParams().width =
+                mAH[AllAppsContainerView.AdapterHolder.MAIN].recyclerView.getTabWidth();
         mMainRV = setupRV(mMainRV, mAH[AllAppsContainerView.AdapterHolder.MAIN].recyclerView);
         mWorkRV = setupRV(mWorkRV, mAH[AllAppsContainerView.AdapterHolder.WORK].recyclerView);
         mParent = (ViewGroup) mMainRV.getParent();
@@ -219,7 +234,7 @@ public class FloatingHeaderView extends LinearLayout implements
     }
 
     private AllAppsRecyclerView setupRV(AllAppsRecyclerView old, AllAppsRecyclerView updated) {
-        if (old != updated && updated != null ) {
+        if (old != updated && updated != null) {
             updated.addOnScrollListener(mOnScrollListener);
         }
         return updated;
@@ -274,8 +289,29 @@ public class FloatingHeaderView extends LinearLayout implements
             } else if (mTranslationY <= -mMaxTranslation) { // hide or stay hidden
                 mHeaderCollapsed = true;
                 mSnappedScrolledY = -mMaxTranslation;
+                mHeaderAnimator.setCurrentFraction(0);
+                mHeaderAnimator.start();
             }
         }
+    }
+
+    /**
+     * Set current header protection background color
+     */
+    public void setHeaderColor(int color) {
+        mHeaderColor = color;
+        invalidate();
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        if (mHeaderCollapsed && !mCollapsed && mTabLayout.getVisibility() == VISIBLE
+                && mHeaderColor != Color.TRANSPARENT && FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
+            mBGPaint.setColor(mHeaderColor);
+            mBGPaint.setAlpha((int) (255 * mHeaderAnimator.getAnimatedFraction()));
+            canvas.drawRect(0, 0, getWidth(), getHeight() + mTranslationY, mBGPaint);
+        }
+        super.dispatchDraw(canvas);
     }
 
     protected void applyVerticalMove() {
@@ -399,6 +435,13 @@ public class FloatingHeaderView extends LinearLayout implements
             }
         }
         return null;
+    }
+
+    /**
+     * Returns visible height of FloatingHeaderView contents
+     */
+    public int getVisibleBottomBound() {
+        return getBottom() + mTranslationY;
     }
 }
 

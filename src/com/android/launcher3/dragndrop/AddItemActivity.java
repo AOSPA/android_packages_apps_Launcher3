@@ -30,6 +30,7 @@ import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.Intent;
 import android.content.pm.LauncherApps.PinItemRequest;
+import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -37,7 +38,6 @@ import android.graphics.Rect;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.DragShadowBuilder;
@@ -56,7 +56,10 @@ import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.PinRequestHelper;
+import com.android.launcher3.util.SystemUiController;
+import com.android.launcher3.views.AbstractSlideInView;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.AddItemWidgetsBottomSheet;
 import com.android.launcher3.widget.LauncherAppWidgetHost;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.NavigableAppWidgetHostView;
@@ -69,8 +72,12 @@ import com.android.launcher3.widget.WidgetManagerHelper;
 
 import java.util.function.Supplier;
 
+/**
+ * Activity to show pin widget dialog.
+ */
 @TargetApi(Build.VERSION_CODES.O)
-public class AddItemActivity extends BaseActivity implements OnLongClickListener, OnTouchListener {
+public class AddItemActivity extends BaseActivity
+        implements OnLongClickListener, OnTouchListener, AbstractSlideInView.OnCloseListener {
 
     private static final int SHADOW_SIZE = 10;
 
@@ -82,6 +89,8 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
     private PinItemRequest mRequest;
     private LauncherAppState mApp;
     private InvariantDeviceProfile mIdp;
+    private BaseDragLayer<AddItemActivity> mDragLayer;
+    private AddItemWidgetsBottomSheet mSlideInView;
 
     private WidgetCell mWidgetCell;
 
@@ -111,6 +120,11 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
         mDeviceProfile = mIdp.getDeviceProfile(getApplicationContext());
 
         setContentView(R.layout.add_item_confirmation_activity);
+        // Set flag to allow activity to draw over navigation and status bar.
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        mDragLayer = findViewById(R.id.add_item_drag_layer);
+        mDragLayer.recreateControllers();
         mWidgetCell = findViewById(R.id.widget_cell);
 
         if (mRequest.getRequestType() == PinItemRequest.REQUEST_TYPE_SHORTCUT) {
@@ -135,6 +149,11 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
 
         TextView widgetAppName = findViewById(R.id.widget_appName);
         widgetAppName.setText(getApplicationInfo().labelRes);
+
+        mSlideInView = findViewById(R.id.add_item_bottom_sheet);
+        mSlideInView.addOnCloseListener(this);
+        mSlideInView.show();
+        setupNavBarColor();
     }
 
     @Override
@@ -193,7 +212,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
                         .addCategory(Intent.CATEGORY_HOME)
                         .setPackage(getPackageName())
                         .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        Launcher.ACTIVITY_TRACKER.runCallbackWhenActivityExists(listener, homeIntent);
+        Launcher.ACTIVITY_TRACKER.registerCallback(listener);
         startActivity(homeIntent,
                 ActivityOptions.makeCustomAnimation(this, 0, android.R.anim.fade_out)
                         .toBundle());
@@ -262,7 +281,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
      */
     public void onCancelClick(View v) {
         logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_CANCELLED);
-        finish();
+        mSlideInView.close(/* animate= */ true);
     }
 
     /**
@@ -273,7 +292,7 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
             ItemInstallQueue.INSTANCE.get(this).queueItem(mRequest.getShortcutInfo());
             logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_PLACED_AUTOMATICALLY);
             mRequest.accept();
-            finish();
+            mSlideInView.close(/* animate= */ true);
             return;
         }
 
@@ -296,13 +315,13 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
         mWidgetOptions.putInt(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         mRequest.accept(mWidgetOptions);
         logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_PLACED_AUTOMATICALLY);
-        finish();
+        mSlideInView.close(/* animate= */ true);
     }
 
     @Override
     public void onBackPressed() {
         logCommand(LAUNCHER_ADD_EXTERNAL_ITEM_BACK);
-        super.onBackPressed();
+        mSlideInView.close(/* animate= */ true);
     }
 
     @Override
@@ -338,23 +357,25 @@ public class AddItemActivity extends BaseActivity implements OnLongClickListener
 
     @Override
     public BaseDragLayer getDragLayer() {
-        throw new UnsupportedOperationException();
+        return mDragLayer;
+    }
+
+    @Override
+    public void onSlideInViewClosed() {
+        finish();
+    }
+
+    protected void setupNavBarColor() {
+        boolean isSheetDark = (getApplicationContext().getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        getSystemUiController().updateUiState(
+                SystemUiController.UI_STATE_BASE_WINDOW,
+                isSheetDark ? SystemUiController.FLAG_DARK_NAV : SystemUiController.FLAG_LIGHT_NAV);
     }
 
     private void logCommand(StatsLogManager.EventEnum command) {
         getStatsLogManager().logger()
                 .withItemInfo((ItemInfo) mWidgetCell.getWidgetView().getTag())
                 .log(command);
-    }
-
-    @Override
-    public void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        View view = getWindow().getDecorView();
-        WindowManager.LayoutParams layoutParams =
-                (WindowManager.LayoutParams) view.getLayoutParams();
-        layoutParams.gravity = Gravity.BOTTOM;
-        layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT;
-        getWindowManager().updateViewLayout(view, layoutParams);
     }
 }

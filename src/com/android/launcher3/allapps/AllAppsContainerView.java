@@ -21,20 +21,23 @@ import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCU
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_CHANGE_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_ENABLED;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.Parcelable;
 import android.os.Process;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -48,7 +51,6 @@ import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.os.BuildCompat;
-import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -81,10 +83,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         ScrimView.ScrimDrawingController {
 
     public static final float PULL_MULTIPLIER = .02f;
-    public static final float FLING_VELOCITY_MULTIPLIER = 2000f;
-
-    // Starts the springs after at least 25% of the animation has passed.
-    public static final float FLING_ANIMATION_THRESHOLD = 0.25f;
+    public static final float FLING_VELOCITY_MULTIPLIER = 1200f;
 
     private final Paint mHeaderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -93,6 +92,14 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     private final ItemInfoMatcher mPersonalMatcher = ItemInfoMatcher.ofUser(Process.myUserHandle());
     private final ItemInfoMatcher mWorkMatcher = mPersonalMatcher.negate();
     private final AllAppsStore mAllAppsStore = new AllAppsStore();
+
+    private final RecyclerView.OnScrollListener mScrollListener =
+            new RecyclerView.OnScrollListener() {
+                @Override
+                public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                    updateHeaderScroll(((AllAppsRecyclerView) recyclerView).getCurrentScrollY());
+                }
+            };
 
     private final Paint mNavBarScrimPaint;
     private int mNavBarScrimHeight = 0;
@@ -117,13 +124,12 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     private Rect mInsets = new Rect();
 
     private SearchAdapterProvider mSearchAdapterProvider;
-    private final int mHeaderTopPadding;
+    private WorkAdapterProvider mWorkAdapterProvider;
     private final int mScrimColor;
     private final int mHeaderProtectionColor;
     private final float mHeaderThreshold;
     private ScrimView mScrimView;
     private int mHeaderColor;
-
 
     public AllAppsContainerView(Context context) {
         this(context, null);
@@ -141,20 +147,20 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         mScrimColor = Themes.getAttrColor(context, R.attr.allAppsScrimColor);
         mHeaderThreshold = getResources().getDimensionPixelSize(
                 R.dimen.dynamic_grid_cell_border_spacing);
-        mHeaderTopPadding = context.getResources()
-                .getDimensionPixelSize(R.dimen.all_apps_header_top_padding);
-        int accentColor = Themes.getColorAccent(getContext());
-        mHeaderProtectionColor = ColorUtils.blendARGB(mScrimColor, accentColor, .3f);
+        mHeaderProtectionColor = Themes.getAttrColor(context, R.attr.allappsHeaderProtectionColor);
 
         mLauncher.addOnDeviceProfileChangeListener(this);
-
-
 
         mSearchAdapterProvider = mLauncher.createSearchAdapterProvider(this);
         mSearchQueryBuilder = new SpannableStringBuilder();
         Selection.setSelection(mSearchQueryBuilder, 0);
 
         mAH = new AdapterHolder[2];
+        mWorkAdapterProvider = new WorkAdapterProvider(mLauncher, () -> {
+            if (mAH[AdapterHolder.WORK] != null) {
+                mAH[AdapterHolder.WORK].appsList.updateAdapterItems();
+            }
+        });
         mAH[AdapterHolder.MAIN] = new AdapterHolder(false /* isWork */);
         mAH[AdapterHolder.WORK] = new AdapterHolder(true /* isWork */);
 
@@ -162,6 +168,19 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         mNavBarScrimPaint.setColor(Themes.getAttrColor(context, R.attr.allAppsNavBarScrimColor));
 
         mAllAppsStore.addUpdateListener(this::onAppsUpdated);
+    }
+
+    @Override
+    protected void dispatchRestoreInstanceState(SparseArray<Parcelable> sparseArray) {
+        try {
+            // Many slice view id is not properly assigned, and hence throws null
+            // pointer exception in the underneath method. Catching the exception
+            // simply doesn't restore these slice views. This doesn't have any
+            // user visible effect because because we query them again.
+            super.dispatchRestoreInstanceState(sparseArray);
+        } catch (Exception e) {
+            Log.e("AllAppsContainerView", "restoreInstanceState viewId = 0", e);
+        }
     }
 
     /**
@@ -211,8 +230,9 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     }
 
     private void resetWorkProfile() {
-        mWorkModeSwitch.update(!mAllAppsStore.hasModelFlag(FLAG_QUIET_MODE_ENABLED));
-        mAH[AdapterHolder.WORK].setupOverlay();
+        boolean isEnabled = !mAllAppsStore.hasModelFlag(FLAG_QUIET_MODE_ENABLED);
+        mWorkModeSwitch.updateCurrentState(isEnabled);
+        mWorkAdapterProvider.updateCurrentState(isEnabled);
         mAH[AdapterHolder.WORK].applyPadding();
     }
 
@@ -375,7 +395,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             mAH[i].padding.bottom = insets.bottom;
             mAH[i].padding.left = mAH[i].padding.right = leftRightPadding;
             mAH[i].applyPadding();
-            mAH[i].setupOverlay();
         }
 
         ViewGroup.MarginLayoutParams mlp = (MarginLayoutParams) getLayoutParams();
@@ -431,6 +450,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             setupWorkToggle();
             mAH[AdapterHolder.MAIN].setup(mViewPager.getChildAt(0), mPersonalMatcher);
             mAH[AdapterHolder.WORK].setup(mViewPager.getChildAt(1), mWorkMatcher);
+            mAH[AdapterHolder.WORK].recyclerView.setId(R.id.apps_list_view_work);
             mViewPager.getPageIndicator().setActiveMarker(AdapterHolder.MAIN);
             findViewById(R.id.tab_personal)
                     .setOnClickListener((View view) -> {
@@ -464,20 +484,11 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     private void setupWorkToggle() {
         if (Utilities.ATLEAST_P) {
             mWorkModeSwitch = (WorkModeSwitch) mLauncher.getLayoutInflater().inflate(
-                    R.layout.work_mode_switch, this, false);
+                    R.layout.work_mode_fab, this, false);
             this.addView(mWorkModeSwitch);
             mWorkModeSwitch.setInsets(mInsets);
             mWorkModeSwitch.post(this::resetWorkProfile);
         }
-    }
-
-    @Override
-    protected void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        View overlay = mAH[AdapterHolder.WORK].getOverlayView();
-        int v = newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE ? GONE : VISIBLE;
-        overlay.findViewById(R.id.work_apps_paused_title).setVisibility(v);
-        overlay.findViewById(R.id.work_apps_paused_content).setVisibility(v);
     }
 
     private void replaceRVContainer(boolean showTabs) {
@@ -559,6 +570,10 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         return mViewPager == null ? getActiveRecyclerView() : mViewPager;
     }
 
+    public int getCurrentPage() {
+        return mViewPager != null ? mViewPager.getCurrentPage() : AdapterHolder.MAIN;
+    }
+
     /**
      * Handles selection on focused view and returns success
      */
@@ -632,50 +647,29 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     /**
      * Adds an update listener to {@param animator} that adds springs to the animation.
      */
-    public void addSpringFromFlingUpdateListener(ValueAnimator animator, float velocity) {
-        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            boolean shouldSpring = true;
-
+    public void addSpringFromFlingUpdateListener(ValueAnimator animator,
+            float velocity /* release velocity */,
+            float progress /* portion of the distance to travel*/) {
+        animator.addListener(new AnimatorListenerAdapter() {
             @Override
-            public void onAnimationUpdate(ValueAnimator valueAnimator) {
-                if (shouldSpring
-                        && valueAnimator.getAnimatedFraction() >= FLING_ANIMATION_THRESHOLD) {
-                    absorbSwipeUpVelocity(Math.max(100, Math.abs(
-                            Math.round(velocity * FLING_VELOCITY_MULTIPLIER))));
-                    // calculate the velocity of using the not user controlled interpolator
-                    // of when the container reach the end.
-                    shouldSpring = false;
-                }
+            public void onAnimationStart(Animator animator) {
+                float distance = (float) ((1 - progress) * getHeight()); // px
+                float settleVelocity = Math.min(0, distance
+                        / (AllAppsTransitionController.INTERP_COEFF * animator.getDuration())
+                        + velocity);
+                absorbSwipeUpVelocity(Math.max(1000, Math.abs(
+                        Math.round(settleVelocity * FLING_VELOCITY_MULTIPLIER))));
             }
         });
     }
 
     public void onPull(float deltaDistance, float displacement) {
-        absorbPullDeltaDistance(PULL_MULTIPLIER * deltaDistance,
-                PULL_MULTIPLIER * displacement);
-        // ideally, this should be done using EdgeEffect.onPush to create squish effect.
-        // However, until such method is available, launcher to simulate the onPush method.
-        mHeader.setTranslationY(-.5f * mHeaderTop * deltaDistance);
-        getRecyclerViewContainer().setTranslationY(-mHeaderTop * deltaDistance);
+        absorbPullDeltaDistance(PULL_MULTIPLIER * deltaDistance, PULL_MULTIPLIER * displacement);
+        // Current motion spec is to actually push and not pull
+        // on this surface. However, until EdgeEffect.onPush (b/190612804) is
+        // implemented at view level, we will simply pull
     }
 
-    public void onRelease() {
-        ValueAnimator anim1 = ValueAnimator.ofFloat(1f, 0f);
-        final float floatingHeaderHeight = getFloatingHeaderView().getTranslationY();
-        final float recyclerViewHeight = getRecyclerViewContainer().getTranslationY();
-        anim1.setDuration(200);
-        anim1.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator valueAnimator) {
-                getFloatingHeaderView().setTranslationY(
-                        ((float) valueAnimator.getAnimatedValue()) * floatingHeaderHeight);
-                getRecyclerViewContainer().setTranslationY(
-                        ((float) valueAnimator.getAnimatedValue()) * recyclerViewHeight);
-            }
-        });
-        anim1.start();
-        super.onRelease();
-    }
     @Override
     public void getDrawingRect(Rect outRect) {
         super.getDrawingRect(outRect);
@@ -697,7 +691,9 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         mHeaderPaint.setColor(mHeaderColor);
         mHeaderPaint.setAlpha((int) (getAlpha() * Color.alpha(mHeaderColor)));
         if (mHeaderPaint.getColor() != mScrimColor && mHeaderPaint.getColor() != 0) {
-            canvas.drawRect(0, 0, getWidth(), mHeaderTopPadding + getTranslationY(),
+            int bottom = mUsingTabs && mHeader.mHeaderCollapsed ? mHeader.getVisibleBottomBound()
+                    : mSearchContainer.getBottom();
+            canvas.drawRect(0, 0, getWidth(), bottom + getTranslationY(),
                     mHeaderPaint);
         }
     }
@@ -720,9 +716,15 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
         AdapterHolder(boolean isWork) {
             mIsWork = isWork;
-            appsList = new AlphabeticalAppsList(mLauncher, mAllAppsStore, isWork);
+            appsList = new AlphabeticalAppsList(mLauncher, mAllAppsStore,
+                    isWork ? mWorkAdapterProvider : null);
+
+            BaseAdapterProvider[] adapterProviders =
+                    isWork ? new BaseAdapterProvider[]{mSearchAdapterProvider, mWorkAdapterProvider}
+                            : new BaseAdapterProvider[]{mSearchAdapterProvider};
+
             adapter = new AllAppsGridAdapter(mLauncher, getLayoutInflater(), appsList,
-                    mSearchAdapterProvider);
+                    adapterProviders);
             appsList.setAdapter(adapter);
             layoutManager = adapter.getLayoutManager();
         }
@@ -738,41 +740,15 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             recyclerView.setHasFixedSize(true);
             // No animations will occur when changes occur to the items in this RecyclerView.
             recyclerView.setItemAnimator(null);
+            recyclerView.addOnScrollListener(mScrollListener);
             FocusedItemDecorator focusedItemDecorator = new FocusedItemDecorator(recyclerView);
             recyclerView.addItemDecoration(focusedItemDecorator);
             adapter.setIconFocusListener(focusedItemDecorator.getFocusListener());
             applyVerticalFadingEdgeEnabled(verticalFadingEdge);
             applyPadding();
-            setupOverlay();
             if (FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
                 recyclerView.addItemDecoration(mSearchAdapterProvider.getDecorator());
             }
-        }
-
-        void setupOverlay() {
-            if (!mIsWork || recyclerView == null) return;
-            boolean workDisabled = mAllAppsStore.hasModelFlag(FLAG_QUIET_MODE_ENABLED);
-            if (mWorkDisabled == workDisabled) return;
-            recyclerView.setContentDescription(workDisabled ? mLauncher.getString(
-                    R.string.work_apps_paused_content_description) : null);
-            View overlayView = getOverlayView();
-            recyclerView.setItemAnimator(new DefaultItemAnimator());
-            if (workDisabled) {
-                overlayView.setAlpha(0);
-                recyclerView.addAutoSizedOverlay(overlayView);
-                overlayView.animate().alpha(1).withEndAction(
-                        () -> {
-                            appsList.updateItemFilter((info, cn) -> false);
-                            recyclerView.setItemAnimator(null);
-                        }).start();
-            } else if (mInfoMatcher != null) {
-                appsList.updateItemFilter(mInfoMatcher);
-                overlayView.animate().alpha(0).withEndAction(() -> {
-                    recyclerView.setItemAnimator(null);
-                    recyclerView.clearAutoSizedOverlays();
-                }).start();
-            }
-            mWorkDisabled = workDisabled;
         }
 
         void applyPadding() {
@@ -794,22 +770,18 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             mAH[AdapterHolder.MAIN].recyclerView.setVerticalFadingEdgeEnabled(!mUsingTabs
                     && verticalFadingEdge);
         }
-
-        private View getOverlayView() {
-            if (mOverlay == null) {
-                mOverlay = mLauncher.getLayoutInflater().inflate(R.layout.work_apps_paused, null);
-            }
-            return mOverlay;
-        }
     }
 
 
     protected void updateHeaderScroll(int scrolledOffset) {
         float prog = Math.max(0, Math.min(1, (float) scrolledOffset / mHeaderThreshold));
-        int headerColor = ColorUtils.setAlphaComponent(mHeaderProtectionColor, (int) (prog * 255));
+        int viewBG = ColorUtils.blendARGB(mScrimColor, mHeaderProtectionColor, prog);
+        int headerColor = ColorUtils.setAlphaComponent(viewBG,
+                (int) (getSearchView().getAlpha() * 255));
         if (headerColor != mHeaderColor) {
             mHeaderColor = headerColor;
-            getSearchView().setBackgroundColor(mHeaderColor);
+            getSearchView().setBackgroundColor(viewBG);
+            getFloatingHeaderView().setHeaderColor(viewBG);
             invalidateHeader();
         }
     }
@@ -818,7 +790,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
      * redraws header protection
      */
     public void invalidateHeader() {
-        if (mScrimView != null) {
+        if (mScrimView != null && FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
             mScrimView.invalidate();
         }
     }
