@@ -16,9 +16,10 @@
 package com.android.quickstep;
 
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
+import android.view.IRecentsAnimationController;
+import android.view.SurfaceControl;
 import android.window.PictureInPictureSurfaceTransaction;
 
 import androidx.annotation.NonNull;
@@ -101,7 +102,7 @@ public class RecentsAnimationController {
      */
     @UiThread
     public void removeTaskTarget(@NonNull RemoteAnimationTargetCompat target) {
-        THREAD_POOL_EXECUTOR.execute(() -> mController.removeTask(target.taskId));
+        UI_HELPER_EXECUTOR.execute(() -> mController.removeTask(target.taskId));
     }
 
     @UiThread
@@ -155,16 +156,35 @@ public class RecentsAnimationController {
     }
 
     /**
+     * @see RecentsAnimationControllerCompat#detachNavigationBarFromApp
+     */
+    @UiThread
+    public void detachNavigationBarFromApp(boolean moveHomeToTop) {
+        UI_HELPER_EXECUTOR.execute(() -> mController.detachNavigationBarFromApp(moveHomeToTop));
+    }
+
+    /**
+     * @see IRecentsAnimationController#animateNavigationBarToApp(long)
+     */
+    @UiThread
+    public void animateNavigationBarToApp(long duration) {
+        UI_HELPER_EXECUTOR.execute(() -> mController.animateNavigationBarToApp(duration));
+    }
+
+    /**
      * Sets the final surface transaction on a Task. This is used by Launcher to notify the system
      * that animating Activity to PiP has completed and the associated task surface should be
      * updated accordingly. This should be called before `finish`
      * @param taskId for which the leash should be updated
-     * @param finishTransaction leash operations for the final transform.
+     * @param finishTransaction the transaction to transfer to the task surface control after the
+     *                          leash is removed
+     * @param overlay the surface control for an overlay being shown above the pip (can be null)
      */
     public void setFinishTaskTransaction(int taskId,
-            PictureInPictureSurfaceTransaction finishTransaction) {
+            PictureInPictureSurfaceTransaction finishTransaction,
+            SurfaceControl overlay) {
         UI_HELPER_EXECUTOR.execute(
-                () -> mController.setFinishTaskTransaction(taskId, finishTransaction));
+                () -> mController.setFinishTaskTransaction(taskId, finishTransaction, overlay));
     }
 
     /**

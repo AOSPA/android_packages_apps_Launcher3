@@ -32,12 +32,43 @@ public class LauncherAppWidgetProviderInfo extends AppWidgetProviderInfo
 
     public static final String CLS_CUSTOM_WIDGET_PREFIX = "#custom-widget-";
 
+    /**
+     * The desired number of cells that this widget occupies horizontally in
+     * {@link com.android.launcher3.CellLayout}.
+     */
     public int spanX;
+
+    /**
+     * The desired number of cells that this widget occupies vertically in
+     * {@link com.android.launcher3.CellLayout}.
+     */
     public int spanY;
+
+    /**
+     * The minimum number of cells that this widget can occupy horizontally in
+     * {@link com.android.launcher3.CellLayout}.
+     */
     public int minSpanX;
+
+    /**
+     * The minimum number of cells that this widget can occupy vertically in
+     * {@link com.android.launcher3.CellLayout}.
+     */
     public int minSpanY;
+
+    /**
+     * The maximum number of cells that this widget can occupy horizontally in
+     * {@link com.android.launcher3.CellLayout}.
+     */
     public int maxSpanX;
+
+    /**
+     * The maximum number of cells that this widget can occupy vertically in
+     * {@link com.android.launcher3.CellLayout}.
+     */
     public int maxSpanY;
+
+    private boolean mIsMinSizeFulfilled;
 
     public static LauncherAppWidgetProviderInfo fromProviderInfo(Context context,
             AppWidgetProviderInfo info) {
@@ -67,61 +98,98 @@ public class LauncherAppWidgetProviderInfo extends AppWidgetProviderInfo
     }
 
     public void initSpans(Context context, InvariantDeviceProfile idp) {
-        // Always assume we're working with the smallest span to make sure we
-        // reserve enough space in both orientations.
-        float smallestCellWidth = Float.MAX_VALUE;
-        float smallestCellHeight = Float.MAX_VALUE;
+        int minSpanX = 0;
+        int minSpanY = 0;
+        int maxSpanX = idp.numColumns;
+        int maxSpanY = idp.numRows;
+        int spanX = 0;
+        int spanY = 0;
+
+        Rect widgetPadding = new Rect();
+        Rect localPadding = new Rect();
+        AppWidgetHostView.getDefaultPaddingForWidget(context, provider, widgetPadding);
 
         Point cellSize = new Point();
-        boolean isWidgetPadded = false;
         for (DeviceProfile dp : idp.supportedProfiles) {
             dp.getCellSize(cellSize);
-            smallestCellWidth = Math.min(smallestCellWidth, cellSize.x);
-            smallestCellHeight = Math.min(smallestCellHeight, cellSize.y);
-            isWidgetPadded = isWidgetPadded || !dp.shouldInsetWidgets();
+            // We want to account for the extra amount of padding that we are adding to the widget
+            // to ensure that it gets the full amount of space that it has requested.
+            // If grids supports insetting widgets, we do not account for widget padding.
+            if (dp.shouldInsetWidgets()) {
+                localPadding.setEmpty();
+            } else {
+                localPadding.set(widgetPadding);
+            }
+            minSpanX = Math.max(minSpanX,
+                    getSpanX(localPadding, minResizeWidth, dp.cellLayoutBorderSpacingPx,
+                            cellSize.x));
+            minSpanY = Math.max(minSpanY,
+                    getSpanY(localPadding, minResizeHeight, dp.cellLayoutBorderSpacingPx,
+                            cellSize.y));
+
+            if (ATLEAST_S) {
+                if (maxResizeWidth > 0) {
+                    maxSpanX = Math.min(maxSpanX,
+                            getSpanX(localPadding, maxResizeWidth, dp.cellLayoutBorderSpacingPx,
+                                    cellSize.x));
+                }
+                if (maxResizeHeight > 0) {
+                    maxSpanY = Math.min(maxSpanY,
+                            getSpanY(localPadding, maxResizeHeight, dp.cellLayoutBorderSpacingPx,
+                                    cellSize.y));
+                }
+            }
+
+            spanX = Math.max(spanX,
+                    getSpanX(localPadding, minWidth, dp.cellLayoutBorderSpacingPx, cellSize.x));
+            spanY = Math.max(spanY,
+                    getSpanY(localPadding, minHeight, dp.cellLayoutBorderSpacingPx, cellSize.y));
         }
 
-        // We want to account for the extra amount of padding that we are adding to the widget
-        // to ensure that it gets the full amount of space that it has requested.
-        // If grids supports insetting widgets, we do not account for widget padding.
-        Rect widgetPadding = new Rect();
-        if (isWidgetPadded) {
-            AppWidgetHostView.getDefaultPaddingForWidget(context, provider, widgetPadding);
+        if (ATLEAST_S) {
+            // Ensures maxSpan >= minSpan
+            maxSpanX = Math.max(maxSpanX, minSpanX);
+            maxSpanY = Math.max(maxSpanY, minSpanY);
+
+            // Use targetCellWidth/Height if it is within the min/max ranges.
+            // Otherwise, use the span of minWidth/Height.
+            if (targetCellWidth >= minSpanX && targetCellWidth <= maxSpanX
+                    && targetCellHeight >= minSpanY && targetCellHeight <= maxSpanY) {
+                spanX = targetCellWidth;
+                spanY = targetCellHeight;
+            }
         }
 
-        minSpanX = getSpanX(widgetPadding, minResizeWidth, smallestCellWidth);
-        minSpanY = getSpanY(widgetPadding, minResizeHeight, smallestCellHeight);
-
-        // Use maxResizeWidth/Height if they are defined and we're on S or above.
-        maxSpanX =
-                (ATLEAST_S && maxResizeWidth > 0)
-                        ? getSpanX(widgetPadding, maxResizeWidth, smallestCellWidth)
-                        : idp.numColumns;
-        maxSpanY =
-                (ATLEAST_S && maxResizeHeight > 0)
-                        ? getSpanY(widgetPadding, maxResizeHeight, smallestCellHeight)
-                        : idp.numRows;
-
-        // Use targetCellWidth/Height if it is within the min/max ranges and we're on S or above.
-        // Otherwise, fall back to minWidth/Height.
-        if (ATLEAST_S && targetCellWidth >= minSpanX && targetCellWidth <= maxSpanX
-                && targetCellHeight >= minSpanY && targetCellHeight <= maxSpanY) {
-            spanX = targetCellWidth;
-            spanY = targetCellHeight;
-        } else {
-            spanX = getSpanX(widgetPadding, minWidth, smallestCellWidth);
-            spanY = getSpanY(widgetPadding, minHeight, smallestCellHeight);
-        }
+        this.minSpanX = minSpanX;
+        this.minSpanY = minSpanY;
+        this.maxSpanX = maxSpanX;
+        this.maxSpanY = maxSpanY;
+        this.mIsMinSizeFulfilled = Math.min(spanX, minSpanX) <= idp.numColumns
+            && Math.min(spanY, minSpanY) <= idp.numRows;
+        // Ensures the default span X and span Y will not exceed the current grid size.
+        this.spanX = Math.min(spanX, idp.numColumns);
+        this.spanY = Math.min(spanY, idp.numRows);
     }
 
-    private int getSpanX(Rect widgetPadding, int widgetWidth, float cellWidth) {
-        return Math.max(1, (int) Math.ceil(
-                (widgetWidth + widgetPadding.left + widgetPadding.right) / cellWidth));
+    /**
+     * Returns {@code true} if the widget's minimum size requirement can be fulfilled in the device
+     * grid setting, {@link InvariantDeviceProfile}, that was passed in
+     * {@link #initSpans(Context, InvariantDeviceProfile)}.
+     */
+    public boolean isMinSizeFulfilled() {
+        return mIsMinSizeFulfilled;
     }
 
-    private int getSpanY(Rect widgetPadding, int widgetHeight, float cellHeight) {
+    private int getSpanX(Rect widgetPadding, int widgetWidth, int cellSpacing, float cellWidth) {
         return Math.max(1, (int) Math.ceil(
-                (widgetHeight + widgetPadding.top + widgetPadding.bottom) / cellHeight));
+                (widgetWidth + widgetPadding.left + widgetPadding.right + cellSpacing) / (cellWidth
+                        + cellSpacing)));
+    }
+
+    private int getSpanY(Rect widgetPadding, int widgetHeight, int cellSpacing, float cellHeight) {
+        return Math.max(1, (int) Math.ceil(
+                (widgetHeight + widgetPadding.top + widgetPadding.bottom + cellSpacing) / (
+                        cellHeight + cellSpacing)));
     }
 
     public String getLabel(PackageManager packageManager) {
@@ -147,6 +215,12 @@ public class LauncherAppWidgetProviderInfo extends AppWidgetProviderInfo
 
     public boolean isReconfigurable() {
         return configure != null && (getWidgetFeatures() & WIDGET_FEATURE_RECONFIGURABLE) != 0;
+    }
+
+    public boolean isConfigurationOptional() {
+        return ATLEAST_S
+                && isReconfigurable()
+                && (getWidgetFeatures() & WIDGET_FEATURE_CONFIGURATION_OPTIONAL) != 0;
     }
 
     @Override

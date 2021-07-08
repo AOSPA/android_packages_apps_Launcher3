@@ -24,6 +24,8 @@ import static com.android.launcher3.util.SettingsCache.NOTIFICATION_BADGING_URI;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.LauncherApps;
 import android.os.UserHandle;
 import android.util.Log;
@@ -45,6 +47,7 @@ import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
+import com.android.launcher3.util.Themes;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
 public class LauncherAppState {
@@ -78,6 +81,8 @@ public class LauncherAppState {
 
     public LauncherAppState(Context context) {
         this(context, LauncherFiles.APP_ICONS_DB);
+        Log.v(Launcher.TAG, "LauncherAppState initiated");
+        Preconditions.assertUIThread();
 
         mInvariantDeviceProfile.addOnChangeListener(idp -> refreshAndReloadLauncher());
 
@@ -94,8 +99,6 @@ public class LauncherAppState {
         }
         mOnTerminateCallback.add(() -> mContext.unregisterReceiver(modelChangeReceiver));
 
-        // TODO: remove listener on terminate
-        FeatureFlags.APP_SEARCH_IMPROVEMENTS.addChangeListener(context, mModel::forceReload);
         CustomWidgetManager.INSTANCE.get(mContext)
                 .setWidgetRefreshCallback(mModel::refreshAndBindWidgetsAndShortcuts);
 
@@ -108,6 +111,12 @@ public class LauncherAppState {
                 observer, MODEL_EXECUTOR.getHandler());
         mOnTerminateCallback.add(iconChangeTracker::close);
         MODEL_EXECUTOR.execute(observer::verifyIconChanged);
+        if (ENABLE_THEMED_ICONS.get()) {
+            SharedPreferences prefs = Utilities.getPrefs(mContext);
+            prefs.registerOnSharedPreferenceChangeListener(observer);
+            mOnTerminateCallback.add(
+                    () -> prefs.unregisterOnSharedPreferenceChangeListener(observer));
+        }
 
         InstallSessionTracker installSessionTracker =
                 InstallSessionHelper.INSTANCE.get(context).registerInstallTracker(mModel);
@@ -123,16 +132,15 @@ public class LauncherAppState {
     }
 
     public LauncherAppState(Context context, @Nullable String iconCacheFileName) {
-        Log.v(Launcher.TAG, "LauncherAppState initiated");
-        Preconditions.assertUIThread();
         mContext = context;
 
         mInvariantDeviceProfile = InvariantDeviceProfile.INSTANCE.get(context);
-        mIconProvider =  new IconProvider(context, ENABLE_THEMED_ICONS.get());
+        mIconProvider =  new IconProvider(context, Themes.isThemedIconEnabled(context));
         mIconCache = new IconCache(mContext, mInvariantDeviceProfile,
                 iconCacheFileName, mIconProvider);
         mWidgetCache = new WidgetPreviewLoader(mContext, mIconCache);
         mModel = new LauncherModel(context, this, mIconCache, new AppFilter(mContext));
+        mOnTerminateCallback.add(mIconCache::close);
     }
 
     private void onNotificationSettingsChanged(boolean areNotificationDotsEnabled) {
@@ -187,7 +195,8 @@ public class LauncherAppState {
         return InvariantDeviceProfile.INSTANCE.get(context);
     }
 
-    private class IconObserver implements IconProvider.IconChangeListener {
+    private class IconObserver
+            implements IconProvider.IconChangeListener, OnSharedPreferenceChangeListener {
 
         @Override
         public void onAppIconChanged(String packageName, UserHandle user) {
@@ -205,6 +214,14 @@ public class LauncherAppState {
             String iconState = mIconProvider.getSystemIconState();
             if (!iconState.equals(getDevicePrefs(mContext).getString(KEY_ICON_STATE, ""))) {
                 onSystemIconStateChanged(iconState);
+            }
+        }
+
+        @Override
+        public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
+            if (Themes.KEY_THEMED_ICONS.equals(key)) {
+                mIconProvider.setIconThemeSupported(Themes.isThemedIconEnabled(mContext));
+                verifyIconChanged();
             }
         }
     }

@@ -34,8 +34,6 @@ import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 
-import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.DynamicResource;
@@ -43,7 +41,7 @@ import com.android.systemui.plugins.ResourceProvider;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Locale;
 
 /**
  * Applies spring forces to animate from a starting rect to a target rect,
@@ -69,12 +67,12 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
             new FloatPropertyCompat<RectFSpringAnim2>("rectYSpring") {
                 @Override
                 public float getValue(RectFSpringAnim2 anim) {
-                    return anim.mCurrentY;
+                    return anim.mCurrentCenterY;
                 }
 
                 @Override
                 public void setValue(RectFSpringAnim2 anim, float y) {
-                    anim.mCurrentY = y;
+                    anim.mCurrentCenterY = y;
                     anim.onUpdate();
                 }
             };
@@ -100,13 +98,12 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
     private final List<Animator.AnimatorListener> mAnimatorListeners = new ArrayList<>();
 
     private float mCurrentCenterX;
-    private float mCurrentY;
+    private float mCurrentCenterY;
 
     private float mTargetX;
     private float mTargetY;
 
     // If true, tracking the bottom of the rects, else tracking the top.
-    private final boolean mTrackingBottomY;
     private float mProgress;
     private SpringAnimation mRectXAnim;
     private SpringAnimation mRectYAnim;
@@ -139,11 +136,10 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
         mStartRect = startRect;
         mTargetRect = targetRect;
 
-        mTrackingBottomY = startRect.bottom < targetRect.bottom;
-        mCurrentY = mTrackingBottomY ? mStartRect.bottom : mStartRect.top;
+        mCurrentCenterY = mStartRect.centerY();
         mCurrentCenterX = mStartRect.centerX();
 
-        mTargetY = mTrackingBottomY ? mTargetRect.bottom : mTargetRect.top;
+        mTargetY = mTargetRect.centerY();
         mTargetX = mTargetRect.centerX();
 
         ResourceProvider rp = DynamicResource.provider(context);
@@ -156,12 +152,6 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
 
         mHomeTransYEnd = dpToPx(rp.getFloat(R.dimen.swipe_up_trans_y_dp));
         mScaleStart = rp.getFloat(R.dimen.swipe_up_scale_start);
-
-
-        if (!mTrackingBottomY) {
-            mYStiffness *= rp.getFloat(R.dimen.swipe_up_rect_2_y_stiffness_low_swipe_multiplier);
-            mDuration *= rp.getFloat(R.dimen.swipe_up_low_swipe_duration_multiplier);
-        }
 
         mCloseInterpolator = getAppCloseInterpolator(context);
 
@@ -180,11 +170,8 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
         }
 
         if (mRectYAnim != null) {
-            if (mTrackingBottomY && mTargetY != mTargetRect.bottom) {
-                mTargetY = mTargetRect.bottom;
-                mRectYAnim.animateToFinalPosition(mTargetY);
-            } else if (!mTrackingBottomY && mTargetY != mTargetRect.top) {
-                mTargetY = mTargetRect.top;
+            if (mTargetY != mTargetRect.centerY()) {
+                mTargetY = mTargetRect.centerY();
                 mRectYAnim.animateToFinalPosition(mTargetY);
             }
         }
@@ -204,12 +191,8 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
      * @param velocityPxPerMs Velocity of swipe in px/ms.
      */
     public void start(Context context, PointF velocityPxPerMs) {
-        DeviceProfile dp = InvariantDeviceProfile.INSTANCE.get(context).getDeviceProfile(context);
-
         mRectXAnim = new SpringAnimation(this, RECT_CENTER_X)
                 .setStartValue(mCurrentCenterX)
-                .setMinValue(Math.min(0, mCurrentCenterX))
-                .setMaxValue(Math.max(dp.widthPx, mCurrentCenterX))
                 .setStartVelocity(velocityPxPerMs.x * 1000)
                 .setSpring(new SpringForce(mTargetX)
                         .setStiffness(mXStiffness)
@@ -220,9 +203,7 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
         }));
 
         mRectYAnim = new SpringAnimation(this, RECT_Y)
-                .setStartValue(mCurrentY)
-                .setMinValue(Math.min(0, mCurrentY))
-                .setMaxValue(Math.max(dp.heightPx, mCurrentY))
+                .setStartValue(mCurrentCenterY)
                 .setStartVelocity(velocityPxPerMs.y * 1000)
                 .setSpring(new SpringForce(mTargetY)
                         .setStiffness(mYStiffness)
@@ -299,7 +280,7 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
             }
 
             @Override
-            public void onUpdate(float percent) {}
+            public void onUpdate(float percent, boolean initOnly) {}
         };
     }
 
@@ -336,13 +317,11 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
                     mTargetRect.width());
             float currentHeight = Utilities.mapRange(rectProgress, mStartRect.height(),
                     mTargetRect.height());
-            if (mTrackingBottomY) {
-                mCurrentRect.set(mCurrentCenterX - currentWidth / 2, mCurrentY - currentHeight,
-                        mCurrentCenterX + currentWidth / 2, mCurrentY);
-            } else {
-                mCurrentRect.set(mCurrentCenterX - currentWidth / 2, mCurrentY,
-                        mCurrentCenterX + currentWidth / 2, mCurrentY + currentHeight);
-            }
+
+            mCurrentRect.set(mCurrentCenterX - currentWidth / 2,
+                    mCurrentCenterY - currentHeight / 2,
+                    mCurrentCenterX + currentWidth / 2,
+                    mCurrentCenterY + currentHeight / 2);
 
             float currentPlayTime = mRectScaleAnimEnded ? mRectScaleAnim.getDuration()
                     : mRectScaleAnim.getCurrentPlayTime();
@@ -374,7 +353,8 @@ public class RectFSpringAnim2 extends RectFSpringAnim {
 
     private Interpolator getAppCloseInterpolator(Context context) {
         ResourceProvider rp = DynamicResource.provider(context);
-        String path = String.format("M 0,0 C %f, %f, %f, %f, %f, %f C %f, %f, %f, %f, 1, 1",
+        String path = String.format(Locale.ENGLISH,
+                "M 0,0 C %f, %f, %f, %f, %f, %f C %f, %f, %f, %f, 1, 1",
                 rp.getFloat(R.dimen.c1_a),
                 rp.getFloat(R.dimen.c1_b),
                 rp.getFloat(R.dimen.c1_c),

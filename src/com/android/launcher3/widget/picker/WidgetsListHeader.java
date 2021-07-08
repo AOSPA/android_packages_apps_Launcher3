@@ -67,6 +67,7 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
 
     private CheckBox mExpandToggle;
     private boolean mIsExpanded = false;
+    @Nullable private WidgetsListDrawableState mListDrawableState;
 
     public WidgetsListHeader(Context context) {
         this(context, /* attrs= */ null);
@@ -152,6 +153,14 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
             layoutParams.bottomMargin = bottomMargin;
             setLayoutParams(layoutParams);
         }
+    }
+
+    /** Sets the {@link WidgetsListDrawableState} and refreshes the background drawable. */
+    @UiThread
+    public void setListDrawableState(WidgetsListDrawableState state) {
+        if (state == mListDrawableState) return;
+        this.mListDrawableState = state;
+        refreshDrawableState();
     }
 
     /** Apply app icon, labels and tag using a generic {@link WidgetsListHeaderEntry}. */
@@ -275,6 +284,17 @@ public final class WidgetsListHeader extends LinearLayout implements ItemInfoUpd
 
             mEnableIconUpdateAnimation = false;
         }
+    }
+
+    @Override
+    protected int[] onCreateDrawableState(int extraSpace) {
+        if (mListDrawableState == null) return super.onCreateDrawableState(extraSpace);
+        // Augment the state set from the super implementation with the custom states from
+        // mListDrawableState.
+        int[] drawableState =
+                super.onCreateDrawableState(extraSpace + mListDrawableState.mStateSet.length);
+        mergeDrawableStates(drawableState, mListDrawableState.mStateSet);
+        return drawableState;
     }
 
     /** Verifies that the current icon is high-res otherwise posts a request to load the icon. */

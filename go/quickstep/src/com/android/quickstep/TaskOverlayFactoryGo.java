@@ -21,19 +21,19 @@ import static com.android.quickstep.views.OverviewActionsView.DISABLED_ROTATED;
 
 import android.annotation.SuppressLint;
 import android.app.assist.AssistContent;
+import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Matrix;
-import android.net.Uri;
 import android.os.SystemClock;
+import android.os.UserManager;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.BuildConfig;
-import com.android.launcher3.R;
 import com.android.quickstep.util.AssistContentRequester;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.TaskThumbnailView;
@@ -53,18 +53,18 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
     public static final String ACTIONS_ERROR_CODE = "niu_actions_app_error_code";
     public static final int ERROR_PERMISSIONS = 1;
     private static final String TAG = "TaskOverlayFactoryGo";
-    private static final String URI_AUTHORITY =
-            BuildConfig.APPLICATION_ID + ".overview.fileprovider";
-    private static final String FAKE_FILEPATH = "shared_images/null.png";
 
-    // Empty constructor required for ResourceBasedOverride
-    public TaskOverlayFactoryGo(Context context) {}
+    private AssistContentRequester mContentRequester;
+
+    public TaskOverlayFactoryGo(Context context) {
+        mContentRequester = new AssistContentRequester(context);
+    }
 
     /**
      * Create a new overlay instance for the given View
      */
     public TaskOverlayGo createOverlay(TaskThumbnailView thumbnailView) {
-        return new TaskOverlayGo(thumbnailView);
+        return new TaskOverlayGo(thumbnailView, mContentRequester);
     }
 
     /**
@@ -76,9 +76,12 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         private String mTaskPackageName;
         private String mWebUrl;
         private boolean mAssistPermissionsEnabled;
+        private AssistContentRequester mFactoryContentRequester;
 
-        private TaskOverlayGo(TaskThumbnailView taskThumbnailView) {
+        private TaskOverlayGo(TaskThumbnailView taskThumbnailView,
+                AssistContentRequester assistContentRequester) {
             super(taskThumbnailView);
+            mFactoryContentRequester = assistContentRequester;
         }
 
         /**
@@ -88,27 +91,25 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         public void initOverlay(Task task, ThumbnailData thumbnail, Matrix matrix,
                 boolean rotated) {
             getActionsView().updateDisabledFlags(DISABLED_NO_THUMBNAIL, thumbnail == null);
-            mNIUPackageName =
-                    mApplicationContext.getString(R.string.niu_actions_package);
-
+            checkSettings();
             if (thumbnail == null || TextUtils.isEmpty(mNIUPackageName)) {
                 return;
             }
 
             getActionsView().updateDisabledFlags(DISABLED_ROTATED, rotated);
-            boolean isAllowedByPolicy = mThumbnailView.isRealSnapshot();
+            // Disable Overview Actions for Work Profile apps
+            boolean isManagedProfileTask =
+                    UserManager.get(mApplicationContext).isManagedProfile(task.key.userId);
+            boolean isAllowedByPolicy = mThumbnailView.isRealSnapshot() && !isManagedProfileTask;
             getActionsView().setCallbacks(new OverlayUICallbacksGoImpl(isAllowedByPolicy, task));
             mTaskPackageName = task.key.getPackageName();
 
-            checkPermissions();
             if (!mAssistPermissionsEnabled) {
                 return;
             }
 
             int taskId = task.key.id;
-            AssistContentRequester contentRequester =
-                    new AssistContentRequester(mApplicationContext);
-            contentRequester.requestAssistContent(taskId, this::onAssistContentReceived);
+            mFactoryContentRequester.requestAssistContent(taskId, this::onAssistContentReceived);
         }
 
         /** Provide Assist Content to the overlay. */
@@ -127,24 +128,18 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         /**
          * Creates and sends an Intent corresponding to the button that was clicked
          */
-        @VisibleForTesting
-        public void sendNIUIntent(String actionType) {
+        private void sendNIUIntent(String actionType) {
             Intent intent = createNIUIntent(actionType);
             // Only add and send the image if the appropriate permissions are held
             if (mAssistPermissionsEnabled) {
                 mImageApi.shareAsDataWithExplicitIntent(/* crop */ null, intent);
             } else {
                 intent.putExtra(ACTIONS_ERROR_CODE, ERROR_PERMISSIONS);
-                // The Intent recipient expects an image URI, and omitting one or using a
-                // completely invalid URI will cause the Intent parsing to crash.
-                // So we construct a URI for a nonexistent image.
-                Uri uri = new Uri.Builder()
-                        .scheme(ContentResolver.SCHEME_CONTENT)
-                        .authority(URI_AUTHORITY)
-                        .path(FAKE_FILEPATH)
-                        .build();
-                intent.setData(uri);
-                mApplicationContext.startActivity(intent);
+                try {
+                    mApplicationContext.startActivity(intent);
+                } catch (ActivityNotFoundException e) {
+                    Log.e(TAG, "No activity found to receive permission error intent");
+                }
             }
         }
 
@@ -167,13 +162,17 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
          * Checks whether the Assistant has screen context permissions
          */
         @VisibleForTesting
-        public void checkPermissions() {
+        public void checkSettings() {
             ContentResolver contentResolver = mApplicationContext.getContentResolver();
             boolean structureEnabled = Settings.Secure.getInt(contentResolver,
                     Settings.Secure.ASSIST_STRUCTURE_ENABLED, 1) != 0;
             boolean screenshotEnabled = Settings.Secure.getInt(contentResolver,
                     Settings.Secure.ASSIST_SCREENSHOT_ENABLED, 1) != 0;
             mAssistPermissionsEnabled = structureEnabled && screenshotEnabled;
+
+            String assistantPackage =
+                    Settings.Secure.getString(contentResolver, Settings.Secure.ASSISTANT);
+            mNIUPackageName = assistantPackage.split("/", 2)[0];
         }
 
         protected class OverlayUICallbacksGoImpl extends OverlayUICallbacksImpl

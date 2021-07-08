@@ -111,14 +111,14 @@ public final class WidgetsListTableViewHolderBinderTest {
                 mWidgetPreviewLoader,
                 mIconCache,
                 /* iconClickListener= */ view -> {},
-                /* iconLongClickListener= */ view -> false,
-                /* searchBarUIHelper= */ null);
+                /* iconLongClickListener= */ view -> false);
         mViewHolderBinder = new WidgetsListTableViewHolderBinder(
                 mContext,
                 LayoutInflater.from(mTestActivity),
                 mOnIconClickListener,
                 mOnLongClickListener,
                 mWidgetPreviewLoader,
+                new WidgetsListDrawableFactory(mTestActivity),
                 widgetsListAdapter);
     }
 

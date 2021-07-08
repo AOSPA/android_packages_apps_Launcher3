@@ -22,21 +22,23 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import android.content.Context;
 import android.view.View;
 import android.widget.ImageButton;
 
 import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.search.SearchAlgorithm;
+import com.android.launcher3.testing.TestActivity;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
-import org.robolectric.RuntimeEnvironment;
+import org.robolectric.android.controller.ActivityController;
 
 import java.util.ArrayList;
 
@@ -44,7 +46,9 @@ import java.util.ArrayList;
 public class WidgetsSearchBarControllerTest {
 
     private WidgetsSearchBarController mController;
-    private Context mContext;
+    // TODO: Replace ActivityController with ActivityScenario, which is the recommended way for
+    // activity testing.
+    private ActivityController<TestActivity> mActivityController;
     private ExtendedEditText mEditText;
     private ImageButton mCancelButton;
     @Mock
@@ -55,11 +59,18 @@ public class WidgetsSearchBarControllerTest {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-        mContext = RuntimeEnvironment.application;
-        mEditText = new ExtendedEditText(mContext);
-        mCancelButton = new ImageButton(mContext);
+        mActivityController = Robolectric.buildActivity(TestActivity.class);
+        TestActivity testActivity = mActivityController.setup().get();
+
+        mEditText = new ExtendedEditText(testActivity);
+        mCancelButton = new ImageButton(testActivity);
         mController = new WidgetsSearchBarController(
                 mSearchAlgorithm, mEditText, mCancelButton, mSearchModeListener);
+    }
+
+    @After
+    public void tearDown() {
+        mActivityController.destroy();
     }
 
     @Test

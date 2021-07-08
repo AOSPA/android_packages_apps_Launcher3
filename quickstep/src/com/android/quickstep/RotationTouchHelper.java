@@ -38,6 +38,7 @@ import com.android.quickstep.util.RecentsOrientedState;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.TaskStackChangeListener;
+import com.android.systemui.shared.system.TaskStackChangeListeners;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -152,7 +153,7 @@ public class RotationTouchHelper implements
 
         // Register for navigation mode changes
         SysUINavigationMode.Mode newMode = mSysUiNavMode.addModeChangeListener(this);
-        onNavigationModeChanged(newMode);
+        onNavModeChangedInternal(newMode, newMode.hasGestures);
         runOnDestroy(() -> mSysUiNavMode.removeModeChangeListener(this));
 
         mOrientationListener = new OrientationEventListener(mContext) {
@@ -178,14 +179,14 @@ public class RotationTouchHelper implements
     }
 
     private void setupOrientationSwipeHandler() {
-        ActivityManagerWrapper.getInstance().registerTaskStackListener(mFrozenTaskListener);
-        mOnDestroyFrozenTaskRunnable = () -> ActivityManagerWrapper.getInstance()
+        TaskStackChangeListeners.getInstance().registerTaskStackListener(mFrozenTaskListener);
+        mOnDestroyFrozenTaskRunnable = () -> TaskStackChangeListeners.getInstance()
                 .unregisterTaskStackListener(mFrozenTaskListener);
         runOnDestroy(mOnDestroyFrozenTaskRunnable);
     }
 
     private void destroyOrientationSwipeHandlerCallback() {
-        ActivityManagerWrapper.getInstance().unregisterTaskStackListener(mFrozenTaskListener);
+        TaskStackChangeListeners.getInstance().unregisterTaskStackListener(mFrozenTaskListener);
         mOnDestroyActions.remove(mOnDestroyFrozenTaskRunnable);
     }
 
@@ -245,13 +246,22 @@ public class RotationTouchHelper implements
 
     @Override
     public void onNavigationModeChanged(SysUINavigationMode.Mode newMode) {
+        onNavModeChangedInternal(newMode, false);
+    }
+
+    /**
+     * @param forceRegister if {@code true}, this will register {@link #mFrozenTaskListener} via
+     *                      {@link #setupOrientationSwipeHandler()}
+     */
+    private void onNavModeChangedInternal(SysUINavigationMode.Mode newMode, boolean forceRegister) {
         mDisplayController.removeChangeListener(this);
         mDisplayController.addChangeListener(this);
         onDisplayInfoChanged(mContext, mDisplayController.getInfo(), CHANGE_ALL);
 
         mOrientationTouchTransformer.setNavigationMode(newMode, mDisplayController.getInfo(),
-            mContext.getResources());
-        if (!mMode.hasGestures && newMode.hasGestures) {
+                mContext.getResources());
+
+        if (forceRegister || (!mMode.hasGestures && newMode.hasGestures)) {
             setupOrientationSwipeHandler();
         } else if (mMode.hasGestures && !newMode.hasGestures){
             destroyOrientationSwipeHandlerCallback();
@@ -369,7 +379,7 @@ public class RotationTouchHelper implements
 
     private void notifySysuiOfCurrentRotation(int rotation) {
         UI_HELPER_EXECUTOR.execute(() -> SystemUiProxy.INSTANCE.get(mContext)
-                .onQuickSwitchToNewTask(rotation));
+                .notifyPrioritizedRotation(rotation));
     }
 
     /**
