@@ -16,26 +16,41 @@
 
 package com.android.quickstep;
 
+import static android.view.Surface.ROTATION_0;
+
 import static com.android.quickstep.views.OverviewActionsView.DISABLED_NO_THUMBNAIL;
 import static com.android.quickstep.views.OverviewActionsView.DISABLED_ROTATED;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.app.assist.AssistContent;
 import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.drawable.ColorDrawable;
+import android.os.Handler;
 import android.os.SystemClock;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.Button;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.android.launcher3.BaseActivity;
+import com.android.launcher3.BaseDraggingActivity;
+import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.quickstep.util.AssistContentRequester;
-import com.android.quickstep.views.OverviewActionsView;
+import com.android.quickstep.util.RecentsOrientedState;
+import com.android.quickstep.views.GoOverviewActionsView;
 import com.android.quickstep.views.TaskThumbnailView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -51,8 +66,13 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
     public static final String ACTIONS_URL = "niu_actions_app_url";
     public static final String ACTIONS_APP_PACKAGE = "niu_actions_app_package";
     public static final String ACTIONS_ERROR_CODE = "niu_actions_app_error_code";
-    public static final int ERROR_PERMISSIONS = 1;
+    public static final int ERROR_PERMISSIONS_STRUCTURE = 1;
+    public static final int ERROR_PERMISSIONS_SCREENSHOT = 2;
+    private static final String NIU_ACTIONS_CONFIRMED = "launcher_go.niu_actions_confirmed";
     private static final String TAG = "TaskOverlayFactoryGo";
+
+    public static final String LISTEN_TOOL_TIP_SEEN = "launcher.go_listen_tip_seen";
+    public static final String TRANSLATE_TOOL_TIP_SEEN = "launcher.go_translate_tip_seen";
 
     private AssistContentRequester mContentRequester;
 
@@ -71,17 +91,22 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
      * Overlay on each task handling Overview Action Buttons.
      * @param <T> The type of View in which the overlay will be placed
      */
-    public static final class TaskOverlayGo<T extends OverviewActionsView> extends TaskOverlay {
+    public static final class TaskOverlayGo<T extends GoOverviewActionsView> extends TaskOverlay {
         private String mNIUPackageName;
         private String mTaskPackageName;
         private String mWebUrl;
-        private boolean mAssistPermissionsEnabled;
+        private boolean mAssistStructurePermitted;
+        private boolean mAssistScreenshotPermitted;
         private AssistContentRequester mFactoryContentRequester;
+        private SharedPreferences mSharedPreferences;
+        private String mPreviousAction;
+        private AlertDialog mConfirmationDialog;
 
         private TaskOverlayGo(TaskThumbnailView taskThumbnailView,
                 AssistContentRequester assistContentRequester) {
             super(taskThumbnailView);
             mFactoryContentRequester = assistContentRequester;
+            mSharedPreferences = Utilities.getPrefs(mApplicationContext);
         }
 
         /**
@@ -90,6 +115,12 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         @Override
         public void initOverlay(Task task, ThumbnailData thumbnail, Matrix matrix,
                 boolean rotated) {
+            if (mConfirmationDialog != null && mConfirmationDialog.isShowing()) {
+                // Redraw the dialog in case the layout changed
+                mConfirmationDialog.dismiss();
+                showConfirmationDialog();
+            }
+
             getActionsView().updateDisabledFlags(DISABLED_NO_THUMBNAIL, thumbnail == null);
             checkSettings();
             if (thumbnail == null || TextUtils.isEmpty(mNIUPackageName)) {
@@ -103,13 +134,26 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
             boolean isAllowedByPolicy = mThumbnailView.isRealSnapshot() && !isManagedProfileTask;
             getActionsView().setCallbacks(new OverlayUICallbacksGoImpl(isAllowedByPolicy, task));
             mTaskPackageName = task.key.getPackageName();
+            mSharedPreferences = Utilities.getPrefs(mApplicationContext);
 
-            if (!mAssistPermissionsEnabled) {
+            if (!mAssistStructurePermitted || !mAssistScreenshotPermitted) {
                 return;
             }
 
             int taskId = task.key.id;
             mFactoryContentRequester.requestAssistContent(taskId, this::onAssistContentReceived);
+
+            RecentsOrientedState orientedState =
+                    mThumbnailView.getTaskView().getRecentsView().getPagedViewOrientedState();
+            boolean isInLandscape = orientedState.getDisplayRotation() != ROTATION_0;
+
+            // show tooltips in portrait mode only
+            // TODO: remove If check once b/183714277 is fixed
+            if (!isInLandscape) {
+                new Handler().post(() -> {
+                    showTooltipsIfUnseen();
+                });
+            }
         }
 
         /** Provide Assist Content to the overlay. */
@@ -125,16 +169,32 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
             mWebUrl = null;
         }
 
+        @Override
+        public void updateOrientationState(RecentsOrientedState state) {
+            super.updateOrientationState(state);
+            ((GoOverviewActionsView) getActionsView()).updateOrientationState(state);
+        }
+
         /**
          * Creates and sends an Intent corresponding to the button that was clicked
          */
         private void sendNIUIntent(String actionType) {
+            if (!mSharedPreferences.getBoolean(NIU_ACTIONS_CONFIRMED, false)) {
+                mPreviousAction = actionType;
+                showConfirmationDialog();
+                return;
+            }
+
             Intent intent = createNIUIntent(actionType);
             // Only add and send the image if the appropriate permissions are held
-            if (mAssistPermissionsEnabled) {
+            if (mAssistStructurePermitted && mAssistScreenshotPermitted) {
                 mImageApi.shareAsDataWithExplicitIntent(/* crop */ null, intent);
             } else {
-                intent.putExtra(ACTIONS_ERROR_CODE, ERROR_PERMISSIONS);
+                // If both permissions are disabled, the structure error code takes priority
+                // The user must enable that one before they can enable screenshots
+                int code = mAssistStructurePermitted ? ERROR_PERMISSIONS_SCREENSHOT
+                        : ERROR_PERMISSIONS_STRUCTURE;
+                intent.putExtra(ACTIONS_ERROR_CODE, code);
                 try {
                     mApplicationContext.startActivity(intent);
                 } catch (ActivityNotFoundException e) {
@@ -164,11 +224,10 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         @VisibleForTesting
         public void checkSettings() {
             ContentResolver contentResolver = mApplicationContext.getContentResolver();
-            boolean structureEnabled = Settings.Secure.getInt(contentResolver,
+            mAssistStructurePermitted = Settings.Secure.getInt(contentResolver,
                     Settings.Secure.ASSIST_STRUCTURE_ENABLED, 1) != 0;
-            boolean screenshotEnabled = Settings.Secure.getInt(contentResolver,
+            mAssistScreenshotPermitted = Settings.Secure.getInt(contentResolver,
                     Settings.Secure.ASSIST_SCREENSHOT_ENABLED, 1) != 0;
-            mAssistPermissionsEnabled = structureEnabled && screenshotEnabled;
 
             String assistantPackage =
                     Settings.Secure.getString(contentResolver, Settings.Secure.ASSISTANT);
@@ -212,6 +271,49 @@ public final class TaskOverlayFactoryGo extends TaskOverlayFactory {
         @VisibleForTesting
         public void setImageActionsAPI(ImageActionsApi imageActionsApi) {
             mImageApi = imageActionsApi;
+        }
+
+        private void showConfirmationDialog() {
+            BaseDraggingActivity activity = BaseActivity.fromContext(getActionsView().getContext());
+            LayoutInflater inflater = LayoutInflater.from(activity);
+            View view = inflater.inflate(R.layout.niu_actions_confirmation_dialog, /* root */ null);
+
+            Button acceptButton = view.findViewById(R.id.niu_actions_confirmation_accept);
+            acceptButton.setOnClickListener(this::onNiuActionsConfirmationAccept);
+
+            Button rejectButton = view.findViewById(R.id.niu_actions_confirmation_reject);
+            rejectButton.setOnClickListener(this::onNiuActionsConfirmationReject);
+
+            mConfirmationDialog = new AlertDialog.Builder(activity)
+                    .setView(view)
+                    .create();
+            mConfirmationDialog.getWindow()
+                    .setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            mConfirmationDialog.show();
+        }
+
+        private void onNiuActionsConfirmationAccept(View v) {
+            mConfirmationDialog.dismiss();
+            mSharedPreferences.edit().putBoolean(NIU_ACTIONS_CONFIRMED, true).apply();
+            sendNIUIntent(mPreviousAction);
+        }
+
+        private void onNiuActionsConfirmationReject(View v) {
+            mConfirmationDialog.cancel();
+        }
+
+        /**
+         * Checks and Shows the tooltip if they are not seen by user
+         * Order of tooltips are translate and then listen
+         */
+        private void showTooltipsIfUnseen() {
+            if (!mSharedPreferences.getBoolean(TRANSLATE_TOOL_TIP_SEEN, false)) {
+                ((GoOverviewActionsView) getActionsView()).showTranslateToolTip();
+                mSharedPreferences.edit().putBoolean(TRANSLATE_TOOL_TIP_SEEN, true).apply();
+            } else if (!mSharedPreferences.getBoolean(LISTEN_TOOL_TIP_SEEN, false)) {
+                ((GoOverviewActionsView) getActionsView()).showListenToolTip();
+                mSharedPreferences.edit().putBoolean(LISTEN_TOOL_TIP_SEEN, true).apply();
+            }
         }
     }
 

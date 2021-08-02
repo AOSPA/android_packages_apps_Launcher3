@@ -31,6 +31,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.Bundle;
 import android.os.Parcelable;
 import android.os.Process;
 import android.text.Selection;
@@ -50,7 +51,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.ColorUtils;
-import androidx.core.os.BuildCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -81,6 +81,8 @@ import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.OnActivePag
 public class AllAppsContainerView extends SpringRelativeLayout implements DragSource,
         Insettable, OnDeviceProfileChangeListener, OnActivePageChangedListener,
         ScrimView.ScrimDrawingController {
+
+    private static final String BUNDLE_KEY_CURRENT_PAGE = "launcher.allapps.current_page";
 
     public static final float PULL_MULTIPLIER = .02f;
     public static final float FLING_VELOCITY_MULTIPLIER = 1200f;
@@ -181,6 +183,26 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         } catch (Exception e) {
             Log.e("AllAppsContainerView", "restoreInstanceState viewId = 0", e);
         }
+
+        Bundle state = (Bundle) sparseArray.get(R.id.work_tab_state_id, null);
+        if (state != null) {
+            int currentPage = state.getInt(BUNDLE_KEY_CURRENT_PAGE, 0);
+            if (currentPage != 0 && mViewPager != null) {
+                mViewPager.setCurrentPage(currentPage);
+                rebindAdapters(true);
+            } else {
+                reset(true);
+            }
+        }
+
+    }
+
+    @Override
+    protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
+        super.dispatchSaveInstanceState(container);
+        Bundle state = new Bundle();
+        state.putInt(BUNDLE_KEY_CURRENT_PAGE, getCurrentPage());
+        container.put(R.id.work_tab_state_id, state);
     }
 
     /**
@@ -231,24 +253,10 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
     private void resetWorkProfile() {
         boolean isEnabled = !mAllAppsStore.hasModelFlag(FLAG_QUIET_MODE_ENABLED);
-        mWorkModeSwitch.updateCurrentState(isEnabled);
-        mWorkAdapterProvider.updateCurrentState(isEnabled);
-        mAH[AdapterHolder.WORK].applyPadding();
-    }
-
-    private void hideInput() {
-        if (!BuildCompat.isAtLeastR() || !FeatureFlags.ENABLE_DEVICE_SEARCH.get()) return;
-
-        WindowInsets insets = getRootWindowInsets();
-        if (insets == null) return;
-
-        if (insets.isVisible(WindowInsets.Type.ime())) {
-            hideIme();
+        if (mWorkModeSwitch != null) {
+            mWorkModeSwitch.updateCurrentState(isEnabled);
         }
-    }
-
-    protected void hideIme() {
-        getWindowInsetsController().hide(WindowInsets.Type.ime());
+        mWorkAdapterProvider.updateCurrentState(isEnabled);
     }
 
     /**
@@ -266,7 +274,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         }
         if (rv.getScrollbar().getThumbOffsetY() >= 0 &&
                 mLauncher.getDragLayer().isEventOverView(rv.getScrollbar(), ev)) {
-            hideInput();
             return false;
         }
         return rv.shouldContainerScroll(ev, mLauncher.getDragLayer());
@@ -487,7 +494,10 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
                     R.layout.work_mode_fab, this, false);
             this.addView(mWorkModeSwitch);
             mWorkModeSwitch.setInsets(mInsets);
-            mWorkModeSwitch.post(this::resetWorkProfile);
+            mWorkModeSwitch.post(() -> {
+                mAH[AdapterHolder.WORK].applyPadding();
+                resetWorkProfile();
+            });
         }
     }
 
@@ -611,6 +621,7 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             mSearchModeWhileUsingTabs = true;
             rebindAdapters(false); // hide tabs
         }
+        mHeader.setCollapsed(true);
     }
 
     public void onClearSearchResult() {
@@ -693,8 +704,12 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
         if (mHeaderPaint.getColor() != mScrimColor && mHeaderPaint.getColor() != 0) {
             int bottom = mUsingTabs && mHeader.mHeaderCollapsed ? mHeader.getVisibleBottomBound()
                     : mSearchContainer.getBottom();
-            canvas.drawRect(0, 0, getWidth(), bottom + getTranslationY(),
+            canvas.drawRect(0, 0, canvas.getWidth(), bottom + getTranslationY(),
                     mHeaderPaint);
+
+            if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && getTranslationY() == 0) {
+                mSearchUiManager.getEditText().setBackground(null);
+            }
         }
     }
 
@@ -761,7 +776,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
                 int bottomOffset = mWorkModeSwitch != null && mIsWork ? switchH : 0;
                 recyclerView.setPadding(padding.left, padding.top, padding.right,
                         padding.bottom + bottomOffset);
-                recyclerView.scrollToTop();
             }
         }
 
@@ -783,6 +797,9 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
             getSearchView().setBackgroundColor(viewBG);
             getFloatingHeaderView().setHeaderColor(viewBG);
             invalidateHeader();
+            if (scrolledOffset == 0 && mSearchUiManager.getEditText() != null) {
+                mSearchUiManager.getEditText().show();
+            }
         }
     }
 

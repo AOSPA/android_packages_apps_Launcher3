@@ -18,8 +18,9 @@ package com.android.launcher3.widget.picker;
 import static com.android.launcher3.widget.picker.WidgetsListDrawableState.LAST;
 import static com.android.launcher3.widget.picker.WidgetsListDrawableState.MIDDLE;
 
-import android.content.Context;
+import android.graphics.Bitmap;
 import android.util.Log;
+import android.util.Size;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -30,9 +31,9 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 
 import com.android.launcher3.R;
-import com.android.launcher3.WidgetPreviewLoader;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.recyclerview.ViewHolderBinder;
+import com.android.launcher3.widget.CachingWidgetPreviewLoader;
 import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.util.WidgetsTableUtils;
@@ -48,21 +49,19 @@ public final class WidgetsListTableViewHolderBinder
     private static final boolean DEBUG = false;
     private static final String TAG = "WidgetsListRowViewHolderBinder";
 
-    private int mMaxSpansPerRow = 4;
     private final LayoutInflater mLayoutInflater;
     private final OnClickListener mIconClickListener;
     private final OnLongClickListener mIconLongClickListener;
-    private final WidgetPreviewLoader mWidgetPreviewLoader;
     private final WidgetsListDrawableFactory mListDrawableFactory;
+    private final CachingWidgetPreviewLoader mWidgetPreviewLoader;
     private final WidgetsListAdapter mWidgetsListAdapter;
     private boolean mApplyBitmapDeferred = false;
 
     public WidgetsListTableViewHolderBinder(
-            Context context,
             LayoutInflater layoutInflater,
             OnClickListener iconClickListener,
             OnLongClickListener iconLongClickListener,
-            WidgetPreviewLoader widgetPreviewLoader,
+            CachingWidgetPreviewLoader widgetPreviewLoader,
             WidgetsListDrawableFactory listDrawableFactory,
             WidgetsListAdapter listAdapter) {
         mLayoutInflater = layoutInflater;
@@ -75,15 +74,11 @@ public final class WidgetsListTableViewHolderBinder
 
     /**
      * Defers applying bitmap on all the {@link WidgetCell} at
-     * {@link #bindViewHolder(WidgetsRowViewHolder, WidgetsListContentEntry)} if
+     * {@link #bindViewHolder(WidgetsRowViewHolder, WidgetsListContentEntry, int)} if
      * {@code applyBitmapDeferred} is {@code true}.
      */
     public void setApplyBitmapDeferred(boolean applyBitmapDeferred) {
         mApplyBitmapDeferred = applyBitmapDeferred;
-    }
-
-    public void setMaxSpansPerRow(int maxSpansPerRow) {
-        mMaxSpansPerRow = maxSpansPerRow;
     }
 
     @Override
@@ -113,7 +108,8 @@ public final class WidgetsListTableViewHolderBinder
                 position == mWidgetsListAdapter.getItemCount() - 1 ? LAST : MIDDLE);
 
         List<ArrayList<WidgetItem>> widgetItemsTable =
-                WidgetsTableUtils.groupWidgetItemsIntoTable(entry.mWidgets, mMaxSpansPerRow);
+                WidgetsTableUtils.groupWidgetItemsIntoTable(
+                        entry.mWidgets, entry.getMaxSpanSizeInCells());
         recycleTableBeforeBinding(table, widgetItemsTable);
         // Bind the widget items.
         for (int i = 0; i < widgetItemsTable.size(); i++) {
@@ -124,10 +120,15 @@ public final class WidgetsListTableViewHolderBinder
                 WidgetCell widget = (WidgetCell) row.getChildAt(j);
                 widget.clear();
                 WidgetItem widgetItem = widgetItemsPerRow.get(j);
-                widget.setPreviewSize(widgetItem.spanX, widgetItem.spanY);
+                Size previewSize = widget.setPreviewSize(widgetItem.spanX, widgetItem.spanY);
                 widget.applyFromCellItem(widgetItem, mWidgetPreviewLoader);
                 widget.setApplyBitmapDeferred(mApplyBitmapDeferred);
-                widget.ensurePreview();
+                Bitmap preview = mWidgetPreviewLoader.getPreview(widgetItem, previewSize);
+                if (preview == null) {
+                    widget.ensurePreview();
+                } else {
+                    widget.applyPreview(preview);
+                }
                 widget.setVisibility(View.VISIBLE);
             }
         }

@@ -28,6 +28,7 @@ import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.PackageManagerHelper.hasShortcutsPermission;
 import static com.android.launcher3.util.PackageManagerHelper.isSystemApp;
 
+import android.annotation.SuppressLint;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.ContentResolver;
@@ -40,6 +41,7 @@ import android.content.pm.PackageInstaller;
 import android.content.pm.PackageInstaller.SessionInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
+import android.graphics.Point;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.UserHandle;
@@ -50,6 +52,8 @@ import android.util.Log;
 import android.util.LongSparseArray;
 import android.util.TimingLogger;
 
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherSettings;
@@ -71,7 +75,6 @@ import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
-import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.PackageInstallInfo;
@@ -376,6 +379,8 @@ public class LoaderTask implements Runnable {
                         LauncherSettings.Favorites.RANK);
                 final int optionsIndex = c.getColumnIndexOrThrow(
                         LauncherSettings.Favorites.OPTIONS);
+                final int sourceContainerIndex = c.getColumnIndexOrThrow(
+                        LauncherSettings.Favorites.APPWIDGET_SOURCE);
 
                 final LongSparseArray<Boolean> unlockedUsers = new LongSparseArray<>();
 
@@ -743,6 +748,7 @@ public class LoaderTask implements Runnable {
                                 appWidgetInfo.spanY = c.getInt(spanYIndex);
                                 appWidgetInfo.options = c.getInt(optionsIndex);
                                 appWidgetInfo.user = c.user;
+                                appWidgetInfo.sourceContainer = c.getInt(sourceContainerIndex);
 
                                 if (appWidgetInfo.spanX <= 0 || appWidgetInfo.spanY <= 0) {
                                     c.markDeleted("Widget has invalid size: "
@@ -754,6 +760,9 @@ public class LoaderTask implements Runnable {
                                 if (widgetProviderInfo != null
                                         && (appWidgetInfo.spanX < widgetProviderInfo.minSpanX
                                         || appWidgetInfo.spanY < widgetProviderInfo.minSpanY)) {
+                                    logDeleteWidgetInfo(mApp.getInvariantDeviceProfile(),
+                                            widgetProviderInfo);
+
                                     // This can happen when display size changes.
                                     c.markDeleted("Widget removed, min sizes not met: "
                                             + "span=" + appWidgetInfo.spanX + "x"
@@ -784,8 +793,8 @@ public class LoaderTask implements Runnable {
 
                                 if (appWidgetInfo.restoreStatus !=
                                         LauncherAppWidgetInfo.RESTORE_COMPLETED) {
-                                    String pkg = appWidgetInfo.providerName.getPackageName();
-                                    appWidgetInfo.pendingItemInfo = new PackageItemInfo(pkg);
+                                    appWidgetInfo.pendingItemInfo = WidgetsModel.newPendingItemInfo(
+                                            appWidgetInfo.providerName);
                                     appWidgetInfo.pendingItemInfo.user = appWidgetInfo.user;
                                     mIconCache.getTitleAndIconForApp(
                                             appWidgetInfo.pendingItemInfo, false);
@@ -978,6 +987,51 @@ public class LoaderTask implements Runnable {
     public static boolean isValidProvider(AppWidgetProviderInfo provider) {
         return (provider != null) && (provider.provider != null)
                 && (provider.provider.getPackageName() != null);
+    }
+
+    @SuppressLint("NewApi") // Already added API check.
+    private static void logDeleteWidgetInfo(InvariantDeviceProfile idp,
+            LauncherAppWidgetProviderInfo widgetProviderInfo) {
+        FileLog.d(TAG, "Deleting " + widgetProviderInfo.getComponent()
+                + " due to min size constraint");
+        Point cellSize = new Point();
+        for (DeviceProfile deviceProfile : idp.supportedProfiles) {
+            deviceProfile.getCellSize(cellSize);
+            FileLog.d(TAG, "DeviceProfile available width: " + deviceProfile.availableWidthPx
+                    + ", available height: " + deviceProfile.availableHeightPx
+                    + ", cellLayoutBorderSpacingPx: " + deviceProfile.cellLayoutBorderSpacingPx
+                    + ", cellSize: " + cellSize);
+        }
+
+        StringBuilder widgetDimension = new StringBuilder();
+        widgetDimension.append("Widget dimensions:\n")
+                .append("minResizeWidth: ")
+                .append(widgetProviderInfo.minResizeWidth)
+                .append("\n")
+                .append("minResizeHeight: ")
+                .append(widgetProviderInfo.minResizeHeight)
+                .append("\n")
+                .append("defaultWidth: ")
+                .append(widgetProviderInfo.minWidth)
+                .append("\n")
+                .append("defaultHeight: ")
+                .append(widgetProviderInfo.minHeight)
+                .append("\n");
+        if (Utilities.ATLEAST_S) {
+            widgetDimension.append("targetCellWidth: ")
+                    .append(widgetProviderInfo.targetCellWidth)
+                    .append("\n")
+                    .append("targetCellHeight: ")
+                    .append(widgetProviderInfo.targetCellHeight)
+                    .append("\n")
+                    .append("maxResizeWidth: ")
+                    .append(widgetProviderInfo.maxResizeWidth)
+                    .append("\n")
+                    .append("maxResizeHeight: ")
+                    .append(widgetProviderInfo.maxResizeHeight)
+                    .append("\n");
+        }
+        FileLog.d(TAG, widgetDimension.toString());
     }
 
     private static void logASplit(final TimingLogger logger, final String label) {

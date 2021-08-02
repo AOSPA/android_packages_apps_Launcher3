@@ -115,7 +115,7 @@ public class WidgetsDiffReporter {
                 // or did the widget size and desc, span, etc change?
                 if (!isSamePackageItemInfo(orgRowEntry.mPkgItem, newRowEntry.mPkgItem)
                         || hasHeaderUpdated(orgRowEntry, newRowEntry)
-                        || hasWidgetsListChanged(orgRowEntry, newRowEntry)) {
+                        || hasWidgetsListContentChanged(orgRowEntry, newRowEntry)) {
                     index = currentEntries.indexOf(orgRowEntry);
                     currentEntries.set(index, newRowEntry);
                     mListener.notifyItemChanged(index);
@@ -158,17 +158,15 @@ public class WidgetsDiffReporter {
 
     /**
      * Returns {@code true} if both {@code curRow} & {@code newRow} are
-     * {@link WidgetsListContentEntry}s with a different list of widgets.
+     * {@link WidgetsListContentEntry}s with a different list or arrangement of widgets.
      */
-    private boolean hasWidgetsListChanged(WidgetsListBaseEntry curRow,
+    private boolean hasWidgetsListContentChanged(WidgetsListBaseEntry curRow,
             WidgetsListBaseEntry newRow) {
         if (!(curRow instanceof WidgetsListContentEntry)
                 || !(newRow instanceof WidgetsListContentEntry)) {
             return false;
         }
-        WidgetsListContentEntry orgRowEntry = (WidgetsListContentEntry) curRow;
-        WidgetsListContentEntry newRowEntry = (WidgetsListContentEntry) newRow;
-        return !orgRowEntry.mWidgets.equals(newRowEntry.mWidgets);
+        return !curRow.equals(newRow);
     }
 
     /**
@@ -177,7 +175,7 @@ public class WidgetsDiffReporter {
      */
     private boolean hasHeaderUpdated(WidgetsListBaseEntry curRow, WidgetsListBaseEntry newRow) {
         if (newRow instanceof WidgetsListHeaderEntry && curRow instanceof WidgetsListHeaderEntry) {
-            return ((WidgetsListHeaderEntry) newRow).hasEntryUpdated() || !curRow.equals(newRow);
+            return !curRow.equals(newRow);
         }
         if (newRow instanceof WidgetsListSearchHeaderEntry
                 && curRow instanceof WidgetsListSearchHeaderEntry) {
