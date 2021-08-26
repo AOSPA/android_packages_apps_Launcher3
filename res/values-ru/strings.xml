@@ -35,6 +35,7 @@
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Виджет \"<xliff:g id="WIDGET_NAME">%1$s</xliff:g>\""</string>
     <string name="add_item_request_drag_hint" msgid="5653291305078645405">"Чтобы переместить виджет, нажмите на него и удерживайте."</string>
     <string name="add_to_home_screen" msgid="8631549138215492708">"Добавить на главный экран"</string>
+    <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"Виджет \"<xliff:g id="WIDGET_NAME">%1$s</xliff:g>\" добавлен на главный экран"</string>
     <plurals name="widgets_count" formatted="false" msgid="656794749266073027">
       <item quantity="one"><xliff:g id="WIDGETS_COUNT_1">%1$d</xliff:g> виджет</item>
       <item quantity="few"><xliff:g id="WIDGETS_COUNT_1">%1$d</xliff:g> виджета</item>
@@ -74,7 +75,7 @@
     <string name="all_apps_button_label" msgid="8130441508702294465">"Список приложений"</string>
     <string name="all_apps_button_personal_label" msgid="1315764287305224468">"Открыть список личных приложений"</string>
     <string name="all_apps_button_work_label" msgid="7270707118948892488">"Открыть список приложений для работы"</string>
-    <string name="remove_drop_target_label" msgid="7812859488053230776">"Убрать"</string>
+    <string name="remove_drop_target_label" msgid="7812859488053230776">"Удалить"</string>
     <string name="uninstall_drop_target_label" msgid="4722034217958379417">"Удалить"</string>
     <string name="app_info_drop_target_label" msgid="692894985365717661">"О приложении"</string>
     <string name="install_drop_target_label" msgid="2539096853673231757">"Установить"</string>

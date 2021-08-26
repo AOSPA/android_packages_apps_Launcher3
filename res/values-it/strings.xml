@@ -35,6 +35,7 @@
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
     <string name="add_item_request_drag_hint" msgid="5653291305078645405">"Tocca e tieni premuto il widget per spostarlo nella schermata Home"</string>
     <string name="add_to_home_screen" msgid="8631549138215492708">"Aggiungi a schermata Home"</string>
+    <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"Widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g> aggiunto alla schermata Home"</string>
     <plurals name="widgets_count" formatted="false" msgid="656794749266073027">
       <item quantity="other"><xliff:g id="WIDGETS_COUNT_1">%1$d</xliff:g> widget</item>
       <item quantity="one"><xliff:g id="WIDGETS_COUNT_0">%1$d</xliff:g> widget</item>
@@ -84,7 +85,7 @@
     <string name="permdesc_write_settings" msgid="5440712911516509985">"Consente all\'app di modificare le impostazioni e le scorciatoie in Home."</string>
     <string name="msg_no_phone_permission" msgid="9208659281529857371">"L\'app <xliff:g id="APP_NAME">%1$s</xliff:g> non è autorizzata a effettuare telefonate"</string>
     <string name="gadget_error_text" msgid="740356548025791839">"Impossibile caricare il widget"</string>
-    <string name="gadget_setup_text" msgid="1745356155479272374">"Tocca per completare la configurazione"</string>
+    <string name="gadget_setup_text" msgid="1745356155479272374">"Tocca e completa configurazione"</string>
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"Questa è un\'app di sistema e non può essere disinstallata."</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"Modifica nome"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"App <xliff:g id="APP_NAME">%1$s</xliff:g> disattivata"</string>
