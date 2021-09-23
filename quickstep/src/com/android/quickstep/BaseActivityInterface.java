@@ -48,7 +48,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -207,37 +206,22 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect,
             PagedOrientationHandler orientedState) {
         Resources res = context.getResources();
-        if (dp.isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get()) {
+        if (dp.overviewShowAsGrid) {
             Rect gridRect = new Rect();
             calculateGridSize(context, dp, gridRect);
 
-            int verticalMargin = res.getDimensionPixelSize(
-                    R.dimen.overview_grid_focus_vertical_margin);
-            float taskHeight = gridRect.height() - verticalMargin * 2;
-
             PointF taskDimension = getTaskDimension(context, dp);
-            float scale = taskHeight / Math.max(taskDimension.x, taskDimension.y);
+            float scale = gridRect.height() / taskDimension.y;
             int outWidth = Math.round(scale * taskDimension.x);
             int outHeight = Math.round(scale * taskDimension.y);
 
-            int gravity = Gravity.CENTER_VERTICAL;
-            gravity |= orientedState.getRecentsRtlSetting(res) ? Gravity.RIGHT : Gravity.LEFT;
+            int gravity = Gravity.CENTER;
             Gravity.apply(gravity, outWidth, outHeight, gridRect, outRect);
         } else {
             int taskMargin = dp.overviewTaskMarginPx;
-            int proactiveRowAndMargin;
-            if (!TaskView.SHOW_PROACTIVE_ACTIONS || dp.isVerticalBarLayout()) {
-                // In Vertical Bar Layout the proactive row doesn't have its own space, it's inside
-                // the actions row.
-                proactiveRowAndMargin = 0;
-            } else {
-                proactiveRowAndMargin = res.getDimensionPixelSize(
-                        R.dimen.overview_proactive_row_height)
-                        + res.getDimensionPixelSize(R.dimen.overview_proactive_row_bottom_margin);
-            }
             calculateTaskSizeInternal(context, dp,
                     dp.overviewTaskThumbnailTopMarginPx,
-                    proactiveRowAndMargin + getOverviewActionsHeight(context, dp),
+                    getProactiveRowAndMargin(context, dp) + getOverviewActionsHeight(context, dp),
                     res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
                     outRect);
         }
@@ -299,13 +283,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      */
     public final void calculateGridSize(Context context, DeviceProfile dp, Rect outRect) {
         Resources res = context.getResources();
-        int topMargin = res.getDimensionPixelSize(R.dimen.overview_grid_top_margin);
-        int bottomMargin = res.getDimensionPixelSize(R.dimen.overview_grid_bottom_margin);
+        Rect insets = dp.getInsets();
+        int topMargin = dp.overviewTaskThumbnailTopMarginPx;
+        int bottomMargin =
+                getProactiveRowAndMargin(context, dp) + getOverviewActionsHeight(context, dp);
         int sideMargin = res.getDimensionPixelSize(R.dimen.overview_grid_side_margin);
 
-        Rect insets = dp.getInsets();
         outRect.set(0, 0, dp.widthPx, dp.heightPx);
-        outRect.inset(Math.max(insets.left, sideMargin), Math.max(insets.top, topMargin),
+        outRect.inset(Math.max(insets.left, sideMargin), insets.top + topMargin,
                 Math.max(insets.right, sideMargin), Math.max(insets.bottom, bottomMargin));
     }
 
@@ -318,18 +303,17 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         Rect gridRect = new Rect();
         calculateGridSize(context, dp, gridRect);
 
-        int rowSpacing = res.getDimensionPixelSize(R.dimen.overview_grid_row_spacing);
-        float rowHeight = (gridRect.height() - rowSpacing) / 2f;
+        float rowHeight =
+                (gridRect.height() + dp.overviewTaskThumbnailTopMarginPx - dp.overviewRowSpacing)
+                        / 2f;
 
         PointF taskDimension = getTaskDimension(context, dp);
-        float scale = (rowHeight - dp.overviewTaskThumbnailTopMarginPx) / Math.max(
-                taskDimension.x, taskDimension.y);
+        float scale = (rowHeight - dp.overviewTaskThumbnailTopMarginPx) / taskDimension.y;
         int outWidth = Math.round(scale * taskDimension.x);
         int outHeight = Math.round(scale * taskDimension.y);
 
         int gravity = Gravity.TOP;
         gravity |= orientedState.getRecentsRtlSetting(res) ? Gravity.RIGHT : Gravity.LEFT;
-        gridRect.inset(0, dp.overviewTaskThumbnailTopMarginPx, 0, 0);
         Gravity.apply(gravity, outWidth, outHeight, gridRect, outRect);
     }
 
@@ -345,6 +329,21 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                 outRect);
     }
 
+    private int getProactiveRowAndMargin(Context context, DeviceProfile dp) {
+        Resources res = context.getResources();
+        int proactiveRowAndMargin;
+        if (!TaskView.SHOW_PROACTIVE_ACTIONS || dp.isVerticalBarLayout()) {
+            // In Vertical Bar Layout the proactive row doesn't have its own space, it's inside
+            // the actions row.
+            proactiveRowAndMargin = 0;
+        } else {
+            proactiveRowAndMargin = res.getDimensionPixelSize(
+                    R.dimen.overview_proactive_row_height)
+                    + res.getDimensionPixelSize(R.dimen.overview_proactive_row_bottom_margin);
+        }
+        return proactiveRowAndMargin;
+    }
+
     /** Gets the space that the overview actions will take, including bottom margin. */
     private int getOverviewActionsHeight(Context context, DeviceProfile dp) {
         Resources res = context.getResources();
@@ -358,7 +357,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * an optional additional animation with the same duration.
      */
     public @Nullable Animator getParallelAnimationToLauncher(
-            GestureState.GestureEndTarget endTarget, long duration) {
+            GestureState.GestureEndTarget endTarget, long duration,
+            RecentsAnimationCallbacks callbacks) {
         if (endTarget == RECENTS) {
             ACTIVITY_TYPE activity = getCreatedActivity();
             if (activity == null) {
@@ -399,6 +399,10 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         default boolean isRecentsAttachedToAppWindow() {
             return false;
         }
+
+        default boolean hasRecentsEverAttachedToAppWindow() {
+            return false;
+        }
     }
 
     class DefaultAnimationFactory implements AnimationFactory {
@@ -408,6 +412,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         private final Consumer<AnimatorControllerWithResistance> mCallback;
 
         private boolean mIsAttachedToWindow;
+        private boolean mHasEverAttachedToWindow;
 
         DefaultAnimationFactory(Consumer<AnimatorControllerWithResistance> callback) {
             mCallback = callback;
@@ -461,6 +466,9 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             }
             mIsAttachedToWindow = attached;
             RecentsView recentsView = mActivity.getOverviewPanel();
+            if (attached) {
+                mHasEverAttachedToWindow = true;
+            }
             Animator fadeAnim = mActivity.getStateManager()
                     .createStateElementAnimation(INDEX_RECENTS_FADE_ANIM, attached ? 1 : 0);
 
@@ -488,6 +496,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         @Override
         public boolean isRecentsAttachedToAppWindow() {
             return mIsAttachedToWindow;
+        }
+
+        @Override
+        public boolean hasRecentsEverAttachedToAppWindow() {
+            return mHasEverAttachedToWindow;
         }
 
         protected void createBackgroundToOverviewAnim(ACTIVITY_TYPE activity, PendingAnimation pa) {

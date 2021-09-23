@@ -50,8 +50,6 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
      */
     private boolean isEnabled = true;
 
-    private boolean mHasFinishRecentsInAction = false;
-
     public SystemShortcut(int iconResId, int labelResId, T target, ItemInfo itemInfo) {
         mIconResId = iconResId;
         mLabelResId = labelResId;
@@ -100,14 +98,6 @@ public abstract class SystemShortcut<T extends BaseDraggingActivity> extends Ite
 
     public boolean hasHandlerForAction(int action) {
         return mAccessibilityActionId == action;
-    }
-
-    public void setHasFinishRecentsInAction(boolean hasFinishRecentsInAction) {
-        mHasFinishRecentsInAction = hasFinishRecentsInAction;
-    }
-
-    public boolean hasFinishRecentsInAction() {
-        return mHasFinishRecentsInAction;
     }
 
     public interface Factory<T extends BaseDraggingActivity> {

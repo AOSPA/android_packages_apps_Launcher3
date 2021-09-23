@@ -68,6 +68,10 @@ public class Background extends LauncherInstrumentation.VisibleContainer {
     }
 
     protected boolean zeroButtonToOverviewGestureStartsInLauncher() {
+        return mLauncher.isTablet();
+    }
+
+    protected boolean zeroButtonToOverviewGestureStateTransitionWhileHolding() {
         return false;
     }
 
@@ -90,21 +94,32 @@ public class Background extends LauncherInstrumentation.VisibleContainer {
 
                 mLauncher.sendPointer(
                         downTime, downTime, MotionEvent.ACTION_DOWN, start, gestureScope);
-                mLauncher.executeAndWaitForLauncherEvent(
-                        () -> mLauncher.movePointer(
-                                downTime,
-                                downTime,
-                                ZERO_BUTTON_SWIPE_UP_GESTURE_DURATION,
-                                start,
-                                end,
-                                gestureScope),
-                        event -> TestProtocol.PAUSE_DETECTED_MESSAGE.equals(event.getClassName()),
-                        () -> "Pause wasn't detected", "swiping and holding");
-                mLauncher.runToState(
-                        () -> mLauncher.sendPointer(
-                                downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, end,
-                                gestureScope),
-                        OVERVIEW_STATE_ORDINAL, "sending UP event");
+                Runnable swipeAndHold = () -> mLauncher.movePointer(
+                        downTime,
+                        downTime,
+                        ZERO_BUTTON_SWIPE_UP_GESTURE_DURATION,
+                        start,
+                        end,
+                        gestureScope);
+                String swipeAndHoldAction = "swiping and holding";
+                Runnable up = () -> mLauncher.sendPointer(
+                        downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, end,
+                        gestureScope);
+                String upAction = "sending UP event";
+                if (zeroButtonToOverviewGestureStateTransitionWhileHolding()) {
+                    mLauncher.runToState(swipeAndHold, OVERVIEW_STATE_ORDINAL, swipeAndHoldAction);
+                    try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(upAction)) {
+                        up.run();
+                    }
+                } else {
+                    mLauncher.executeAndWaitForLauncherEvent(
+                            swipeAndHold,
+                            event -> TestProtocol.PAUSE_DETECTED_MESSAGE.equals(
+                                    event.getClassName()),
+                            () -> "Pause wasn't detected",
+                            swipeAndHoldAction);
+                    mLauncher.runToState(up, OVERVIEW_STATE_ORDINAL, upAction);
+                }
                 break;
             }
 
@@ -134,9 +149,15 @@ public class Background extends LauncherInstrumentation.VisibleContainer {
             }
 
             case THREE_BUTTON:
+                if (mLauncher.isTablet()) {
+                    mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN,
+                            LauncherInstrumentation.EVENT_TOUCH_DOWN);
+                    mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN,
+                            LauncherInstrumentation.EVENT_TOUCH_UP);
+                }
                 mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, SQUARE_BUTTON_EVENT);
                 mLauncher.runToState(
-                        () -> mLauncher.waitForSystemUiObject("recent_apps").click(),
+                        () -> mLauncher.waitForNavigationUiObject("recent_apps").click(),
                         OVERVIEW_STATE_ORDINAL, "clicking Recents button");
                 break;
         }
@@ -224,11 +245,23 @@ public class Background extends LauncherInstrumentation.VisibleContainer {
 
                 case THREE_BUTTON:
                     // Double press the recents button.
-                    UiObject2 recentsButton = mLauncher.waitForSystemUiObject("recent_apps");
+                    UiObject2 recentsButton = mLauncher.waitForNavigationUiObject("recent_apps");
+                    if (mLauncher.isTablet()) {
+                        mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN,
+                                LauncherInstrumentation.EVENT_TOUCH_DOWN);
+                        mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN,
+                                LauncherInstrumentation.EVENT_TOUCH_UP);
+                    }
                     mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, SQUARE_BUTTON_EVENT);
                     mLauncher.runToState(() -> recentsButton.click(), OVERVIEW_STATE_ORDINAL,
                             "clicking Recents button for the first time");
                     mLauncher.getOverview();
+                    if (mLauncher.isTablet()) {
+                        mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN,
+                                LauncherInstrumentation.EVENT_TOUCH_DOWN);
+                        mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN,
+                                LauncherInstrumentation.EVENT_TOUCH_UP);
+                    }
                     mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, SQUARE_BUTTON_EVENT);
                     mLauncher.executeAndWaitForEvent(
                             () -> recentsButton.click(),

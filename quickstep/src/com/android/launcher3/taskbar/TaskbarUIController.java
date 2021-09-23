@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.taskbar;
 
+import android.graphics.Rect;
+
 /**
  * Base class for providing different taskbar UI
  */
@@ -22,12 +24,7 @@ public class TaskbarUIController {
 
     public static final TaskbarUIController DEFAULT = new TaskbarUIController();
 
-    /**
-     * Pads the Hotseat to line up exactly with Taskbar's copy of the Hotseat.
-     */
-    public void alignRealHotseatWithTaskbar() { }
-
-    protected void onCreate() { }
+    protected void init(TaskbarControllers taskbarControllers) { }
 
     protected void onDestroy() { }
 
@@ -35,7 +32,5 @@ public class TaskbarUIController {
         return true;
     }
 
-    protected void onImeVisible(TaskbarDragLayer container, boolean isVisible) {
-        container.updateImeBarVisibilityAlpha(isVisible ? 1 : 0);
-    }
+    protected void updateContentInsets(Rect outContentInsets) { }
 }

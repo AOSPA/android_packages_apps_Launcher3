@@ -34,26 +34,16 @@ import android.content.Context;
 import android.os.Process;
 import android.os.UserHandle;
 
-import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.ComponentWithLabel;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.QuickstepModelDelegate.PredictorState;
-import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.model.data.LauncherAppWidgetInfo;
-import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.shadows.ShadowDeviceFlag;
-import com.android.launcher3.util.ComponentKey;
-import com.android.launcher3.util.IntArray;
-import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherModelHelper;
-import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
-import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -67,9 +57,6 @@ import org.robolectric.shadows.ShadowAppWidgetManager;
 import org.robolectric.shadows.ShadowPackageManager;
 import org.robolectric.util.ReflectionHelpers;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -87,7 +74,6 @@ public final class WidgetsPredicationUpdateTaskTest {
     private Context mContext;
     private LauncherModelHelper mModelHelper;
     private UserHandle mUserHandle;
-    private InvariantDeviceProfile mTestProfile;
 
     @Mock
     private IconCache mIconCache;
@@ -103,7 +89,6 @@ public final class WidgetsPredicationUpdateTaskTest {
         mContext = RuntimeEnvironment.application;
         mModelHelper = new LauncherModelHelper();
         mUserHandle = Process.myUserHandle();
-        mTestProfile = new InvariantDeviceProfile();
         // 2 widgets, app4/provider1 & app5/provider1, have already been added to the workspace.
         mModelHelper.initializeData("/widgets_predication_update_task_data.txt");
 
@@ -237,65 +222,5 @@ public final class WidgetsPredicationUpdateTaskTest {
         public void bindExtraContainerItems(FixedContainerItems item) {
             mRecommendedWidgets = item;
         }
-
-        @Override
-        public int getPageToBindSynchronously() {
-            return 0;
-        }
-
-        @Override
-        public void clearPendingBinds() { }
-
-        @Override
-        public void startBinding() { }
-
-        @Override
-        public void bindItems(List<ItemInfo> shortcuts, boolean forceAnimateIcons) { }
-
-        @Override
-        public void bindScreens(IntArray orderedScreenIds) { }
-
-        @Override
-        public void finishFirstPageBind(ViewOnDrawExecutor executor) { }
-
-        @Override
-        public void finishBindingItems(int pageBoundFirst) { }
-
-        @Override
-        public void preAddApps() { }
-
-        @Override
-        public void bindAppsAdded(IntArray newScreens, ArrayList<ItemInfo> addNotAnimated,
-                ArrayList<ItemInfo> addAnimated) { }
-
-        @Override
-        public void bindIncrementalDownloadProgressUpdated(AppInfo app) { }
-
-        @Override
-        public void bindWorkspaceItemsChanged(List<WorkspaceItemInfo> updated) { }
-
-        @Override
-        public void bindWidgetsRestored(ArrayList<LauncherAppWidgetInfo> widgets) { }
-
-        @Override
-        public void bindRestoreItemsChange(HashSet<ItemInfo> updates) { }
-
-        @Override
-        public void bindWorkspaceComponentsRemoved(ItemInfoMatcher matcher) { }
-
-        @Override
-        public void bindAllWidgets(List<WidgetsListBaseEntry> widgets) { }
-
-        @Override
-        public void onPageBoundSynchronously(int page) { }
-
-        @Override
-        public void executeOnNextDraw(ViewOnDrawExecutor executor) { }
-
-        @Override
-        public void bindDeepShortcutMap(HashMap<ComponentKey, Integer> deepShortcutMap) { }
-
-        @Override
-        public void bindAllApplications(AppInfo[] apps, int flags) { }
     }
 }

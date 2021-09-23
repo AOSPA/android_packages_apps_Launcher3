@@ -16,6 +16,8 @@
 
 package com.android.launcher3;
 
+import static androidx.annotation.VisibleForTesting.PACKAGE_PRIVATE;
+
 import static com.android.launcher3.anim.Interpolators.SCROLL;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.isAccessibilityEnabled;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.isObservedEventType;
@@ -48,6 +50,7 @@ import android.widget.OverScroller;
 import android.widget.ScrollView;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
@@ -55,6 +58,7 @@ import com.android.launcher3.pageindicators.PageIndicator;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.touch.PagedOrientationHandler.ChildBounds;
 import com.android.launcher3.util.EdgeEffectCompat;
+import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
 
@@ -100,6 +104,10 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
     @ViewDebug.ExportedProperty(category = "launcher")
     protected int mCurrentPage;
+    // Difference between current scroll position and mCurrentPage's page scroll. Used to maintain
+    // relative scroll position unchanged in updateCurrentPageScroll. Cleared when snapping to a
+    // page.
+    protected int mCurrentPageScrollDiff;
 
     @ViewDebug.ExportedProperty(category = "launcher")
     protected int mNextPage = INVALID_PAGE;
@@ -230,10 +238,6 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         return getChildAt(index);
     }
 
-    protected int indexToPage(int index) {
-        return index;
-    }
-
     /**
      * Updates the scroll of the current page immediately to its final scroll position.  We use this
      * in CustomizePagedView to allow tabs to share the same PagedView while resetting the scroll of
@@ -243,7 +247,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         // If the current page is invalid, just reset the scroll position to zero
         int newPosition = 0;
         if (0 <= mCurrentPage && mCurrentPage < getPageCount()) {
-            newPosition = getScrollForPage(mCurrentPage);
+            newPosition = getScrollForPage(mCurrentPage) + mCurrentPageScrollDiff;
         }
         mOrientationHandler.set(this, VIEW_SCROLL_TO, newPosition);
         mScroller.startScroll(mScroller.getCurrX(), 0, newPosition - mScroller.getCurrX(), 0);
@@ -291,9 +295,15 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         return newPage;
     }
 
-    private int getLeftmostVisiblePageForIndex(int pageIndex) {
+    /**
+     * In most cases where panelCount is 1, this method will just return the page index that was
+     * passed in.
+     * But for example when two panel home is enabled we might need the leftmost visible page index
+     * because that page is the current page.
+     */
+    public int getLeftmostVisiblePageForIndex(int pageIndex) {
         int panelCount = getPanelCount();
-        return (pageIndex / panelCount) * panelCount;
+        return pageIndex - pageIndex % panelCount;
     }
 
     /**
@@ -304,23 +314,81 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     }
 
     /**
+     * Returns an IntSet with the indices of the currently visible pages
+     */
+    @VisibleForTesting(otherwise = PACKAGE_PRIVATE)
+    public IntSet getVisiblePageIndices() {
+        return getPageIndices(mCurrentPage);
+    }
+
+    /**
+     * In case the panelCount is 1 this just returns the same page index in an IntSet.
+     * But in cases where the panelCount > 1 this will return all the page indices that belong
+     * together, i.e. on the Workspace they are next to each other and shown at the same time.
+     */
+    private IntSet getPageIndices(int pageIndex) {
+        // we want to make sure the pageIndex is the leftmost page
+        pageIndex = getLeftmostVisiblePageForIndex(pageIndex);
+
+        IntSet pageIndices = new IntSet();
+        int panelCount = getPanelCount();
+        int pageCount = getPageCount();
+        for (int page = pageIndex; page < pageIndex + panelCount && page < pageCount; page++) {
+            pageIndices.add(page);
+        }
+        return pageIndices;
+    }
+
+    /**
+     * Returns an IntSet with the indices of the neighbour pages that are in the focus direction.
+     */
+    private IntSet getNeighbourPageIndices(int focus) {
+        int panelCount = getPanelCount();
+        // getNextPage is more reliable than getCurrentPage
+        int currentPage = getNextPage();
+
+        int nextPage;
+        if (focus == View.FOCUS_LEFT) {
+            nextPage = currentPage - panelCount;
+        } else if (focus == View.FOCUS_RIGHT) {
+            nextPage = currentPage + panelCount;
+        } else {
+            // no neighbours to other directions
+            return new IntSet();
+        }
+        nextPage = validateNewPage(nextPage);
+        if (nextPage == currentPage) {
+            // We reached the end of the pages
+            return new IntSet();
+        }
+
+        return getPageIndices(nextPage);
+    }
+
+    /**
      * Executes the callback against each visible page
      */
     public void forEachVisiblePage(Consumer<View> callback) {
-        int panelCount = getPanelCount();
-        for (int i = mCurrentPage; i < mCurrentPage + panelCount; i++) {
-            View page = getPageAt(i);
+        getVisiblePageIndices().forEach(pageIndex -> {
+            View page = getPageAt(pageIndex);
             if (page != null) {
                 callback.accept(page);
             }
-        }
+        });
     }
 
     /**
      * Returns true if the view is on one of the current pages, false otherwise.
      */
     public boolean isVisible(View child) {
-        return getLeftmostVisiblePageForIndex(indexOfChild(child)) == mCurrentPage;
+        return isVisible(indexOfChild(child));
+    }
+
+    /**
+     * Returns true if the page with the given index is currently visible, false otherwise.
+     */
+    private boolean isVisible(int pageIndex) {
+        return getLeftmostVisiblePageForIndex(pageIndex) == mCurrentPage;
     }
 
     /**
@@ -424,6 +492,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
      * to provide custom behavior during animation.
      */
     protected void onPageEndTransition() {
+        mCurrentPageScrollDiff = 0;
         AccessibilityManagerCompat.sendScrollFinishedEventToTest(getContext());
         AccessibilityManagerCompat.sendCustomAccessibilityEvent(getPageAt(mCurrentPage),
                 AccessibilityEvent.TYPE_VIEW_FOCUSED, null);
@@ -676,6 +745,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         final int scrollOffsetStart = mOrientationHandler.getScrollOffsetStart(this, mInsets);
         final int scrollOffsetEnd = mOrientationHandler.getScrollOffsetEnd(this, mInsets);
         boolean pageScrollChanged = false;
+        int panelCount = getPanelCount();
 
         for (int i = startIndex, childStart = scrollOffsetStart; i != endIndex; i += delta) {
             final View child = getPageAt(i);
@@ -693,11 +763,15 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                     pageScrollChanged = true;
                     outPageScrolls[i] = pageScroll;
                 }
-                childStart += primaryDimension + mPageSpacing + getChildGap();
+                childStart += primaryDimension + getChildGap();
+
+                // This makes sure that the space is added after the page, not after each panel
+                if (i % panelCount == panelCount - 1) {
+                    childStart += mPageSpacing;
+                }
             }
         }
 
-        int panelCount = getPanelCount();
         if (panelCount > 1) {
             for (int i = 0; i < childCount; i++) {
                 // In case we have multiple panels, always use left panel's page scroll for all
@@ -779,8 +853,8 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
     @Override
     public boolean requestChildRectangleOnScreen(View child, Rect rectangle, boolean immediate) {
-        int page = indexToPage(indexOfChild(child));
-        if (page != mCurrentPage || !mScroller.isFinished()) {
+        int page = indexOfChild(child);
+        if (!isVisible(page) || !mScroller.isFinished()) {
             if (immediate) {
                 setCurrentPage(page);
             } else {
@@ -819,21 +893,25 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                 direction = View.FOCUS_LEFT;
             }
         }
-        if (direction == View.FOCUS_LEFT) {
-            if (getCurrentPage() > 0) {
-                int nextPage = validateNewPage(getCurrentPage() - 1);
-                snapToPage(nextPage);
-                getChildAt(nextPage).requestFocus(direction);
-                return true;
-            }
-        } else if (direction == View.FOCUS_RIGHT) {
-            if (getCurrentPage() < getPageCount() - 1) {
-                int nextPage = validateNewPage(getCurrentPage() + 1);
-                snapToPage(nextPage);
-                getChildAt(nextPage).requestFocus(direction);
-                return true;
+
+        int currentPage = getNextPage();
+        int closestNeighbourIndex = -1;
+        int closestNeighbourDistance = Integer.MAX_VALUE;
+        // Find the closest neighbour page
+        for (int neighbourPageIndex : getNeighbourPageIndices(direction)) {
+            int distance = Math.abs(neighbourPageIndex - currentPage);
+            if (closestNeighbourDistance > distance) {
+                closestNeighbourDistance = distance;
+                closestNeighbourIndex = neighbourPageIndex;
             }
         }
+        if (closestNeighbourIndex != -1) {
+            View page = getPageAt(closestNeighbourIndex);
+            snapToPage(closestNeighbourIndex);
+            page.requestFocus(direction);
+            return true;
+        }
+
         return false;
     }
 
@@ -843,28 +921,12 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             return;
         }
 
-        // Add the current page's views as focusable and the next possible page's too. If the
-        // last focus change action was left then the left neighbour's views will be added, and
-        // if it was right then the right neighbour's views will be added.
-        // Unfortunately mCurrentPage can be outdated if there were multiple control actions in a
-        // short period of time, but mNextPage is up to date because it is always updated by
-        // method snapToPage.
-        int nextPage = getNextPage();
-        // XXX-RTL: This will be fixed in a future CL
-        if (nextPage >= 0 && nextPage < getPageCount()) {
-            getPageAt(nextPage).addFocusables(views, direction, focusableMode);
-        }
-        if (direction == View.FOCUS_LEFT) {
-            if (nextPage > 0) {
-                nextPage = validateNewPage(nextPage - 1);
-                getPageAt(nextPage).addFocusables(views, direction, focusableMode);
-            }
-        } else if (direction == View.FOCUS_RIGHT) {
-            if (nextPage < getPageCount() - 1) {
-                nextPage = validateNewPage(nextPage + 1);
-                getPageAt(nextPage).addFocusables(views, direction, focusableMode);
-            }
-        }
+        // nextPage is more reliable when multiple control movements have been done in a short
+        // period of time
+        getPageIndices(getNextPage())
+                .addAll(getNeighbourPageIndices(direction))
+                .forEach(pageIndex ->
+                        getPageAt(pageIndex).addFocusables(views, direction, focusableMode));
     }
 
     /**
@@ -1054,26 +1116,25 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
     protected float getScrollProgress(int screenCenter, View v, int page) {
         final int halfScreenSize = getMeasuredWidth() / 2;
-
         int delta = screenCenter - (getScrollForPage(page) + halfScreenSize);
-        int count = getChildCount();
+        int panelCount = getPanelCount();
+        int pageCount = getChildCount();
 
-        final int totalDistance;
-
-        int adjacentPage = page + 1;
+        int adjacentPage = page + panelCount;
         if ((delta < 0 && !mIsRtl) || (delta > 0 && mIsRtl)) {
-            adjacentPage = page - 1;
+            adjacentPage = page - panelCount;
         }
 
-        if (adjacentPage < 0 || adjacentPage > count - 1) {
-            totalDistance = v.getMeasuredWidth() + mPageSpacing;
+        final int totalDistance;
+        if (adjacentPage < 0 || adjacentPage > pageCount - 1) {
+            totalDistance = (v.getMeasuredWidth() + mPageSpacing) * panelCount;
         } else {
             totalDistance = Math.abs(getScrollForPage(adjacentPage) - getScrollForPage(page));
         }
 
         float scrollProgress = delta / (totalDistance * 1.0f);
         scrollProgress = Math.min(scrollProgress, MAX_SCROLL_PROGRESS);
-        scrollProgress = Math.max(scrollProgress, - MAX_SCROLL_PROGRESS);
+        scrollProgress = Math.max(scrollProgress, -MAX_SCROLL_PROGRESS);
         return scrollProgress;
     }
 
@@ -1118,6 +1179,10 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
     protected void setEnableOverscroll(boolean enable) {
         mAllowOverScroll = enable;
+    }
+
+    protected float getSignificantMoveThreshold() {
+        return SIGNIFICANT_MOVE_THRESHOLD;
     }
 
     @Override
@@ -1191,6 +1256,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                     }
                     delta -= consumed;
                 }
+                delta /= mOrientationHandler.getPrimaryScale(this);
 
                 // Only scroll and update mLastMotionX if we have moved some discrete amount.  We
                 // keep the remainder because we are actually testing if we've moved from the last
@@ -1243,11 +1309,12 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
                 int velocity = (int) mOrientationHandler.getPrimaryVelocity(velocityTracker,
                     mActivePointerId);
-                int delta = (int) (primaryDirection - mDownMotionPrimary);
+                float delta = primaryDirection - mDownMotionPrimary;
+                delta /= mOrientationHandler.getPrimaryScale(this);
                 int pageOrientedSize = mOrientationHandler.getMeasuredSize(getPageAt(mCurrentPage));
 
-                boolean isSignificantMove = Math.abs(delta) > pageOrientedSize *
-                    SIGNIFICANT_MOVE_THRESHOLD;
+                boolean isSignificantMove = Math.abs(delta)
+                        > pageOrientedSize * getSignificantMoveThreshold();
 
                 mTotalMotion += Math.abs(mLastMotion + mLastMotionRemainder - primaryDirection);
                 boolean passedSlop = mAllowEasyFling || mTotalMotion > mPageSlop;
@@ -1439,8 +1506,8 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             setCurrentPage(nextPage);
         }
 
-        int page = indexToPage(indexOfChild(child));
-        if (page >= 0 && page != getCurrentPage() && !isInTouchMode()) {
+        int page = indexOfChild(child);
+        if (page >= 0 && !isVisible(page) && !isInTouchMode()) {
             snapToPage(page);
         }
     }
@@ -1571,7 +1638,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             return false;
         }
 
-        if (FeatureFlags.IS_STUDIO_BUILD) {
+        if (FeatureFlags.IS_STUDIO_BUILD && !Utilities.IS_RUNNING_IN_TEST_HARNESS) {
             duration *= Settings.Global.getFloat(getContext().getContentResolver(),
                     Settings.Global.WINDOW_ANIMATION_SCALE, 1);
         }
@@ -1610,7 +1677,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
     public boolean scrollLeft() {
         if (getNextPage() > 0) {
-            snapToPage(getNextPage() - 1);
+            snapToPage(getNextPage() - getPanelCount());
             return true;
         }
         return mAllowOverScroll;
@@ -1618,7 +1685,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
 
     public boolean scrollRight() {
         if (getNextPage() < getChildCount() - 1) {
-            snapToPage(getNextPage() + 1);
+            snapToPage(getNextPage() + getPanelCount());
             return true;
         }
         return mAllowOverScroll;

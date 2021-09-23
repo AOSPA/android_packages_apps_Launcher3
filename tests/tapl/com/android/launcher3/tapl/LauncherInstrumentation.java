@@ -80,6 +80,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -96,15 +97,17 @@ public final class LauncherInstrumentation {
     private static final String TAG = "Tapl";
     private static final int ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME = 20;
     private static final int GESTURE_STEP_MS = 16;
+    private static final long FORCE_PAUSE_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(2);
 
-    private static final Pattern EVENT_TOUCH_DOWN = getTouchEventPattern("ACTION_DOWN");
-    private static final Pattern EVENT_TOUCH_UP = getTouchEventPattern("ACTION_UP");
+    static final Pattern EVENT_TOUCH_DOWN = getTouchEventPattern("ACTION_DOWN");
+    static final Pattern EVENT_TOUCH_UP = getTouchEventPattern("ACTION_UP");
     private static final Pattern EVENT_TOUCH_CANCEL = getTouchEventPattern("ACTION_CANCEL");
     private static final Pattern EVENT_PILFER_POINTERS = Pattern.compile("pilferPointers");
     static final Pattern EVENT_START = Pattern.compile("start:");
 
     static final Pattern EVENT_TOUCH_DOWN_TIS = getTouchEventPatternTIS("ACTION_DOWN");
     static final Pattern EVENT_TOUCH_UP_TIS = getTouchEventPatternTIS("ACTION_UP");
+
     private final String mLauncherPackage;
     private Boolean mIsLauncher3;
     private long mTestStartTime = -1;
@@ -122,8 +125,6 @@ public final class LauncherInstrumentation {
     public enum GestureScope {
         OUTSIDE_WITHOUT_PILFER, OUTSIDE_WITH_PILFER, INSIDE, INSIDE_TO_OUTSIDE
     }
-
-    ;
 
     // Base class for launcher containers.
     static abstract class VisibleContainer {
@@ -207,6 +208,11 @@ public final class LauncherInstrumentation {
     public LauncherInstrumentation(Instrumentation instrumentation) {
         mInstrumentation = instrumentation;
         mDevice = UiDevice.getInstance(instrumentation);
+        try {
+            mDevice.executeShellCommand("am wait-for-broadcast-idle");
+        } catch (IOException e) {
+            log("Failed to wait for broadcast idle");
+        }
 
         // Launcher should run in test harness so that custom accessibility protocol between
         // Launcher and TAPL is enabled. In-process tests enable this protocol with a direct call
@@ -267,9 +273,13 @@ public final class LauncherInstrumentation {
     }
 
     Bundle getTestInfo(String request) {
+        return getTestInfo(request, /*arg=*/ null);
+    }
+
+    Bundle getTestInfo(String request, String arg) {
         try (ContentProviderClient client = getContext().getContentResolver()
                 .acquireContentProviderClient(mTestProviderUri)) {
-            return client.call(request, null, null);
+            return client.call(request, arg, null);
         } catch (DeadObjectException e) {
             fail("Launcher crashed");
             return null;
@@ -279,8 +289,32 @@ public final class LauncherInstrumentation {
     }
 
     Insets getTargetInsets() {
+        return getTestInfo(TestProtocol.REQUEST_TARGET_INSETS)
+                .getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
+    Insets getWindowInsets() {
         return getTestInfo(TestProtocol.REQUEST_WINDOW_INSETS)
                 .getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
+    public boolean isTablet() {
+        return getTestInfo(TestProtocol.REQUEST_IS_TABLET)
+                .getBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
+    public boolean isTwoPanels() {
+        return getTestInfo(TestProtocol.REQUEST_IS_TWO_PANELS)
+            .getBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
+    private void setForcePauseTimeout(long timeout) {
+        getTestInfo(TestProtocol.REQUEST_SET_FORCE_PAUSE_TIMEOUT, Long.toString(timeout));
+    }
+
+    public boolean hadNontestEvents() {
+        return getTestInfo(TestProtocol.REQUEST_GET_HAD_NONTEST_EVENTS)
+                .getBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD);
     }
 
     void setActiveContainer(VisibleContainer container) {
@@ -368,6 +402,14 @@ public final class LauncherInstrumentation {
 
             if (hasSystemUiObject("keyguard_status_view")) return "Phone is locked";
 
+            final String visibleApps = mDevice.findObjects(getAnyObjectSelector())
+                    .stream()
+                    .map(LauncherInstrumentation::getApplicationPackageSafe)
+                    .distinct()
+                    .filter(pkg -> pkg != null)
+                    .collect(Collectors.joining(","));
+            if (SYSTEMUI_PACKAGE.equals(visibleApps)) return "Only System UI views are visible";
+
             if (!mDevice.wait(Until.hasObject(getAnyObjectSelector()), WAIT_TIME_MS)) {
                 return "Screen is empty";
             }
@@ -391,12 +433,15 @@ public final class LauncherInstrumentation {
     }
 
     private String getVisiblePackages() {
-        return mDevice.findObjects(getAnyObjectSelector())
+        final String apps = mDevice.findObjects(getAnyObjectSelector())
                 .stream()
                 .map(LauncherInstrumentation::getApplicationPackageSafe)
                 .distinct()
-                .filter(pkg -> pkg != null && !"com.android.systemui".equals(pkg))
+                .filter(pkg -> pkg != null && !SYSTEMUI_PACKAGE.equals(pkg))
                 .collect(Collectors.joining(", "));
+        return !apps.isEmpty()
+                ? "active app: " + apps
+                : "the test doesn't see views from any app, including Launcher";
     }
 
     private static String getApplicationPackageSafe(UiObject2 object) {
@@ -499,9 +544,8 @@ public final class LauncherInstrumentation {
     void fail(String message) {
         checkForAnomaly();
         Assert.fail(formatSystemHealthMessage(formatErrorWithEvents(
-                "http://go/tapl test failure:\nContext: " + getContextDescription()
-                        + " - visible state is " + getVisibleStateMessage()
-                        + ";\nDetails: " + message, true)));
+                "http://go/tapl test failure: " + message + ";\nContext: " + getContextDescription()
+                        + "; now visible state is " + getVisibleStateMessage(), true)));
     }
 
     private String getContextDescription() {
@@ -554,27 +598,33 @@ public final class LauncherInstrumentation {
     public String getNavigationModeMismatchError(boolean waitForCorrectState) {
         final int waitTime = waitForCorrectState ? WAIT_TIME_MS : 0;
         final NavigationModel navigationModel = getNavigationModel();
-
+        String resPackage = getNavigationButtonResPackage();
         if (navigationModel == NavigationModel.THREE_BUTTON) {
-            if (!mDevice.wait(Until.hasObject(By.res(SYSTEMUI_PACKAGE, "recent_apps")), waitTime)) {
+            if (!mDevice.wait(Until.hasObject(By.res(resPackage, "recent_apps")), waitTime)) {
                 return "Recents button not present in 3-button mode";
             }
         } else {
-            if (!mDevice.wait(Until.gone(By.res(SYSTEMUI_PACKAGE, "recent_apps")), waitTime)) {
+            if (!mDevice.wait(Until.gone(By.res(resPackage, "recent_apps")), waitTime)) {
                 return "Recents button is present in non-3-button mode";
             }
         }
 
         if (navigationModel == NavigationModel.ZERO_BUTTON) {
-            if (!mDevice.wait(Until.gone(By.res(SYSTEMUI_PACKAGE, "home")), waitTime)) {
+            if (!mDevice.wait(Until.gone(By.res(resPackage, "home")), waitTime)) {
                 return "Home button is present in gestural mode";
             }
         } else {
-            if (!mDevice.wait(Until.hasObject(By.res(SYSTEMUI_PACKAGE, "home")), waitTime)) {
+            if (!mDevice.wait(Until.hasObject(By.res(resPackage, "home")), waitTime)) {
                 return "Home button not present in non-gestural mode";
             }
         }
         return null;
+    }
+
+    private String getNavigationButtonResPackage() {
+        return isTablet() && getNavigationModel() == NavigationModel.THREE_BUTTON ?
+                getLauncherPackageName() :
+                SYSTEMUI_PACKAGE;
     }
 
     private UiObject2 verifyContainerType(ContainerType containerType) {
@@ -688,7 +738,8 @@ public final class LauncherInstrumentation {
      * @return the Workspace object.
      */
     public Workspace pressHome() {
-        try (LauncherInstrumentation.Closable e = eventsCheck()) {
+        try (LauncherInstrumentation.Closable e = eventsCheck();
+             LauncherInstrumentation.Closable c = addContextLayer("want to switch to home")) {
             waitForLauncherInitialized();
             // Click home, then wait for any accessibility event, then wait until accessibility
             // events stop.
@@ -696,19 +747,25 @@ public final class LauncherInstrumentation {
             // otherwise waitForIdle may return immediately in case when there was a big enough
             // pause in accessibility events prior to pressing Home.
             final String action;
-            final boolean launcherWasVisible = isLauncherVisible();
             if (getNavigationModel() == NavigationModel.ZERO_BUTTON) {
                 checkForAnomaly();
+                setForcePauseTimeout(FORCE_PAUSE_TIMEOUT_MS);
 
                 final Point displaySize = getRealDisplaySize();
+                boolean gestureStartFromLauncher = isTablet()
+                        ? !isLauncher3() || hasLauncherObject(WORKSPACE_RES_ID)
+                        : isLauncherVisible();
+                GestureScope gestureScope = gestureStartFromLauncher
+                        ? GestureScope.INSIDE_TO_OUTSIDE
+                        : GestureScope.OUTSIDE_WITH_PILFER;
 
                 if (hasLauncherObject(CONTEXT_MENU_RES_ID)) {
                     linearGesture(
                             displaySize.x / 2, displaySize.y - 1,
                             displaySize.x / 2, 0,
                             ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME,
-                            false, GestureScope.INSIDE_TO_OUTSIDE);
-                    try (LauncherInstrumentation.Closable c = addContextLayer(
+                            false, gestureScope);
+                    try (LauncherInstrumentation.Closable c1 = addContextLayer(
                             "Swiped up from context menu to home")) {
                         waitUntilLauncherObjectGone(CONTEXT_MENU_RES_ID);
                         // Swiping up can temporarily bring Nexus Launcher if the current
@@ -728,9 +785,7 @@ public final class LauncherInstrumentation {
                             displaySize.x / 2, displaySize.y - 1,
                             displaySize.x / 2, 0,
                             ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME, NORMAL_STATE_ORDINAL,
-                            launcherWasVisible
-                                    ? GestureScope.INSIDE_TO_OUTSIDE
-                                    : GestureScope.OUTSIDE_WITH_PILFER);
+                            gestureScope);
                 }
             } else {
                 log("Hierarchy before clicking home:");
@@ -740,16 +795,20 @@ public final class LauncherInstrumentation {
                     expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_DOWN_TIS);
                     expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_UP_TIS);
                 }
+                if (isTablet()) {
+                    expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_DOWN);
+                    expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_UP);
+                }
 
                 runToState(
-                        waitForSystemUiObject("home")::click,
+                        waitForNavigationUiObject("home")::click,
                         NORMAL_STATE_ORDINAL,
                         !hasLauncherObject(WORKSPACE_RES_ID)
                                 && (hasLauncherObject(APPS_RES_ID)
                                 || hasLauncherObject(OVERVIEW_RES_ID)),
                         action);
             }
-            try (LauncherInstrumentation.Closable c = addContextLayer(
+            try (LauncherInstrumentation.Closable c1 = addContextLayer(
                     "performed action to switch to Home - " + action)) {
                 return getWorkspace();
             }
@@ -892,6 +951,15 @@ public final class LauncherInstrumentation {
         return object;
     }
 
+    @NonNull
+    UiObject2 waitForNavigationUiObject(String resId) {
+        String resPackage = getNavigationButtonResPackage();
+        final UiObject2 object = mDevice.wait(
+                Until.findObject(By.res(resPackage, resId)), WAIT_TIME_MS);
+        assertNotNull("Can't find a navigation UI object with id: " + resId, object);
+        return object;
+    }
+
     @Nullable
     UiObject2 findObjectInContainer(UiObject2 container, BySelector selector) {
         try {
@@ -930,7 +998,7 @@ public final class LauncherInstrumentation {
     void waitForObjectEnabled(UiObject2 object, String waitReason) {
         try {
             assertTrue("Timed out waiting for object to be enabled for " + waitReason + " "
-                    + object.getResourceName(),
+                            + object.getResourceName(),
                     object.wait(Until.enabled(true), WAIT_TIME_MS));
         } catch (StaleObjectException e) {
             fail("The object disappeared from screen");
@@ -1049,7 +1117,7 @@ public final class LauncherInstrumentation {
                 () -> "Failed to receive an event for the state change: expected ["
                         + TestProtocol.stateOrdinalToString(expectedState)
                         + "], actual: " + eventListToString(actualEvents),
-                        actionName);
+                actionName);
     }
 
     private boolean isSwitchToStateEvent(
@@ -1070,9 +1138,9 @@ public final class LauncherInstrumentation {
                 "swiping");
     }
 
-    private int getBottomGestureSize() {
-        return ResourceUtils.getNavbarSize(
-                ResourceUtils.NAVBAR_BOTTOM_GESTURE_SIZE, getResources()) + 1;
+    int getBottomGestureSize() {
+        return Math.max(getWindowInsets().bottom, ResourceUtils.getNavbarSize(
+                ResourceUtils.NAVBAR_BOTTOM_GESTURE_SIZE, getResources())) + 1;
     }
 
     int getBottomGestureMarginInContainer(UiObject2 container) {
@@ -1176,7 +1244,7 @@ public final class LauncherInstrumentation {
                 event -> TestProtocol.SCROLL_FINISHED_MESSAGE.equals(event.getClassName()),
                 () -> "Didn't receive a scroll end message: " + startX + ", " + startY
                         + ", " + endX + ", " + endY,
-                        "scrolling");
+                "scrolling");
     }
 
     // Inject a swipe gesture. Inject exactly 'steps' motion points, incrementing event time by a

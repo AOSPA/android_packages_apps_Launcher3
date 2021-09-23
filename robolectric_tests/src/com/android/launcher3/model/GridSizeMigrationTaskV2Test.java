@@ -124,14 +124,12 @@ public class GridSizeMigrationTaskV2Test {
         mIdp.numColumns = 4;
         mIdp.numRows = 4;
         GridSizeMigrationTaskV2.DbReader srcReader = new GridSizeMigrationTaskV2.DbReader(mDb,
-                LauncherSettings.Favorites.TMP_TABLE, mContext, mValidPackages,
-                srcHotseatItems.length);
+                LauncherSettings.Favorites.TMP_TABLE, mContext, mValidPackages);
         GridSizeMigrationTaskV2.DbReader destReader = new GridSizeMigrationTaskV2.DbReader(mDb,
-                LauncherSettings.Favorites.TABLE_NAME, mContext, mValidPackages,
-                mIdp.numDatabaseHotseatIcons);
+                LauncherSettings.Favorites.TABLE_NAME, mContext, mValidPackages);
         GridSizeMigrationTaskV2 task = new GridSizeMigrationTaskV2(mContext, mDb, srcReader,
                 destReader, mIdp.numDatabaseHotseatIcons, new Point(mIdp.numColumns, mIdp.numRows));
-        task.migrate();
+        task.migrate(mIdp);
 
         // Check hotseat items
         Cursor c = mContext.getContentResolver().query(LauncherSettings.Favorites.CONTENT_URI,
@@ -204,14 +202,12 @@ public class GridSizeMigrationTaskV2Test {
         mIdp.numColumns = 4;
         mIdp.numRows = 4;
         GridSizeMigrationTaskV2.DbReader srcReader = new GridSizeMigrationTaskV2.DbReader(mDb,
-                LauncherSettings.Favorites.TMP_TABLE, mContext, mValidPackages,
-                numSrcDatabaseHotseatIcons);
+                LauncherSettings.Favorites.TMP_TABLE, mContext, mValidPackages);
         GridSizeMigrationTaskV2.DbReader destReader = new GridSizeMigrationTaskV2.DbReader(mDb,
-                LauncherSettings.Favorites.TABLE_NAME, mContext, mValidPackages,
-                mIdp.numDatabaseHotseatIcons);
+                LauncherSettings.Favorites.TABLE_NAME, mContext, mValidPackages);
         GridSizeMigrationTaskV2 task = new GridSizeMigrationTaskV2(mContext, mDb, srcReader,
                 destReader, mIdp.numDatabaseHotseatIcons, new Point(mIdp.numColumns, mIdp.numRows));
-        task.migrate();
+        task.migrate(mIdp);
 
         // Check hotseat items
         Cursor c = mContext.getContentResolver().query(LauncherSettings.Favorites.CONTENT_URI,
@@ -247,19 +243,16 @@ public class GridSizeMigrationTaskV2Test {
                 mModelHelper.addItem(APP_ICON, 5, HOTSEAT, 0, 0, testPackage5, 5, TMP_CONTENT_URI),
         };
 
-        int numSrcDatabaseHotseatIcons = srcHotseatItems.length;
         mIdp.numDatabaseHotseatIcons = 4;
         mIdp.numColumns = 4;
         mIdp.numRows = 4;
         GridSizeMigrationTaskV2.DbReader srcReader = new GridSizeMigrationTaskV2.DbReader(mDb,
-                LauncherSettings.Favorites.TMP_TABLE, mContext, mValidPackages,
-                numSrcDatabaseHotseatIcons);
+                LauncherSettings.Favorites.TMP_TABLE, mContext, mValidPackages);
         GridSizeMigrationTaskV2.DbReader destReader = new GridSizeMigrationTaskV2.DbReader(mDb,
-                LauncherSettings.Favorites.TABLE_NAME, mContext, mValidPackages,
-                mIdp.numDatabaseHotseatIcons);
+                LauncherSettings.Favorites.TABLE_NAME, mContext, mValidPackages);
         GridSizeMigrationTaskV2 task = new GridSizeMigrationTaskV2(mContext, mDb, srcReader,
                 destReader, mIdp.numDatabaseHotseatIcons, new Point(mIdp.numColumns, mIdp.numRows));
-        task.migrate();
+        task.migrate(mIdp);
 
         // Check hotseat items
         Cursor c = mContext.getContentResolver().query(LauncherSettings.Favorites.CONTENT_URI,

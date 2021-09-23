@@ -19,7 +19,6 @@ package com.android.quickstep.views;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
 
-import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.systemui.shared.system.WindowManagerWrapper.WINDOWING_MODE_FULLSCREEN;
 
@@ -32,8 +31,6 @@ import android.graphics.ColorFilter;
 import android.graphics.Insets;
 import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -50,7 +47,6 @@ import androidx.core.graphics.ColorUtils;
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SystemUiController;
@@ -85,7 +81,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
     private TaskOverlay mOverlay;
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint mClearPaint = new Paint();
     private final Paint mDimmingPaintAfterClearing = new Paint();
     private final int mDimColor;
 
@@ -116,7 +111,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         super(context, attrs, defStyleAttr);
         mPaint.setFilterBitmap(true);
         mBackgroundPaint.setColor(Color.WHITE);
-        mClearPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
         mActivity = BaseActivity.fromContext(context);
         // Initialize with placeholder value. It is overridden later by TaskView
         mFullscreenParams = TEMP_PARAMS.get(context);
@@ -168,6 +162,9 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
             mBitmapShader = new BitmapShader(bm, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
             mPaint.setShader(mBitmapShader);
             updateThumbnailMatrix();
+            if (mOverlayEnabled) {
+                getTaskOverlay().refreshActionVisibility(mThumbnailData);
+            }
         } else {
             mBitmapShader = null;
             mThumbnailData = null;
@@ -309,17 +306,7 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
             float cornerRadius) {
         if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
             if (mTask != null && getTaskView().isRunningTask() && !getTaskView().showScreenshot()) {
-                // TODO(b/189265196): Temporary fix to align the surface with the cutout perfectly.
-                // Round up only when the live tile task is displayed in Overview.
-                float rounding = comp(mFullscreenParams.mFullscreenProgress);
-                float left = x + rounding / 2;
-                float top = y + rounding / 2;
-                float right = width - rounding;
-                float bottom = height - rounding;
-
-                canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius,
-                        mClearPaint);
-                canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius,
+                canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius,
                         mDimmingPaintAfterClearing);
                 return;
             }
@@ -431,7 +418,9 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
      */
     public static class PreviewPositionHelper {
 
-        // Contains the portion of the thumbnail that is clipped when fullscreen progress = 0.
+        private static final RectF EMPTY_RECT_F = new RectF();
+
+        // Contains the portion of the thumbnail that is unclipped when fullscreen progress = 1.
         private final RectF mClippedInsets = new RectF();
         private final Matrix mMatrix = new Matrix();
         private boolean mIsOrientationChanged;
@@ -461,7 +450,7 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
             // Note: Disable rotation in grid layout.
             boolean windowingModeSupportsRotation = !dp.isMultiWindowMode
                     && thumbnailData.windowingMode == WINDOWING_MODE_FULLSCREEN
-                    && !(dp.isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get());
+                    && !dp.overviewShowAsGrid;
             isOrientationDifferent = isOrientationChange(deltaRotate)
                     && windowingModeSupportsRotation;
             if (canvasWidth == 0 || canvasHeight == 0 || scale == 0) {
@@ -636,15 +625,17 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
                     break;
             }
             mClippedInsets.offsetTo(newLeftInset * scale, newTopInset * scale);
-            mMatrix.postTranslate(translateX - mClippedInsets.left,
-                    translateY - mClippedInsets.top);
+            mMatrix.postTranslate(translateX, translateY);
+            if (TaskView.FULL_THUMBNAIL) {
+                mMatrix.postTranslate(-mClippedInsets.left, -mClippedInsets.top);
+            }
         }
 
         /**
          * Insets to used for clipping the thumbnail (in case it is drawing outside its own space)
          */
         public RectF getInsetsToDrawInFullscreen() {
-            return mClippedInsets;
+            return TaskView.FULL_THUMBNAIL ? mClippedInsets : EMPTY_RECT_F;
         }
     }
 }

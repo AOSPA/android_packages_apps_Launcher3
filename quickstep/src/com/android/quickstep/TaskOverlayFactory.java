@@ -68,13 +68,14 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
         final BaseDraggingActivity activity = BaseActivity.fromContext(taskView.getContext());
         for (TaskShortcutFactory menuOption : MENU_OPTIONS) {
             SystemShortcut shortcut = menuOption.getShortcut(activity, taskView);
-            if (menuOption == TaskShortcutFactory.SPLIT_SCREEN &&
-                    FeatureFlags.ENABLE_SPLIT_SELECT.get()) {
-                addSplitOptions(shortcuts, activity, taskView, deviceProfile);
+            if (shortcut == null) {
                 continue;
             }
 
-            if (shortcut != null) {
+            if (menuOption == TaskShortcutFactory.SPLIT_SCREEN &&
+                    FeatureFlags.ENABLE_SPLIT_SELECT.get()) {
+                addSplitOptions(shortcuts, activity, taskView, deviceProfile);
+            } else {
                 shortcuts.add(shortcut);
             }
         }
@@ -88,7 +89,6 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
             SystemShortcut screenshotShortcut = TaskShortcutFactory.SCREENSHOT
                     .getShortcut(activity, taskView);
             if (screenshotShortcut != null) {
-                screenshotShortcut.setHasFinishRecentsInAction(true);
                 shortcuts.add(screenshotShortcut);
             }
 
@@ -97,7 +97,6 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
                 SystemShortcut modalShortcut = TaskShortcutFactory.MODAL
                         .getShortcut(activity, taskView);
                 if (modalShortcut != null) {
-                    modalShortcut.setHasFinishRecentsInAction(true);
                     shortcuts.add(modalShortcut);
                 }
             }
@@ -181,6 +180,13 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
                 boolean isAllowedByPolicy = mThumbnailView.isRealSnapshot();
                 getActionsView().setCallbacks(new OverlayUICallbacksImpl(isAllowedByPolicy, task));
             }
+        }
+
+        /**
+         * Called when the current task's thumbnail has changed.
+         */
+        public void refreshActionVisibility(ThumbnailData thumbnail) {
+            getActionsView().updateDisabledFlags(DISABLED_NO_THUMBNAIL, thumbnail == null);
         }
 
         /**

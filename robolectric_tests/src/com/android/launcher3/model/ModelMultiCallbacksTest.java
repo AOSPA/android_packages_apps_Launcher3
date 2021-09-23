@@ -26,16 +26,17 @@ import static org.robolectric.Shadows.shadowOf;
 
 import android.os.Process;
 
-import com.android.launcher3.PagedView;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.shadows.ShadowLooperExecutor;
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.IntArray;
+import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.LauncherLayoutBuilder;
 import com.android.launcher3.util.LauncherModelHelper;
 import com.android.launcher3.util.LooperExecutor;
-import com.android.launcher3.util.ViewOnDrawExecutor;
+import com.android.launcher3.util.RunnableList;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -92,7 +93,7 @@ public class ModelMultiCallbacksTest {
         // Add a new callback
         cb1.reset();
         MyCallbacks cb2 = spy(MyCallbacks.class);
-        cb2.mPageToBindSync = 2;
+        cb2.mPageToBindSync = IntSet.wrap(2);
         mModelHelper.getModel().addCallbacksAndLoad(cb2);
 
         waitForLoaderAndTempMainThread();
@@ -106,14 +107,14 @@ public class ModelMultiCallbacksTest {
         // No effect on callbacks when removing an callback
         mModelHelper.getModel().removeCallbacks(cb2);
         waitForLoaderAndTempMainThread();
-        assertNull(cb1.mDeferredExecutor);
-        assertNull(cb2.mDeferredExecutor);
+        assertNull(cb1.mPendingTasks);
+        assertNull(cb2.mPendingTasks);
 
         // Reloading only loads registered callbacks
         mModelHelper.getModel().startLoader();
         waitForLoaderAndTempMainThread();
         cb1.verifySynchronouslyBound(3);
-        assertNull(cb2.mDeferredExecutor);
+        assertNull(cb2.mPendingTasks);
     }
 
     @Test
@@ -178,21 +179,17 @@ public class ModelMultiCallbacksTest {
     private abstract static class MyCallbacks implements Callbacks {
 
         final List<ItemInfo> mItems = new ArrayList<>();
-        int mPageToBindSync = 0;
-        int mPageBoundSync = PagedView.INVALID_PAGE;
-        ViewOnDrawExecutor mDeferredExecutor;
+        IntSet mPageToBindSync = IntSet.wrap(0);
+        IntSet mPageBoundSync = new IntSet();
+        RunnableList mPendingTasks;
         AppInfo[] mAppInfos;
 
         MyCallbacks() { }
 
         @Override
-        public void onPageBoundSynchronously(int page) {
-            mPageBoundSync = page;
-        }
-
-        @Override
-        public void executeOnNextDraw(ViewOnDrawExecutor executor) {
-            mDeferredExecutor = executor;
+        public void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks) {
+            mPageBoundSync = boundPages;
+            mPendingTasks = pendingTasks;
         }
 
         @Override
@@ -206,26 +203,26 @@ public class ModelMultiCallbacksTest {
         }
 
         @Override
-        public int getPageToBindSynchronously() {
+        public IntSet getPagesToBindSynchronously(IntArray orderedScreenIds) {
             return mPageToBindSync;
         }
 
         public void reset() {
             mItems.clear();
-            mPageBoundSync = PagedView.INVALID_PAGE;
-            mDeferredExecutor = null;
+            mPageBoundSync = new IntSet();
+            mPendingTasks = null;
             mAppInfos = null;
         }
 
         public void verifySynchronouslyBound(int totalItems) {
             // Verify that the requested page is bound synchronously
-            assertEquals(mPageBoundSync, mPageToBindSync);
+            assertEquals(mPageToBindSync, mPageBoundSync);
             assertEquals(mItems.size(), 1);
-            assertEquals(mItems.get(0).screenId, mPageBoundSync);
-            assertNotNull(mDeferredExecutor);
+            assertEquals(IntSet.wrap(mItems.get(0).screenId), mPageBoundSync);
+            assertNotNull(mPendingTasks);
 
             // Verify that all other pages are bound properly
-            mDeferredExecutor.runAllTasks();
+            mPendingTasks.executeAllAndDestroy();
             assertEquals(mItems.size(), totalItems);
         }
 
