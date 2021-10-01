@@ -96,9 +96,11 @@ import com.android.quickstep.inputconsumers.OverviewWithoutFocusInputConsumer;
 import com.android.quickstep.inputconsumers.ResetGestureInputConsumer;
 import com.android.quickstep.inputconsumers.ScreenPinnedInputConsumer;
 import com.android.quickstep.inputconsumers.SysUiOverlayInputConsumer;
+import com.android.quickstep.inputconsumers.TaskbarStashInputConsumer;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.AssistantUtilities;
 import com.android.quickstep.util.ProtoTracer;
+import com.android.quickstep.util.ProxyScreenStatusProvider;
 import com.android.quickstep.util.SplitScreenBounds;
 import com.android.systemui.plugins.OverscrollPlugin;
 import com.android.systemui.plugins.PluginListener;
@@ -262,16 +264,41 @@ public class TouchInteractionService extends Service implements PluginListener<O
         }
 
         @Override
-        public void onSplitScreenSecondaryBoundsChanged(Rect bounds, Rect insets)  {
+        public void onSplitScreenSecondaryBoundsChanged(Rect bounds, Rect insets) {
             WindowBounds wb = new WindowBounds(bounds, insets);
             MAIN_EXECUTOR.execute(() -> SplitScreenBounds.INSTANCE.setSecondaryWindowBounds(wb));
         }
 
+        @BinderThread
         @Override
-        public void onImeWindowStatusChanged(int displayId, IBinder token, int vis,
-                int backDisposition, boolean showImeSwitcher) {
-            MAIN_EXECUTOR.execute(() -> mTaskbarManager.updateImeStatus(
-                    displayId, vis, backDisposition, showImeSwitcher));
+        public void onScreenTurnedOn() {
+            MAIN_EXECUTOR.execute(ProxyScreenStatusProvider.INSTANCE::onScreenTurnedOn);
+        }
+
+        @Override
+        public void onRotationProposal(int rotation, boolean isValid) {
+            executeForTaskbarManager(() -> mTaskbarManager.onRotationProposal(rotation, isValid));
+        }
+
+        @Override
+        public void disable(int displayId, int state1, int state2, boolean animate) {
+            executeForTaskbarManager(() -> mTaskbarManager
+                    .disableNavBarElements(displayId, state1, state2, animate));
+        }
+
+        @Override
+        public void onSystemBarAttributesChanged(int displayId, int behavior) {
+            executeForTaskbarManager(() -> mTaskbarManager
+                    .onSystemBarAttributesChanged(displayId, behavior));
+        }
+
+        private void executeForTaskbarManager(final Runnable r) {
+            MAIN_EXECUTOR.execute(() -> {
+                if (mTaskbarManager == null) {
+                    return;
+                }
+                r.run();
+            });
         }
 
         public TaskbarManager getTaskbarManager() {
@@ -290,7 +317,6 @@ public class TouchInteractionService extends Service implements PluginListener<O
     public static boolean isConnected() {
         return sConnected;
     }
-
 
     public static boolean isInitialized() {
         return sIsInitialized;
@@ -656,6 +682,14 @@ public class TouchInteractionService extends Service implements PluginListener<O
             if (mDeviceState.canTriggerAssistantAction(event, newGestureState.getRunningTask())) {
                 base = new AssistantInputConsumer(this, newGestureState, base, mInputMonitorCompat,
                         mDeviceState, event);
+            }
+
+            // If Taskbar is present, we listen for long press to unstash it.
+            BaseActivityInterface activityInterface = newGestureState.getActivityInterface();
+            StatefulActivity activity = activityInterface.getCreatedActivity();
+            if (activity != null && activity.getDeviceProfile().isTaskbarPresent) {
+                base = new TaskbarStashInputConsumer(this, base, mInputMonitorCompat,
+                        mTaskbarManager.getCurrentActivityContext());
             }
 
             if (FeatureFlags.ENABLE_QUICK_CAPTURE_GESTURE.get()) {

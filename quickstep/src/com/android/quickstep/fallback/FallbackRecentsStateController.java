@@ -15,6 +15,8 @@
  */
 package com.android.quickstep.fallback;
 
+import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
+import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_MODAL;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_SCALE;
@@ -77,9 +79,7 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
         float clearAllButtonAlpha = state.hasClearAllButton() ? 1 : 0;
         setter.setFloat(mRecentsView.getClearAllButton(), ClearAllButton.VISIBILITY_ALPHA,
                 clearAllButtonAlpha, LINEAR);
-        float overviewButtonAlpha =
-                state.hasOverviewActions() && mRecentsView.shouldShowOverviewActionsForState(state)
-                        ? 1 : 0;
+        float overviewButtonAlpha = state.hasOverviewActions() ? 1 : 0;
         setter.setFloat(mActivity.getActionsView().getVisibilityAlpha(),
                 MultiValueAlpha.VALUE, overviewButtonAlpha, LINEAR);
 
@@ -94,8 +94,9 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
         setter.setFloat(mRecentsView, TASK_MODALNESS, state.getOverviewModalness(),
                 config.getInterpolator(ANIM_OVERVIEW_MODAL, LINEAR));
         setter.setFloat(mRecentsView, FULLSCREEN_PROGRESS, state.isFullScreen() ? 1 : 0, LINEAR);
-        setter.setFloat(mRecentsView, RECENTS_GRID_PROGRESS,
-                state.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()) ? 1f : 0f, LINEAR);
+        boolean showAsGrid = state.displayOverviewTasksAsGrid(mActivity.getDeviceProfile());
+        setter.setFloat(mRecentsView, RECENTS_GRID_PROGRESS, showAsGrid ? 1f : 0f,
+                showAsGrid ? INSTANT : FINAL_FRAME);
 
         setter.setViewBackgroundColor(mActivity.getScrimView(), state.getScrimColor(mActivity),
                 config.getInterpolator(ANIM_SCRIM_FADE, LINEAR));

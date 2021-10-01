@@ -17,12 +17,14 @@ package com.android.quickstep.util;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 
 import com.android.launcher3.Alarm;
 import com.android.launcher3.R;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
+import com.android.launcher3.testing.TestProtocol;
 
 /**
  * Given positions along x- or y-axis, tracks velocity and acceleration and determines when there is
@@ -84,7 +86,12 @@ public class MotionPauseDetector {
         mSpeedSomewhatFast = res.getDimension(R.dimen.motion_pause_detector_speed_somewhat_fast);
         mSpeedFast = res.getDimension(R.dimen.motion_pause_detector_speed_fast);
         mForcePauseTimeout = new Alarm();
-        mForcePauseTimeout.setOnAlarmListener(alarm -> updatePaused(true /* isPaused */));
+        mForcePauseTimeout.setOnAlarmListener(alarm -> {
+            if (TestProtocol.sDebugTracing) {
+                Log.d(TestProtocol.MOTION_PAUSE_TIMEOUT, "onAlarm");
+            }
+            updatePaused(true /* isPaused */);
+        });
         mMakePauseHarderToTrigger = makePauseHarderToTrigger;
         mVelocityProvider = new SystemVelocityProvider(axis);
     }
@@ -118,9 +125,13 @@ public class MotionPauseDetector {
      * @param pointerIndex Index for the pointer being tracked in the motion event
      */
     public void addPosition(MotionEvent ev, int pointerIndex) {
-        mForcePauseTimeout.setAlarm(mMakePauseHarderToTrigger
-                ? HARDER_TRIGGER_TIMEOUT
-                : FORCE_PAUSE_TIMEOUT);
+        long timeoutMs = TestProtocol.sForcePauseTimeout != null
+                ? TestProtocol.sForcePauseTimeout
+                : mMakePauseHarderToTrigger ? HARDER_TRIGGER_TIMEOUT : FORCE_PAUSE_TIMEOUT;
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.MOTION_PAUSE_TIMEOUT, "setAlarm: " + timeoutMs);
+        }
+        mForcePauseTimeout.setAlarm(timeoutMs);
         float newVelocity = mVelocityProvider.addMotionEvent(ev, ev.getPointerId(pointerIndex));
         if (mPreviousVelocity != null) {
             checkMotionPaused(newVelocity, mPreviousVelocity, ev.getEventTime());
@@ -160,6 +171,9 @@ public class MotionPauseDetector {
                     }
                 }
             }
+        }
+        if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.MOTION_PAUSE_TIMEOUT, "checkMotionPaused: " + isPaused);
         }
         updatePaused(isPaused);
     }

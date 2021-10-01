@@ -18,11 +18,12 @@ package com.android.launcher3.taskbar;
 
 import static android.view.Display.DEFAULT_DISPLAY;
 
-import android.content.Intent;
 import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.IntDef;
 
+import com.android.launcher3.testing.TestLogging;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TouchInteractionService;
@@ -44,7 +45,9 @@ public class TaskbarNavButtonController {
             BUTTON_BACK,
             BUTTON_HOME,
             BUTTON_RECENTS,
-            BUTTON_IME_SWITCH
+            BUTTON_IME_SWITCH,
+            BUTTON_A11Y,
+            BUTTON_A11Y_LONG_CLICK
     })
 
     public @interface TaskbarButton {}
@@ -53,6 +56,8 @@ public class TaskbarNavButtonController {
     static final int BUTTON_HOME = BUTTON_BACK << 1;
     static final int BUTTON_RECENTS = BUTTON_HOME << 1;
     static final int BUTTON_IME_SWITCH = BUTTON_RECENTS << 1;
+    static final int BUTTON_A11Y = BUTTON_IME_SWITCH << 1;
+    static final int BUTTON_A11Y_LONG_CLICK = BUTTON_A11Y << 1;
 
     private final TouchInteractionService mService;
 
@@ -74,18 +79,22 @@ public class TaskbarNavButtonController {
             case BUTTON_IME_SWITCH:
                 showIMESwitcher();
                 break;
+            case BUTTON_A11Y:
+                notifyImeClick(false /* longClick */);
+                break;
+            case BUTTON_A11Y_LONG_CLICK:
+                notifyImeClick(true /* longClick */);
+                break;
         }
     }
 
     private void navigateHome() {
-        mService.startActivity(new Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_HOME)
-                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        mService.getOverviewCommandHelper().addCommand(OverviewCommandHelper.TYPE_HOME);
     }
 
     private void navigateToOverview() {
-        mService.getOverviewCommandHelper()
-                .addCommand(OverviewCommandHelper.TYPE_SHOW);
+        TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onOverviewToggle");
+        mService.getOverviewCommandHelper().addCommand(OverviewCommandHelper.TYPE_TOGGLE);
     }
 
     private void executeBack() {
@@ -96,5 +105,14 @@ public class TaskbarNavButtonController {
         mService.getSystemService(InputMethodManager.class)
                 .showInputMethodPickerFromSystem(true /* showAuxiliarySubtypes */,
                         DEFAULT_DISPLAY);
+    }
+
+    private void notifyImeClick(boolean longClick) {
+        SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.getNoCreate();
+        if (longClick) {
+            systemUiProxy.notifyAccessibilityButtonLongClicked();
+        } else {
+            systemUiProxy.notifyAccessibilityButtonClicked(mService.getDisplayId());
+        }
     }
 }

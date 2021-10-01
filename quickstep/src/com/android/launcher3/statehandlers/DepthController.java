@@ -108,6 +108,13 @@ public class DepthController implements StateHandler<LauncherState>,
         }
     };
 
+    private final Runnable mOpaquenessListener = new Runnable() {
+        @Override
+        public void run() {
+            dispatchTransactionSurface(mDepth);
+        }
+    };
+
     private final Launcher mLauncher;
     /**
      * Blur radius when completely zoomed out, in pixels.
@@ -117,6 +124,10 @@ public class DepthController implements StateHandler<LauncherState>,
     private WallpaperManagerCompat mWallpaperManager;
     private SurfaceControl mSurface;
     /**
+     * How visible the -1 overlay is, from 0 to 1.
+     */
+    private float mOverlayScrollProgress;
+    /**
      * Ratio from 0 to 1, where 0 is fully zoomed out, and 1 is zoomed in.
      * @see android.service.wallpaper.WallpaperService.Engine#onZoomChanged(float)
      */
@@ -125,6 +136,10 @@ public class DepthController implements StateHandler<LauncherState>,
      * If we're launching and app and should not be blurring the screen for performance reasons.
      */
     private boolean mBlurDisabledForAppLaunch;
+    /**
+     * If we requested early wake-up offsets to SurfaceFlinger.
+     */
+    private boolean mInEarlyWakeUp;
 
     // Workaround for animating the depth when multiwindow mode changes.
     private boolean mIgnoreStateChangesDuringMultiWindowAnimation = false;
@@ -150,21 +165,26 @@ public class DepthController implements StateHandler<LauncherState>,
                     if (windowToken != null) {
                         mWallpaperManager.setWallpaperZoomOut(windowToken, mDepth);
                     }
-                    CrossWindowBlurListeners.getInstance().addListener(mLauncher.getMainExecutor(),
-                            mCrossWindowBlurListener);
+                    onAttached();
                 }
 
                 @Override
                 public void onViewDetachedFromWindow(View view) {
                     CrossWindowBlurListeners.getInstance().removeListener(mCrossWindowBlurListener);
+                    mLauncher.getScrimView().removeOpaquenessListener(mOpaquenessListener);
                 }
             };
             mLauncher.getRootView().addOnAttachStateChangeListener(mOnAttachListener);
             if (mLauncher.getRootView().isAttachedToWindow()) {
-                CrossWindowBlurListeners.getInstance().addListener(mLauncher.getMainExecutor(),
-                        mCrossWindowBlurListener);
+                onAttached();
             }
         }
+    }
+
+    private void onAttached() {
+        CrossWindowBlurListeners.getInstance().addListener(mLauncher.getMainExecutor(),
+                mCrossWindowBlurListener);
+        mLauncher.getScrimView().addOpaquenessListener(mOpaquenessListener);
     }
 
     /**
@@ -251,12 +271,24 @@ public class DepthController implements StateHandler<LauncherState>,
         }
     }
 
+    public void onOverlayScrollChanged(float progress) {
+        // Round out the progress to dedupe frequent, non-perceptable updates
+        int progressI = (int) (progress * 256);
+        float progressF = progressI / 256f;
+        if (Float.compare(mOverlayScrollProgress, progressF) == 0) {
+            return;
+        }
+        mOverlayScrollProgress = progressF;
+        dispatchTransactionSurface(mDepth);
+    }
+
     private boolean dispatchTransactionSurface(float depth) {
         boolean supportsBlur = BlurUtils.supportsBlursOnWindows();
         if (supportsBlur && (mSurface == null || !mSurface.isValid())) {
             return false;
         }
         ensureDependencies();
+        depth = Math.max(depth, mOverlayScrollProgress);
         IBinder windowToken = mLauncher.getRootView().getWindowToken();
         if (windowToken != null) {
             mWallpaperManager.setWallpaperZoomOut(windowToken, depth);
@@ -270,10 +302,21 @@ public class DepthController implements StateHandler<LauncherState>,
 
             int blur = opaque || isOverview || !mCrossWindowBlursEnabled
                     || mBlurDisabledForAppLaunch ? 0 : (int) (depth * mMaxBlurRadius);
-            new SurfaceControl.Transaction()
+            SurfaceControl.Transaction transaction = new SurfaceControl.Transaction()
                     .setBackgroundBlurRadius(mSurface, blur)
-                    .setOpaque(mSurface, opaque)
-                    .apply();
+                    .setOpaque(mSurface, opaque);
+
+            // Set early wake-up flags when we know we're executing an expensive operation, this way
+            // SurfaceFlinger will adjust its internal offsets to avoid jank.
+            boolean wantsEarlyWakeUp = depth > 0 && depth < 1;
+            if (wantsEarlyWakeUp && !mInEarlyWakeUp) {
+                transaction.setEarlyWakeupStart();
+                mInEarlyWakeUp = true;
+            } else if (!wantsEarlyWakeUp && mInEarlyWakeUp) {
+                transaction.setEarlyWakeupEnd();
+                mInEarlyWakeUp = false;
+            }
+            transaction.apply();
         }
         return true;
     }

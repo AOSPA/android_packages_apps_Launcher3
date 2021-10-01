@@ -33,6 +33,8 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.RemoteAnimationAdapter;
+import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 
 import com.android.launcher3.util.MainThreadInitializedObject;
@@ -85,6 +87,7 @@ public class SystemUiProxy implements ISystemUiProxy,
     private float mLastNavButtonAlpha;
     private boolean mLastNavButtonAnimate;
     private boolean mHasNavButtonAlphaBeenSet = false;
+    private Runnable mPendingSetNavButtonAlpha = null;
 
     // TODO(141886704): Find a way to remove this
     private int mLastSystemUiStateFlags;
@@ -156,6 +159,11 @@ public class SystemUiProxy implements ISystemUiProxy,
         if (mPendingSmartspaceCallback != null && mSmartspaceTransitionController != null) {
             setSmartspaceCallback(mPendingSmartspaceCallback);
             mPendingSmartspaceCallback = null;
+        }
+
+        if (mPendingSetNavButtonAlpha != null) {
+            mPendingSetNavButtonAlpha.run();
+            mPendingSetNavButtonAlpha = null;
         }
     }
 
@@ -240,14 +248,18 @@ public class SystemUiProxy implements ISystemUiProxy,
         boolean changed = Float.compare(alpha, mLastNavButtonAlpha) != 0
                 || animate != mLastNavButtonAnimate
                 || !mHasNavButtonAlphaBeenSet;
-        if (mSystemUiProxy != null && changed) {
-            mLastNavButtonAlpha = alpha;
-            mLastNavButtonAnimate = animate;
-            mHasNavButtonAlphaBeenSet = true;
-            try {
-                mSystemUiProxy.setNavBarButtonAlpha(alpha, animate);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call setNavBarButtonAlpha", e);
+        if (changed) {
+            if (mSystemUiProxy == null) {
+                mPendingSetNavButtonAlpha = () -> setNavBarButtonAlpha(alpha, animate);
+            } else {
+                mLastNavButtonAlpha = alpha;
+                mLastNavButtonAnimate = animate;
+                mHasNavButtonAlphaBeenSet = true;
+                try {
+                    mSystemUiProxy.setNavBarButtonAlpha(alpha, animate);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed call setNavBarButtonAlpha", e);
+                }
             }
         }
     }
@@ -346,7 +358,7 @@ public class SystemUiProxy implements ISystemUiProxy,
             try {
                 mSystemUiProxy.setSplitScreenMinimized(minimized);
             } catch (RemoteException e) {
-                Log.w(TAG, "Failed call stopScreenPinning", e);
+                Log.w(TAG, "Failed call setSplitScreenMinimized", e);
             }
         }
     }
@@ -383,6 +395,18 @@ public class SystemUiProxy implements ISystemUiProxy,
                 mSystemUiProxy.notifyPrioritizedRotation(rotation);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call notifyPrioritizedRotation with arg: " + rotation, e);
+            }
+        }
+    }
+
+    @Override
+    public void notifyTaskbarStatus(boolean visible, boolean stashed) {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.notifyTaskbarStatus(visible, stashed);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call notifyTaskbarStatus with arg: " +
+                        visible + ", " + stashed, e);
             }
         }
     }
@@ -552,6 +576,22 @@ public class SystemUiProxy implements ISystemUiProxy,
         }
     }
 
+    /**
+     * Start multiple tasks in split-screen simultaneously.
+     */
+    public void startTasksWithLegacyTransition(int mainTaskId, Bundle mainOptions, int sideTaskId,
+            Bundle sideOptions, @SplitConfigurationOptions.StagePosition int sidePosition,
+            RemoteAnimationAdapter adapter) {
+        if (mSystemUiProxy != null) {
+            try {
+                mSplitScreen.startTasksWithLegacyTransition(mainTaskId, mainOptions, sideTaskId,
+                        sideOptions, sidePosition, adapter);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call startTasksWithLegacyTransition");
+            }
+        }
+    }
+
     public void startShortcut(String packageName, String shortcutId, int stage, int position,
             Bundle options, UserHandle user) {
         if (mSplitScreen != null) {
@@ -583,6 +623,24 @@ public class SystemUiProxy implements ISystemUiProxy,
                 Log.w(TAG, "Failed call removeFromSideStage");
             }
         }
+    }
+
+    /**
+     * Call this when going to recents so that shell can set-up and provide appropriate leashes
+     * for animation (eg. DividerBar).
+     *
+     * @param cancel true if recents starting is being cancelled.
+     * @return RemoteAnimationTargets of windows that need to animate but only exist in shell.
+     */
+    public RemoteAnimationTarget[] onGoingToRecentsLegacy(boolean cancel) {
+        if (mSplitScreen != null) {
+            try {
+                return mSplitScreen.onGoingToRecentsLegacy(cancel);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call onGoingToRecentsLegacy");
+            }
+        }
+        return null;
     }
 
     //

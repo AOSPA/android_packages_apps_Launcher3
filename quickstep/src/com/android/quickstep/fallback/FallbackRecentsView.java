@@ -24,22 +24,23 @@ import android.animation.AnimatorSet;
 import android.annotation.TargetApi;
 import android.app.ActivityManager.RunningTaskInfo;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.util.AttributeSet;
-import android.util.Log;
+import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statemanager.StateManager.StateListener;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.quickstep.FallbackActivityInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RecentsActivity;
+import com.android.quickstep.util.SplitSelectStateController;
+import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
-import com.android.quickstep.views.SplitPlaceholderView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.Task.TaskKey;
@@ -62,8 +63,8 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public void init(OverviewActionsView actionsView, SplitPlaceholderView splitPlaceholderView) {
-        super.init(actionsView, splitPlaceholderView);
+    public void init(OverviewActionsView actionsView, SplitSelectStateController splitController) {
+        super.init(actionsView, splitController);
         setOverviewStateEnabled(true);
         setOverlayEnabled(true);
     }
@@ -90,12 +91,14 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
      */
     @Override
     public void onPrepareGestureEndAnimation(
-            @Nullable AnimatorSet animatorSet, GestureState.GestureEndTarget endTarget) {
-        super.onPrepareGestureEndAnimation(animatorSet, endTarget);
+            @Nullable AnimatorSet animatorSet, GestureState.GestureEndTarget endTarget,
+            TaskViewSimulator taskViewSimulator) {
+        super.onPrepareGestureEndAnimation(animatorSet, endTarget, taskViewSimulator);
         if (mHomeTaskInfo != null && endTarget == RECENTS && animatorSet != null) {
-            TaskView tv = getTaskView(mHomeTaskInfo.taskId);
+            TaskView tv = getTaskViewByTaskId(mHomeTaskInfo.taskId);
             if (tv != null) {
-                PendingAnimation pa = createTaskDismissAnimation(tv, true, false, 150);
+                PendingAnimation pa = createTaskDismissAnimation(tv, true, false, 150,
+                        false /* dismissingForSplitSelection*/);
                 pa.addEndListener(e -> setCurrentTask(-1));
                 AnimatorPlaybackController controller = pa.createPlaybackController();
                 controller.dispatchOnStart();
@@ -114,12 +117,19 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public void setCurrentTask(int runningTaskId) {
-        super.setCurrentTask(runningTaskId);
+    public void setCurrentTask(int runningTaskViewId) {
+        super.setCurrentTask(runningTaskViewId);
+        int runningTaskId = getTaskIdsForRunningTaskView()[0];
         if (mHomeTaskInfo != null && mHomeTaskInfo.taskId != runningTaskId) {
             mHomeTaskInfo = null;
             setRunningTaskHidden(false);
         }
+    }
+
+    @Nullable
+    @Override
+    protected TaskView getHomeTaskView() {
+        return mHomeTaskInfo != null ? getTaskViewByTaskId(mHomeTaskInfo.taskId) : null;
     }
 
     @Override
@@ -139,11 +149,12 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
         // When quick-switching on 3p-launcher, we add a "stub" tile corresponding to Launcher
         // as well. This tile is never shown as we have setCurrentTaskHidden, but allows use to
         // track the index of the next task appropriately, as if we are switching on any other app.
-        if (mHomeTaskInfo != null && mHomeTaskInfo.taskId == mRunningTaskId && !tasks.isEmpty()) {
+        int runningTaskId = getTaskIdsForRunningTaskView()[0];
+        if (mHomeTaskInfo != null && mHomeTaskInfo.taskId == runningTaskId && !tasks.isEmpty()) {
             // Check if the task list has running task
             boolean found = false;
             for (Task t : tasks) {
-                if (t.key.id == mRunningTaskId) {
+                if (t.key.id == runningTaskId) {
                     found = true;
                     break;
                 }
@@ -175,6 +186,7 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
         } else {
             if (mActivity.isInState(RecentsState.MODAL_TASK)) {
                 mActivity.getStateManager().goToState(DEFAULT);
+                resetModalVisuals();
             }
         }
     }
@@ -204,5 +216,20 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
             RecentsState state = mActivity.getStateManager().getState();
             setDisallowScrollToClearAll(!state.hasClearAllButton());
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        boolean result = super.onTouchEvent(ev);
+        // Do not let touch escape to siblings below this view.
+        return result || mActivity.getStateManager().getState().overviewUi();
+    }
+
+    @Override
+    protected void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        // Reset modal state if full configuration changes
+        setModalStateEnabled(false);
     }
 }

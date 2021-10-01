@@ -23,7 +23,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
-import android.util.Log;
 
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
@@ -37,8 +36,8 @@ import com.android.launcher3.tapl.LauncherInstrumentation.NavigationModel;
 import com.android.launcher3.tapl.Overview;
 import com.android.launcher3.tapl.OverviewActions;
 import com.android.launcher3.tapl.OverviewTask;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.ui.TaplTestsLauncher3;
+import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.quickstep.NavigationModeSwitchRule.NavigationModeSwitch;
 import com.android.quickstep.views.RecentsView;
 
@@ -145,12 +144,8 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
                 launcher -> assertEquals("Dismissing a task didn't remove 1 task from Overview",
                         numTasks - 1, getTaskCount(launcher)));
 
-        // Test UIDevice.pressHome, once we are in AllApps.
-        mDevice.pressHome();
-        waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
-
         // Test dismissing all tasks.
-        mLauncher.getWorkspace().switchToOverview().dismissAllTasks();
+        mLauncher.pressHome().switchToOverview().dismissAllTasks();
         waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
         executeOnLauncher(
                 launcher -> assertEquals("Still have tasks after dismissing all",
@@ -163,6 +158,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @NavigationModeSwitch
     @PortraitLandscape
+    @ScreenRecord //b/193125090
     public void testOverviewActions() throws Exception {
         // Experimenting for b/165029151:
         final Overview overview = mLauncher.pressHome().switchToOverview();

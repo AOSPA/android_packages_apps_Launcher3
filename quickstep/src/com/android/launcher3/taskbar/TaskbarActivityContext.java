@@ -17,7 +17,7 @@ package com.android.launcher3.taskbar;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
 import static com.android.systemui.shared.system.WindowManagerWrapper.ITYPE_BOTTOM_TAPPABLE_ELEMENT;
 import static com.android.systemui.shared.system.WindowManagerWrapper.ITYPE_EXTRA_NAVIGATION_BAR;
@@ -28,9 +28,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.LauncherApps;
 import android.graphics.PixelFormat;
-import android.graphics.Point;
 import android.graphics.Rect;
-import android.graphics.drawable.Drawable;
 import android.os.Process;
 import android.os.SystemProperties;
 import android.util.Log;
@@ -40,31 +38,25 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.DragSource;
-import com.android.launcher3.DropTarget;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.R;
-import com.android.launcher3.dragndrop.DragController;
-import com.android.launcher3.dragndrop.DragOptions;
-import com.android.launcher3.dragndrop.DragView;
-import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.data.FolderInfo;
-import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarButton;
+import com.android.launcher3.taskbar.contextual.RotationButtonController;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.TraceHelper;
+import com.android.launcher3.util.ViewCache;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
@@ -88,45 +80,55 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
     private final DeviceProfile mDeviceProfile;
     private final LayoutInflater mLayoutInflater;
     private final TaskbarDragLayer mDragLayer;
-    private final TaskbarIconController mIconController;
-    private final MyDragController mDragController;
+    private final TaskbarControllers mControllers;
 
     private final WindowManager mWindowManager;
     private WindowManager.LayoutParams mWindowLayoutParams;
+    private boolean mIsFullscreen;
+    // The size we should return to when we call setTaskbarWindowFullscreen(false)
+    private int mLastRequestedNonFullscreenHeight;
 
     private final SysUINavigationMode.Mode mNavMode;
-    private final TaskbarNavButtonController mNavButtonController;
+    private final ViewCache mViewCache = new ViewCache();
 
     private final boolean mIsSafeModeEnabled;
-
-    @NonNull
-    private TaskbarUIController mUIController = TaskbarUIController.DEFAULT;
-
-    private final View.OnClickListener mOnTaskbarIconClickListener;
-    private final View.OnLongClickListener mOnTaskbarIconLongClickListener;
+    private boolean mIsDestroyed = false;
 
     public TaskbarActivityContext(Context windowContext, DeviceProfile dp,
             TaskbarNavButtonController buttonController) {
         super(windowContext, Themes.getActivityThemeRes(windowContext));
         mDeviceProfile = dp;
-        mNavButtonController = buttonController;
+
         mNavMode = SysUINavigationMode.getMode(windowContext);
         mIsSafeModeEnabled = TraceHelper.allowIpcs("isSafeMode",
                 () -> getPackageManager().isSafeMode());
 
-        mOnTaskbarIconLongClickListener =
-                new TaskbarDragController(this)::startSystemDragOnLongClick;
-        mOnTaskbarIconClickListener = this::onTaskbarIconClicked;
-
         float taskbarIconSize = getResources().getDimension(R.dimen.taskbar_icon_size);
+        mDeviceProfile.updateIconSize(1, getResources());
         float iconScale = taskbarIconSize / mDeviceProfile.iconSizePx;
         mDeviceProfile.updateIconSize(iconScale, getResources());
 
         mLayoutInflater = LayoutInflater.from(this).cloneInContext(this);
-        mDragLayer = (TaskbarDragLayer) mLayoutInflater
-                .inflate(R.layout.taskbar, null, false);
-        mIconController = new TaskbarIconController(this, mDragLayer);
-        mDragController = new MyDragController(this);
+
+        // Inflate views.
+        mDragLayer = (TaskbarDragLayer) mLayoutInflater.inflate(
+                R.layout.taskbar, null, false);
+        TaskbarView taskbarView = mDragLayer.findViewById(R.id.taskbar_view);
+        FrameLayout navButtonsView = mDragLayer.findViewById(R.id.navbuttons_view);
+        View stashedHandleView = mDragLayer.findViewById(R.id.stashed_handle);
+
+        // Construct controllers.
+        mControllers = new TaskbarControllers(this,
+                new TaskbarDragController(this),
+                buttonController,
+                new NavbarButtonsViewController(this, navButtonsView),
+                new RotationButtonController(this, R.color.popup_color_primary_light,
+                        R.color.popup_color_primary_light),
+                new TaskbarDragLayerController(this, mDragLayer),
+                new TaskbarViewController(this, taskbarView),
+                new TaskbarKeyguardController(this),
+                new StashedHandleViewController(this, stashedHandleView),
+                new TaskbarStashController(this));
 
         Display display = windowContext.getDisplay();
         Context c = display.getDisplayId() == Display.DEFAULT_DISPLAY
@@ -136,10 +138,11 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
     }
 
     public void init() {
+        mLastRequestedNonFullscreenHeight = mDeviceProfile.taskbarSize;
         mWindowLayoutParams = new WindowManager.LayoutParams(
                 MATCH_PARENT,
-                mDeviceProfile.taskbarSize,
-                TYPE_APPLICATION_OVERLAY,
+                mLastRequestedNonFullscreenHeight,
+                TYPE_NAVIGATION_BAR_PANEL,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         mWindowLayoutParams.setTitle(WINDOW_TITLE);
@@ -148,7 +151,6 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         mWindowLayoutParams.setFitInsetsTypes(0);
         mWindowLayoutParams.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
         mWindowLayoutParams.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-        mWindowLayoutParams.setSystemApplicationOverlay(true);
 
         WindowManagerWrapper wmWrapper = WindowManagerWrapper.getInstance();
         wmWrapper.setProvidesInsetsTypes(
@@ -156,23 +158,14 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                 new int[] { ITYPE_EXTRA_NAVIGATION_BAR, ITYPE_BOTTOM_TAPPABLE_ELEMENT }
         );
 
-        mIconController.init(mOnTaskbarIconClickListener, mOnTaskbarIconLongClickListener);
+        // Initialize controllers after all are constructed.
+        mControllers.init();
+
         mWindowManager.addView(mDragLayer, mWindowLayoutParams);
     }
 
-    /**
-     * Updates the TaskbarContainer height (pass deviceProfile.taskbarSize to reset).
-     */
-    public void setTaskbarWindowHeight(int height) {
-        if (mWindowLayoutParams.height == height) {
-            return;
-        }
-        mWindowLayoutParams.height = height;
-        mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
-    }
-
-    public boolean canShowNavButtons() {
-        return ENABLE_THREE_BUTTON_TASKBAR && mNavMode == Mode.THREE_BUTTONS;
+    public boolean isThreeButtonNav() {
+        return mNavMode == Mode.THREE_BUTTONS;
     }
 
     @Override
@@ -192,59 +185,89 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
 
     @Override
     public Rect getFolderBoundingBox() {
-        return mDragLayer.getFolderBoundingBox();
+        return mControllers.taskbarDragLayerController.getFolderBoundingBox();
     }
 
     @Override
-    public DragController getDragController() {
-        return mDragController;
+    public TaskbarDragController getDragController() {
+        return mControllers.taskbarDragController;
+    }
+
+    @Override
+    public ViewCache getViewCache() {
+        return mViewCache;
     }
 
     /**
      * Sets a new data-source for this taskbar instance
      */
     public void setUIController(@NonNull TaskbarUIController uiController) {
-        mUIController.onDestroy();
-        mUIController = uiController;
-        mIconController.setUIController(mUIController);
-        mUIController.onCreate();
+        mControllers.uiController.onDestroy();
+        mControllers.uiController = uiController;
+        mControllers.uiController.init(mControllers);
     }
 
     /**
      * Called when this instance of taskbar is no longer needed
      */
     public void onDestroy() {
+        mIsDestroyed = true;
         setUIController(TaskbarUIController.DEFAULT);
-        mIconController.onDestroy();
+        mControllers.onDestroy();
         mWindowManager.removeViewImmediate(mDragLayer);
     }
 
-    void onNavigationButtonClick(@TaskbarButton int buttonType) {
-        mNavButtonController.onButtonClick(buttonType);
+    public void updateSysuiStateFlags(int systemUiStateFlags, boolean forceUpdate) {
+        mControllers.navbarButtonsViewController.updateStateForSysuiFlags(
+                systemUiStateFlags, forceUpdate);
+        mControllers.taskbarViewController.setImeIsVisible(
+                mControllers.navbarButtonsViewController.isImeVisible());
+        mControllers.taskbarKeyguardController.updateStateForSysuiFlags(systemUiStateFlags);
     }
 
-    /**
-     * Should be called when the IME visibility changes, so we can hide/show Taskbar accordingly.
-     */
-    public void setImeIsVisible(boolean isImeVisible) {
-        mIconController.setImeIsVisible(isImeVisible);
+    public void onRotationProposal(int rotation, boolean isValid) {
+        mControllers.rotationButtonController.onRotationProposal(rotation, isValid);
     }
 
-    /**
-     * When in 3 button nav, the above doesn't get called since we prevent sysui nav bar from
-     * instantiating at all, which is what's responsible for sending sysui state flags over.
-     *
-     * @param vis IME visibility flag
-     */
-    public void updateImeStatus(int displayId, int vis, boolean showImeSwitcher) {
-        mIconController.updateImeStatus(displayId, vis, showImeSwitcher);
+    public void disableNavBarElements(int displayId, int state1, int state2, boolean animate) {
+        if (displayId != getDisplayId()) {
+            return;
+        }
+        mControllers.rotationButtonController.onDisable2FlagChanged(state2);
+        mControllers.taskbarKeyguardController.disableNavbarElements(state1, state2);
+    }
+
+    public void onSystemBarAttributesChanged(int displayId, int behavior) {
+        mControllers.rotationButtonController.onBehaviorChanged(displayId, behavior);
     }
 
     /**
      * Updates the TaskbarContainer to MATCH_PARENT vs original Taskbar size.
      */
-    protected void setTaskbarWindowFullscreen(boolean fullscreen) {
-        setTaskbarWindowHeight(fullscreen ? MATCH_PARENT : getDeviceProfile().taskbarSize);
+    public void setTaskbarWindowFullscreen(boolean fullscreen) {
+        mIsFullscreen = fullscreen;
+        setTaskbarWindowHeight(fullscreen ? MATCH_PARENT : mLastRequestedNonFullscreenHeight);
+    }
+
+    /**
+     * Updates the TaskbarContainer height (pass deviceProfile.taskbarSize to reset).
+     */
+    public void setTaskbarWindowHeight(int height) {
+        if (mWindowLayoutParams.height == height || mIsDestroyed) {
+            return;
+        }
+        if (height != MATCH_PARENT) {
+            mLastRequestedNonFullscreenHeight = height;
+            if (mIsFullscreen) {
+                // We still need to be fullscreen, so defer any change to our height until we call
+                // setTaskbarWindowFullscreen(false). For example, this could happen when dragging
+                // from the gesture region, as the drag will cancel the gesture and reset launcher's
+                // state, which in turn normally would reset the taskbar window height as well.
+                return;
+            }
+        }
+        mWindowLayoutParams.height = height;
+        mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
     }
 
     protected void onTaskbarIconClicked(View view) {
@@ -262,8 +285,8 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                 folder.animateOpen();
 
                 folder.iterateOverItems((itemInfo, itemView) -> {
-                    itemView.setOnClickListener(mOnTaskbarIconClickListener);
-                    itemView.setOnLongClickListener(mOnTaskbarIconLongClickListener);
+                    mControllers.taskbarViewController
+                            .setClickAndLongClickListenersForIcon(itemView);
                     // To play haptic when dragging, like other Taskbar items do.
                     itemView.setHapticFeedbackEnabled(true);
                     return false;
@@ -271,7 +294,9 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
             });
         } else if (tag instanceof WorkspaceItemInfo) {
             WorkspaceItemInfo info = (WorkspaceItemInfo) tag;
-            if (!(info.isDisabled() && ItemClickHandler.handleDisabledItemClicked(info, this))) {
+            if (info.isDisabled()) {
+                ItemClickHandler.handleDisabledItemClicked(info, this);
+            } else {
                 Intent intent = new Intent(info.getIntent())
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 try {
@@ -308,26 +333,19 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         AbstractFloatingView.closeAllOpenViews(this);
     }
 
-    private static class MyDragController extends DragController<TaskbarActivityContext> {
-        MyDragController(TaskbarActivityContext activity) {
-            super(activity);
-        }
+    /**
+     * Called when we detect a long press in the nav region before passing the gesture slop.
+     * @return Whether taskbar handled the long press, and thus should cancel the gesture.
+     */
+    public boolean onLongPressToUnstashTaskbar() {
+        return mControllers.taskbarStashController.onLongPressToUnstashTaskbar();
+    }
 
-        @Override
-        protected DragView startDrag(@Nullable Drawable drawable, @Nullable View view,
-                DraggableView originalView, int dragLayerX, int dragLayerY, DragSource source,
-                ItemInfo dragInfo, Point dragOffset, Rect dragRegion, float initialDragViewScale,
-                float dragViewScaleOnDrop, DragOptions options) {
-            return null;
-        }
-
-        @Override
-        protected void exitDrag() {
-        }
-
-        @Override
-        protected DropTarget getDefaultDropTarget(int[] dropCoordinates) {
-            return null;
-        }
+    /**
+     * Called when we detect a motion down or up/cancel in the nav region while stashed.
+     * @param animateForward Whether to animate towards the unstashed hint state or back to stashed.
+     */
+    public void startTaskbarUnstashHint(boolean animateForward) {
+        mControllers.taskbarStashController.startUnstashHint(animateForward);
     }
 }

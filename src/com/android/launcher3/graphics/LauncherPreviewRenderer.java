@@ -29,6 +29,7 @@ import android.annotation.TargetApi;
 import android.app.Fragment;
 import android.app.WallpaperColors;
 import android.app.WallpaperManager;
+import android.appwidget.AppWidgetHost;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.Context;
@@ -84,11 +85,15 @@ import com.android.launcher3.uioverrides.PredictedAppIconInflater;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
+import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.BaseLauncherAppWidgetHostView;
+import com.android.launcher3.widget.LauncherAppWidgetHost;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.LocalColorExtractor;
+import com.android.launcher3.widget.NavigableAppWidgetHostView;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
 import java.util.ArrayList;
@@ -205,7 +210,8 @@ public class LauncherPreviewRenderer extends ContextWrapper
     private final LayoutInflater mHomeElementInflater;
     private final InsettableFrameLayout mRootView;
     private final Hotseat mHotseat;
-    private final CellLayout mWorkspace;
+    private final Map<Integer, CellLayout> mWorkspaceScreens = new HashMap<>();
+    private final AppWidgetHost mAppWidgetHost;
     private final SparseIntArray mWallpaperColorResources;
 
     public LauncherPreviewRenderer(Context context,
@@ -250,19 +256,31 @@ public class LauncherPreviewRenderer extends ContextWrapper
                 new ContextThemeWrapper(this, R.style.HomeScreenElementTheme));
         mHomeElementInflater.setFactory2(this);
 
+        int layoutRes = mDp.isTwoPanels ? R.layout.launcher_preview_two_panel_layout
+                : R.layout.launcher_preview_layout;
         mRootView = (InsettableFrameLayout) mHomeElementInflater.inflate(
-                R.layout.launcher_preview_layout, null, false);
+                layoutRes, null, false);
         mRootView.setInsets(mInsets);
         measureView(mRootView, mDp.widthPx, mDp.heightPx);
 
         mHotseat = mRootView.findViewById(R.id.hotseat);
         mHotseat.resetLayout(false);
 
-        mWorkspace = mRootView.findViewById(R.id.workspace);
-        mWorkspace.setPadding(mDp.workspacePadding.left + mDp.cellLayoutPaddingLeftRightPx,
+        if (mDp.isTwoPanels) {
+            CellLayout leftPanel = mRootView.findViewById(R.id.workspace_left);
+            leftPanel.setPadding(mDp.workspacePadding.left + mDp.cellLayoutPaddingLeftRightPx,
+                    mDp.workspacePadding.top,
+                    mDp.workspacePadding.right + mDp.cellLayoutPaddingLeftRightPx,
+                    mDp.workspacePadding.bottom);
+            mWorkspaceScreens.put(LEFT_PANEL_ID, leftPanel);
+        }
+
+        CellLayout firstScreen = mRootView.findViewById(R.id.workspace);
+        firstScreen.setPadding(mDp.workspacePadding.left + mDp.cellLayoutPaddingLeftRightPx,
                 mDp.workspacePadding.top,
                 mDp.workspacePadding.right + mDp.cellLayoutPaddingLeftRightPx,
                 mDp.workspacePadding.bottom);
+        mWorkspaceScreens.put(FIRST_SCREEN_ID, firstScreen);
 
         if (Utilities.ATLEAST_S) {
             WallpaperColors wallpaperColors = wallpaperColorsOverride != null
@@ -273,6 +291,9 @@ public class LauncherPreviewRenderer extends ContextWrapper
         } else {
             mWallpaperColorResources = null;
         }
+        mAppWidgetHost = FeatureFlags.WIDGETS_IN_LAUNCHER_PREVIEW.get()
+                ? new LauncherPreviewAppWidgetHost(context)
+                : null;
     }
 
     /** Populate preview and render it. */
@@ -330,18 +351,20 @@ public class LauncherPreviewRenderer extends ContextWrapper
 
     @Override
     public CellLayout getScreenWithId(int screenId) {
-        return mWorkspace;
+        return mWorkspaceScreens.get(screenId);
     }
 
     private void inflateAndAddIcon(WorkspaceItemInfo info) {
+        CellLayout screen = mWorkspaceScreens.get(info.screenId);
         BubbleTextView icon = (BubbleTextView) mHomeElementInflater.inflate(
-                R.layout.app_icon, mWorkspace, false);
+                R.layout.app_icon, screen, false);
         icon.applyFromWorkspaceItem(info);
         addInScreenFromBind(icon, info);
     }
 
     private void inflateAndAddFolder(FolderInfo info) {
-        FolderIcon folderIcon = FolderIcon.inflateIcon(R.layout.folder_icon, this, mWorkspace,
+        CellLayout screen = mWorkspaceScreens.get(info.screenId);
+        FolderIcon folderIcon = FolderIcon.inflateIcon(R.layout.folder_icon, this, screen,
                 info);
         addInScreenFromBind(folderIcon, info);
     }
@@ -372,20 +395,31 @@ public class LauncherPreviewRenderer extends ContextWrapper
 
     private void inflateAndAddWidgets(
             LauncherAppWidgetInfo info, LauncherAppWidgetProviderInfo providerInfo) {
-        AppWidgetHostView view = new AppWidgetHostView(mContext);
-        view.setAppWidget(-1, providerInfo);
-        view.updateAppWidget(null);
-        view.setTag(info);
+        AppWidgetHostView view;
+        if (FeatureFlags.WIDGETS_IN_LAUNCHER_PREVIEW.get()) {
+            view = mAppWidgetHost.createView(mContext, info.appWidgetId, providerInfo);
+        } else {
+            view = new NavigableAppWidgetHostView(this) {
+                @Override
+                protected boolean shouldAllowDirectClick() {
+                    return false;
+                }
+            };
+            view.setAppWidget(-1, providerInfo);
+            view.updateAppWidget(null);
+        }
 
         if (mWallpaperColorResources != null) {
             view.setColorResources(mWallpaperColorResources);
         }
 
+        view.setTag(info);
         addInScreenFromBind(view, info);
     }
 
     private void inflateAndAddPredictedIcon(WorkspaceItemInfo info) {
-        View view = PredictedAppIconInflater.inflate(mHomeElementInflater, mWorkspace, info);
+        CellLayout screen = mWorkspaceScreens.get(info.screenId);
+        View view = PredictedAppIconInflater.inflate(mHomeElementInflater, screen, info);
         if (view != null) {
             addInScreenFromBind(view, info);
         }
@@ -416,11 +450,13 @@ public class LauncherPreviewRenderer extends ContextWrapper
         ArrayList<ItemInfo> otherWorkspaceItems = new ArrayList<>();
         ArrayList<LauncherAppWidgetInfo> currentAppWidgets = new ArrayList<>();
         ArrayList<LauncherAppWidgetInfo> otherAppWidgets = new ArrayList<>();
-        filterCurrentWorkspaceItems(0 /* currentScreenId */,
-                dataModel.workspaceItems, currentWorkspaceItems,
-                otherWorkspaceItems);
-        filterCurrentWorkspaceItems(0 /* currentScreenId */, dataModel.appWidgets,
-                currentAppWidgets, otherAppWidgets);
+
+        IntSet currentScreenIds = IntSet.wrap(mWorkspaceScreens.keySet());
+        filterCurrentWorkspaceItems(currentScreenIds, dataModel.workspaceItems,
+                currentWorkspaceItems, otherWorkspaceItems);
+        filterCurrentWorkspaceItems(currentScreenIds, dataModel.appWidgets, currentAppWidgets,
+                otherAppWidgets);
+
         sortWorkspaceItemsSpatially(mIdp, currentWorkspaceItems);
         for (ItemInfo itemInfo : currentWorkspaceItems) {
             switch (itemInfo.itemType) {
@@ -473,12 +509,13 @@ public class LauncherPreviewRenderer extends ContextWrapper
 
         // Add first page QSB
         if (FeatureFlags.QSB_ON_FIRST_SCREEN) {
+            CellLayout firstScreen = mWorkspaceScreens.get(FIRST_SCREEN_ID);
             View qsb = mHomeElementInflater.inflate(
-                    R.layout.search_container_workspace, mWorkspace, false);
+                    R.layout.search_container_workspace, firstScreen, false);
             CellLayout.LayoutParams lp =
-                    new CellLayout.LayoutParams(0, 0, mWorkspace.getCountX(), 1);
+                    new CellLayout.LayoutParams(0, 0, firstScreen.getCountX(), 1);
             lp.canReorder = false;
-            mWorkspace.addViewToCellLayout(qsb, 0, R.id.search_container_workspace, lp, true);
+            firstScreen.addViewToCellLayout(qsb, 0, R.id.search_container_workspace, lp, true);
         }
 
         measureView(mRootView, mDp.widthPx, mDp.heightPx);
@@ -491,6 +528,32 @@ public class LauncherPreviewRenderer extends ContextWrapper
     private static void measureView(View view, int width, int height) {
         view.measure(makeMeasureSpec(width, EXACTLY), makeMeasureSpec(height, EXACTLY));
         view.layout(0, 0, width, height);
+    }
+
+    private class LauncherPreviewAppWidgetHost extends AppWidgetHost {
+
+        private LauncherPreviewAppWidgetHost(Context context) {
+            super(context, LauncherAppWidgetHost.APPWIDGET_HOST_ID);
+        }
+
+        @Override
+        protected AppWidgetHostView onCreateView(
+                Context context,
+                int appWidgetId,
+                AppWidgetProviderInfo appWidget) {
+            return new LauncherPreviewAppWidgetHostView(LauncherPreviewRenderer.this);
+        }
+    }
+
+    private static class LauncherPreviewAppWidgetHostView extends BaseLauncherAppWidgetHostView {
+        private LauncherPreviewAppWidgetHostView(Context context) {
+            super(context);
+        }
+
+        @Override
+        protected boolean shouldAllowDirectClick() {
+            return false;
+        }
     }
 
     /** Root layout for launcher preview that intercepts all touch events. */

@@ -16,7 +16,7 @@
 
 package com.android.launcher3.model;
 
-import static com.android.launcher3.config.FeatureFlags.MULTI_DB_GRID_MIRATION_ALGO;
+import static com.android.launcher3.WorkspaceLayoutManager.LEFT_PANEL_ID;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCUT_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_CHANGE_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_ENABLED;
@@ -79,13 +79,14 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.pm.UserCache;
-import com.android.launcher3.provider.ImportDataTask;
 import com.android.launcher3.qsb.QsbContainerView;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
 import com.android.launcher3.shortcuts.ShortcutRequest.QueryResult;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IOUtils;
+import com.android.launcher3.util.IntArray;
+import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.LooperIdleLock;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
@@ -174,10 +175,17 @@ public class LoaderTask implements Runnable {
     private void sendFirstScreenActiveInstallsBroadcast() {
         ArrayList<ItemInfo> firstScreenItems = new ArrayList<>();
         ArrayList<ItemInfo> allItems = mBgDataModel.getAllWorkspaceItems();
-        // Screen set is never empty
-        final int firstScreen = mBgDataModel.collectWorkspaceScreens().get(0);
 
-        filterCurrentWorkspaceItems(firstScreen, allItems, firstScreenItems,
+        // Screen set is never empty
+        IntArray allScreens = mBgDataModel.collectWorkspaceScreens();
+        final int firstScreen = allScreens.get(0);
+
+        IntSet firstScreens = IntSet.wrap(firstScreen);
+        if (firstScreen == LEFT_PANEL_ID && allScreens.size() >= 2) {
+            firstScreens.add(allScreens.get(1));
+        }
+
+        filterCurrentWorkspaceItems(firstScreens, allItems, firstScreenItems,
                 new ArrayList<>() /* otherScreenItems are ignored */);
         mFirstScreenBroadcast.sendBroadcasts(mApp.getContext(), firstScreenItems);
     }
@@ -208,7 +216,7 @@ public class LoaderTask implements Runnable {
             }
 
             verifyNotStopped();
-            mResults.bindWorkspace();
+            mResults.bindWorkspace(true /* incrementBindId */);
             logASplit(logger, "bindWorkspace");
 
             mModelDelegate.workspaceLoadComplete();
@@ -324,16 +332,7 @@ public class LoaderTask implements Runnable {
         final WidgetManagerHelper widgetHelper = new WidgetManagerHelper(context);
 
         boolean clearDb = false;
-        try {
-            ImportDataTask.performImportIfPossible(context);
-        } catch (Exception e) {
-            // Migration failed. Clear workspace.
-            clearDb = true;
-        }
-
-        if (!clearDb && (MULTI_DB_GRID_MIRATION_ALGO.get()
-                ? !GridSizeMigrationTaskV2.migrateGridIfNeeded(context)
-                : !GridSizeMigrationTask.migrateGridIfNeeded(context))) {
+        if (!GridSizeMigrationTaskV2.migrateGridIfNeeded(context)) {
             // Migration failed. Clear workspace.
             clearDb = true;
         }

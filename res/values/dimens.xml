@@ -29,7 +29,8 @@
     <dimen name="dynamic_grid_cell_layout_padding">5.5dp</dimen>
     <dimen name="dynamic_grid_cell_padding_x">8dp</dimen>
 
-    <dimen name="two_panel_home_side_padding">18dp</dimen>
+    <dimen name="two_panels_home_side_padding_landscape">36dp</dimen>
+    <dimen name="two_panels_home_side_padding_portrait">9dp</dimen>
 
     <!-- Hotseat -->
     <dimen name="dynamic_grid_hotseat_top_padding">8dp</dimen>
@@ -196,6 +197,7 @@
     <dimen name="drop_target_text_size">16sp</dimen>
     <dimen name="drop_target_shadow_elevation">2dp</dimen>
     <dimen name="drop_target_bar_margin_horizontal">4dp</dimen>
+    <dimen name="drop_target_button_drawable_padding">8dp</dimen>
 
     <!-- the distance an icon must be dragged before button drop targets accept it -->
     <dimen name="drag_distanceThreshold">30dp</dimen>
@@ -312,16 +314,31 @@
 
 <!-- Taskbar related (placeholders to compile in Launcher3 without Quickstep) -->
     <dimen name="taskbar_size">0dp</dimen>
+    <dimen name="qsb_widget_height">0dp</dimen>
+    <dimen name="taskbar_icon_size">44dp</dimen>
+    <!-- Note that this applies to both sides of all icons, so visible space is double this. -->
+    <dimen name="taskbar_icon_spacing">8dp</dimen>
 
     <!-- Size of the maximum radius for the enforced rounded rectangles. -->
     <dimen name="enforced_rounded_corner_max_radius">16dp</dimen>
 
 <!-- Overview placeholder to compile in Launcer3 without Quickstep -->
     <dimen name="task_thumbnail_icon_size">0dp</dimen>
-    <dimen name="task_thumbnail_icon_size_grid">0dp</dimen>
+    <dimen name="task_thumbnail_icon_drawable_size">0dp</dimen>
+    <dimen name="task_thumbnail_icon_drawable_size_grid">0dp</dimen>
     <dimen name="overview_task_margin">0dp</dimen>
-    <dimen name="overview_actions_bottom_margin_gesture">0dp</dimen>
-    <dimen name="overview_actions_bottom_margin_three_button">0dp</dimen>
+    <dimen name="overview_task_margin_grid">0dp</dimen>
+    <dimen name="overview_actions_margin_gesture">0dp</dimen>
+    <dimen name="overview_actions_top_margin_gesture_grid_portrait">0dp</dimen>
+    <dimen name="overview_actions_bottom_margin_gesture_grid_portrait">0dp</dimen>
+    <dimen name="overview_actions_top_margin_gesture_grid_landscape">0dp</dimen>
+    <dimen name="overview_actions_bottom_margin_gesture_grid_landscape">0dp</dimen>
+    <dimen name="overview_actions_margin_three_button">0dp</dimen>
+    <dimen name="overview_grid_row_spacing_portrait">0dp</dimen>
+    <dimen name="overview_grid_row_spacing_landscape">0dp</dimen>
+    <dimen name="recents_page_spacing">0dp</dimen>
+    <dimen name="recents_page_spacing_grid">0dp</dimen>
+    <dimen name="split_placeholder_size">110dp</dimen>
 
 <!-- Workspace grid visualization parameters -->
     <dimen name="grid_visualization_rounding_radius">22dp</dimen>

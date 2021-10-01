@@ -22,6 +22,7 @@ import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.NO_OFFSET;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
+import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.SysUINavigationMode.Mode.TWO_BUTTONS;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
@@ -30,12 +31,15 @@ import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
 import android.app.ActivityOptions;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.Handler;
 import android.os.IBinder;
+import android.util.Log;
 import android.view.View;
 import android.window.SplashScreen;
 
@@ -56,6 +60,8 @@ import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.taskbar.TaskbarStateHandler;
 import com.android.launcher3.uioverrides.RecentsViewStateController;
 import com.android.launcher3.util.ActivityOptionsWrapper;
+import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ObjectWrapper;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.quickstep.OverviewCommandHelper;
@@ -86,6 +92,11 @@ import java.util.stream.Stream;
 public abstract class BaseQuickstepLauncher extends Launcher
         implements NavigationModeChangeListener {
 
+    private static final long BACKOFF_MILLIS = 1000;
+
+    // Max backoff caps at 5 mins
+    private static final long MAX_BACKOFF_MILLIS = 10 * 60 * 1000;
+
     private DepthController mDepthController = new DepthController(this);
     private QuickstepTransitionManager mAppTransitionManager;
 
@@ -106,14 +117,26 @@ public abstract class BaseQuickstepLauncher extends Launcher
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
             mTaskbarManager = ((TISBinder) iBinder).getTaskbarManager();
             mTaskbarManager.setLauncher(BaseQuickstepLauncher.this);
+            Log.d(TAG, "TIS service connected");
+            resetServiceBindRetryState();
 
             mOverviewCommandHelper = ((TISBinder) iBinder).getOverviewCommandHelper();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName componentName) { }
+
+        @Override
+        public void onBindingDied(ComponentName name) {
+            Log.w(TAG, "TIS binding died");
+            internalBindToTIS();
+        }
     };
+
+    private final Runnable mConnectionRunnable = this::internalBindToTIS;
+    private short mConnectionAttempts;
     private final TaskbarStateHandler mTaskbarStateHandler = new TaskbarStateHandler(this);
+    private final Handler mHandler = new Handler();
 
     // Will be updated when dragging from taskbar.
     private @Nullable DragOptions mNextWorkspaceDragOptions = null;
@@ -132,11 +155,11 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
         SysUINavigationMode.INSTANCE.get(this).removeModeChangeListener(this);
 
-
         unbindService(mTisBinderConnection);
         if (mTaskbarManager != null) {
-            mTaskbarManager.setLauncher(null);
+            mTaskbarManager.clearLauncher(this);
         }
+        resetServiceBindRetryState();
         super.onDestroy();
     }
 
@@ -200,6 +223,17 @@ public abstract class BaseQuickstepLauncher extends Launcher
         }
     }
 
+    /**
+     * {@code LauncherOverlayCallbacks} scroll amount.
+     * Indicates transition progress to -1 screen.
+     * @param progress From 0 to 1.
+     */
+    @Override
+    public void onScrollChanged(float progress) {
+        super.onScrollChanged(progress);
+        mDepthController.onOverlayScrollChanged(progress);
+    }
+
     @Override
     public void startIntentSenderForResult(IntentSender intent, int requestCode,
             Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags, Bundle options) {
@@ -261,20 +295,43 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
         SysUINavigationMode.INSTANCE.get(this).updateMode();
         mActionsView = findViewById(R.id.overview_actions_view);
-        mSplitPlaceholderView = findViewById(R.id.split_placeholder);
         RecentsView overviewPanel = (RecentsView) getOverviewPanel();
-        mSplitPlaceholderView.init(
-                new SplitSelectStateController(mHandler, SystemUiProxy.INSTANCE.get(this))
-        );
-        overviewPanel.init(mActionsView, mSplitPlaceholderView);
+        SplitSelectStateController controller =
+                new SplitSelectStateController(mHandler, SystemUiProxy.INSTANCE.get(this));
+        overviewPanel.init(mActionsView, controller);
         mActionsView.setDp(getDeviceProfile());
         mActionsView.updateVerticalMargin(SysUINavigationMode.getMode(this));
 
         mAppTransitionManager = new QuickstepTransitionManager(this);
         mAppTransitionManager.registerRemoteAnimations();
 
-        bindService(new Intent(this, TouchInteractionService.class), mTisBinderConnection, 0);
+        internalBindToTIS();
+    }
 
+    /**
+     * Binds {@link #mTisBinderConnection} to {@link TouchInteractionService}. If the binding fails,
+     * attempts to retry via {@link #mConnectionRunnable}
+     */
+    private void internalBindToTIS() {
+        boolean bound = bindService(new Intent(this, TouchInteractionService.class),
+                        mTisBinderConnection, 0);
+        if (bound) {
+            resetServiceBindRetryState();
+            return;
+        }
+
+        Log.w(TAG, "Retrying TIS Binder connection attempt: " + mConnectionAttempts);
+        final long timeoutMs = (long) Math.min(
+                Math.scalb(BACKOFF_MILLIS, mConnectionAttempts), MAX_BACKOFF_MILLIS);
+        mHandler.postDelayed(mConnectionRunnable, timeoutMs);
+        mConnectionAttempts++;
+    }
+
+    private void resetServiceBindRetryState() {
+        if (mHandler.hasCallbacks(mConnectionRunnable)) {
+            mHandler.removeCallbacks(mConnectionRunnable);
+        }
+        mConnectionAttempts = 0;
     }
 
     public void setTaskbarUIController(LauncherTaskbarUIController taskbarUIController) {
@@ -364,14 +421,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
     }
 
     @Override
-    public float getNormalTaskbarScale() {
-        if (mTaskbarUIController != null) {
-            return mTaskbarUIController.getTaskbarScaleOnHome();
-        }
-        return super.getNormalTaskbarScale();
-    }
-
-    @Override
     public void onDragLayerHierarchyChanged() {
         onLauncherStateOrFocusChanged();
     }
@@ -425,8 +474,8 @@ public abstract class BaseQuickstepLauncher extends Launcher
     }
 
     @Override
-    public void finishBindingItems(int pageBoundFirst) {
-        super.finishBindingItems(pageBoundFirst);
+    public void finishBindingItems(IntSet pagesBoundFirst) {
+        super.finishBindingItems(pagesBoundFirst);
         // Instantiate and initialize WellbeingModel now that its loading won't interfere with
         // populating workspace.
         // TODO: Find a better place for this
@@ -493,5 +542,16 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     public void setHintUserWillBeActive() {
         addActivityFlags(ACTIVITY_STATE_USER_WILL_BE_ACTIVE);
+    }
+
+    @Override
+    public void onDisplayInfoChanged(Context context, DisplayController.Info info, int flags) {
+        super.onDisplayInfoChanged(context, info, flags);
+        // When changing screens with live tile active, finish the recents animation to close
+        // overview as it should be an interim state
+        if ((flags & CHANGE_ACTIVE_SCREEN) != 0 && ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+            RecentsView recentsView = getOverviewPanel();
+            recentsView.finishRecentsAnimation(/* toRecents= */ true, null);
+        }
     }
 }
