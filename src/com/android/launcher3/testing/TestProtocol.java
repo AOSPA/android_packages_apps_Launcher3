@@ -24,6 +24,7 @@ public final class TestProtocol {
     public static final String SWITCHED_TO_STATE_MESSAGE = "TAPL_SWITCHED_TO_STATE";
     public static final String SCROLL_FINISHED_MESSAGE = "TAPL_SCROLL_FINISHED";
     public static final String PAUSE_DETECTED_MESSAGE = "TAPL_PAUSE_DETECTED";
+    public static final String DISMISS_ANIMATION_ENDS_MESSAGE = "TAPL_DISMISS_ANIMATION_ENDS";
     public static final int NORMAL_STATE_ORDINAL = 0;
     public static final int SPRING_LOADED_STATE_ORDINAL = 1;
     public static final int OVERVIEW_STATE_ORDINAL = 2;
@@ -85,6 +86,7 @@ public final class TestProtocol {
     public static final String REQUEST_APP_LIST_FREEZE_FLAGS = "app-list-freeze-flags";
     public static final String REQUEST_APPS_LIST_SCROLL_Y = "apps-list-scroll-y";
     public static final String REQUEST_WIDGETS_SCROLL_Y = "widgets-scroll-y";
+    public static final String REQUEST_TARGET_INSETS = "target-insets";
     public static final String REQUEST_WINDOW_INSETS = "window-insets";
     public static final String REQUEST_PID = "pid";
     public static final String REQUEST_FORCE_GC = "gc";
@@ -92,8 +94,14 @@ public final class TestProtocol {
     public static final String REQUEST_RECENT_TASKS_LIST = "recent-tasks-list";
     public static final String REQUEST_START_EVENT_LOGGING = "start-event-logging";
     public static final String REQUEST_GET_TEST_EVENTS = "get-test-events";
+    public static final String REQUEST_GET_HAD_NONTEST_EVENTS = "get-had-nontest-events";
     public static final String REQUEST_STOP_EVENT_LOGGING = "stop-event-logging";
     public static final String REQUEST_CLEAR_DATA = "clear-data";
+    public static final String REQUEST_IS_TABLET = "is-tablet";
+    public static final String REQUEST_IS_TWO_PANELS = "is-two-panel";
+
+    public static Long sForcePauseTimeout;
+    public static final String REQUEST_SET_FORCE_PAUSE_TIMEOUT = "set-force-pause-timeout";
 
     public static boolean sDebugTracing = false;
     public static final String REQUEST_ENABLE_DEBUG_TRACING = "enable-debug-tracing";
@@ -109,4 +117,7 @@ public final class TestProtocol {
     public static final String PERMANENT_DIAG_TAG = "TaplTarget";
     public static final String WORK_PROFILE_REMOVED = "b/159671700";
     public static final String FALLBACK_ACTIVITY_NO_SET = "b/181019015";
+    public static final String THIRD_PARTY_LAUNCHER_NOT_SET = "b/187080582";
+    public static final String MOTION_PAUSE_TIMEOUT = "b/194114179";
+    public static final String TASK_VIEW_ID_CRASH = "b/195430732";
 }

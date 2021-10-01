@@ -144,9 +144,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_DEEP_SHORTCUT_ICON_CACHE = getDebugFlag(
             "ENABLE_DEEP_SHORTCUT_ICON_CACHE", true, "R/W deep shortcut in IconCache");
 
-    public static final BooleanFlag MULTI_DB_GRID_MIRATION_ALGO = getDebugFlag(
-            "MULTI_DB_GRID_MIRATION_ALGO", true, "Use the multi-db grid migration algorithm");
-
     public static final BooleanFlag ENABLE_THEMED_ICONS = getDebugFlag(
             "ENABLE_THEMED_ICONS", true, "Enable themed icons on workspace");
 
@@ -220,14 +217,14 @@ public final class FeatureFlags {
             + "predictions to be updated while they are visible to the user.");
 
     public static final BooleanFlag ENABLE_TASKBAR = getDebugFlag(
-            "ENABLE_TASKBAR", false, "Allows a system Taskbar to be shown on larger devices.");
+            "ENABLE_TASKBAR", true, "Allows a system Taskbar to be shown on larger devices.");
 
     public static final BooleanFlag ENABLE_OVERVIEW_GRID = getDebugFlag(
-            "ENABLE_OVERVIEW_GRID", false, "Uses grid overview layout. "
+            "ENABLE_OVERVIEW_GRID", true, "Uses grid overview layout. "
             + "Only applicable on large screen devices.");
 
     public static final BooleanFlag ENABLE_TWO_PANEL_HOME = getDebugFlag(
-            "ENABLE_TWO_PANEL_HOME", false,
+            "ENABLE_TWO_PANEL_HOME", true,
             "Uses two panel on home screen. Only applicable on large screen devices.");
 
     public static final BooleanFlag ENABLE_SCRIM_FOR_APP_LAUNCH = getDebugFlag(
@@ -253,6 +250,14 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_WALLPAPER_SCRIM = getDebugFlag(
             "ENABLE_WALLPAPER_SCRIM", false,
             "Enables scrim over wallpaper for text protection.");
+
+    public static final BooleanFlag WIDGETS_IN_LAUNCHER_PREVIEW = getDebugFlag(
+            "WIDGETS_IN_LAUNCHER_PREVIEW", true,
+            "Enables widgets in Launcher preview for the Wallpaper app.");
+
+    public static final BooleanFlag QUICK_WALLPAPER_PICKER = getDebugFlag(
+            "QUICK_WALLPAPER_PICKER", false,
+            "Shows quick wallpaper picker in long-press menu");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
@@ -291,7 +296,7 @@ public final class FeatureFlags {
     public static class BooleanFlag {
 
         public final String key;
-        public boolean defaultValue;
+        public final boolean defaultValue;
 
         public BooleanFlag(String key, boolean defaultValue) {
             this.key = key;
@@ -310,16 +315,12 @@ public final class FeatureFlags {
         protected StringBuilder appendProps(StringBuilder src) {
             return src.append(key).append(", defaultValue=").append(defaultValue);
         }
-
-        public void addChangeListener(Context context, Runnable r) { }
-
-        public void removeChangeListener(Runnable r) {}
     }
 
     public static class DebugFlag extends BooleanFlag {
 
         public final String description;
-        private boolean mCurrentValue;
+        protected boolean mCurrentValue;
 
         public DebugFlag(String key, boolean defaultValue, String description) {
             super(key, defaultValue);

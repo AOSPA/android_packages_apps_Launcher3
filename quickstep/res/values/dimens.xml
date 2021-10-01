@@ -16,7 +16,8 @@
 
 <resources>
     <dimen name="task_thumbnail_icon_size">48dp</dimen>
-    <dimen name="task_thumbnail_icon_size_grid">32dp</dimen>
+    <dimen name="task_thumbnail_icon_drawable_size">48dp</dimen>
+    <dimen name="task_thumbnail_icon_drawable_size_grid">32dp</dimen>
     <!-- For screens without rounded corners -->
     <dimen name="task_corner_radius_small">2dp</dimen>
     <!-- For Launchers that want to override the default dialog corner radius -->
@@ -31,19 +32,22 @@
 
     <dimen name="overview_minimum_next_prev_size">50dp</dimen>
     <dimen name="overview_task_margin">16dp</dimen>
+    <dimen name="overview_task_margin_grid">12dp</dimen>
 
     <!-- Overrideable in overlay that provides the Overview Actions. -->
     <dimen name="overview_actions_height">48dp</dimen>
-    <dimen name="overview_actions_bottom_margin_gesture">28dp</dimen>
-    <dimen name="overview_actions_bottom_margin_three_button">8dp</dimen>
+    <dimen name="overview_actions_margin_gesture">28dp</dimen>
+    <dimen name="overview_actions_top_margin_gesture_grid_portrait">19.37dp</dimen>
+    <dimen name="overview_actions_bottom_margin_gesture_grid_portrait">22dp</dimen>
+    <dimen name="overview_actions_top_margin_gesture_grid_landscape">19.1dp</dimen>
+    <dimen name="overview_actions_bottom_margin_gesture_grid_landscape">10dp</dimen>
+    <dimen name="overview_actions_margin_three_button">8dp</dimen>
     <dimen name="overview_actions_horizontal_margin">16dp</dimen>
 
-    <dimen name="overview_grid_top_margin">77dp</dimen>
-    <dimen name="overview_grid_bottom_margin">90dp</dimen>
-    <dimen name="overview_grid_side_margin">54dp</dimen>
-    <dimen name="overview_grid_row_spacing">42dp</dimen>
-    <dimen name="overview_grid_focus_vertical_margin">90dp</dimen>
-    <dimen name="split_placeholder_size">110dp</dimen>
+    <dimen name="overview_grid_side_margin">50dp</dimen>
+    <dimen name="overview_grid_row_spacing_portrait">37.13dp</dimen>
+    <dimen name="overview_grid_row_spacing_landscape">33.38dp</dimen>
+    <dimen name="overview_grid_focus_vertical_margin">0dp</dimen>
 
     <!-- These speeds are in dp/s -->
     <dimen name="max_task_dismiss_drag_velocity">2.25dp</dimen>
@@ -52,6 +56,7 @@
     <dimen name="default_task_dismiss_drag_velocity_grid_focus_task">5dp</dimen>
 
     <dimen name="recents_page_spacing">16dp</dimen>
+    <dimen name="recents_page_spacing_grid">36dp</dimen>
     <dimen name="recents_clear_all_deadzone_vertical_margin">70dp</dimen>
 
     <!-- The speed in dp/s at which the user needs to be scrolling in recents such that we start
@@ -69,6 +74,8 @@
     <!-- Launcher app transition -->
     <item name="content_scale" format="float" type="dimen">0.97</item>
     <dimen name="closing_window_trans_y">115dp</dimen>
+
+    <dimen name="quick_switch_scaling_scroll_threshold">100dp</dimen>
 
     <dimen name="recents_empty_message_text_size">16sp</dimen>
     <dimen name="recents_empty_message_text_padding">16dp</dimen>
@@ -150,11 +157,12 @@
 
     <!-- Taskbar -->
     <dimen name="taskbar_size">60dp</dimen>
-    <dimen name="taskbar_icon_size">44dp</dimen>
     <dimen name="taskbar_icon_touch_size">48dp</dimen>
     <dimen name="taskbar_icon_drag_icon_size">54dp</dimen>
-    <!-- Note that this applies to both sides of all icons, so visible space is double this. -->
-    <dimen name="taskbar_icon_spacing">8dp</dimen>
     <dimen name="taskbar_folder_margin">16dp</dimen>
     <dimen name="taskbar_nav_buttons_spacing">16dp</dimen>
+    <dimen name="taskbar_nav_buttons_size">48dp</dimen>
+    <dimen name="taskbar_stashed_size">24dp</dimen>
+    <dimen name="taskbar_stashed_handle_width">220dp</dimen>
+    <dimen name="taskbar_stashed_handle_height">6dp</dimen>
 </resources>

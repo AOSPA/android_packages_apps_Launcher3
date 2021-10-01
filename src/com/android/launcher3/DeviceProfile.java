@@ -45,6 +45,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.IconNormalizer;
+import com.android.launcher3.uioverrides.ApiWrapper;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.WindowBounds;
@@ -55,6 +56,8 @@ import java.io.PrintWriter;
 public class DeviceProfile {
 
     private static final int DEFAULT_DOT_SIZE = 100;
+    // Ratio of empty space, qsb should take up to appear visually centered.
+    private static final float QSB_CENTER_FACTOR = .325f;
 
     public final InvariantDeviceProfile inv;
     private final Info mInfo;
@@ -163,6 +166,7 @@ public class DeviceProfile {
     // Start is the side next to the nav bar, end is the side next to the workspace
     public final int hotseatBarSidePaddingStartPx;
     public final int hotseatBarSidePaddingEndPx;
+    public final int hotseatQsbHeight;
 
     public final float qsbBottomMarginOriginalPx;
     public int qsbBottomMarginPx;
@@ -177,11 +181,17 @@ public class DeviceProfile {
     public float allAppsIconTextSizePx;
 
     // Overview
+    public final boolean overviewShowAsGrid;
     public int overviewTaskMarginPx;
     public int overviewTaskIconSizePx;
+    public int overviewTaskIconDrawableSizePx;
+    public int overviewTaskIconDrawableSizeGridPx;
     public int overviewTaskThumbnailTopMarginPx;
     public final int overviewActionsMarginThreeButtonPx;
-    public final int overviewActionsMarginGesturePx;
+    public final int overviewActionsTopMarginGesturePx;
+    public final int overviewActionsBottomMarginGesturePx;
+    public int overviewPageSpacing;
+    public int overviewRowSpacing;
 
     // Widgets
     public final PointF appWidgetScale = new PointF(1.0f, 1.0f);
@@ -250,7 +260,9 @@ public class DeviceProfile {
         mMetrics = context.getResources().getDisplayMetrics();
         final Resources res = context.getResources();
 
-        isTaskbarPresent = isTablet && FeatureFlags.ENABLE_TASKBAR.get();
+        hotseatQsbHeight = res.getDimensionPixelSize(R.dimen.qsb_widget_height);
+        isTaskbarPresent = isTablet && ApiWrapper.TASKBAR_DRAWN_IN_PROCESS
+                && FeatureFlags.ENABLE_TASKBAR.get();
         if (isTaskbarPresent) {
             // Taskbar will be added later, but provides bottom insets that we should subtract
             // from availableHeightPx.
@@ -295,8 +307,10 @@ public class DeviceProfile {
                 : res.getDimensionPixelSize(R.dimen.dynamic_grid_cell_layout_padding);
 
         if (isTwoPanels) {
-            cellLayoutPaddingLeftRightPx =
-                    res.getDimensionPixelSize(R.dimen.two_panel_home_side_padding);
+            cellLayoutPaddingLeftRightPx = res.getDimensionPixelSize(
+                    isLandscape
+                            ? R.dimen.two_panels_home_side_padding_landscape
+                            : R.dimen.two_panels_home_side_padding_portrait);
             cellLayoutBottomPaddingPx = 0;
         } else if (isLandscape) {
             cellLayoutPaddingLeftRightPx = 0;
@@ -345,16 +359,41 @@ public class DeviceProfile {
                 ? res.getDimensionPixelSize(R.dimen.scalable_grid_qsb_bottom_margin)
                 : 0;
 
-        overviewTaskMarginPx = res.getDimensionPixelSize(R.dimen.overview_task_margin);
-        overviewTaskIconSizePx =
-                isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get() ? res.getDimensionPixelSize(
-                        R.dimen.task_thumbnail_icon_size_grid) : res.getDimensionPixelSize(
-                        R.dimen.task_thumbnail_icon_size);
+        overviewShowAsGrid = isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get();
+        overviewTaskMarginPx = overviewShowAsGrid
+                ? res.getDimensionPixelSize(R.dimen.overview_task_margin_grid)
+                : res.getDimensionPixelSize(R.dimen.overview_task_margin);
+        overviewTaskIconSizePx = res.getDimensionPixelSize(R.dimen.task_thumbnail_icon_size);
+        overviewTaskIconDrawableSizePx =
+                res.getDimensionPixelSize(R.dimen.task_thumbnail_icon_drawable_size);
+        overviewTaskIconDrawableSizeGridPx =
+                res.getDimensionPixelSize(R.dimen.task_thumbnail_icon_drawable_size_grid);
         overviewTaskThumbnailTopMarginPx = overviewTaskIconSizePx + overviewTaskMarginPx * 2;
-        overviewActionsMarginGesturePx = res.getDimensionPixelSize(
-                R.dimen.overview_actions_bottom_margin_gesture);
+        if (overviewShowAsGrid) {
+            if (isLandscape) {
+                overviewActionsTopMarginGesturePx = res.getDimensionPixelSize(
+                        R.dimen.overview_actions_top_margin_gesture_grid_landscape);
+                overviewActionsBottomMarginGesturePx = res.getDimensionPixelSize(
+                        R.dimen.overview_actions_bottom_margin_gesture_grid_landscape);
+            } else {
+                overviewActionsTopMarginGesturePx = res.getDimensionPixelSize(
+                        R.dimen.overview_actions_top_margin_gesture_grid_portrait);
+                overviewActionsBottomMarginGesturePx = res.getDimensionPixelSize(
+                        R.dimen.overview_actions_bottom_margin_gesture_grid_portrait);
+            }
+        } else {
+            overviewActionsTopMarginGesturePx = res.getDimensionPixelSize(
+                    R.dimen.overview_actions_margin_gesture);
+            overviewActionsBottomMarginGesturePx = overviewActionsTopMarginGesturePx;
+        }
         overviewActionsMarginThreeButtonPx = res.getDimensionPixelSize(
-                R.dimen.overview_actions_bottom_margin_three_button);
+                R.dimen.overview_actions_margin_three_button);
+        overviewPageSpacing = overviewShowAsGrid
+                        ? res.getDimensionPixelSize(R.dimen.recents_page_spacing_grid)
+                        : res.getDimensionPixelSize(R.dimen.recents_page_spacing);
+        overviewRowSpacing = isLandscape
+                ? res.getDimensionPixelSize(R.dimen.overview_grid_row_spacing_landscape)
+                : res.getDimensionPixelSize(R.dimen.overview_grid_row_spacing_portrait);
 
         // Calculate all of the remaining variables.
         extraSpace = updateAvailableDimensions(res);
@@ -435,6 +474,10 @@ public class DeviceProfile {
 
     private void setCellLayoutBorderSpacing(int borderSpacing) {
         cellLayoutBorderSpacingPx = isScalableGrid ? borderSpacing : 0;
+    }
+
+    public Info getDisplayInfo() {
+        return mInfo;
     }
 
     /**
@@ -727,8 +770,14 @@ public class DeviceProfile {
         // Since we are only concerned with the overall padding, layout direction does
         // not matter.
         Point padding = getTotalWorkspacePadding();
-        result.x = calculateCellWidth(availableWidthPx - padding.x
-                - cellLayoutPaddingLeftRightPx * 2, cellLayoutBorderSpacingPx, inv.numColumns);
+        // availableWidthPx is the screen width of the device. In 2 panels mode, each panel should
+        // only have half of the screen width. In addition, there is only cellLayoutPadding in the
+        // left side of the left panel and the right side of the right panel. There is no
+        // cellLayoutPadding in the middle.
+        int screenWidthPx = isTwoPanels
+                ? availableWidthPx / 2 - padding.x - cellLayoutPaddingLeftRightPx
+                : availableWidthPx - padding.x - cellLayoutPaddingLeftRightPx * 2;
+        result.x = calculateCellWidth(screenWidthPx, cellLayoutBorderSpacingPx, inv.numColumns);
         result.y = calculateCellHeight(availableHeightPx - padding.y
                 - cellLayoutBottomPaddingPx, cellLayoutBorderSpacingPx, inv.numRows);
         return result;
@@ -788,7 +837,10 @@ public class DeviceProfile {
         }
     }
 
-    public Rect getHotseatLayoutPadding() {
+    /**
+     * Returns the padding for hotseat view
+     */
+    public Rect getHotseatLayoutPadding(Context context) {
         if (isVerticalBarLayout()) {
             if (isSeascape()) {
                 mHotseatPadding.set(mInsets.left + hotseatBarSidePaddingStartPx,
@@ -796,6 +848,30 @@ public class DeviceProfile {
             } else {
                 mHotseatPadding.set(hotseatBarSidePaddingEndPx, mInsets.top,
                         mInsets.right + hotseatBarSidePaddingStartPx, mInsets.bottom);
+            }
+        } else if (isTaskbarPresent) {
+            int hotseatHeight = workspacePadding.bottom + taskbarSize;
+            int taskbarOffset = getTaskbarOffsetY();
+            int hotseatTopDiff = hotseatHeight - taskbarSize - taskbarOffset;
+
+            int endOffset = ApiWrapper.getHotseatEndOffset(context);
+            int requiredWidth = iconSizePx * numShownHotseatIcons;
+
+            Resources res = context.getResources();
+            float taskbarIconSize = res.getDimension(R.dimen.taskbar_icon_size);
+            float taskbarIconSpacing = 2 * res.getDimension(R.dimen.taskbar_icon_spacing);
+            int maxSize = (int) (requiredWidth
+                    * (taskbarIconSize + taskbarIconSpacing) / taskbarIconSize);
+            int hotseatSize = Math.min(maxSize, availableWidthPx - endOffset);
+            int sideSpacing = (availableWidthPx - hotseatSize) / 2;
+            mHotseatPadding.set(sideSpacing, hotseatTopDiff, sideSpacing, taskbarOffset);
+
+            if (endOffset > sideSpacing) {
+                int diff = Utilities.isRtl(context.getResources())
+                        ? sideSpacing - endOffset
+                        : endOffset - sideSpacing;
+                mHotseatPadding.left -= diff;
+                mHotseatPadding.right += diff;
             }
         } else {
             // We want the edges of the hotseat to line up with the edges of the workspace, but the
@@ -815,6 +891,29 @@ public class DeviceProfile {
                             + cellLayoutBottomPaddingPx + mInsets.bottom);
         }
         return mHotseatPadding;
+    }
+
+    /**
+     * Returns the number of pixels the QSB is translated from the bottom of the screen.
+     */
+    public int getQsbOffsetY() {
+        int freeSpace = isTaskbarPresent
+                ? workspacePadding.bottom
+                : hotseatBarSizePx - hotseatCellHeightPx - hotseatQsbHeight;
+
+        if (isScalableGrid && qsbBottomMarginPx > mInsets.bottom) {
+            return Math.min(qsbBottomMarginPx, freeSpace);
+        } else {
+            return (int) (freeSpace * QSB_CENTER_FACTOR)
+                + (isTaskbarPresent ? taskbarSize : mInsets.bottom);
+        }
+    }
+
+    /**
+     * Returns the number of pixels the taskbar is translated from the bottom of the screen.
+     */
+    public int getTaskbarOffsetY() {
+        return (getQsbOffsetY() - taskbarSize) / 2;
     }
 
     /**

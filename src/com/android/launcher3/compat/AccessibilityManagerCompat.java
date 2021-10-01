@@ -89,6 +89,14 @@ public class AccessibilityManagerCompat {
         sendEventToTest(accessibilityManager, context, TestProtocol.PAUSE_DETECTED_MESSAGE, null);
     }
 
+    public static void sendDismissAnimationEndsEventToTest(Context context) {
+        final AccessibilityManager accessibilityManager = getAccessibilityManagerForTest(context);
+        if (accessibilityManager == null) return;
+
+        sendEventToTest(accessibilityManager, context, TestProtocol.DISMISS_ANIMATION_ENDS_MESSAGE,
+                null);
+    }
+
     private static void sendEventToTest(
             AccessibilityManager accessibilityManager,
             Context context, String eventTag, Bundle data) {

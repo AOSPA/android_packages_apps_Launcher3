@@ -62,6 +62,10 @@ public class TestInformationHandler implements ResourceBasedOverride {
     }
 
     public Bundle call(String method) {
+        return call(method, /*arg=*/ null);
+    }
+
+    public Bundle call(String method, String arg) {
         final Bundle response = new Bundle();
         switch (method) {
             case TestProtocol.REQUEST_HOME_TO_ALL_APPS_SWIPE_HEIGHT: {
@@ -98,12 +102,23 @@ public class TestInformationHandler implements ResourceBasedOverride {
                         l -> WidgetsFullSheet.getWidgetsView(l).getCurrentScrollY());
             }
 
-            case TestProtocol.REQUEST_WINDOW_INSETS: {
-                return getUIProperty(Bundle::putParcelable, a -> {
-                    WindowInsets insets = a.getWindow()
+            case TestProtocol.REQUEST_TARGET_INSETS: {
+                return getUIProperty(Bundle::putParcelable, activity -> {
+                    WindowInsets insets = activity.getWindow()
                             .getDecorView().getRootWindowInsets();
                     return Insets.max(
-                            insets.getSystemGestureInsets(), insets.getSystemWindowInsets());
+                            insets.getSystemGestureInsets(),
+                            insets.getSystemWindowInsets());
+                }, this::getCurrentActivity);
+            }
+
+            case TestProtocol.REQUEST_WINDOW_INSETS: {
+                return getUIProperty(Bundle::putParcelable, activity -> {
+                    WindowInsets insets = activity.getWindow()
+                            .getDecorView().getRootWindowInsets();
+                    return Insets.subtract(
+                            insets.getSystemWindowInsets(),
+                            Insets.of(0, 0, 0, mDeviceProfile.nonOverlappingTaskbarInset));
                 }, this::getCurrentActivity);
             }
 
@@ -115,6 +130,24 @@ public class TestInformationHandler implements ResourceBasedOverride {
 
             case TestProtocol.REQUEST_MOCK_SENSOR_ROTATION:
                 TestProtocol.sDisableSensorRotation = true;
+                return response;
+
+            case TestProtocol.REQUEST_IS_TABLET:
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD, mDeviceProfile.isTablet);
+                return response;
+
+            case TestProtocol.REQUEST_IS_TWO_PANELS:
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        mDeviceProfile.isTwoPanels);
+                return response;
+
+            case TestProtocol.REQUEST_SET_FORCE_PAUSE_TIMEOUT:
+                TestProtocol.sForcePauseTimeout = Long.parseLong(arg);
+                return response;
+
+            case TestProtocol.REQUEST_GET_HAD_NONTEST_EVENTS:
+                response.putBoolean(
+                        TestProtocol.TEST_INFO_RESPONSE_FIELD, TestLogging.sHadEventsNotFromTest);
                 return response;
 
             default:

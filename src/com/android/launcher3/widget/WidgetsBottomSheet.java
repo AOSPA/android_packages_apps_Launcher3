@@ -72,7 +72,8 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
 
     private ItemInfo mOriginalItemInfo;
     private final int mMaxTableHeight;
-    private int mMaxHorizontalSpan = 4;
+    private int mMaxHorizontalSpan = DEFAULT_MAX_HORIZONTAL_SPANS;
+    private final int mWidgetCellHorizontalPadding;
 
     private final OnLayoutChangeListener mLayoutChangeListenerToShowTips =
             new OnLayoutChangeListener() {
@@ -117,6 +118,8 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
         if (!hasSeenEducationTip()) {
             addOnLayoutChangeListener(mLayoutChangeListenerToShowTips);
         }
+        mWidgetCellHorizontalPadding = getResources().getDimensionPixelSize(
+                R.dimen.widget_cell_horizontal_padding);
     }
 
     @Override
@@ -137,10 +140,7 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
     private boolean updateMaxSpansPerRow() {
         if (getMeasuredWidth() == 0) return false;
 
-        int paddingPx = 2 * getResources().getDimensionPixelOffset(
-                R.dimen.widget_cell_horizontal_padding);
-        int maxHorizontalSpan = findViewById(R.id.widgets_table).getMeasuredWidth()
-                / (mActivityContext.getDeviceProfile().cellWidthPx + paddingPx);
+        int maxHorizontalSpan = computeMaxHorizontalSpans(mContent, mWidgetCellHorizontalPadding);
         if (mMaxHorizontalSpan != maxHorizontalSpan) {
             // Ensure the table layout is showing widgets in the right column after measure.
             mMaxHorizontalSpan = maxHorizontalSpan;
@@ -269,6 +269,14 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
         } else {
             clearNavBarColor();
         }
+    }
+
+    @Override
+    protected void onContentHorizontalMarginChanged(int contentHorizontalMarginInPx) {
+        ViewGroup.MarginLayoutParams layoutParams =
+                ((ViewGroup.MarginLayoutParams) findViewById(R.id.widgets_table).getLayoutParams());
+        layoutParams.setMarginStart(contentHorizontalMarginInPx);
+        layoutParams.setMarginEnd(contentHorizontalMarginInPx);
     }
 
     @Override

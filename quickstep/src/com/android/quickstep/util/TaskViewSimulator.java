@@ -15,7 +15,6 @@
  */
 package com.android.quickstep.util;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.states.RotationHelper.deltaRotation;
 import static com.android.launcher3.touch.PagedOrientationHandler.MATRIX_POST_TRANSLATE;
 import static com.android.quickstep.util.RecentsOrientedState.postDisplayRotation;
@@ -56,14 +55,12 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
 
     private final Context mContext;
     private final BaseActivityInterface mSizeStrategy;
-    private final boolean mIsForLiveTile;
 
     @NonNull
     private RecentsOrientedState mOrientationState;
     private final boolean mIsRecentsRtl;
 
     private final Rect mTaskRect = new Rect();
-    private boolean mDrawsBelowRecents;
     private final PointF mPivot = new PointF();
     private DeviceProfile mDp;
 
@@ -94,14 +91,8 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
     private int mOrientationStateId;
 
     public TaskViewSimulator(Context context, BaseActivityInterface sizeStrategy) {
-        this(context, sizeStrategy, false);
-    }
-
-    public TaskViewSimulator(Context context, BaseActivityInterface sizeStrategy,
-            boolean isForLiveTile) {
         mContext = context;
         mSizeStrategy = sizeStrategy;
-        mIsForLiveTile = isForLiveTile;
 
         // TODO(b/187074722): Don't create this per-TaskViewSimulator
         mOrientationState = TraceHelper.allowIpcs("",
@@ -168,10 +159,6 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
      */
     public void setScroll(float scroll) {
         recentsViewScroll.value = scroll;
-    }
-
-    public void setDrawsBelowRecents(boolean drawsBelowRecents) {
-        mDrawsBelowRecents = drawsBelowRecents;
     }
 
     /**
@@ -263,8 +250,8 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
 
         float fullScreenProgress = Utilities.boundToRange(this.fullScreenProgress.value, 0, 1);
         mCurrentFullscreenParams.setProgress(
-                fullScreenProgress, recentsViewScale.value, mTaskRect.width(), mDp,
-                mPositionHelper);
+                fullScreenProgress, recentsViewScale.value, /*taskViewScale=*/1f, mTaskRect.width(),
+                mDp, mPositionHelper);
 
         // Apply thumbnail matrix
         RectF insets = mCurrentFullscreenParams.mCurrentDrawnInsets;
@@ -308,13 +295,6 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         builder.withMatrix(mMatrix)
                 .withWindowCrop(mTmpCropRect)
                 .withCornerRadius(getCurrentCornerRadius());
-
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && mIsForLiveTile
-                && params.getRecentsSurface() != null) {
-            // When relativeLayer = 0, it reverts the surfaces back to the original order.
-            builder.withRelativeLayerTo(params.getRecentsSurface(),
-                    mDrawsBelowRecents ? Integer.MIN_VALUE : 0);
-        }
     }
 
     /**

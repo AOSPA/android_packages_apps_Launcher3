@@ -17,7 +17,6 @@
 package com.android.launcher3;
 
 import static com.android.launcher3.Utilities.dpiFromPx;
-import static com.android.launcher3.Utilities.getPointString;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TWO_PANEL_HOME;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
@@ -36,7 +35,6 @@ import android.graphics.Rect;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.util.SparseArray;
 import android.util.TypedValue;
 import android.util.Xml;
@@ -45,7 +43,7 @@ import android.view.Display;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.model.DeviceGridState;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.IntArray;
@@ -67,9 +65,6 @@ public class InvariantDeviceProfile {
     // We do not need any synchronization for this variable as its only written on UI thread.
     public static final MainThreadInitializedObject<InvariantDeviceProfile> INSTANCE =
             new MainThreadInitializedObject<>(InvariantDeviceProfile::new);
-
-    public static final String KEY_MIGRATION_SRC_WORKSPACE_SIZE = "migration_src_workspace_size";
-    public static final String KEY_MIGRATION_SRC_HOTSEAT_COUNT = "migration_src_hotseat_count";
 
     private static final int DEFAULT_TRUE = -1;
     private static final int DEFAULT_SPLIT_DISPLAY = 2;
@@ -190,10 +185,7 @@ public class InvariantDeviceProfile {
         if (!newGridName.equals(gridName)) {
             Utilities.getPrefs(context).edit().putString(KEY_IDP_GRID_NAME, newGridName).apply();
         }
-        Utilities.getPrefs(context).edit()
-                .putInt(KEY_MIGRATION_SRC_HOTSEAT_COUNT, numDatabaseHotseatIcons)
-                .putString(KEY_MIGRATION_SRC_WORKSPACE_SIZE, getPointString(numColumns, numRows))
-                .apply();
+        new DeviceGridState(this).writeToPrefs(context);
 
         DisplayController.INSTANCE.get(context).addChangeListener(
                 (displayContext, info, flags) -> {
@@ -253,17 +245,10 @@ public class InvariantDeviceProfile {
 
     private String initGrid(Context context, String gridName) {
         Info displayInfo = DisplayController.INSTANCE.get(context).getInfo();
-        // Determine if we have split display
-
-        boolean isTablet = false, isPhone = false;
-        for (WindowBounds bounds : displayInfo.supportedBounds) {
-            if (displayInfo.isTablet(bounds)) {
-                isTablet = true;
-            } else {
-                isPhone = true;
-            }
-        }
-        boolean isSplitDisplay = isPhone && isTablet && ENABLE_TWO_PANEL_HOME.get();
+        // Each screen has two profiles (portrait/landscape), so devices with four or more
+        // supported profiles implies two or more internal displays.
+        boolean isSplitDisplay =
+                displayInfo.supportedBounds.size() >= 4 && ENABLE_TWO_PANEL_HOME.get();
 
         ArrayList<DisplayOption> allOptions =
                 getPredefinedDeviceProfiles(context, gridName, isSplitDisplay);

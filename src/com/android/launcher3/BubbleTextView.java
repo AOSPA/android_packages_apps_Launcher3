@@ -90,6 +90,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private final PointF mTranslationForReorderBounce = new PointF(0, 0);
     private final PointF mTranslationForReorderPreview = new PointF(0, 0);
 
+    private final PointF mTranslationForMoveFromCenterAnimation = new PointF(0, 0);
+
     private float mScaleForReorderBounce = 1f;
 
     private static final Property<BubbleTextView, Float> DOT_SCALE_PROPERTY
@@ -321,7 +323,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @UiThread
     protected void applyIconAndLabel(ItemInfoWithIcon info) {
-        boolean useTheme = mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER;
+        boolean useTheme = mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER
+                || mDisplay == DISPLAY_TASKBAR;
         FastBitmapDrawable iconDrawable = info.newIcon(getContext(), useTheme);
         mDotParams.color = IconPalette.getMutedColor(iconDrawable.getIconColor(), 0.54f);
 
@@ -407,7 +410,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
     }
 
-    void clearPressedBackground() {
+    public void clearPressedBackground() {
         setPressed(false);
         setStayPressed(false);
     }
@@ -799,8 +802,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     private void updateTranslation() {
-        super.setTranslationX(mTranslationForReorderBounce.x + mTranslationForReorderPreview.x);
-        super.setTranslationY(mTranslationForReorderBounce.y + mTranslationForReorderPreview.y);
+        super.setTranslationX(mTranslationForReorderBounce.x + mTranslationForReorderPreview.x
+                + mTranslationForMoveFromCenterAnimation.x);
+        super.setTranslationY(mTranslationForReorderBounce.y + mTranslationForReorderPreview.y
+                + mTranslationForMoveFromCenterAnimation.y);
     }
 
     public void setReorderBounceOffset(float x, float y) {
@@ -833,6 +838,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         return mScaleForReorderBounce;
     }
 
+    public void setTranslationForMoveFromCenterAnimation(float x, float y) {
+        mTranslationForMoveFromCenterAnimation.set(x, y);
+        updateTranslation();
+    }
+
     public View getView() {
         return this;
     }
@@ -853,8 +863,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         switch (display) {
             case DISPLAY_ALL_APPS:
                 return grid.allAppsIconSizePx;
-            case DISPLAY_WORKSPACE:
             case DISPLAY_FOLDER:
+                return grid.folderChildIconSizePx;
+            case DISPLAY_WORKSPACE:
             default:
                 return grid.iconSizePx;
         }

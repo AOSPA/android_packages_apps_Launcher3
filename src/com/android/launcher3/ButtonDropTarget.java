@@ -66,6 +66,8 @@ public abstract class ButtonDropTarget extends TextView
     private final int mDragDistanceThreshold;
     /** The size of the drawable shown in the drop target. */
     private final int mDrawableSize;
+    /** The padding, in pixels, between the text and drawable. */
+    private final int mDrawablePadding;
 
     protected CharSequence mText;
     protected Drawable mDrawable;
@@ -85,6 +87,8 @@ public abstract class ButtonDropTarget extends TextView
         Resources resources = getResources();
         mDragDistanceThreshold = resources.getDimensionPixelSize(R.dimen.drag_distanceThreshold);
         mDrawableSize = resources.getDimensionPixelSize(R.dimen.drop_target_text_size);
+        mDrawablePadding = resources.getDimensionPixelSize(
+                R.dimen.drop_target_button_drawable_padding);
     }
 
     @Override
@@ -211,27 +215,21 @@ public abstract class ButtonDropTarget extends TextView
         }
         final DragLayer dragLayer = mLauncher.getDragLayer();
         final DragView dragView = d.dragView;
-        final Rect from = new Rect();
-        dragLayer.getViewRectRelativeToSelf(d.dragView, from);
-
         final Rect to = getIconRect(d);
-        final float scale = (float) to.width() / from.width();
-        dragView.disableColorExtraction();
+        final float scale = (float) to.width() / dragView.getMeasuredWidth();
         dragView.detachContentView(/* reattachToPreviousParent= */ true);
+
         mDropTargetBar.deferOnDragEnd();
 
         Runnable onAnimationEndRunnable = () -> {
             completeDrop(d);
             mDropTargetBar.onDragEnd();
             mLauncher.getStateManager().goToState(NORMAL);
-            // Only re-enable updates once the workspace is back to normal, which will be after the
-            // current frame.
-            post(dragView::resumeColorExtraction);
         };
 
-        dragLayer.animateView(d.dragView, from, to, scale, 1f, 1f, 0.1f, 0.1f,
+        dragLayer.animateView(d.dragView, to, scale, 0.1f, 0.1f,
                 DRAG_VIEW_DROP_DURATION,
-                Interpolators.DEACCEL_2, Interpolators.LINEAR, onAnimationEndRunnable,
+                Interpolators.DEACCEL_2, onAnimationEndRunnable,
                 DragLayer.ANIMATION_END_DISAPPEAR, null);
     }
 
@@ -303,6 +301,8 @@ public abstract class ButtonDropTarget extends TextView
             mTextVisible = isVisible;
             setText(newText);
             setCompoundDrawablesRelative(mDrawable, null, null, null);
+            int drawablePadding = mTextVisible ? mDrawablePadding : 0;
+            setCompoundDrawablePadding(drawablePadding);
         }
     }
 

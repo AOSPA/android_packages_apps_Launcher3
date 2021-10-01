@@ -59,6 +59,7 @@ import com.android.launcher3.testcomponent.TestCommandReceiver;
 import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.rule.FailureWatcher;
+import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.quickstep.views.RecentsView;
 
 import org.junit.After;
@@ -98,6 +99,7 @@ public class FallbackRecentsTest {
         mDevice = UiDevice.getInstance(instrumentation);
         mDevice.setOrientationNatural();
         mLauncher = new LauncherInstrumentation();
+        mLauncher.enableDebugTracing();
         // b/143488140
         //mLauncher.enableCheckEventsForSuccessfulGestures();
 
@@ -213,6 +215,7 @@ public class FallbackRecentsTest {
     // b/143488140
     //@NavigationModeSwitch
     @Test
+    @ScreenRecord // b/187080582
     public void testOverview() {
         startAppFast(getAppPackageName());
         startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));

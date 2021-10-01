@@ -16,7 +16,6 @@
 
 package com.android.quickstep.views;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.quickstep.views.TaskThumbnailView.DIM_ALPHA;
 
 import android.animation.Animator;
@@ -44,7 +43,6 @@ import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.views.BaseDragLayer;
@@ -139,7 +137,7 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
         // NOTE: Changing the pivots means the rotated view gets rotated about the new pivots set,
         // which would render the X and Y position set here incorrect
         setPivotX(0);
-        if (mActivity.getDeviceProfile().isTablet && FeatureFlags.ENABLE_OVERVIEW_GRID.get()) {
+        if (mActivity.getDeviceProfile().overviewShowAsGrid) {
             // In tablet, set pivotY to original position without mThumbnailTopMargin adjustment.
             setPivotY(-taskTopMargin);
         } else {
@@ -221,17 +219,7 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
                 menuOptionView, mActivity.getDeviceProfile());
         menuOptionView.setEnabled(menuOption.isEnabled());
         menuOptionView.setAlpha(menuOption.isEnabled() ? 1 : 0.5f);
-        menuOptionView.setOnClickListener(view -> {
-            if (ENABLE_QUICKSTEP_LIVE_TILE.get() && !menuOption.hasFinishRecentsInAction()) {
-                RecentsView recentsView = mTaskView.getRecentsView();
-                recentsView.switchToScreenshot(null,
-                        () -> recentsView.finishRecentsAnimation(true /* toRecents */,
-                                false /* shouldPip */,
-                                () -> menuOption.onClick(view)));
-            } else {
-                menuOption.onClick(view);
-            }
-        });
+        menuOptionView.setOnClickListener(menuOption::onClick);
         mOptionLayout.addView(menuOptionView);
     }
 
