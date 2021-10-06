@@ -99,6 +99,7 @@ import com.android.quickstep.inputconsumers.SysUiOverlayInputConsumer;
 import com.android.quickstep.inputconsumers.TaskbarStashInputConsumer;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.AssistantUtilities;
+import com.android.quickstep.util.LauncherSplitScreenListener;
 import com.android.quickstep.util.ProtoTracer;
 import com.android.quickstep.util.ProxyScreenStatusProvider;
 import com.android.quickstep.util.SplitScreenBounds;
@@ -178,12 +179,6 @@ public class TouchInteractionService extends Service implements PluginListener<O
                         smartspaceTransitionController);
                 TouchInteractionService.this.initInputMonitor();
                 preloadOverview(true /* fromInit */);
-                mDeviceState.runOnUserUnlocked(() -> {
-                    final BaseActivityInterface ai =
-                            mOverviewComponentObserver.getActivityInterface();
-                    if (ai == null) return;
-                    ai.onOverviewServiceBound();
-                });
             });
             sIsInitialized = true;
         }
@@ -357,13 +352,16 @@ public class TouchInteractionService extends Service implements PluginListener<O
         mDeviceState = new RecentsAnimationDeviceState(this, true);
         mDisplayManager = getSystemService(DisplayManager.class);
         mTaskbarManager = new TaskbarManager(this);
-
         mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
-        mDeviceState.addNavigationModeChangedCallback(this::onNavigationModeChanged);
-        mDeviceState.addOneHandedModeChangedCallback(this::onOneHandedModeOverlayChanged);
+
+        // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
         mDeviceState.runOnUserUnlocked(this::onUserUnlocked);
         mDeviceState.runOnUserUnlocked(mTaskbarManager::onUserUnlocked);
+        mDeviceState.addNavigationModeChangedCallback(this::onNavigationModeChanged);
+        mDeviceState.addOneHandedModeChangedCallback(this::onOneHandedModeOverlayChanged);
+
         ProtoTracer.INSTANCE.get(this).add(this);
+        LauncherSplitScreenListener.INSTANCE.get(this).init();
         sConnected = true;
     }
 
@@ -520,6 +518,7 @@ public class TouchInteractionService extends Service implements PluginListener<O
         getSystemService(AccessibilityManager.class)
                 .unregisterSystemAction(SYSTEM_ACTION_ID_ALL_APPS);
 
+        LauncherSplitScreenListener.INSTANCE.get(this).destroy();
         mTaskbarManager.destroy();
         sConnected = false;
         super.onDestroy();

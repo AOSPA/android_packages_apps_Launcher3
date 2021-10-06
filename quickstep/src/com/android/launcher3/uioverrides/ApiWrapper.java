@@ -44,13 +44,26 @@ public class ApiWrapper {
     }
 
     /**
+     * Returns a unique ID representing the display
+     */
+    public static String getUniqueId(Display display) {
+        return display.getUniqueId();
+    }
+
+    /**
      * Returns the minimum space that should be left empty at the end of hotseat
      */
     public static int getHotseatEndOffset(Context context) {
         if (SysUINavigationMode.INSTANCE.get(context).getMode() == Mode.THREE_BUTTONS) {
             Resources res = context.getResources();
+            /*
+            * 2 (left + right) x Padding +
+            * 3 nav buttons +
+            * Little space at the end for contextual buttons
+            */
             return 2 * res.getDimensionPixelSize(R.dimen.taskbar_nav_buttons_spacing)
-                    + 3 * res.getDimensionPixelSize(R.dimen.taskbar_nav_buttons_size);
+                    + 3 * res.getDimensionPixelSize(R.dimen.taskbar_nav_buttons_size)
+                    + res.getDimensionPixelSize(R.dimen.taskbar_contextual_button_margin);
         } else {
             return 0;
         }

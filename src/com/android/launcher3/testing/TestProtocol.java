@@ -99,6 +99,11 @@ public final class TestProtocol {
     public static final String REQUEST_CLEAR_DATA = "clear-data";
     public static final String REQUEST_IS_TABLET = "is-tablet";
     public static final String REQUEST_IS_TWO_PANELS = "is-two-panel";
+    public static final String REQUEST_GET_ACTIVITIES_CREATED_COUNT =
+            "get-activities-created-count";
+    public static final String REQUEST_GET_ACTIVITIES = "get-activities";
+    public static final String REQUEST_GET_FOCUSED_TASK_HEIGHT_FOR_TABLET =
+            "get-focused-task-height-for-tablet";
 
     public static Long sForcePauseTimeout;
     public static final String REQUEST_SET_FORCE_PAUSE_TIMEOUT = "set-force-pause-timeout";
@@ -107,17 +112,13 @@ public final class TestProtocol {
     public static final String REQUEST_ENABLE_DEBUG_TRACING = "enable-debug-tracing";
     public static final String REQUEST_DISABLE_DEBUG_TRACING = "disable-debug-tracing";
 
-    public static final String REQUEST_OVERVIEW_SHARE_ENABLED = "overview-share-enabled";
-    public static final String REQUEST_OVERVIEW_CONTENT_PUSH_ENABLED =
-            "overview-content-push-enabled";
 
     public static boolean sDisableSensorRotation;
     public static final String REQUEST_MOCK_SENSOR_ROTATION = "mock-sensor-rotation";
 
     public static final String PERMANENT_DIAG_TAG = "TaplTarget";
     public static final String WORK_PROFILE_REMOVED = "b/159671700";
-    public static final String FALLBACK_ACTIVITY_NO_SET = "b/181019015";
-    public static final String THIRD_PARTY_LAUNCHER_NOT_SET = "b/187080582";
-    public static final String MOTION_PAUSE_TIMEOUT = "b/194114179";
     public static final String TASK_VIEW_ID_CRASH = "b/195430732";
+    public static final String NO_DROP_TARGET = "b/195031154";
+    public static final String NULL_INT_SET = "b/200572078";
 }

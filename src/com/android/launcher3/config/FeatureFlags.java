@@ -94,11 +94,6 @@ public final class FeatureFlags {
             "ENABLE_QUICKSTEP_WIDGET_APP_START", true,
             "Enable Quickstep animation when launching activities from an app widget");
 
-    // Keep as DeviceFlag to allow remote disable in emergency.
-    public static final BooleanFlag ENABLE_SUGGESTED_ACTIONS_OVERVIEW = new DeviceFlag(
-            "ENABLE_SUGGESTED_ACTIONS_OVERVIEW", false, "Show chip hints on the overview screen");
-
-
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = new DeviceFlag(
             "ENABLE_DEVICE_SEARCH", true, "Allows on device search in all apps");
 
@@ -147,6 +142,16 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_THEMED_ICONS = getDebugFlag(
             "ENABLE_THEMED_ICONS", true, "Enable themed icons on workspace");
 
+    public static final BooleanFlag ENABLE_BULK_WORKSPACE_ICON_LOADING = getDebugFlag(
+            "ENABLE_BULK_WORKSPACE_ICON_LOADING",
+            false,
+            "Enable loading workspace icons in bulk.");
+
+    public static final BooleanFlag ENABLE_BULK_ALL_APPS_ICON_LOADING = getDebugFlag(
+            "ENABLE_BULK_ALL_APPS_ICON_LOADING",
+            false,
+            "Enable loading all apps icons in bulk.");
+
     // Keep as DeviceFlag for remote disable in emergency.
     public static final BooleanFlag ENABLE_OVERVIEW_SELECTIONS = new DeviceFlag(
             "ENABLE_OVERVIEW_SELECTIONS", true, "Show Select Mode button in Overview Actions");
@@ -154,15 +159,9 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_WIDGETS_PICKER_AIAI_SEARCH = new DeviceFlag(
             "ENABLE_WIDGETS_PICKER_AIAI_SEARCH", false, "Enable AiAi search in the widgets picker");
 
-    public static final BooleanFlag ENABLE_OVERVIEW_SHARE = getDebugFlag(
-            "ENABLE_OVERVIEW_SHARE", false, "Show Share button in Overview Actions");
-
     public static final BooleanFlag ENABLE_OVERVIEW_SHARING_TO_PEOPLE = getDebugFlag(
             "ENABLE_OVERVIEW_SHARING_TO_PEOPLE", true,
             "Show indicators for content on Overview to share with top people. ");
-
-    public static final BooleanFlag ENABLE_OVERVIEW_CONTENT_PUSH = getDebugFlag(
-            "ENABLE_OVERVIEW_CONTENT_PUSH", false, "Show Content Push button in Overview Actions");
 
     public static final BooleanFlag ENABLE_DATABASE_RESTORE = getDebugFlag(
             "ENABLE_DATABASE_RESTORE", false,
@@ -178,7 +177,7 @@ public final class FeatureFlags {
                     + "Ignored if ENABLE_SMARTSPACE_UNIVERSAL is enabled.");
 
     public static final BooleanFlag ENABLE_SMARTSPACE_FEEDBACK = getDebugFlag(
-            "ENABLE_SMARTSPACE_FEEDBACK", true,
+            "ENABLE_SMARTSPACE_FEEDBACK", false,
             "Adds a menu option to send feedback for Enhanced Smartspace.");
 
     public static final BooleanFlag ENABLE_SMARTSPACE_DISMISS = getDebugFlag(
@@ -219,6 +218,9 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_TASKBAR = getDebugFlag(
             "ENABLE_TASKBAR", true, "Allows a system Taskbar to be shown on larger devices.");
 
+    public static final BooleanFlag ENABLE_TASKBAR_EDU = getDebugFlag("ENABLE_TASKBAR_EDU", true,
+            "Enables showing taskbar education the first time an app is opened.");
+
     public static final BooleanFlag ENABLE_OVERVIEW_GRID = getDebugFlag(
             "ENABLE_OVERVIEW_GRID", true, "Uses grid overview layout. "
             + "Only applicable on large screen devices.");
@@ -227,12 +229,16 @@ public final class FeatureFlags {
             "ENABLE_TWO_PANEL_HOME", true,
             "Uses two panel on home screen. Only applicable on large screen devices.");
 
+    public static final BooleanFlag ENABLE_TWO_PANEL_HOME_IN_PORTRAIT = getDebugFlag(
+            "ENABLE_TWO_PANEL_HOME_IN_PORTRAIT", true,
+            "Uses two panel on home screen in portrait if ENABLE_TWO_PANEL_HOME is enabled.");
+
     public static final BooleanFlag ENABLE_SCRIM_FOR_APP_LAUNCH = getDebugFlag(
             "ENABLE_SCRIM_FOR_APP_LAUNCH", false,
             "Enables scrim during app launch animation.");
 
     public static final BooleanFlag ENABLE_SPLIT_SELECT = getDebugFlag(
-            "ENABLE_SPLIT_SELECT", false, "Uses new split screen selection overview UI");
+            "ENABLE_SPLIT_SELECT", true, "Uses new split screen selection overview UI");
 
     public static final BooleanFlag ENABLE_ENFORCED_ROUNDED_CORNERS = new DeviceFlag(
             "ENABLE_ENFORCED_ROUNDED_CORNERS", true, "Enforce rounded corners on all App Widgets");
@@ -258,6 +264,10 @@ public final class FeatureFlags {
     public static final BooleanFlag QUICK_WALLPAPER_PICKER = getDebugFlag(
             "QUICK_WALLPAPER_PICKER", false,
             "Shows quick wallpaper picker in long-press menu");
+
+    public static final BooleanFlag ENABLE_BACK_SWIPE_HOME_ANIMATION = getDebugFlag(
+            "ENABLE_BACK_SWIPE_HOME_ANIMATION", true,
+            "Enables home animation to icon when user swipes back.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

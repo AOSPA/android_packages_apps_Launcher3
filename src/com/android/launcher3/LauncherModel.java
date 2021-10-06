@@ -72,6 +72,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -95,9 +96,10 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     // our monitoring of the package manager provides all updates and we never
     // need to do a requery. This is only ever touched from the loader thread.
     private boolean mModelLoaded;
+    private boolean mModelDestroyed = false;
     public boolean isModelLoaded() {
         synchronized (mLock) {
-            return mModelLoaded && mLoaderTask == null;
+            return mModelLoaded && mLoaderTask == null && !mModelDestroyed;
         }
     }
 
@@ -124,10 +126,12 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
         }
     };
 
-    LauncherModel(Context context, LauncherAppState app, IconCache iconCache, AppFilter appFilter) {
+    LauncherModel(Context context, LauncherAppState app, IconCache iconCache, AppFilter appFilter,
+            boolean isPrimaryInstance) {
         mApp = app;
         mBgAllAppsList = new AllAppsList(iconCache, appFilter);
-        mModelDelegate = ModelDelegate.newInstance(context, app, mBgAllAppsList, mBgDataModel);
+        mModelDelegate = ModelDelegate.newInstance(context, app, mBgAllAppsList, mBgDataModel,
+                isPrimaryInstance);
     }
 
     public ModelDelegate getModelDelegate() {
@@ -244,6 +248,7 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
      * Called when the model is destroyed
      */
     public void destroy() {
+        mModelDestroyed = true;
         MODEL_EXECUTOR.execute(mModelDelegate::destroy);
     }
 
@@ -383,7 +388,13 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
                     loaderResults.bindWidgets();
                     return true;
                 } else {
-                    startLoaderForResults(loaderResults);
+                    stopLoader();
+                    mLoaderTask = new LoaderTask(
+                            mApp, mBgAllAppsList, mBgDataModel, mModelDelegate, loaderResults);
+
+                    // Always post the loader task, instead of running directly
+                    // (even on same thread) so that we exit any nested synchronized blocks
+                    MODEL_EXECUTOR.post(mLoaderTask);
                 }
             }
         }
@@ -406,25 +417,17 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
         }
     }
 
-    public void startLoaderForResults(LoaderResults results) {
+    /**
+     * Loads the model if not loaded
+     * @param callback called with the data model upon successful load or null on model thread.
+     */
+    public void loadAsync(Consumer<BgDataModel> callback) {
         synchronized (mLock) {
-            stopLoader();
-            mLoaderTask = new LoaderTask(
-                    mApp, mBgAllAppsList, mBgDataModel, mModelDelegate, results);
-
-            // Always post the loader task, instead of running directly (even on same thread) so
-            // that we exit any nested synchronized blocks
-            MODEL_EXECUTOR.post(mLoaderTask);
-        }
-    }
-
-    public void startLoaderForResultsIfNotLoaded(LoaderResults results) {
-        synchronized (mLock) {
-            if (!isModelLoaded()) {
-                Log.d(TAG, "Workspace not loaded, loading now");
-                startLoaderForResults(results);
+            if (!mModelLoaded && !mIsLoaderTaskRunning) {
+                startLoader();
             }
         }
+        MODEL_EXECUTOR.post(() -> callback.accept(isModelLoaded() ? mBgDataModel : null));
     }
 
     @Override
@@ -558,6 +561,9 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
     }
 
     public void enqueueModelUpdateTask(ModelUpdateTask task) {
+        if (mModelDestroyed) {
+            return;
+        }
         task.init(mApp, this, mBgDataModel, mBgAllAppsList, MAIN_EXECUTOR);
         MODEL_EXECUTOR.execute(task);
     }

@@ -106,9 +106,11 @@ public class LauncherSwipeHandlerV2 extends
         boolean canUseWorkspaceView = workspaceView != null && workspaceView.isAttachedToWindow();
 
         mActivity.getRootView().setForceHideBackArrow(true);
-        mActivity.setHintUserWillBeActive();
+        if (!TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
+            mActivity.setHintUserWillBeActive();
+        }
 
-        if (!canUseWorkspaceView || appCanEnterPip) {
+        if (!canUseWorkspaceView || appCanEnterPip || mIsSwipeForStagedSplit) {
             return new LauncherHomeAnimationFactory();
         }
         if (workspaceView instanceof LauncherAppWidgetHostView) {
@@ -134,6 +136,12 @@ public class LauncherSwipeHandlerV2 extends
             // There is a delay in loading the icon, so we need to keep the window
             // opaque until it is ready.
             private boolean mIsFloatingIconReady = false;
+
+            @Nullable
+            @Override
+            protected View getViewIgnoredInWorkspaceRevealAnimation() {
+                return workspaceView;
+            }
 
             @Override
             public RectF getWindowTargetRect() {
@@ -179,14 +187,16 @@ public class LauncherSwipeHandlerV2 extends
         final float floatingWidgetAlpha = isTargetTranslucent ? 0 : 1;
         RectF backgroundLocation = new RectF();
         Rect crop = new Rect();
-        mTaskViewSimulator.getCurrentCropRect().roundOut(crop);
+        // We can assume there is only one remote target here because staged split never animates
+        // into the app icon, only into the homescreen
+        mRemoteTargetHandles[0].getTaskViewSimulator().getCurrentCropRect().roundOut(crop);
         Size windowSize = new Size(crop.width(), crop.height());
         int fallbackBackgroundColor =
                 FloatingWidgetView.getDefaultBackgroundColor(mContext, runningTaskTarget);
         FloatingWidgetView floatingWidgetView = FloatingWidgetView.getFloatingWidgetView(mActivity,
                 hostView, backgroundLocation, windowSize,
-                mTaskViewSimulator.getCurrentCornerRadius(), isTargetTranslucent,
-                fallbackBackgroundColor);
+                mRemoteTargetHandles[0].getTaskViewSimulator().getCurrentCornerRadius(),
+                isTargetTranslucent, fallbackBackgroundColor);
 
         return new FloatingViewHomeAnimationFactory(floatingWidgetView) {
 

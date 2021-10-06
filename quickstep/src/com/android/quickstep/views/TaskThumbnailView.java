@@ -47,20 +47,17 @@ import androidx.core.graphics.ColorUtils;
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SystemUiController;
 import com.android.quickstep.TaskOverlayFactory.TaskOverlay;
 import com.android.quickstep.views.TaskView.FullscreenDrawParams;
-import com.android.systemui.plugins.OverviewScreenshotActions;
-import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 
 /**
  * A task in the Recents view.
  */
-public class TaskThumbnailView extends View implements PluginListener<OverviewScreenshotActions> {
+public class TaskThumbnailView extends View {
     private static final MainThreadInitializedObject<FullscreenDrawParams> TEMP_PARAMS =
             new MainThreadInitializedObject<>(FullscreenDrawParams::new);
 
@@ -97,7 +94,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
     private float mDimAlpha = 0f;
 
     private boolean mOverlayEnabled;
-    private OverviewScreenshotActions mOverviewScreenshotActionsPlugin;
 
     public TaskThumbnailView(Context context) {
         this(context, null);
@@ -171,9 +167,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
             mPaint.setShader(null);
             getTaskOverlay().reset();
         }
-        if (mOverviewScreenshotActionsPlugin != null) {
-            mOverviewScreenshotActionsPlugin.setupActions(getTaskView(), getThumbnail(), mActivity);
-        }
         updateThumbnailPaintFilter();
     }
 
@@ -211,10 +204,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
             return Insets.NONE;
         }
 
-        if (!TaskView.CLIP_STATUS_AND_NAV_BARS) {
-            return Insets.NONE;
-        }
-
         RectF bitmapRect = new RectF(
                 0, 0,
                 mThumbnailData.thumbnail.getWidth(), mThumbnailData.thumbnail.getHeight());
@@ -228,11 +217,14 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         RectF boundsInBitmapSpace = new RectF();
         boundsToBitmapSpace.mapRect(boundsInBitmapSpace, viewRect);
 
-        return Insets.of(
-            Math.round(boundsInBitmapSpace.left),
-            Math.round(boundsInBitmapSpace.top),
-            Math.round(bitmapRect.right - boundsInBitmapSpace.right),
-            Math.round(bitmapRect.bottom - boundsInBitmapSpace.bottom));
+        DeviceProfile dp = mActivity.getDeviceProfile();
+        int leftInset = TaskView.clipLeft(dp) ? Math.round(boundsInBitmapSpace.left) : 0;
+        int topInset = TaskView.clipTop(dp) ? Math.round(boundsInBitmapSpace.top) : 0;
+        int rightInset = TaskView.clipRight(dp) ? Math.round(
+                bitmapRect.right - boundsInBitmapSpace.right) : 0;
+        int bottomInset = TaskView.clipBottom(dp)
+                ? Math.round(bitmapRect.bottom - boundsInBitmapSpace.bottom) : 0;
+        return Insets.of(leftInset, topInset, rightInset, bottomInset);
     }
 
 
@@ -264,33 +256,6 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
                 getMeasuredHeight() + currentDrawnInsets.bottom,
                 mFullscreenParams.mCurrentDrawnCornerRadius);
         canvas.restore();
-    }
-
-    @Override
-    public void onPluginConnected(OverviewScreenshotActions overviewScreenshotActions,
-            Context context) {
-        mOverviewScreenshotActionsPlugin = overviewScreenshotActions;
-        mOverviewScreenshotActionsPlugin.setupActions(getTaskView(), getThumbnail(), mActivity);
-    }
-
-    @Override
-    public void onPluginDisconnected(OverviewScreenshotActions plugin) {
-        if (mOverviewScreenshotActionsPlugin != null) {
-            mOverviewScreenshotActionsPlugin = null;
-        }
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        PluginManagerWrapper.INSTANCE.get(getContext())
-            .addPluginListener(this, OverviewScreenshotActions.class);
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        PluginManagerWrapper.INSTANCE.get(getContext()).removePluginListener(this);
     }
 
     public PreviewPositionHelper getPreviewPositionHelper() {
@@ -440,8 +405,19 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
 
             int thumbnailRotation = thumbnailData.rotation;
             int deltaRotate = getRotationDelta(currentRotation, thumbnailRotation);
-            RectF thumbnailClipHint = TaskView.CLIP_STATUS_AND_NAV_BARS
-                    ? new RectF(thumbnailData.insets) : new RectF();
+            RectF thumbnailClipHint = new RectF();
+            if (TaskView.clipLeft(dp)) {
+                thumbnailClipHint.left = thumbnailData.insets.left;
+            }
+            if (TaskView.clipRight(dp)) {
+                thumbnailClipHint.right = thumbnailData.insets.right;
+            }
+            if (TaskView.clipTop(dp)) {
+                thumbnailClipHint.top = thumbnailData.insets.top;
+            }
+            if (TaskView.clipBottom(dp)) {
+                thumbnailClipHint.bottom = thumbnailData.insets.bottom;
+            }
 
             float scale = thumbnailData.scale;
             final float thumbnailScale;
@@ -554,7 +530,7 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
                         -thumbnailClipHint.left * scale,
                         -thumbnailClipHint.top * scale);
             } else {
-                setThumbnailRotation(deltaRotate, thumbnailClipHint, scale, thumbnailBounds);
+                setThumbnailRotation(deltaRotate, thumbnailClipHint, scale, thumbnailBounds, dp);
             }
 
             final float widthWithInsets;
@@ -599,7 +575,7 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         }
 
         private void setThumbnailRotation(int deltaRotate, RectF thumbnailInsets, float scale,
-                Rect thumbnailPosition) {
+                Rect thumbnailPosition, DeviceProfile dp) {
             float newLeftInset = 0;
             float newTopInset = 0;
             float translateX = 0;
@@ -626,7 +602,7 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
             }
             mClippedInsets.offsetTo(newLeftInset * scale, newTopInset * scale);
             mMatrix.postTranslate(translateX, translateY);
-            if (TaskView.FULL_THUMBNAIL) {
+            if (TaskView.useFullThumbnail(dp)) {
                 mMatrix.postTranslate(-mClippedInsets.left, -mClippedInsets.top);
             }
         }
@@ -634,8 +610,8 @@ public class TaskThumbnailView extends View implements PluginListener<OverviewSc
         /**
          * Insets to used for clipping the thumbnail (in case it is drawing outside its own space)
          */
-        public RectF getInsetsToDrawInFullscreen() {
-            return TaskView.FULL_THUMBNAIL ? mClippedInsets : EMPTY_RECT_F;
+        public RectF getInsetsToDrawInFullscreen(DeviceProfile dp) {
+            return TaskView.useFullThumbnail(dp) ? mClippedInsets : EMPTY_RECT_F;
         }
     }
 }

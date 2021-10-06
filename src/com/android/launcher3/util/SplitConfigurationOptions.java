@@ -18,6 +18,8 @@ package com.android.launcher3.util;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
+import android.graphics.Rect;
+
 import androidx.annotation.IntDef;
 
 import java.lang.annotation.Retention;
@@ -67,19 +69,64 @@ public final class SplitConfigurationOptions {
     ///////////////////////////////////
 
     public static class SplitPositionOption {
-        public final int mIconResId;
-        public final int mTextResId;
+        public final int iconResId;
+        public final int textResId;
         @StagePosition
-        public final int mStagePosition;
+        public final int stagePosition;
 
         @StageType
         public final int mStageType;
 
         public SplitPositionOption(int iconResId, int textResId, int stagePosition, int stageType) {
-            mIconResId = iconResId;
-            mTextResId = textResId;
-            mStagePosition = stagePosition;
+            this.iconResId = iconResId;
+            this.textResId = textResId;
+            this.stagePosition = stagePosition;
             mStageType = stageType;
         }
+    }
+
+    public static class StagedSplitBounds {
+        public final Rect leftTopBounds;
+        public final Rect rightBottomBounds;
+        /** This rect represents the actual gap between the two apps */
+        public final Rect visualDividerBounds;
+        // This class is orientation-agnostic, so we compute both for later use
+        public final float topTaskPercent;
+        public final float leftTaskPercent;
+        /**
+         * If {@code true}, that means at the time of creation of this object, the
+         * split-screened apps were vertically stacked. This is useful in scenarios like
+         * rotation where the bounds won't change, but this variable can indicate what orientation
+         * the bounds were originally in
+         */
+        public final boolean appsStackedVertically;
+
+        public StagedSplitBounds(Rect leftTopBounds, Rect rightBottomBounds) {
+            this.leftTopBounds = leftTopBounds;
+            this.rightBottomBounds = rightBottomBounds;
+
+            if (rightBottomBounds.top > leftTopBounds.top) {
+                // vertical apps, horizontal divider
+                this.visualDividerBounds = new Rect(leftTopBounds.left, leftTopBounds.bottom,
+                        leftTopBounds.right, rightBottomBounds.top);
+                appsStackedVertically = true;
+            } else {
+                // horizontal apps, vertical divider
+                this.visualDividerBounds = new Rect(leftTopBounds.right, leftTopBounds.top,
+                        rightBottomBounds.left, leftTopBounds.bottom);
+                appsStackedVertically = false;
+            }
+
+            leftTaskPercent = this.leftTopBounds.width() / (float) rightBottomBounds.right;
+            topTaskPercent = this.leftTopBounds.height() / (float) rightBottomBounds.bottom;
+        }
+    }
+
+    public static class StagedSplitTaskPosition {
+        public int taskId = -1;
+        @StagePosition
+        public int stagePosition = STAGE_POSITION_UNDEFINED;
+        @StageType
+        public int stageType = STAGE_TYPE_UNDEFINED;
     }
 }

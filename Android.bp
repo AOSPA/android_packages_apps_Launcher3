@@ -33,6 +33,9 @@ license {
 
 android_library {
     name: "launcher-aosp-tapl",
+    libs: [
+        "framework-statsd",
+    ],
     static_libs: [
         "androidx.annotation_annotation",
         "androidx.test.runner",
@@ -192,6 +195,9 @@ android_library {
     resource_dirs: [
         "quickstep/res",
     ],
+    libs: [
+        "framework-statsd",
+    ],
     static_libs: [
         "Launcher3ResLib",
         "SystemUISharedLib",
@@ -224,7 +230,6 @@ filegroup {
     srcs: ["proguard.flags"],
 }
 
-
 // Library with all the dependencies for building Launcher Go
 android_library {
     name: "LauncherGoResLib",
@@ -241,7 +246,9 @@ android_library {
     static_libs: [
         "Launcher3CommonDepsLib",
         "QuickstepResLib",
+        "androidx.room_room-runtime",
     ],
+    plugins: ["androidx.room_room-compiler-plugin"],
     manifest: "quickstep/AndroidManifest-launcher.xml",
     additional_manifests: [
         "go/AndroidManifest.xml",
@@ -253,3 +260,27 @@ android_library {
     },
 }
 
+// Build rule for Quickstep library
+android_library {
+    name: "Launcher3QuickStepLib",
+    srcs: [
+        ":launcher-src-no-build-config",
+    ],
+    resource_dirs: [
+        "quickstep/res",
+    ],
+    libs: [
+        "framework-statsd",
+    ],
+    static_libs: [
+        "SystemUI-statsd",
+        "SystemUISharedLib",
+        "Launcher3CommonDepsLib"
+    ],
+    manifest: "quickstep/AndroidManifest.xml",
+    platform_apis: true,
+    min_sdk_version: "current",
+    lint: {
+        baseline_filename: "lint-baseline-launcher3.xml",
+    },
+}

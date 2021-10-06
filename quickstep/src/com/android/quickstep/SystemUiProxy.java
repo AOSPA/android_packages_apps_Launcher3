@@ -53,6 +53,8 @@ import com.android.wm.shell.startingsurface.IStartingWindow;
 import com.android.wm.shell.startingsurface.IStartingWindowListener;
 import com.android.wm.shell.transition.IShellTransitions;
 
+import java.util.ArrayList;
+
 /**
  * Holds the reference to SystemUI.
  */
@@ -80,6 +82,7 @@ public class SystemUiProxy implements ISystemUiProxy,
     private ISplitScreenListener mPendingSplitScreenListener;
     private IStartingWindowListener mPendingStartingWindowListener;
     private ISmartspaceCallback mPendingSmartspaceCallback;
+    private final ArrayList<RemoteTransitionCompat> mPendingRemoteTransitions = new ArrayList<>();
 
     // Used to dedupe calls to SystemUI
     private int mLastShelfHeight;
@@ -160,6 +163,10 @@ public class SystemUiProxy implements ISystemUiProxy,
             setSmartspaceCallback(mPendingSmartspaceCallback);
             mPendingSmartspaceCallback = null;
         }
+        for (int i = mPendingRemoteTransitions.size() - 1; i >= 0; --i) {
+            registerRemoteTransition(mPendingRemoteTransitions.get(i));
+        }
+        mPendingRemoteTransitions.clear();
 
         if (mPendingSetNavButtonAlpha != null) {
             mPendingSetNavButtonAlpha.run();
@@ -532,10 +539,17 @@ public class SystemUiProxy implements ISystemUiProxy,
         }
     }
 
-    public void exitSplitScreen() {
+    /**
+     * To be called whenever the user exits out of split screen apps (either by launching another
+     * app or by swiping home)
+     * @param topTaskId The taskId of the new app that was launched. System will then move this task
+     *                  to the front of what the user sees while removing all other split stages.
+     *                  If swiping to home (or there is no task to put at the top), can pass in -1.
+     */
+    public void exitSplitScreen(int topTaskId) {
         if (mSplitScreen != null) {
             try {
-                mSplitScreen.exitSplitScreen();
+                mSplitScreen.exitSplitScreen(topTaskId);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call exitSplitScreen");
             }
@@ -632,10 +646,11 @@ public class SystemUiProxy implements ISystemUiProxy,
      * @param cancel true if recents starting is being cancelled.
      * @return RemoteAnimationTargets of windows that need to animate but only exist in shell.
      */
-    public RemoteAnimationTarget[] onGoingToRecentsLegacy(boolean cancel) {
+    public RemoteAnimationTarget[] onGoingToRecentsLegacy(boolean cancel,
+            RemoteAnimationTarget[] apps) {
         if (mSplitScreen != null) {
             try {
-                return mSplitScreen.onGoingToRecentsLegacy(cancel);
+                return mSplitScreen.onGoingToRecentsLegacy(cancel, apps);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call onGoingToRecentsLegacy");
             }
@@ -679,6 +694,8 @@ public class SystemUiProxy implements ISystemUiProxy,
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call registerRemoteTransition");
             }
+        } else {
+            mPendingRemoteTransitions.add(remoteTransition);
         }
     }
 
@@ -690,6 +707,7 @@ public class SystemUiProxy implements ISystemUiProxy,
                 Log.w(TAG, "Failed call registerRemoteTransition");
             }
         }
+        mPendingRemoteTransitions.remove(remoteTransition);
     }
 
     //

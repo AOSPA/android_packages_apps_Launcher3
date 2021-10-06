@@ -41,7 +41,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings;
-import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.graphics.LauncherPreviewRenderer.PreviewContext;
@@ -49,7 +48,6 @@ import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.model.GridSizeMigrationTaskV2;
 import com.android.launcher3.model.LoaderTask;
 import com.android.launcher3.model.ModelDelegate;
-import com.android.launcher3.model.ModelPreload;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.Themes;
@@ -150,7 +148,8 @@ public class PreviewSurfaceRenderer {
             inflationContext = new ContextThemeWrapper(context,
                     Themes.getActivityThemeRes(context, mWallpaperColors.getColorHints()));
         } else {
-            inflationContext = new ContextThemeWrapper(mContext,  R.style.AppTheme);
+            inflationContext = new ContextThemeWrapper(mContext,
+                    Themes.getActivityThemeRes(mContext));
         }
 
         if (migrated) {
@@ -164,11 +163,14 @@ public class PreviewSurfaceRenderer {
                 @Override
                 public void run() {
                     DeviceProfile deviceProfile = mIdp.getDeviceProfile(previewContext);
-                    String query = (deviceProfile.isTwoPanels ? LauncherSettings.Favorites.SCREEN
-                            + " = " + Workspace.LEFT_PANEL_ID + " or " : "")
-                            + LauncherSettings.Favorites.SCREEN + " = " + Workspace.FIRST_SCREEN_ID
+                    String query =
+                            LauncherSettings.Favorites.SCREEN + " = " + Workspace.FIRST_SCREEN_ID
                             + " or " + LauncherSettings.Favorites.CONTAINER + " = "
                             + LauncherSettings.Favorites.CONTAINER_HOTSEAT;
+                    if (deviceProfile.isTwoPanels) {
+                        query += " or " + LauncherSettings.Favorites.SCREEN + " = "
+                                + Workspace.SECOND_SCREEN_ID;
+                    }
                     loadWorkspace(new ArrayList<>(), LauncherSettings.Favorites.PREVIEW_CONTENT_URI,
                             query);
 
@@ -179,18 +181,13 @@ public class PreviewSurfaceRenderer {
                 }
             }.run();
         } else {
-            new ModelPreload() {
-
-                @Override
-                public void onComplete(boolean isSuccess) {
-                    if (isSuccess) {
-                        MAIN_EXECUTOR.execute(() ->
-                                renderView(inflationContext, getBgDataModel(), null));
-                    } else {
-                        Log.e(TAG, "Model loading failed");
-                    }
+            LauncherAppState.getInstance(inflationContext).getModel().loadAsync(dataModel -> {
+                if (dataModel != null) {
+                    MAIN_EXECUTOR.execute(() -> renderView(inflationContext, dataModel, null));
+                } else {
+                    Log.e(TAG, "Model loading failed");
                 }
-            }.start(inflationContext);
+            });
         }
     }
 

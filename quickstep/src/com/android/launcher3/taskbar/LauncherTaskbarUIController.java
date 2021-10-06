@@ -16,23 +16,38 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_LONGPRESS_HIDE;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_LONGPRESS_SHOW;
+import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
+import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HOME;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.graphics.Rect;
 import android.view.MotionEvent;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 
 import com.android.launcher3.BaseQuickstepLauncher;
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
+import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.logging.InstanceId;
+import com.android.launcher3.logging.InstanceIdSequence;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
+import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
+import com.android.launcher3.util.OnboardingPrefs;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationCallbacks.RecentsAnimationListener;
@@ -40,6 +55,9 @@ import com.android.quickstep.RecentsAnimationController;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
+
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 /**
  * A data source which integrates with a Launcher instance
@@ -58,9 +76,23 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     private final AnimatedFloat mIconAlignmentForGestureState =
             new AnimatedFloat(this::onIconAlignmentRatioChanged);
 
+    private final DeviceProfile.OnDeviceProfileChangeListener mOnDeviceProfileChangeListener =
+            this::onStashedInAppChanged;
+
+    private final StateManager.StateListener<LauncherState> mStateListener =
+            new StateManager.StateListener<LauncherState>() {
+                @Override
+                public void onStateTransitionComplete(LauncherState finalState) {
+                    TaskbarStashController controller = mControllers.taskbarStashController;
+                    controller.updateStateForFlag(FLAG_IN_STASHED_LAUNCHER_STATE,
+                            finalState.isTaskbarStashed());
+                }
+            };
+
     // Initialized in init.
     private TaskbarControllers mControllers;
     private AnimatedFloat mTaskbarBackgroundAlpha;
+    private AnimatedFloat mTaskbarOverrideBackgroundAlpha;
     private AlphaProperty mIconAlphaForHome;
     private boolean mIsAnimatingToLauncherViaResume;
     private boolean mIsAnimatingToLauncherViaGesture;
@@ -84,6 +116,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
         mTaskbarBackgroundAlpha = mControllers.taskbarDragLayerController
                 .getTaskbarBackgroundAlpha();
+        mTaskbarOverrideBackgroundAlpha = mControllers.taskbarDragLayerController
+                .getOverrideBackgroundAlpha();
 
         MultiValueAlpha taskbarIconAlpha = mControllers.taskbarViewController.getTaskbarIconAlpha();
         mIconAlphaForHome = taskbarIconAlpha.getProperty(ALPHA_INDEX_HOME);
@@ -94,6 +128,10 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         onLauncherResumedOrPaused(mLauncher.hasBeenResumed());
         mIconAlignmentForResumedState.finishAnimation();
         onIconAlignmentRatioChanged();
+
+        onStashedInAppChanged(mLauncher.getDeviceProfile());
+        mLauncher.addOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
+        mLauncher.getStateManager().addStateListener(mStateListener);
     }
 
     @Override
@@ -102,13 +140,15 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         mIconAlignmentForResumedState.finishAnimation();
         mIconAlignmentForGestureState.finishAnimation();
 
+        mLauncher.removeOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
+        mLauncher.getStateManager().removeStateListener(mStateListener);
         mLauncher.getHotseat().setIconsAlpha(1f);
         mLauncher.setTaskbarUIController(null);
     }
 
     @Override
     protected boolean isTaskbarTouchable() {
-        return !isAnimatingToLauncher() && !mControllers.taskbarStashController.isStashed();
+        return !isAnimatingToLauncher();
     }
 
     private boolean isAnimatingToLauncher() {
@@ -144,10 +184,9 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         anim.start();
         mIsAnimatingToLauncherViaResume = isResumed;
 
-        if (!isResumed) {
-            TaskbarStashController stashController = mControllers.taskbarStashController;
-            stashController.animateToIsStashed(stashController.isStashedInApp(), duration);
-        }
+        TaskbarStashController stashController = mControllers.taskbarStashController;
+        stashController.updateStateForFlag(FLAG_IN_APP, !isResumed);
+        stashController.applyState(duration);
         SystemUiProxy.INSTANCE.get(mContext).notifyTaskbarStatus(!isResumed,
                 mControllers.taskbarStashController.isStashedInApp());
     }
@@ -160,23 +199,30 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     public Animator createAnimToLauncher(@NonNull LauncherState toState,
             @NonNull RecentsAnimationCallbacks callbacks, long duration) {
+        AnimatorSet animatorSet = new AnimatorSet();
         TaskbarStashController stashController = mControllers.taskbarStashController;
-        ObjectAnimator animator = mIconAlignmentForGestureState
-                .animateToValue(1)
-                .setDuration(duration);
-        animator.addListener(new AnimatorListenerAdapter() {
+        stashController.updateStateForFlag(FLAG_IN_STASHED_LAUNCHER_STATE,
+                toState.isTaskbarStashed());
+        if (toState.isTaskbarStashed()) {
+            animatorSet.play(stashController.applyStateWithoutStart(duration));
+        } else {
+            animatorSet.play(mIconAlignmentForGestureState
+                    .animateToValue(1)
+                    .setDuration(duration));
+        }
+        animatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
-            public void onAnimationEnd(Animator animation) {
+            public void onAnimationEnd(Animator animator) {
                 mTargetStateOverride = null;
                 animator.removeListener(this);
             }
 
             @Override
-            public void onAnimationStart(Animator animation) {
+            public void onAnimationStart(Animator animator) {
                 mTargetStateOverride = toState;
                 mIsAnimatingToLauncherViaGesture = true;
-                // TODO: base this on launcher state
-                stashController.animateToIsStashed(false, duration);
+                stashController.updateStateForFlag(FLAG_IN_APP, false);
+                stashController.applyState(duration);
             }
         });
 
@@ -188,11 +234,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             callbacks.removeListener(listener);
         });
 
-        return animator;
+        return animatorSet;
     }
 
     private float getCurrentIconAlignmentRatio() {
-        return  Math.max(mIconAlignmentForResumedState.value, mIconAlignmentForGestureState.value);
+        return Math.max(mIconAlignmentForResumedState.value, mIconAlignmentForGestureState.value);
     }
 
     private void onIconAlignmentRatioChanged() {
@@ -228,9 +274,71 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mContext.getDragController().isDragging();
     }
 
-    void setTaskbarViewVisible(boolean isVisible) {
+    public View getRootView() {
+        return mTaskbarDragLayer;
+    }
+
+    private void setTaskbarViewVisible(boolean isVisible) {
         mIconAlphaForHome.setValue(isVisible ? 1 : 0);
         mLauncher.getHotseat().setIconsAlpha(isVisible ? 0f : 1f);
+    }
+
+    @Override
+    protected void onStashedInAppChanged() {
+        onStashedInAppChanged(mLauncher.getDeviceProfile());
+        if (mControllers.taskbarStashController.isStashedInApp()) {
+            mContext.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_LONGPRESS_HIDE);
+        } else {
+            mContext.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_LONGPRESS_SHOW);
+        }
+    }
+
+    private void onStashedInAppChanged(DeviceProfile deviceProfile) {
+        boolean taskbarStashedInApps = mControllers.taskbarStashController.isStashedInApp();
+        deviceProfile.isTaskbarPresentInApps = !taskbarStashedInApps;
+    }
+
+    /**
+     * Sets whether the background behind the taskbar/nav bar should be hidden.
+     */
+    public void forceHideBackground(boolean forceHide) {
+        mTaskbarOverrideBackgroundAlpha.updateValue(forceHide ? 0 : 1);
+    }
+
+    @Override
+    public Stream<ItemInfoWithIcon> getAppIconsForEdu() {
+        return Arrays.stream(mLauncher.getAppsView().getAppsStore().getApps());
+    }
+
+    /**
+     * Starts the taskbar education flow, if the user hasn't seen it yet.
+     */
+    public void showEdu() {
+        if (!FeatureFlags.ENABLE_TASKBAR_EDU.get()
+                || Utilities.IS_RUNNING_IN_TEST_HARNESS
+                || mLauncher.getOnboardingPrefs().getBoolean(OnboardingPrefs.TASKBAR_EDU_SEEN)) {
+            return;
+        }
+        mLauncher.getOnboardingPrefs().markChecked(OnboardingPrefs.TASKBAR_EDU_SEEN);
+
+        mControllers.taskbarEduController.showEdu();
+    }
+
+    /**
+     * Manually ends the taskbar education flow.
+     */
+    public void hideEdu() {
+        if (!FeatureFlags.ENABLE_TASKBAR_EDU.get()) {
+            return;
+        }
+
+        mControllers.taskbarEduController.hideEdu();
+    }
+
+    @Override
+    public void onTaskbarIconLaunched(WorkspaceItemInfo item) {
+        InstanceId instanceId = new InstanceIdSequence().newInstanceId();
+        mLauncher.logAppLaunch(mContext.getStatsLogManager(), item, instanceId);
     }
 
     private final class TaskBarRecentsAnimationListener implements RecentsAnimationListener {
@@ -259,9 +367,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                     .start();
 
             TaskbarStashController controller = mControllers.taskbarStashController;
-            if (finishedToApp) {
-                controller.animateToIsStashed(controller.isStashedInApp());
-            }
+            controller.updateStateForFlag(FLAG_IN_APP, finishedToApp);
+            controller.applyState();
         }
     }
 }

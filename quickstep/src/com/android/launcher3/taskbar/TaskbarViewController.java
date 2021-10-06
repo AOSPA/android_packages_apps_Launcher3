@@ -16,20 +16,24 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
-import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.quickstep.AnimatedFloat.VALUE;
 
 import android.graphics.Rect;
+import android.util.FloatProperty;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
+import android.view.ViewTreeObserver.OnPreDrawListener;
 
+import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.AnimatedFloat;
@@ -44,6 +48,9 @@ public class TaskbarViewController {
     public static final int ALPHA_INDEX_IME = 1;
     public static final int ALPHA_INDEX_KEYGUARD = 2;
     public static final int ALPHA_INDEX_STASH = 3;
+    public static final int ALPHA_INDEX_RECENTS_DISABLED = 4;
+    public static final int ALPHA_INDEX_NOTIFICATION_EXPANDED = 5;
+    private static final int NUM_ALPHA_CHANNELS = 6;
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarView mTaskbarView;
@@ -67,7 +74,7 @@ public class TaskbarViewController {
     public TaskbarViewController(TaskbarActivityContext activity, TaskbarView taskbarView) {
         mActivity = activity;
         mTaskbarView = taskbarView;
-        mTaskbarIconAlpha = new MultiValueAlpha(mTaskbarView, 4);
+        mTaskbarIconAlpha = new MultiValueAlpha(mTaskbarView, NUM_ALPHA_CHANNELS);
         mTaskbarIconAlpha.setUpdateVisibility(true);
         mModelCallbacks = new TaskbarModelCallbacks(activity, mTaskbarView);
     }
@@ -101,14 +108,55 @@ public class TaskbarViewController {
     }
 
     /**
+     * Should be called when the notification shade is expanded, so we can hide taskbar icons as
+     * well. Note that we are animating icons to appear / disappear.
+     */
+    public void setNotificationShadeIsExpanded(boolean isNotificationShadeExpanded) {
+        mTaskbarIconAlpha.getProperty(ALPHA_INDEX_NOTIFICATION_EXPANDED)
+                .animateToValue(isNotificationShadeExpanded ? 0 : 1)
+                .start();
+    }
+
+    /**
+     * Should be called when the recents button is disabled, so we can hide taskbar icons as well.
+     */
+    public void setRecentsButtonDisabled(boolean isDisabled) {
+        // TODO: check TaskbarStashController#supportsStashing(), to stash instead of setting alpha.
+        mTaskbarIconAlpha.getProperty(ALPHA_INDEX_RECENTS_DISABLED).setValue(isDisabled ? 0 : 1);
+    }
+
+    /**
      * Sets OnClickListener and OnLongClickListener for the given view.
      */
     public void setClickAndLongClickListenersForIcon(View icon) {
         mTaskbarView.setClickAndLongClickListenersForIcon(icon);
     }
 
+    /**
+     * Adds one time pre draw listener to the taskbar view, it is called before
+     * drawing a frame and invoked only once
+     * @param listener callback that will be invoked before drawing the next frame
+     */
+    public void addOneTimePreDrawListener(Runnable listener) {
+        mTaskbarView.getViewTreeObserver().addOnPreDrawListener(new OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                final ViewTreeObserver viewTreeObserver = mTaskbarView.getViewTreeObserver();
+                if (viewTreeObserver.isAlive()) {
+                    listener.run();
+                    viewTreeObserver.removeOnPreDrawListener(this);
+                }
+                return true;
+            }
+        });
+    }
+
     public Rect getIconLayoutBounds() {
         return mTaskbarView.getIconLayoutBounds();
+    }
+
+    public View[] getIconViews() {
+        return mTaskbarView.getIconViews();
     }
 
     public AnimatedFloat getTaskbarIconScaleForStash() {
@@ -165,8 +213,9 @@ public class TaskbarViewController {
         int offsetY = launcherDp.getTaskbarOffsetY();
         setter.setFloat(mTaskbarIconTranslationYForHome, VALUE, -offsetY, LINEAR);
 
-        int collapsedHeight = mActivity.getDeviceProfile().taskbarSize;
-        int expandedHeight = collapsedHeight + offsetY;
+        int collapsedHeight = mActivity.getDefaultTaskbarWindowHeight();
+        int expandedHeight = Math.max(collapsedHeight,
+                mActivity.getDeviceProfile().taskbarSize + offsetY);
         setter.addOnFrameListener(anim -> mActivity.setTaskbarWindowHeight(
                 anim.getAnimatedFraction() > 0 ? expandedHeight : collapsedHeight));
 
@@ -179,7 +228,7 @@ public class TaskbarViewController {
             float childCenter = (child.getLeft() + child.getRight()) / 2;
             float hotseatIconCenter = hotseatPadding.left + hotseatCellSize * info.screenId
                     + hotseatCellSize / 2;
-            setter.setFloat(child, VIEW_TRANSLATE_X, hotseatIconCenter - childCenter, LINEAR);
+            setter.setFloat(child, ICON_TRANSLATE_X, hotseatIconCenter - childCenter, LINEAR);
         }
 
         AnimatorPlaybackController controller = setter.createPlaybackController();
@@ -208,7 +257,11 @@ public class TaskbarViewController {
             return view -> mControllers.taskbarStashController.updateAndAnimateIsStashedInApp(true);
         }
 
-        public void onTouchEvent(MotionEvent motionEvent) {
+        /**
+         * Get the first chance to handle TaskbarView#onTouchEvent, and return whether we want to
+         * consume the touch so TaskbarView treats it as an ACTION_CANCEL.
+         */
+        public boolean onTouchEvent(MotionEvent motionEvent) {
             final float x = motionEvent.getRawX();
             final float y = motionEvent.getRawY();
             switch (motionEvent.getAction()) {
@@ -224,6 +277,7 @@ public class TaskbarViewController {
                         mControllers.taskbarStashController.startStashHint(
                                 /* animateForward= */ false);
                         mCanceledStashHint = true;
+                        return true;
                     }
                     break;
                 case MotionEvent.ACTION_UP:
@@ -234,6 +288,33 @@ public class TaskbarViewController {
                     }
                     break;
             }
+            return false;
         }
     }
+
+    public static final FloatProperty<View> ICON_TRANSLATE_X =
+            new FloatProperty<View>("taskbarAligmentTranslateX") {
+
+                @Override
+                public void setValue(View view, float v) {
+                    if (view instanceof BubbleTextView) {
+                        ((BubbleTextView) view).setTranslationXForTaskbarAlignmentAnimation(v);
+                    } else if (view instanceof FolderIcon) {
+                        ((FolderIcon) view).setTranslationForTaskbarAlignmentAnimation(v);
+                    } else {
+                        view.setTranslationX(v);
+                    }
+                }
+
+                @Override
+                public Float get(View view) {
+                    if (view instanceof BubbleTextView) {
+                        return ((BubbleTextView) view)
+                                .getTranslationXForTaskbarAlignmentAnimation();
+                    } else if (view instanceof FolderIcon) {
+                        return ((FolderIcon) view).getTranslationXForTaskbarAlignmentAnimation();
+                    }
+                    return view.getTranslationX();
+                }
+            };
 }
