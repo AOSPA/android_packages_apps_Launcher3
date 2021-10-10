@@ -94,7 +94,7 @@ public class FloatingHeaderView extends LinearLayout implements
     public boolean mHeaderCollapsed;
     private int mSnappedScrolledY;
     private int mTranslationY;
-    private int mHeaderColor;
+    private final int mHeaderColor = 0xFFFFFF;
 
     private boolean mForwardToRecyclerView;
 
@@ -301,18 +301,10 @@ public class FloatingHeaderView extends LinearLayout implements
         }
     }
 
-    /**
-     * Set current header protection background color
-     */
-    public void setHeaderColor(int color) {
-        mHeaderColor = color;
-        invalidate();
-    }
-
     @Override
     protected void dispatchDraw(Canvas canvas) {
         if (mHeaderCollapsed && !mCollapsed && mTabLayout.getVisibility() == VISIBLE
-                && mHeaderColor != Color.TRANSPARENT && FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
+                && FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
             mBGPaint.setColor(mHeaderColor);
             mBGPaint.setAlpha((int) (255 * mHeaderAnimator.getAnimatedFraction()));
             canvas.drawRect(0, 0, getWidth(), getHeight() + mTranslationY, mBGPaint);
