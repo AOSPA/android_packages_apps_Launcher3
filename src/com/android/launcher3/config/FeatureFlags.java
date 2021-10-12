@@ -77,7 +77,7 @@ public final class FeatureFlags {
             "ENABLE_LOCAL_COLOR_POPUPS", false, "Enable local color extraction for popups.");
 
     public static final BooleanFlag KEYGUARD_ANIMATION = getDebugFlag(
-            "KEYGUARD_ANIMATION", false, "Enable animation for keyguard going away on wallpaper");
+            "KEYGUARD_ANIMATION", true, "Enable animation for keyguard going away on wallpaper");
 
     public static final BooleanFlag ENABLE_QUICKSTEP_LIVE_TILE = getDebugFlag(
             "ENABLE_QUICKSTEP_LIVE_TILE", true, "Enable live tile in Quickstep overview");
