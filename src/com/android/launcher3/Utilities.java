@@ -140,6 +140,9 @@ public final class Utilities {
     public static final String KEY_ALLAPPS_SUGGESTIONS = "pref_allapps_suggestions";
     public static final String KEY_FONT_SIZE = "pref_font_size";
     public static final String KEY_ICON_SIZE = "pref_icon_size";
+    public static final String LENS_ACTIVITY = "com.google.android.apps.lens.MainActivity";
+    public static final String LENS_URI = "google://lens";
+    public static final String LENS_SHARE_ACTIVITY = "com.google.android.apps.search.lens.LensShareEntryPointActivity";
     /**
      * Returns true if theme is dark.
      */
