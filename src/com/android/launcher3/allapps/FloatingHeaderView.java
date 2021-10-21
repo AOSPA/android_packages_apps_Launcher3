@@ -54,7 +54,6 @@ public class FloatingHeaderView extends LinearLayout implements
     private final ValueAnimator mAnimator = ValueAnimator.ofInt(0, 0);
     private final ValueAnimator mHeaderAnimator = ValueAnimator.ofInt(0, 1).setDuration(100);
     private final Point mTempOffset = new Point();
-    private final Paint mBGPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RecyclerView.OnScrollListener mOnScrollListener =
             new RecyclerView.OnScrollListener() {
                 @Override
@@ -94,7 +93,6 @@ public class FloatingHeaderView extends LinearLayout implements
     public boolean mHeaderCollapsed;
     private int mSnappedScrolledY;
     private int mTranslationY;
-    private final int mHeaderColor = 0xFFFFFF;
 
     private boolean mForwardToRecyclerView;
 
@@ -303,12 +301,6 @@ public class FloatingHeaderView extends LinearLayout implements
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        if (mHeaderCollapsed && !mCollapsed && mTabLayout.getVisibility() == VISIBLE
-                && FeatureFlags.ENABLE_DEVICE_SEARCH.get()) {
-            mBGPaint.setColor(mHeaderColor);
-            mBGPaint.setAlpha((int) (255 * mHeaderAnimator.getAnimatedFraction()));
-            canvas.drawRect(0, 0, getWidth(), getHeight() + mTranslationY, mBGPaint);
-        }
         super.dispatchDraw(canvas);
     }
 

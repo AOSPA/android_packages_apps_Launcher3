@@ -87,8 +87,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     public static final float PULL_MULTIPLIER = .02f;
     public static final float FLING_VELOCITY_MULTIPLIER = 1200f;
 
-    private final Paint mHeaderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-
     protected final BaseDraggingActivity mLauncher;
     protected final AdapterHolder[] mAH;
     private final ItemInfoMatcher mPersonalMatcher = ItemInfoMatcher.ofUser(Process.myUserHandle());
@@ -131,7 +129,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
     private final int mHeaderProtectionColor;
     private final float mHeaderThreshold;
     private ScrimView mScrimView;
-    private final int mHeaderColor = 0xFFFFFF;
 
     public AllAppsContainerView(Context context) {
         this(context, null);
@@ -703,18 +700,6 @@ public class AllAppsContainerView extends SpringRelativeLayout implements DragSo
 
     @Override
     public void drawOnScrim(Canvas canvas) {
-        mHeaderPaint.setColor(mHeaderColor);
-        mHeaderPaint.setAlpha((int) (getAlpha() * Color.alpha(mHeaderColor)));
-        if (mHeaderPaint.getColor() != mScrimColor && mHeaderPaint.getColor() != 0) {
-            int bottom = mUsingTabs && mHeader.mHeaderCollapsed ? mHeader.getVisibleBottomBound()
-                    : mSearchContainer.getBottom();
-            canvas.drawRect(0, 0, canvas.getWidth(), bottom + getTranslationY(),
-                    mHeaderPaint);
-
-            if (FeatureFlags.ENABLE_DEVICE_SEARCH.get() && getTranslationY() == 0) {
-                mSearchUiManager.getEditText().setBackground(null);
-            }
-        }
     }
 
     public class AdapterHolder {
