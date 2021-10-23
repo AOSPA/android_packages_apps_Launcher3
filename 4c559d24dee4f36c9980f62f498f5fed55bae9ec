@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5eca25cf_4d058592",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000427
+      },
+      "writtenOn": "2021-10-23T22:22:44Z",
+      "side": 1,
+      "message": "this should be in vendor, so we don\u0027t have to pick it every cycle\n",
+      "revId": "4c559d24dee4f36c9980f62f498f5fed55bae9ec",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
