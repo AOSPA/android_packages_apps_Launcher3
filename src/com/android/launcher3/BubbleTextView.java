@@ -32,6 +32,7 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.icu.text.MessageFormat;
 import android.text.TextUtils.TruncateAt;
 import android.util.AttributeSet;
 import android.util.Property;
@@ -65,9 +66,12 @@ import com.android.launcher3.model.data.SearchActionItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.views.BubbleTextHolder;
 import com.android.launcher3.views.IconLabelDotView;
 
 import java.text.NumberFormat;
+import java.util.HashMap;
+import java.util.Locale;
 
 /**
  * TextView that draws a bubble behind the text. We cannot use a LineBackgroundSpan
@@ -89,6 +93,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     private final PointF mTranslationForReorderBounce = new PointF(0, 0);
     private final PointF mTranslationForReorderPreview = new PointF(0, 0);
+
+    private float mTranslationXForTaskbarAlignmentAnimation = 0f;
 
     private final PointF mTranslationForMoveFromCenterAnimation = new PointF(0, 0);
 
@@ -256,7 +262,25 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @UiThread
     public void applyFromWorkspaceItem(WorkspaceItemInfo info) {
+        applyFromWorkspaceItem(info, /* animate = */ false, /* staggerIndex = */ 0);
+    }
+
+    @UiThread
+    public void applyFromWorkspaceItem(WorkspaceItemInfo info, boolean animate, int staggerIndex) {
         applyFromWorkspaceItem(info, false);
+    }
+
+    /**
+     * Returns whether the newInfo differs from the current getTag().
+     */
+    public boolean shouldAnimateIconChange(WorkspaceItemInfo newInfo) {
+        WorkspaceItemInfo oldInfo = getTag() instanceof WorkspaceItemInfo
+                ? (WorkspaceItemInfo) getTag()
+                : null;
+        boolean changedIcons = oldInfo != null && oldInfo.getTargetComponent() != null
+                && newInfo.getTargetComponent() != null
+                && !oldInfo.getTargetComponent().equals(newInfo.getTargetComponent());
+        return changedIcons && isShown();
     }
 
     @Override
@@ -274,7 +298,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @UiThread
     public void applyFromWorkspaceItem(WorkspaceItemInfo info, boolean promiseStateChanged) {
         applyIconAndLabel(info);
-        setTag(info);
+        setItemInfo(info);
         applyLoadingState(promiseStateChanged);
         applyDotState(info, false /* animate */);
         setDownloadStateContentDescription(info, info.getProgressLevel());
@@ -285,7 +309,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         applyIconAndLabel(info);
 
         // We don't need to check the info since it's not a WorkspaceItemInfo
-        super.setTag(info);
+        setItemInfo(info);
+
 
         // Verify high res immediately
         verifyHighRes();
@@ -304,7 +329,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public void applyFromItemInfoWithIcon(ItemInfoWithIcon info) {
         applyIconAndLabel(info);
         // We don't need to check the info since it's not a WorkspaceItemInfo
-        super.setTag(info);
+        setItemInfo(info);
 
         // Verify high res immediately
         verifyHighRes();
@@ -312,13 +337,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         setDownloadStateContentDescription(info, info.getProgressLevel());
     }
 
-    /**
-     * Apply label and tag using a {@link SearchActionItemInfo}
-     */
-    @UiThread
-    public void applyFromSearchActionItemInfo(SearchActionItemInfo searchActionItemInfo) {
-        applyIconAndLabel(searchActionItemInfo);
-        setTag(searchActionItemInfo);
+    private void setItemInfo(ItemInfo itemInfo) {
+        setTag(itemInfo);
+        if (getParent() instanceof BubbleTextHolder) {
+            ((BubbleTextHolder) getParent()).onItemInfoChanged(itemInfo);
+        }
     }
 
     @UiThread
@@ -391,6 +414,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      * Returns true if the touch down at the provided position be ignored
      */
     protected boolean shouldIgnoreTouchDown(float x, float y) {
+        if (mDisplay == DISPLAY_TASKBAR) {
+            // Allow touching within padding on taskbar, given icon sizes are smaller.
+            return false;
+        }
         return y < getPaddingTop()
                 || x < getPaddingLeft()
                 || y > getHeight() - getPaddingBottom()
@@ -671,8 +698,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                             itemInfo.contentDescription));
                 } else if (hasDot()) {
                     int count = mDotInfo.getNotificationCount();
-                    setContentDescription(getContext().getResources().getQuantityString(
-                            R.plurals.dotted_app_label, count, itemInfo.contentDescription, count));
+                    setContentDescription(
+                            getAppLabelPluralString(itemInfo.contentDescription.toString(), count));
                 } else {
                     setContentDescription(itemInfo.contentDescription);
                 }
@@ -772,7 +799,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             } else if (info instanceof PackageItemInfo) {
                 applyFromItemInfoWithIcon((PackageItemInfo) info);
             } else if (info instanceof SearchActionItemInfo) {
-                applyFromSearchActionItemInfo((SearchActionItemInfo) info);
+                applyFromItemInfoWithIcon((SearchActionItemInfo) info);
             }
 
             mDisableRelayout = false;
@@ -803,7 +830,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     private void updateTranslation() {
         super.setTranslationX(mTranslationForReorderBounce.x + mTranslationForReorderPreview.x
-                + mTranslationForMoveFromCenterAnimation.x);
+                + mTranslationForMoveFromCenterAnimation.x
+                + mTranslationXForTaskbarAlignmentAnimation);
         super.setTranslationY(mTranslationForReorderBounce.y + mTranslationForReorderPreview.y
                 + mTranslationForMoveFromCenterAnimation.y);
     }
@@ -838,9 +866,27 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         return mScaleForReorderBounce;
     }
 
+    /**
+     * Sets translation values for move from center animation
+     */
     public void setTranslationForMoveFromCenterAnimation(float x, float y) {
         mTranslationForMoveFromCenterAnimation.set(x, y);
         updateTranslation();
+    }
+
+    /**
+     * Sets translationX for taskbar to launcher alignment animation
+     */
+    public void setTranslationXForTaskbarAlignmentAnimation(float translationX) {
+        mTranslationXForTaskbarAlignmentAnimation = translationX;
+        updateTranslation();
+    }
+
+    /**
+     * Returns translationX value for taskbar to launcher alignment animation
+     */
+    public float getTranslationXForTaskbarAlignmentAnimation() {
+        return mTranslationXForTaskbarAlignmentAnimation;
     }
 
     public View getView() {
@@ -894,5 +940,15 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         } else {
             setCompoundDrawables(null, newIcon, null, null);
         }
+    }
+
+    private String getAppLabelPluralString(String appName, int notificationCount) {
+        MessageFormat icuCountFormat = new MessageFormat(
+                getResources().getString(R.string.dotted_app_label),
+                Locale.getDefault());
+        HashMap<String, Object> args = new HashMap();
+        args.put("app_name", appName);
+        args.put("count", notificationCount);
+        return icuCountFormat.format(args);
     }
 }

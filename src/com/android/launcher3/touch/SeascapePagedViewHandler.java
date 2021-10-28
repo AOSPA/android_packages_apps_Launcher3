@@ -16,6 +16,10 @@
 
 package com.android.launcher3.touch;
 
+import static android.view.Gravity.CENTER_VERTICAL;
+import static android.view.Gravity.END;
+import static android.view.Gravity.START;
+
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.HORIZONTAL;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
@@ -26,6 +30,7 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.view.Surface;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import com.android.launcher3.DeviceProfile;
@@ -54,11 +59,6 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
     }
 
     @Override
-    public int getSplitAnimationTranslation(int translationOffset, DeviceProfile dp) {
-        return translationOffset;
-    }
-
-    @Override
     public boolean getRecentsRtlSetting(Resources resources) {
         return Utilities.isRtl(resources);
     }
@@ -81,13 +81,15 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
     }
 
     @Override
-    public float getTaskMenuX(float x, View thumbnailView, int overScroll) {
+    public float getTaskMenuX(float x, View thumbnailView, int overScroll,
+            DeviceProfile deviceProfile) {
         return x;
     }
 
     @Override
     public float getTaskMenuY(float y, View thumbnailView, int overScroll) {
-        return y + thumbnailView.getMeasuredHeight() + overScroll;
+        return y + overScroll +
+                (thumbnailView.getMeasuredHeight() + thumbnailView.getMeasuredWidth()) / 2f;
     }
 
     @Override
@@ -112,6 +114,17 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
         return Collections.singletonList(new SplitPositionOption(
                 R.drawable.ic_split_screen, R.string.split_screen_position_right,
                 STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+    }
+
+    @Override
+    public void setIconAndSnapshotParams(View mIconView, int taskIconMargin, int taskIconHeight,
+            FrameLayout.LayoutParams snapshotParams, boolean isRtl) {
+        FrameLayout.LayoutParams iconParams =
+                (FrameLayout.LayoutParams) mIconView.getLayoutParams();
+        iconParams.gravity = (isRtl ? END : START) | CENTER_VERTICAL;
+        iconParams.leftMargin = -taskIconHeight - taskIconMargin / 2;
+        iconParams.rightMargin = 0;
+        iconParams.topMargin = snapshotParams.topMargin / 2;
     }
 
     /* ---------- The following are only used by TaskViewTouchHandler. ---------- */

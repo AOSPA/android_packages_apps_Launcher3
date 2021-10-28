@@ -16,8 +16,6 @@
 
 package com.android.quickstep.views;
 
-import static com.android.launcher3.config.FeatureFlags.ENABLE_OVERVIEW_SHARE;
-
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Rect;
@@ -53,13 +51,17 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @IntDef(flag = true, value = {
             HIDDEN_NON_ZERO_ROTATION,
             HIDDEN_NO_TASKS,
-            HIDDEN_NO_RECENTS})
+            HIDDEN_NO_RECENTS,
+            HIDDEN_FOCUSED_SCROLL,
+            HIDDEN_SPLIT_SCREEN})
     @Retention(RetentionPolicy.SOURCE)
     public @interface ActionsHiddenFlags { }
 
     public static final int HIDDEN_NON_ZERO_ROTATION = 1 << 0;
     public static final int HIDDEN_NO_TASKS = 1 << 1;
     public static final int HIDDEN_NO_RECENTS = 1 << 2;
+    public static final int HIDDEN_FOCUSED_SCROLL = 1 << 3;
+    public static final int HIDDEN_SPLIT_SCREEN = 1 << 4;
 
     @IntDef(flag = true, value = {
             DISABLED_SCROLLING,
@@ -76,9 +78,9 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     private static final int INDEX_VISIBILITY_ALPHA = 1;
     private static final int INDEX_FULLSCREEN_ALPHA = 2;
     private static final int INDEX_HIDDEN_FLAGS_ALPHA = 3;
-    private static final int INDEX_SCROLL_ALPHA = 4;
 
     private final MultiValueAlpha mMultiValueAlpha;
+    private View mSplitButton;
 
     @ActionsHiddenFlags
     private int mHiddenFlags;
@@ -107,13 +109,9 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        View share = findViewById(R.id.action_share);
-        share.setOnClickListener(this);
         findViewById(R.id.action_screenshot).setOnClickListener(this);
-        if (ENABLE_OVERVIEW_SHARE.get()) {
-            share.setVisibility(VISIBLE);
-            findViewById(R.id.oav_three_button_space).setVisibility(VISIBLE);
-        }
+        mSplitButton = findViewById(R.id.action_split);
+        mSplitButton.setOnClickListener(this);
     }
 
     /**
@@ -131,10 +129,10 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
             return;
         }
         int id = view.getId();
-        if (id == R.id.action_share) {
-            mCallbacks.onShare();
-        } else if (id == R.id.action_screenshot) {
+        if (id == R.id.action_screenshot) {
             mCallbacks.onScreenshot();
+        } else if (id == R.id.action_split) {
+            mCallbacks.onSplit();
         }
     }
 
@@ -191,10 +189,6 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         return mMultiValueAlpha.getProperty(INDEX_FULLSCREEN_ALPHA);
     }
 
-    public AlphaProperty getScrollAlpha() {
-        return mMultiValueAlpha.getProperty(INDEX_SCROLL_ALPHA);
-    }
-
     private void updateHorizontalPadding() {
         setPadding(mInsets.left, 0, mInsets.right, 0);
     }
@@ -218,6 +212,15 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         mDp = dp;
         updateVerticalMargin(SysUINavigationMode.getMode(getContext()));
         requestLayout();
+    }
+
+    public void setSplitButtonVisible(boolean visible) {
+        if (mSplitButton == null) {
+            return;
+        }
+
+        mSplitButton.setVisibility(visible ? VISIBLE : GONE);
+        findViewById(R.id.action_split_space).setVisibility(visible ? VISIBLE : GONE);
     }
 
     /** Get the top margin associated with the action buttons in Overview. */

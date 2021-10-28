@@ -40,6 +40,7 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.View;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
@@ -203,8 +204,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     /**
      * Calculates the taskView size for the provided device configuration.
      */
-    public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect,
-            PagedOrientationHandler orientedState) {
+    public final void calculateTaskSize(Context context, DeviceProfile dp, Rect outRect) {
         Resources res = context.getResources();
         if (dp.overviewShowAsGrid) {
             Rect gridRect = new Rect();
@@ -221,7 +221,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             int taskMargin = dp.overviewTaskMarginPx;
             calculateTaskSizeInternal(context, dp,
                     dp.overviewTaskThumbnailTopMarginPx,
-                    getProactiveRowAndMargin(context, dp) + getOverviewActionsHeight(context, dp),
+                    getOverviewActionsHeight(context, dp),
                     res.getDimensionPixelSize(R.dimen.overview_minimum_next_prev_size) + taskMargin,
                     outRect);
         }
@@ -262,19 +262,35 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public static void getTaskDimension(Context context, DeviceProfile dp, PointF out) {
         if (dp.isMultiWindowMode) {
             WindowBounds bounds = SplitScreenBounds.INSTANCE.getSecondaryWindowBounds(context);
-            if (TaskView.CLIP_STATUS_AND_NAV_BARS) {
-                out.x = bounds.availableSize.x;
-                out.y = bounds.availableSize.y;
-            } else {
-                out.x = bounds.availableSize.x + bounds.insets.left + bounds.insets.right;
-                out.y = bounds.availableSize.y + bounds.insets.top + bounds.insets.bottom;
+            out.x = bounds.availableSize.x;
+            out.y = bounds.availableSize.y;
+            if (!TaskView.clipLeft(dp)) {
+                out.x += bounds.insets.left;
             }
-        } else if (TaskView.CLIP_STATUS_AND_NAV_BARS) {
-            out.x = dp.availableWidthPx;
-            out.y = dp.availableHeightPx;
+            if (!TaskView.clipRight(dp)) {
+                out.x += bounds.insets.right;
+            }
+            if (!TaskView.clipTop(dp)) {
+                out.y += bounds.insets.top;
+            }
+            if (!TaskView.clipBottom(dp)) {
+                out.y += bounds.insets.bottom;
+            }
         } else {
             out.x = dp.widthPx;
             out.y = dp.heightPx;
+            if (TaskView.clipLeft(dp)) {
+                out.x -= dp.getInsets().left;
+            }
+            if (TaskView.clipRight(dp)) {
+                out.x -= dp.getInsets().right;
+            }
+            if (TaskView.clipTop(dp)) {
+                out.y -= dp.getInsets().top;
+            }
+            if (TaskView.clipBottom(dp)) {
+                out.y -= Math.max(dp.getInsets().bottom, dp.taskbarSize);
+            }
         }
     }
 
@@ -285,8 +301,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         Resources res = context.getResources();
         Rect insets = dp.getInsets();
         int topMargin = dp.overviewTaskThumbnailTopMarginPx;
-        int bottomMargin =
-                getProactiveRowAndMargin(context, dp) + getOverviewActionsHeight(context, dp);
+        int bottomMargin = getOverviewActionsHeight(context, dp);
         int sideMargin = res.getDimensionPixelSize(R.dimen.overview_grid_side_margin);
 
         outRect.set(0, 0, dp.widthPx, dp.heightPx);
@@ -329,21 +344,6 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                 outRect);
     }
 
-    private int getProactiveRowAndMargin(Context context, DeviceProfile dp) {
-        Resources res = context.getResources();
-        int proactiveRowAndMargin;
-        if (!TaskView.SHOW_PROACTIVE_ACTIONS || dp.isVerticalBarLayout()) {
-            // In Vertical Bar Layout the proactive row doesn't have its own space, it's inside
-            // the actions row.
-            proactiveRowAndMargin = 0;
-        } else {
-            proactiveRowAndMargin = res.getDimensionPixelSize(
-                    R.dimen.overview_proactive_row_height)
-                    + res.getDimensionPixelSize(R.dimen.overview_proactive_row_bottom_margin);
-        }
-        return proactiveRowAndMargin;
-    }
-
     /** Gets the space that the overview actions will take, including bottom margin. */
     private int getOverviewActionsHeight(Context context, DeviceProfile dp) {
         Resources res = context.getResources();
@@ -384,6 +384,15 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * Returns the expected STATE_TYPE from the provided GestureEndTarget.
      */
     public abstract STATE_TYPE stateFromGestureEndTarget(GestureState.GestureEndTarget endTarget);
+
+    /**
+     * Called when the animation to the target has finished, but right before updating the state.
+     * @return A View that needs to draw before ending the recents animation to LAST_TASK.
+     * (This is a hack to ensure Taskbar draws its background first to avoid flickering.)
+     */
+    public @Nullable View onSettledOnEndTarget(GestureState.GestureEndTarget endTarget) {
+        return null;
+    }
 
     public interface AnimationFactory {
 
@@ -510,10 +519,5 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                     recentsView.getMaxScaleForFullScreen(), 1, LINEAR);
             pa.addFloat(recentsView, FULLSCREEN_PROGRESS, 1, 0, LINEAR);
         }
-    }
-
-    /** Called when OverviewService is bound to this process */
-    void onOverviewServiceBound() {
-        // Do nothing
     }
 }

@@ -17,6 +17,7 @@ package com.android.launcher3.uioverrides;
 
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
 
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
@@ -36,12 +37,8 @@ import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SY
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
-import android.hardware.SensorManager;
-import android.hardware.devicestate.DeviceStateManager;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
-
-import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.DeviceProfile;
@@ -55,6 +52,7 @@ import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.appprediction.PredictionRowView;
 import com.android.launcher3.hybridhotseat.HotseatPredictionController;
 import com.android.launcher3.logging.InstanceId;
+import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.ItemInfo;
@@ -70,7 +68,9 @@ import com.android.launcher3.uioverrides.touchcontrollers.StatusBarTouchControll
 import com.android.launcher3.uioverrides.touchcontrollers.TaskViewTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.TransposedQuickSwitchTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.TwoButtonNavbarTouchController;
+import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.OnboardingPrefs;
+import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.launcher3.util.UiThreadHelper.AsyncCommand;
@@ -79,14 +79,9 @@ import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
-import com.android.quickstep.util.LauncherUnfoldAnimationController;
-import com.android.quickstep.util.ProxyScreenStatusProvider;
 import com.android.quickstep.util.QuickstepOnboardingPrefs;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
-import com.android.unfold.UnfoldTransitionFactory;
-import com.android.unfold.UnfoldTransitionProgressProvider;
-import com.android.unfold.config.UnfoldTransitionConfig;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -106,55 +101,15 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     private FixedContainerItems mAllAppsPredictions;
     private HotseatPredictionController mHotseatPredictionController;
 
-    @Nullable
-    private LauncherUnfoldAnimationController mLauncherUnfoldAnimationController;
-
     @Override
     protected void setupViews() {
         super.setupViews();
         mHotseatPredictionController = new HotseatPredictionController(this);
-
-        final UnfoldTransitionConfig config = UnfoldTransitionFactory.createConfig(this);
-        if (config.isEnabled()) {
-            final UnfoldTransitionProgressProvider unfoldTransitionProgressProvider =
-                    UnfoldTransitionFactory.createUnfoldTransitionProgressProvider(
-                            this,
-                            config,
-                            ProxyScreenStatusProvider.INSTANCE,
-                            getSystemService(DeviceStateManager.class),
-                            getSystemService(SensorManager.class),
-                            getMainThreadHandler(),
-                            getMainExecutor()
-                    );
-
-            mLauncherUnfoldAnimationController = new LauncherUnfoldAnimationController(
-                    this,
-                    getWindowManager(),
-                    unfoldTransitionProgressProvider
-            );
-        }
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-
-        if (mLauncherUnfoldAnimationController != null) {
-            mLauncherUnfoldAnimationController.onResume();
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        if (mLauncherUnfoldAnimationController != null) {
-            mLauncherUnfoldAnimationController.onPause();
-        }
-
-        super.onPause();
-    }
-
-    @Override
-    protected void logAppLaunch(ItemInfo info, InstanceId instanceId) {
+    public void logAppLaunch(StatsLogManager statsLogManager, ItemInfo info,
+            InstanceId instanceId) {
         // If the app launch is from any of the surfaces in AllApps then add the InstanceId from
         // LiveSearchManager to recreate the AllApps session on the server side.
         if (mAllAppsSessionLogId != null && ALL_APPS.equals(
@@ -162,8 +117,7 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
             instanceId = mAllAppsSessionLogId;
         }
 
-        StatsLogger logger = getStatsLogManager()
-                .logger().withItemInfo(info).withInstanceId(instanceId);
+        StatsLogger logger = statsLogManager.logger().withItemInfo(info).withInstanceId(instanceId);
 
         if (mAllAppsPredictions != null
                 && (info.itemType == ITEM_TYPE_APPLICATION
@@ -184,6 +138,15 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
         logger.log(LAUNCHER_APP_LAUNCH_TAP);
 
         mHotseatPredictionController.logLaunchedAppRankingInfo(info, instanceId);
+    }
+
+    @Override
+    protected void completeAddShortcut(Intent data, int container, int screenId, int cellX,
+            int cellY, PendingRequestArgs args) {
+        if (container == CONTAINER_HOTSEAT) {
+            mHotseatPredictionController.onDeferredDrop(cellX, cellY);
+        }
+        super.completeAddShortcut(data, container, screenId, cellX, cellY, args);
     }
 
     @Override
@@ -213,7 +176,11 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
         // Only pause is taskbar controller is not present
         mHotseatPredictionController.setPauseUIUpdate(getTaskbarUIController() == null);
-        return super.startActivitySafely(v, intent, item);
+        boolean started = super.startActivitySafely(v, intent, item);
+        if (getTaskbarUIController() == null && !started) {
+            mHotseatPredictionController.setPauseUIUpdate(false);
+        }
+        return started;
     }
 
     @Override
@@ -278,13 +245,15 @@ public class QuickstepLauncher extends BaseQuickstepLauncher {
     }
 
     @Override
+    public void bindWorkspaceComponentsRemoved(ItemInfoMatcher matcher) {
+        super.bindWorkspaceComponentsRemoved(matcher);
+        mHotseatPredictionController.onModelItemsRemoved(matcher);
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
         mHotseatPredictionController.destroy();
-
-        if (mLauncherUnfoldAnimationController != null) {
-            mLauncherUnfoldAnimationController.onDestroy();
-        }
     }
 
     @Override

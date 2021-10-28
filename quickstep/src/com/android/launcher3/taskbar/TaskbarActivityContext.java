@@ -19,6 +19,9 @@ import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 import static com.android.systemui.shared.system.WindowManagerWrapper.ITYPE_BOTTOM_TAPPABLE_ELEMENT;
 import static com.android.systemui.shared.system.WindowManagerWrapper.ITYPE_EXTRA_NAVIGATION_BAR;
 
@@ -27,6 +30,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.LauncherApps;
+import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Process;
@@ -36,12 +40,14 @@ import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.RoundedCorner;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
@@ -49,6 +55,7 @@ import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.R;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
+import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.taskbar.contextual.RotationButtonController;
@@ -60,6 +67,7 @@ import com.android.launcher3.util.ViewCache;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
+import com.android.quickstep.util.ScopedUnfoldTransitionProgressProvider;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.WindowManagerWrapper;
@@ -83,6 +91,7 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
     private final TaskbarControllers mControllers;
 
     private final WindowManager mWindowManager;
+    private final @Nullable RoundedCorner mLeftCorner, mRightCorner;
     private WindowManager.LayoutParams mWindowLayoutParams;
     private boolean mIsFullscreen;
     // The size we should return to when we call setTaskbarWindowFullscreen(false)
@@ -95,7 +104,8 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
     private boolean mIsDestroyed = false;
 
     public TaskbarActivityContext(Context windowContext, DeviceProfile dp,
-            TaskbarNavButtonController buttonController) {
+            TaskbarNavButtonController buttonController, ScopedUnfoldTransitionProgressProvider
+            unfoldTransitionProgressProvider) {
         super(windowContext, Themes.getActivityThemeRes(windowContext));
         mDeviceProfile = dp;
 
@@ -115,7 +125,15 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                 R.layout.taskbar, null, false);
         TaskbarView taskbarView = mDragLayer.findViewById(R.id.taskbar_view);
         FrameLayout navButtonsView = mDragLayer.findViewById(R.id.navbuttons_view);
-        View stashedHandleView = mDragLayer.findViewById(R.id.stashed_handle);
+        StashedHandleView stashedHandleView = mDragLayer.findViewById(R.id.stashed_handle);
+
+        Display display = windowContext.getDisplay();
+        Context c = display.getDisplayId() == Display.DEFAULT_DISPLAY
+                ? windowContext.getApplicationContext()
+                : windowContext.getApplicationContext().createDisplayContext(display);
+        mWindowManager = c.getSystemService(WindowManager.class);
+        mLeftCorner = display.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT);
+        mRightCorner = display.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT);
 
         // Construct controllers.
         mControllers = new TaskbarControllers(this,
@@ -126,24 +144,22 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                         R.color.popup_color_primary_light),
                 new TaskbarDragLayerController(this, mDragLayer),
                 new TaskbarViewController(this, taskbarView),
+                new TaskbarUnfoldAnimationController(unfoldTransitionProgressProvider,
+                        mWindowManager),
                 new TaskbarKeyguardController(this),
                 new StashedHandleViewController(this, stashedHandleView),
-                new TaskbarStashController(this));
-
-        Display display = windowContext.getDisplay();
-        Context c = display.getDisplayId() == Display.DEFAULT_DISPLAY
-                ? windowContext.getApplicationContext()
-                : windowContext.getApplicationContext().createDisplayContext(display);
-        mWindowManager = c.getSystemService(WindowManager.class);
+                new TaskbarStashController(this),
+                new TaskbarEduController(this));
     }
 
     public void init() {
-        mLastRequestedNonFullscreenHeight = mDeviceProfile.taskbarSize;
+        mLastRequestedNonFullscreenHeight = getDefaultTaskbarWindowHeight();
         mWindowLayoutParams = new WindowManager.LayoutParams(
                 MATCH_PARENT,
                 mLastRequestedNonFullscreenHeight,
                 TYPE_NAVIGATION_BAR_PANEL,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_SLIPPERY,
                 PixelFormat.TRANSLUCENT);
         mWindowLayoutParams.setTitle(WINDOW_TITLE);
         mWindowLayoutParams.packageName = getPackageName();
@@ -151,12 +167,18 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         mWindowLayoutParams.setFitInsetsTypes(0);
         mWindowLayoutParams.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
         mWindowLayoutParams.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        mWindowLayoutParams.privateFlags =
+                WindowManager.LayoutParams.PRIVATE_FLAG_NO_MOVE_ANIMATION;
 
         WindowManagerWrapper wmWrapper = WindowManagerWrapper.getInstance();
         wmWrapper.setProvidesInsetsTypes(
                 mWindowLayoutParams,
                 new int[] { ITYPE_EXTRA_NAVIGATION_BAR, ITYPE_BOTTOM_TAPPABLE_ELEMENT }
         );
+        // Adjust the frame by the rounded corners (ie. leaving just the bar as the inset) when
+        // the IME is showing
+        mWindowLayoutParams.providedInternalImeInsets = Insets.of(0,
+                getDefaultTaskbarWindowHeight() - mDeviceProfile.taskbarSize, 0, 0);
 
         // Initialize controllers after all are constructed.
         mControllers.init();
@@ -166,6 +188,14 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
 
     public boolean isThreeButtonNav() {
         return mNavMode == Mode.THREE_BUTTONS;
+    }
+
+    public int getLeftCornerRadius() {
+        return mLeftCorner == null ? 0 : mLeftCorner.getRadius();
+    }
+
+    public int getRightCornerRadius() {
+        return mRightCorner == null ? 0 : mRightCorner.getRadius();
     }
 
     @Override
@@ -198,6 +228,68 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         return mViewCache;
     }
 
+    @Override
+    public boolean supportsIme() {
+        // Currently we don't support IME because we have FLAG_NOT_FOCUSABLE. We can remove that
+        // flag when opening a floating view that needs IME (such as Folder), but then that means
+        // Taskbar will be below IME and thus users can't click the back button.
+        return false;
+    }
+
+    /**
+     * Change from hotseat/predicted hotseat to taskbar container.
+     */
+    @Override
+    public void applyOverwritesToLogItem(LauncherAtom.ItemInfo.Builder itemInfoBuilder) {
+        if (!itemInfoBuilder.hasContainerInfo()) {
+            return;
+        }
+        LauncherAtom.ContainerInfo oldContainer = itemInfoBuilder.getContainerInfo();
+
+        if (oldContainer.hasPredictedHotseatContainer()) {
+            LauncherAtom.PredictedHotseatContainer predictedHotseat =
+                    oldContainer.getPredictedHotseatContainer();
+            LauncherAtom.TaskBarContainer.Builder taskbarBuilder =
+                    LauncherAtom.TaskBarContainer.newBuilder();
+
+            if (predictedHotseat.hasIndex()) {
+                taskbarBuilder.setIndex(predictedHotseat.getIndex());
+            }
+            if (predictedHotseat.hasCardinality()) {
+                taskbarBuilder.setCardinality(predictedHotseat.getCardinality());
+            }
+
+            itemInfoBuilder.setContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
+                    .setTaskBarContainer(taskbarBuilder));
+        } else if (oldContainer.hasHotseat()) {
+            LauncherAtom.HotseatContainer hotseat = oldContainer.getHotseat();
+            LauncherAtom.TaskBarContainer.Builder taskbarBuilder =
+                    LauncherAtom.TaskBarContainer.newBuilder();
+
+            if (hotseat.hasIndex()) {
+                taskbarBuilder.setIndex(hotseat.getIndex());
+            }
+
+            itemInfoBuilder.setContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
+                    .setTaskBarContainer(taskbarBuilder));
+        } else if (oldContainer.hasFolder() && oldContainer.getFolder().hasHotseat()) {
+            LauncherAtom.FolderContainer.Builder folderBuilder = oldContainer.getFolder()
+                    .toBuilder();
+            LauncherAtom.HotseatContainer hotseat = folderBuilder.getHotseat();
+            LauncherAtom.TaskBarContainer.Builder taskbarBuilder =
+                    LauncherAtom.TaskBarContainer.newBuilder();
+
+            if (hotseat.hasIndex()) {
+                taskbarBuilder.setIndex(hotseat.getIndex());
+            }
+
+            folderBuilder.setTaskbar(taskbarBuilder);
+            folderBuilder.clearHotseat();
+            itemInfoBuilder.setContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
+                    .setFolder(folderBuilder));
+        }
+    }
+
     /**
      * Sets a new data-source for this taskbar instance
      */
@@ -222,6 +314,12 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                 systemUiStateFlags, forceUpdate);
         mControllers.taskbarViewController.setImeIsVisible(
                 mControllers.navbarButtonsViewController.isImeVisible());
+        boolean panelExpanded = (systemUiStateFlags & SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED) != 0;
+        boolean inSettings = (systemUiStateFlags & SYSUI_STATE_QUICK_SETTINGS_EXPANDED) != 0;
+        mControllers.taskbarViewController.setNotificationShadeIsExpanded(
+                panelExpanded || inSettings);
+        mControllers.taskbarViewController.setRecentsButtonDisabled(
+                mControllers.navbarButtonsViewController.isRecentsDisabled());
         mControllers.taskbarKeyguardController.updateStateForSysuiFlags(systemUiStateFlags);
     }
 
@@ -234,7 +332,6 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
             return;
         }
         mControllers.rotationButtonController.onDisable2FlagChanged(state2);
-        mControllers.taskbarKeyguardController.disableNavbarElements(state1, state2);
     }
 
     public void onSystemBarAttributesChanged(int displayId, int behavior) {
@@ -249,8 +346,12 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         setTaskbarWindowHeight(fullscreen ? MATCH_PARENT : mLastRequestedNonFullscreenHeight);
     }
 
+    public boolean isTaskbarWindowFullscreen() {
+        return mIsFullscreen;
+    }
+
     /**
-     * Updates the TaskbarContainer height (pass deviceProfile.taskbarSize to reset).
+     * Updates the TaskbarContainer height (pass {@link #getDefaultTaskbarWindowHeight()} to reset).
      */
     public void setTaskbarWindowHeight(int height) {
         if (mWindowLayoutParams.height == height || mIsDestroyed) {
@@ -270,6 +371,13 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
     }
 
+    /**
+     * Returns the default height of the window, including the static corner radii above taskbar.
+     */
+    public int getDefaultTaskbarWindowHeight() {
+        return mDeviceProfile.taskbarSize + Math.max(getLeftCornerRadius(), getRightCornerRadius());
+    }
+
     protected void onTaskbarIconClicked(View view) {
         Object tag = view.getTag();
         if (tag instanceof Task) {
@@ -283,6 +391,7 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
 
             getDragLayer().post(() -> {
                 folder.animateOpen();
+                getStatsLogManager().logger().withItemInfo(folder.mInfo).log(LAUNCHER_FOLDER_OPEN);
 
                 folder.iterateOverItems((itemInfo, itemView) -> {
                     mControllers.taskbarViewController
@@ -320,6 +429,8 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                         getSystemService(LauncherApps.class).startMainActivity(
                                 intent.getComponent(), info.user, intent.getSourceBounds(), null);
                     }
+
+                    mControllers.uiController.onTaskbarIconLaunched(info);
                 } catch (NullPointerException | ActivityNotFoundException | SecurityException e) {
                     Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT)
                             .show();

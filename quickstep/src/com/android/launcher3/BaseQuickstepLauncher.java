@@ -24,6 +24,7 @@ import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TI
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+import static com.android.quickstep.SysUINavigationMode.Mode.NO_BUTTON;
 import static com.android.quickstep.SysUINavigationMode.Mode.TWO_BUTTONS;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 
@@ -35,12 +36,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.ServiceConnection;
+import android.graphics.Insets;
+import android.hardware.SensorManager;
+import android.hardware.devicestate.DeviceStateManager;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowInsets;
 import android.window.SplashScreen;
 
 import androidx.annotation.Nullable;
@@ -73,16 +78,22 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TouchInteractionService;
 import com.android.quickstep.TouchInteractionService.TISBinder;
+import com.android.quickstep.util.LauncherUnfoldAnimationController;
+import com.android.quickstep.util.ProxyScreenStatusProvider;
 import com.android.quickstep.util.RemoteAnimationProvider;
 import com.android.quickstep.util.RemoteFadeOutAnimationListener;
 import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
-import com.android.quickstep.views.SplitPlaceholderView;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.ActivityOptionsCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
+import com.android.systemui.unfold.UnfoldTransitionFactory;
+import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
+import com.android.systemui.unfold.config.UnfoldTransitionConfig;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -115,8 +126,18 @@ public abstract class BaseQuickstepLauncher extends Launcher
     private final ServiceConnection mTisBinderConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            if (!(iBinder instanceof TISBinder)) {
+                // Seems like there can be a race condition when user unlocks, which kills the TIS
+                // process and re-starts it. I guess in the meantime service can be connected to
+                // a killed TIS? Either way, unbind and try to re-connect in that case.
+                internalUnbindToTIS();
+                mHandler.postDelayed(mConnectionRunnable, BACKOFF_MILLIS);
+                return;
+            }
+
             mTaskbarManager = ((TISBinder) iBinder).getTaskbarManager();
             mTaskbarManager.setLauncher(BaseQuickstepLauncher.this);
+
             Log.d(TAG, "TIS service connected");
             resetServiceBindRetryState();
 
@@ -137,29 +158,59 @@ public abstract class BaseQuickstepLauncher extends Launcher
     private short mConnectionAttempts;
     private final TaskbarStateHandler mTaskbarStateHandler = new TaskbarStateHandler(this);
     private final Handler mHandler = new Handler();
+    private boolean mTisServiceBound;
 
     // Will be updated when dragging from taskbar.
     private @Nullable DragOptions mNextWorkspaceDragOptions = null;
-    private SplitPlaceholderView mSplitPlaceholderView;
+
+    private @Nullable UnfoldTransitionProgressProvider mUnfoldTransitionProgressProvider;
+    private @Nullable LauncherUnfoldAnimationController mLauncherUnfoldAnimationController;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         SysUINavigationMode.INSTANCE.get(this).addModeChangeListener(this);
         addMultiWindowModeChangedListener(mDepthController);
+        initUnfoldTransitionProgressProvider();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (mLauncherUnfoldAnimationController != null) {
+            mLauncherUnfoldAnimationController.onResume();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        if (mLauncherUnfoldAnimationController != null) {
+            mLauncherUnfoldAnimationController.onPause();
+        }
+
+        super.onPause();
     }
 
     @Override
     public void onDestroy() {
         mAppTransitionManager.onActivityDestroyed();
+        if (mUnfoldTransitionProgressProvider != null) {
+            mUnfoldTransitionProgressProvider.destroy();
+        }
 
         SysUINavigationMode.INSTANCE.get(this).removeModeChangeListener(this);
 
-        unbindService(mTisBinderConnection);
+        internalUnbindToTIS();
         if (mTaskbarManager != null) {
             mTaskbarManager.clearLauncher(this);
         }
         resetServiceBindRetryState();
+
+        if (mLauncherUnfoldAnimationController != null) {
+            mLauncherUnfoldAnimationController.onDestroy();
+        }
+
         super.onDestroy();
     }
 
@@ -304,18 +355,20 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
         mAppTransitionManager = new QuickstepTransitionManager(this);
         mAppTransitionManager.registerRemoteAnimations();
+        mAppTransitionManager.registerRemoteTransitions();
 
         internalBindToTIS();
     }
 
     /**
      * Binds {@link #mTisBinderConnection} to {@link TouchInteractionService}. If the binding fails,
-     * attempts to retry via {@link #mConnectionRunnable}
+     * attempts to retry via {@link #mConnectionRunnable}.
+     * Unbind via {@link #internalUnbindToTIS()}
      */
     private void internalBindToTIS() {
-        boolean bound = bindService(new Intent(this, TouchInteractionService.class),
+        mTisServiceBound = bindService(new Intent(this, TouchInteractionService.class),
                         mTisBinderConnection, 0);
-        if (bound) {
+        if (mTisServiceBound) {
             resetServiceBindRetryState();
             return;
         }
@@ -327,11 +380,41 @@ public abstract class BaseQuickstepLauncher extends Launcher
         mConnectionAttempts++;
     }
 
+    /** See {@link #internalBindToTIS()} */
+    private void internalUnbindToTIS() {
+        if (mTisServiceBound) {
+            unbindService(mTisBinderConnection);
+            mTisServiceBound = false;
+        }
+    }
+
     private void resetServiceBindRetryState() {
         if (mHandler.hasCallbacks(mConnectionRunnable)) {
             mHandler.removeCallbacks(mConnectionRunnable);
         }
         mConnectionAttempts = 0;
+    }
+
+    private void initUnfoldTransitionProgressProvider() {
+        final UnfoldTransitionConfig config = UnfoldTransitionFactory.createConfig(this);
+        if (config.isEnabled()) {
+            mUnfoldTransitionProgressProvider =
+                    UnfoldTransitionFactory.createUnfoldTransitionProgressProvider(
+                            this,
+                            config,
+                            ProxyScreenStatusProvider.INSTANCE,
+                            getSystemService(DeviceStateManager.class),
+                            getSystemService(SensorManager.class),
+                            getMainThreadHandler(),
+                            getMainExecutor()
+                    );
+
+            mLauncherUnfoldAnimationController = new LauncherUnfoldAnimationController(
+                    this,
+                    getWindowManager(),
+                    mUnfoldTransitionProgressProvider
+            );
+        }
     }
 
     public void setTaskbarUIController(LauncherTaskbarUIController taskbarUIController) {
@@ -340,10 +423,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     public <T extends OverviewActionsView> T getActionsView() {
         return (T) mActionsView;
-    }
-
-    public SplitPlaceholderView getSplitPlaceholderView() {
-        return mSplitPlaceholderView;
     }
 
     @Override
@@ -371,6 +450,11 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     public TaskbarStateHandler getTaskbarStateHandler() {
         return mTaskbarStateHandler;
+    }
+
+    @Nullable
+    public UnfoldTransitionProgressProvider getUnfoldTransitionProgressProvider() {
+        return mUnfoldTransitionProgressProvider;
     }
 
     @Override
@@ -547,11 +631,31 @@ public abstract class BaseQuickstepLauncher extends Launcher
     @Override
     public void onDisplayInfoChanged(Context context, DisplayController.Info info, int flags) {
         super.onDisplayInfoChanged(context, info, flags);
-        // When changing screens with live tile active, finish the recents animation to close
-        // overview as it should be an interim state
-        if ((flags & CHANGE_ACTIVE_SCREEN) != 0 && ENABLE_QUICKSTEP_LIVE_TILE.get()) {
-            RecentsView recentsView = getOverviewPanel();
-            recentsView.finishRecentsAnimation(/* toRecents= */ true, null);
+        // When changing screens, force moving to rest state similar to StatefulActivity.onStop, as
+        // StatefulActivity isn't called consistently.
+        if ((flags & CHANGE_ACTIVE_SCREEN) != 0) {
+            getStateManager().moveToRestState();
+        }
+    }
+
+    @Override
+    public void dump(String prefix, FileDescriptor fd, PrintWriter writer, String[] args) {
+        super.dump(prefix, fd, writer, args);
+        if (mDepthController != null) {
+            mDepthController.dump(prefix, writer);
+        }
+    }
+
+    @Override
+    public void updateWindowInsets(WindowInsets.Builder updatedInsetsBuilder,
+            WindowInsets oldInsets) {
+        // Override the tappable insets to be 0 on the bottom for gesture nav (otherwise taskbar
+        // would count towards it). This is used for the bottom protection in All Apps for example.
+        if (SysUINavigationMode.getMode(this) == NO_BUTTON) {
+            Insets oldTappableInsets = oldInsets.getInsets(WindowInsets.Type.tappableElement());
+            Insets newTappableInsets = Insets.of(oldTappableInsets.left, oldTappableInsets.top,
+                    oldTappableInsets.right, 0);
+            updatedInsetsBuilder.setInsets(WindowInsets.Type.tappableElement(), newTappableInsets);
         }
     }
 }

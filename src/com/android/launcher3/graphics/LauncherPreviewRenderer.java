@@ -65,6 +65,7 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.Workspace;
 import com.android.launcher3.WorkspaceLayoutManager;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
@@ -86,7 +87,7 @@ import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
-import com.android.launcher3.util.MainThreadInitializedObject;
+import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.BaseLauncherAppWidgetHostView;
@@ -97,13 +98,10 @@ import com.android.launcher3.widget.NavigableAppWidgetHostView;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -122,58 +120,21 @@ public class LauncherPreviewRenderer extends ContextWrapper
      * Context used just for preview. It also provides a few objects (e.g. UserCache) just for
      * preview purposes.
      */
-    public static class PreviewContext extends ContextWrapper {
-
-        private final Set<MainThreadInitializedObject> mAllowedObjects = new HashSet<>(
-                Arrays.asList(UserCache.INSTANCE, InstallSessionHelper.INSTANCE,
-                        LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
-                        CustomWidgetManager.INSTANCE, PluginManagerWrapper.INSTANCE));
+    public static class PreviewContext extends SandboxContext {
 
         private final InvariantDeviceProfile mIdp;
-        private final Map<MainThreadInitializedObject, Object> mObjectMap = new HashMap<>();
         private final ConcurrentLinkedQueue<LauncherIconsForPreview> mIconPool =
                 new ConcurrentLinkedQueue<>();
 
-        private boolean mDestroyed = false;
-
         public PreviewContext(Context base, InvariantDeviceProfile idp) {
-            super(base);
+            super(base, UserCache.INSTANCE, InstallSessionHelper.INSTANCE,
+                    LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
+                    CustomWidgetManager.INSTANCE, PluginManagerWrapper.INSTANCE);
             mIdp = idp;
             mObjectMap.put(InvariantDeviceProfile.INSTANCE, idp);
             mObjectMap.put(LauncherAppState.INSTANCE,
                     new LauncherAppState(this, null /* iconCacheFileName */));
 
-        }
-
-        @Override
-        public Context getApplicationContext() {
-            return this;
-        }
-
-        public void onDestroy() {
-            CustomWidgetManager.INSTANCE.get(this).onDestroy();
-            LauncherAppState.INSTANCE.get(this).onTerminate();
-            mDestroyed = true;
-        }
-
-        /**
-         * Find a cached object from mObjectMap if we have already created one. If not, generate
-         * an object using the provider.
-         */
-        public <T> T getObject(MainThreadInitializedObject<T> mainThreadInitializedObject,
-                MainThreadInitializedObject.ObjectProvider<T> provider) {
-            if (FeatureFlags.IS_STUDIO_BUILD && mDestroyed) {
-                throw new RuntimeException("Context already destroyed");
-            }
-            if (!mAllowedObjects.contains(mainThreadInitializedObject)) {
-                throw new IllegalStateException("Leaking unknown objects");
-            }
-            if (mObjectMap.containsKey(mainThreadInitializedObject)) {
-                return (T) mObjectMap.get(mainThreadInitializedObject);
-            }
-            T t = provider.get(this);
-            mObjectMap.put(mainThreadInitializedObject, t);
-            return t;
         }
 
         public LauncherIcons newLauncherIcons(Context context, boolean shapeDetection) {
@@ -266,21 +227,25 @@ public class LauncherPreviewRenderer extends ContextWrapper
         mHotseat = mRootView.findViewById(R.id.hotseat);
         mHotseat.resetLayout(false);
 
-        if (mDp.isTwoPanels) {
-            CellLayout leftPanel = mRootView.findViewById(R.id.workspace_left);
-            leftPanel.setPadding(mDp.workspacePadding.left + mDp.cellLayoutPaddingLeftRightPx,
-                    mDp.workspacePadding.top,
-                    mDp.workspacePadding.right + mDp.cellLayoutPaddingLeftRightPx,
-                    mDp.workspacePadding.bottom);
-            mWorkspaceScreens.put(LEFT_PANEL_ID, leftPanel);
-        }
-
         CellLayout firstScreen = mRootView.findViewById(R.id.workspace);
         firstScreen.setPadding(mDp.workspacePadding.left + mDp.cellLayoutPaddingLeftRightPx,
                 mDp.workspacePadding.top,
-                mDp.workspacePadding.right + mDp.cellLayoutPaddingLeftRightPx,
-                mDp.workspacePadding.bottom);
+                (mDp.isTwoPanels ? mDp.cellLayoutBorderSpacePx.x / 2
+                        : mDp.workspacePadding.right) + mDp.cellLayoutPaddingLeftRightPx,
+                mDp.workspacePadding.bottom
+        );
         mWorkspaceScreens.put(FIRST_SCREEN_ID, firstScreen);
+
+        if (mDp.isTwoPanels) {
+            CellLayout rightPanel = mRootView.findViewById(R.id.workspace_right);
+            rightPanel.setPadding(
+                    mDp.cellLayoutBorderSpacePx.x / 2 + mDp.cellLayoutPaddingLeftRightPx,
+                    mDp.workspacePadding.top,
+                    mDp.workspacePadding.right + mDp.cellLayoutPaddingLeftRightPx,
+                    mDp.workspacePadding.bottom
+            );
+            mWorkspaceScreens.put(Workspace.SECOND_SCREEN_ID, rightPanel);
+        }
 
         if (Utilities.ATLEAST_S) {
             WallpaperColors wallpaperColors = wallpaperColorsOverride != null
@@ -363,7 +328,9 @@ public class LauncherPreviewRenderer extends ContextWrapper
     }
 
     private void inflateAndAddFolder(FolderInfo info) {
-        CellLayout screen = mWorkspaceScreens.get(info.screenId);
+        CellLayout screen = info.container == Favorites.CONTAINER_DESKTOP
+                ? mWorkspaceScreens.get(info.screenId)
+                : mHotseat;
         FolderIcon folderIcon = FolderIcon.inflateIcon(R.layout.folder_icon, this, screen,
                 info);
         addInScreenFromBind(folderIcon, info);
@@ -386,7 +353,7 @@ public class LauncherPreviewRenderer extends ContextWrapper
 
     private void inflateAndAddWidgets(LauncherAppWidgetInfo info, WidgetsModel widgetsModel) {
         WidgetItem widgetItem = widgetsModel.getWidgetProviderInfoByProviderName(
-                info.providerName);
+                info.providerName, info.user);
         if (widgetItem == null) {
             return;
         }
@@ -510,8 +477,8 @@ public class LauncherPreviewRenderer extends ContextWrapper
         // Add first page QSB
         if (FeatureFlags.QSB_ON_FIRST_SCREEN) {
             CellLayout firstScreen = mWorkspaceScreens.get(FIRST_SCREEN_ID);
-            View qsb = mHomeElementInflater.inflate(
-                    R.layout.search_container_workspace, firstScreen, false);
+            View qsb = mHomeElementInflater.inflate(R.layout.qsb_preview, firstScreen,
+                    false);
             CellLayout.LayoutParams lp =
                     new CellLayout.LayoutParams(0, 0, firstScreen.getCountX(), 1);
             lp.canReorder = false;

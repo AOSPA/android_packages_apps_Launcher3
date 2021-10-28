@@ -35,6 +35,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     BaseOverview(LauncherInstrumentation launcher) {
         super(launcher);
         verifyActiveContainer();
+        verifyActionsViewVisibility();
     }
 
     @Override
@@ -59,7 +60,11 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             final int leftMargin = mLauncher.getTargetInsets().left;
             mLauncher.scroll(
                     overview, Direction.LEFT, new Rect(leftMargin + 1, 0, 0, 0), 20, false);
-            verifyActiveContainer();
+            try (LauncherInstrumentation.Closable c2 =
+                         mLauncher.addContextLayer("flung forwards")) {
+                verifyActiveContainer();
+                verifyActionsViewVisibility();
+            }
         }
     }
 
@@ -95,7 +100,11 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             final int rightMargin = mLauncher.getTargetInsets().right;
             mLauncher.scroll(
                     overview, Direction.RIGHT, new Rect(0, 0, rightMargin + 1, 0), 20, false);
-            verifyActiveContainer();
+            try (LauncherInstrumentation.Closable c2 =
+                         mLauncher.addContextLayer("flung backwards")) {
+                verifyActiveContainer();
+                verifyActionsViewVisibility();
+            }
         }
     }
 
@@ -129,6 +138,10 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
         }
     }
 
+    int getTaskCount() {
+        return getTasks().size();
+    }
+
     /**
      * Returns whether Overview has tasks.
      */
@@ -149,5 +162,52 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             UiObject2 overviewActions = mLauncher.waitForLauncherObject("action_buttons");
             return new OverviewActions(overviewActions, mLauncher);
         }
+    }
+
+    /* TODO(b/197630182): Once b/188790554 is fixed, remove instanceof check. Currently, when
+        swiping from app to overview in Fallback Recents, taskbar remains and no action buttons
+        are visible, so we are only testing Overview for now, not BaseOverview. */
+    private void verifyActionsViewVisibility() {
+        if (!(this instanceof Overview)) {
+            return;
+        }
+        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                "want to assert overview actions view visibility")) {
+            if (mLauncher.isTablet() && !isOverviewSnappedToFocusedTaskForTablet()) {
+                mLauncher.waitUntilLauncherObjectGone("action_buttons");
+            } else {
+                mLauncher.waitForLauncherObject("action_buttons");
+            }
+        }
+    }
+
+    /**
+     * Returns if focused task is currently snapped task in tablet grid overview.
+     */
+    private boolean isOverviewSnappedToFocusedTaskForTablet() {
+        UiObject2 focusedTask = getFocusedTaskForTablet();
+        if (focusedTask == null) {
+            return false;
+        }
+        return Math.abs(
+                focusedTask.getVisibleBounds().exactCenterX() - mLauncher.getExactScreenCenterX())
+                < 1;
+    }
+
+    /**
+     * Returns Overview focused task if it exists.
+     */
+    UiObject2 getFocusedTaskForTablet() {
+        final List<UiObject2> taskViews = getTasks();
+        if (taskViews.size() == 0) {
+            return null;
+        }
+        int focusedTaskHeight = mLauncher.getFocusedTaskHeightForTablet();
+        for (UiObject2 task : taskViews) {
+            if (task.getVisibleBounds().height() == focusedTaskHeight) {
+                return task;
+            }
+        }
+        return null;
     }
 }

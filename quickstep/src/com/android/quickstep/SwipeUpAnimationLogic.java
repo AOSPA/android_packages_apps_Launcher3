@@ -17,6 +17,7 @@ package com.android.quickstep;
 
 import static com.android.launcher3.anim.Interpolators.ACCEL_1_5;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_SPLIT_SELECT;
 import static com.android.launcher3.config.FeatureFlags.PROTOTYPE_APP_CLOSE;
 
 import android.animation.Animator;
@@ -36,8 +37,10 @@ import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.touch.PagedOrientationHandler;
+import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.AppCloseConfig;
+import com.android.quickstep.util.LauncherSplitScreenListener;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.RectFSpringAnim2;
 import com.android.quickstep.util.TaskViewSimulator;
@@ -46,18 +49,22 @@ import com.android.quickstep.util.TransformParams.BuilderProxy;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams.Builder;
 
-public abstract class SwipeUpAnimationLogic {
+import java.util.Arrays;
+import java.util.function.Consumer;
+
+public abstract class SwipeUpAnimationLogic implements
+        RecentsAnimationCallbacks.RecentsAnimationListener{
 
     protected static final Rect TEMP_RECT = new Rect();
+    protected final RemoteTargetGluer mTargetGluer;
 
     protected DeviceProfile mDp;
 
     protected final Context mContext;
     protected final RecentsAnimationDeviceState mDeviceState;
     protected final GestureState mGestureState;
-    protected final TaskViewSimulator mTaskViewSimulator;
 
-    protected final TransformParams mTransformParams;
+    protected RemoteTargetHandle[] mRemoteTargetHandles;
 
     // Shift in the range of [0, 1].
     // 0 => preview snapShot is completely visible, and hotseat is completely translated down
@@ -70,37 +77,48 @@ public abstract class SwipeUpAnimationLogic {
     // How much further we can drag past recents, as a factor of mTransitionDragLength.
     protected float mDragLengthFactor = 1;
 
-    protected AnimatorControllerWithResistance mWindowTransitionController;
+    protected boolean mIsSwipeForStagedSplit;
 
     public SwipeUpAnimationLogic(Context context, RecentsAnimationDeviceState deviceState,
-            GestureState gestureState, TransformParams transformParams) {
+            GestureState gestureState) {
         mContext = context;
         mDeviceState = deviceState;
         mGestureState = gestureState;
-        mTaskViewSimulator = new TaskViewSimulator(context, gestureState.getActivityInterface());
-        mTransformParams = transformParams;
 
-        mTaskViewSimulator.getOrientationState().update(
-                mDeviceState.getRotationTouchHelper().getCurrentActiveRotation(),
-                mDeviceState.getRotationTouchHelper().getDisplayRotation());
+        mIsSwipeForStagedSplit = ENABLE_SPLIT_SELECT.get() &&
+                LauncherSplitScreenListener.INSTANCE.getNoCreate()
+                        .getRunningSplitTaskIds().length > 1;
+
+        mTargetGluer = new RemoteTargetGluer(mContext, mGestureState.getActivityInterface());
+        mRemoteTargetHandles = mTargetGluer.getRemoteTargetHandles();
+        runActionOnRemoteHandles(remoteTargetHandle ->
+                remoteTargetHandle.getTaskViewSimulator().getOrientationState().update(
+                        mDeviceState.getRotationTouchHelper().getCurrentActiveRotation(),
+                        mDeviceState.getRotationTouchHelper().getDisplayRotation()
+                ));
     }
 
     protected void initTransitionEndpoints(DeviceProfile dp) {
         mDp = dp;
-
-        mTaskViewSimulator.setDp(dp);
         mTransitionDragLength = mGestureState.getActivityInterface().getSwipeUpDestinationAndLength(
-                dp, mContext, TEMP_RECT,
-                mTaskViewSimulator.getOrientationState().getOrientationHandler());
+                dp, mContext, TEMP_RECT, mRemoteTargetHandles[0].getTaskViewSimulator()
+                        .getOrientationState().getOrientationHandler());
         mDragLengthFactor = (float) dp.heightPx / mTransitionDragLength;
 
-        PendingAnimation pa = new PendingAnimation(mTransitionDragLength * 2);
-        mTaskViewSimulator.addAppToOverviewAnim(pa, LINEAR);
-        AnimatorPlaybackController normalController = pa.createPlaybackController();
-        mWindowTransitionController = AnimatorControllerWithResistance.createForRecents(
-                normalController, mContext, mTaskViewSimulator.getOrientationState(),
-                mDp, mTaskViewSimulator.recentsViewScale, AnimatedFloat.VALUE,
-                mTaskViewSimulator.recentsViewSecondaryTranslation, AnimatedFloat.VALUE);
+        for (RemoteTargetHandle remoteHandle : mRemoteTargetHandles) {
+            PendingAnimation pendingAnimation = new PendingAnimation(mTransitionDragLength * 2);
+            TaskViewSimulator taskViewSimulator = remoteHandle.getTaskViewSimulator();
+            taskViewSimulator.setDp(dp);
+            taskViewSimulator.addAppToOverviewAnim(pendingAnimation, LINEAR);
+            AnimatorPlaybackController playbackController =
+                    pendingAnimation.createPlaybackController();
+
+            remoteHandle.setPlaybackController(AnimatorControllerWithResistance.createForRecents(
+                    playbackController, mContext, taskViewSimulator.getOrientationState(),
+                    mDp, taskViewSimulator.recentsViewScale, AnimatedFloat.VALUE,
+                    taskViewSimulator.recentsViewSecondaryTranslation, AnimatedFloat.VALUE
+            ));
+        }
     }
 
     @UiThread
@@ -125,7 +143,9 @@ public abstract class SwipeUpAnimationLogic {
     public abstract void updateFinalShift();
 
     protected PagedOrientationHandler getOrientationHandler() {
-        return mTaskViewSimulator.getOrientationState().getOrientationHandler();
+        // OrientationHandler should be independent of remote target, can directly take one
+        return mRemoteTargetHandles[0].getTaskViewSimulator()
+                .getOrientationState().getOrientationHandler();
     }
 
     protected abstract class HomeAnimationFactory {
@@ -207,16 +227,35 @@ public abstract class SwipeUpAnimationLogic {
      * @param startProgress The progress of {@link #mCurrentShift} to start thw window from.
      * @return {@link RectF} represents the bounds as starting point in window space.
      */
-    protected RectF updateProgressForStartRect(Matrix outMatrix, float startProgress) {
+    protected RectF[] updateProgressForStartRect(Matrix[] outMatrix, float startProgress) {
         mCurrentShift.updateValue(startProgress);
-        mTaskViewSimulator.apply(mTransformParams.setProgress(startProgress));
-        RectF cropRectF = new RectF(mTaskViewSimulator.getCurrentCropRect());
+        RectF[] startRects = new RectF[mRemoteTargetHandles.length];
+        for (int i = 0, mRemoteTargetHandlesLength = mRemoteTargetHandles.length;
+                i < mRemoteTargetHandlesLength; i++) {
+            RemoteTargetHandle remoteHandle = mRemoteTargetHandles[i];
+            TaskViewSimulator tvs = remoteHandle.getTaskViewSimulator();
+            tvs.apply(remoteHandle.getTransformParams().setProgress(startProgress));
 
-        mTaskViewSimulator.applyWindowToHomeRotation(outMatrix);
+            startRects[i] = new RectF(tvs.getCurrentCropRect());
+            outMatrix[i] = new Matrix();
+            tvs.applyWindowToHomeRotation(outMatrix[i]);
+            tvs.getCurrentMatrix().mapRect(startRects[i]);
+        }
+        return startRects;
+    }
 
-        final RectF startRect = new RectF(cropRectF);
-        mTaskViewSimulator.getCurrentMatrix().mapRect(startRect);
-        return startRect;
+    /** Helper to avoid writing some for-loops to iterate over {@link #mRemoteTargetHandles} */
+    protected void runActionOnRemoteHandles(Consumer<RemoteTargetHandle> consumer) {
+        for (RemoteTargetHandle handle : mRemoteTargetHandles) {
+            consumer.accept(handle);
+        }
+    }
+
+    /** @return only the TaskViewSimulators from {@link #mRemoteTargetHandles} */
+    protected TaskViewSimulator[] getRemoteTaskViewSimulators() {
+        return Arrays.stream(mRemoteTargetHandles)
+                .map(remoteTargetHandle -> remoteTargetHandle.getTaskViewSimulator())
+                .toArray(TaskViewSimulator[]::new);
     }
 
     /**
@@ -224,14 +263,28 @@ public abstract class SwipeUpAnimationLogic {
      * @param startProgress The progress of {@link #mCurrentShift} to start the window from.
      * @param homeAnimationFactory The home animation factory.
      */
-    protected RectFSpringAnim createWindowAnimationToHome(float startProgress,
+    protected RectFSpringAnim[] createWindowAnimationToHome(float startProgress,
             HomeAnimationFactory homeAnimationFactory) {
+        // TODO(b/195473584) compute separate end targets for different staged split
         final RectF targetRect = homeAnimationFactory.getWindowTargetRect();
+        RectFSpringAnim[] out = new RectFSpringAnim[mRemoteTargetHandles.length];
+        Matrix[] homeToWindowPositionMap = new Matrix[mRemoteTargetHandles.length];
+        RectF[] startRects = updateProgressForStartRect(homeToWindowPositionMap, startProgress);
+        for (int i = 0, mRemoteTargetHandlesLength = mRemoteTargetHandles.length;
+                i < mRemoteTargetHandlesLength; i++) {
+            RemoteTargetHandle remoteHandle = mRemoteTargetHandles[i];
+            out[i] = getWindowAnimationToHomeInternal(homeAnimationFactory,
+                    targetRect, remoteHandle.getTransformParams(),
+                    remoteHandle.getTaskViewSimulator(), startRects[i], homeToWindowPositionMap[i]);
+        }
+        return out;
+    }
 
-        Matrix homeToWindowPositionMap = new Matrix();
-        final RectF startRect = updateProgressForStartRect(homeToWindowPositionMap, startProgress);
-        RectF cropRectF = new RectF(mTaskViewSimulator.getCurrentCropRect());
-
+    private RectFSpringAnim getWindowAnimationToHomeInternal(
+            HomeAnimationFactory homeAnimationFactory, RectF targetRect,
+            TransformParams transformParams, TaskViewSimulator taskViewSimulator,
+            RectF startRect, Matrix homeToWindowPositionMap) {
+        RectF cropRectF = new RectF(taskViewSimulator.getCurrentCropRect());
         // Move the startRect to Launcher space as floatingIconView runs in Launcher
         Matrix windowToHomePositionMap = new Matrix();
         homeToWindowPositionMap.invert(windowToHomePositionMap);
@@ -240,17 +293,18 @@ public abstract class SwipeUpAnimationLogic {
         RectFSpringAnim anim;
         if (PROTOTYPE_APP_CLOSE.get()) {
             anim = new RectFSpringAnim2(startRect, targetRect, mContext,
-                    mTaskViewSimulator.getCurrentCornerRadius(),
+                    taskViewSimulator.getCurrentCornerRadius(),
                     homeAnimationFactory.getEndRadius(cropRectF));
         } else {
-            anim = new RectFSpringAnim(startRect, targetRect, mContext);
+            anim = new RectFSpringAnim(startRect, targetRect, mContext, mDp);
         }
         homeAnimationFactory.setAnimation(anim);
 
         SpringAnimationRunner runner = new SpringAnimationRunner(
-                homeAnimationFactory, cropRectF, homeToWindowPositionMap);
-        anim.addOnUpdateListener(runner);
+                homeAnimationFactory, cropRectF, homeToWindowPositionMap,
+                transformParams, taskViewSimulator);
         anim.addAnimatorListener(runner);
+        anim.addOnUpdateListener(runner);
         return anim;
     }
 
@@ -262,6 +316,7 @@ public abstract class SwipeUpAnimationLogic {
 
         final RectF mWindowCurrentRect = new RectF();
         final Matrix mHomeToWindowPositionMap;
+        private final TransformParams mLocalTransformParams;
         final HomeAnimationFactory mAnimationFactory;
 
         final AnimatorPlaybackController mHomeAnim;
@@ -271,17 +326,19 @@ public abstract class SwipeUpAnimationLogic {
         final float mEndRadius;
 
         SpringAnimationRunner(HomeAnimationFactory factory, RectF cropRectF,
-                Matrix homeToWindowPositionMap) {
+                Matrix homeToWindowPositionMap, TransformParams transformParams,
+                TaskViewSimulator taskViewSimulator) {
             mAnimationFactory = factory;
             mHomeAnim = factory.createActivityAnimationToHome();
             mCropRectF = cropRectF;
             mHomeToWindowPositionMap = homeToWindowPositionMap;
+            mLocalTransformParams = transformParams;
 
             cropRectF.roundOut(mCropRect);
 
             // End on a "round-enough" radius so that the shape reveal doesn't have to do too much
             // rounding at the end of the animation.
-            mStartRadius = mTaskViewSimulator.getCurrentCornerRadius();
+            mStartRadius = taskViewSimulator.getCurrentCornerRadius();
             mEndRadius = factory.getEndRadius(cropRectF);
         }
 
@@ -300,10 +357,11 @@ public abstract class SwipeUpAnimationLogic {
             if (mAnimationFactory.keepWindowOpaque()) {
                 alpha = 1f;
             }
-            mTransformParams
+            mLocalTransformParams
                     .setTargetAlpha(alpha)
                     .setCornerRadius(cornerRadius);
-            mTransformParams.applySurfaceParams(mTransformParams.createSurfaceParams(this));
+            mLocalTransformParams.applySurfaceParams(mLocalTransformParams
+                    .createSurfaceParams(this));
             mAnimationFactory.update(config, currentRect, progress,
                     mMatrix.mapRadius(cornerRadius));
         }

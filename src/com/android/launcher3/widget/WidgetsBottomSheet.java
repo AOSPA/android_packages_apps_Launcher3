@@ -36,8 +36,6 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
-import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.model.WidgetItem;
@@ -71,7 +69,6 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
     private static final long EDUCATION_TIP_DELAY_MS = 300;
 
     private ItemInfo mOriginalItemInfo;
-    private final int mMaxTableHeight;
     private int mMaxHorizontalSpan = DEFAULT_MAX_HORIZONTAL_SPANS;
     private final int mWidgetCellHorizontalPadding;
 
@@ -111,10 +108,6 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
     public WidgetsBottomSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setWillNotDraw(false);
-        DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
-        // Set the max table height to 2 / 3 of the grid height so that the bottom picker won't
-        // take over the entire view vertically.
-        mMaxTableHeight = deviceProfile.inv.numRows * 2 / 3  * deviceProfile.cellHeightPx;
         if (!hasSeenEducationTip()) {
             addOnLayoutChangeListener(mLayoutChangeListenerToShowTips);
         }
@@ -163,13 +156,9 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
 
         setTranslationShift(mTranslationShift);
 
-        // Ensure the scroll view height is not larger than mMaxTableHeight, which is a value
-        // smaller than the entire screen height.
         ScrollView widgetsTableScrollView = findViewById(R.id.widgets_table_scroll_view);
-        if (widgetsTableScrollView.getMeasuredHeight() > mMaxTableHeight) {
-            ViewGroup.LayoutParams layoutParams = widgetsTableScrollView.getLayoutParams();
-            layoutParams.height = mMaxTableHeight;
-            widgetsTableScrollView.setLayoutParams(layoutParams);
+        TableLayout widgetsTable = findViewById(R.id.widgets_table);
+        if (widgetsTable.getMeasuredHeight() > widgetsTableScrollView.getMeasuredHeight()) {
             findViewById(R.id.collapse_handle).setVisibility(VISIBLE);
         }
     }
@@ -194,19 +183,16 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
         TableLayout widgetsTable = findViewById(R.id.widgets_table);
         widgetsTable.removeAllViews();
 
-        WidgetsTableUtils.groupWidgetItemsIntoTable(widgets, mMaxHorizontalSpan).forEach(row -> {
-            TableRow tableRow = new TableRow(getContext());
-            tableRow.setGravity(Gravity.TOP);
-            row.forEach(widgetItem -> {
-                WidgetCell widget = addItemCell(tableRow);
-                widget.setPreviewSize(widgetItem);
-                widget.applyFromCellItem(widgetItem, LauncherAppState.getInstance(mActivityContext)
-                        .getWidgetCache());
-                widget.ensurePreview();
-                widget.setVisibility(View.VISIBLE);
-            });
-            widgetsTable.addView(tableRow);
-        });
+        WidgetsTableUtils.groupWidgetItemsIntoTableWithReordering(widgets, mMaxHorizontalSpan)
+                .forEach(row -> {
+                    TableRow tableRow = new TableRow(getContext());
+                    tableRow.setGravity(Gravity.TOP);
+                    row.forEach(widgetItem -> {
+                        WidgetCell widget = addItemCell(tableRow);
+                        widget.applyFromCellItem(widgetItem);
+                    });
+                    widgetsTable.addView(tableRow);
+                });
     }
 
     @Override

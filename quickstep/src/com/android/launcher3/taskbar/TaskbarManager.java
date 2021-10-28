@@ -22,8 +22,14 @@ import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
 
+import android.content.ComponentCallbacks;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
+import android.net.Uri;
+import android.provider.Settings;
 import android.view.Display;
 
 import androidx.annotation.NonNull;
@@ -35,10 +41,13 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
+import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.SysUINavigationMode;
 import com.android.quickstep.SysUINavigationMode.Mode;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TouchInteractionService;
+import com.android.quickstep.util.ScopedUnfoldTransitionProgressProvider;
 
 /**
  * Class to manage taskbar lifecycle
@@ -46,10 +55,20 @@ import com.android.quickstep.TouchInteractionService;
 public class TaskbarManager implements DisplayController.DisplayInfoChangeListener,
         SysUINavigationMode.NavigationModeChangeListener {
 
+    private static final Uri USER_SETUP_COMPLETE_URI = Settings.Secure.getUriFor(
+            Settings.Secure.USER_SETUP_COMPLETE);
+
     private final Context mContext;
     private final DisplayController mDisplayController;
     private final SysUINavigationMode mSysUINavigationMode;
     private final TaskbarNavButtonController mNavButtonController;
+    private final SettingsCache.OnChangeListener mUserSetupCompleteListener;
+    private final ComponentCallbacks mComponentCallbacks;
+    private final SimpleBroadcastReceiver mShutdownReceiver;
+
+    // The source for this provider is set when Launcher is available
+    private final ScopedUnfoldTransitionProgressProvider mUnfoldProgressProvider =
+            new ScopedUnfoldTransitionProgressProvider();
 
     private TaskbarActivityContext mTaskbarActivityContext;
     private BaseQuickstepLauncher mLauncher;
@@ -71,9 +90,31 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
                 service.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
         mContext = service.createWindowContext(display, TYPE_APPLICATION_OVERLAY, null);
         mNavButtonController = new TaskbarNavButtonController(service);
+        mUserSetupCompleteListener = isUserSetupComplete -> recreateTaskbar();
+        mComponentCallbacks = new ComponentCallbacks() {
+            private Configuration mOldConfig = mContext.getResources().getConfiguration();
+
+            @Override
+            public void onConfigurationChanged(Configuration newConfig) {
+                if ((mOldConfig.diff(newConfig) & ActivityInfo.CONFIG_ASSETS_PATHS) != 0) {
+                    // Color has changed, recreate taskbar to reload background color & icons.
+                    recreateTaskbar();
+                }
+                mOldConfig = newConfig;
+            }
+
+            @Override
+            public void onLowMemory() { }
+        };
+        mShutdownReceiver = new SimpleBroadcastReceiver(i -> destroyExistingTaskbar());
 
         mDisplayController.addChangeListener(this);
         mSysUINavigationMode.addModeChangeListener(this);
+        SettingsCache.INSTANCE.get(mContext).register(USER_SETUP_COMPLETE_URI,
+                mUserSetupCompleteListener);
+        mContext.registerComponentCallbacks(mComponentCallbacks);
+        mShutdownReceiver.register(mContext, Intent.ACTION_SHUTDOWN);
+
         recreateTaskbar();
     }
 
@@ -109,6 +150,9 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
      */
     public void setLauncher(@NonNull BaseQuickstepLauncher launcher) {
         mLauncher = launcher;
+        mUnfoldProgressProvider.setSourceProvider(launcher
+                .getUnfoldTransitionProgressProvider());
+
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.setUIController(
                     new LauncherTaskbarUIController(launcher, mTaskbarActivityContext));
@@ -124,6 +168,7 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
             if (mTaskbarActivityContext != null) {
                 mTaskbarActivityContext.setUIController(TaskbarUIController.DEFAULT);
             }
+            mUnfoldProgressProvider.setSourceProvider(null);
         }
     }
 
@@ -142,8 +187,8 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
             return;
         }
 
-        mTaskbarActivityContext = new TaskbarActivityContext(
-                mContext, dp.copy(mContext), mNavButtonController);
+        mTaskbarActivityContext = new TaskbarActivityContext(mContext, dp.copy(mContext),
+                mNavButtonController, mUnfoldProgressProvider);
         mTaskbarActivityContext.init();
         if (mLauncher != null) {
             mTaskbarActivityContext.setUIController(
@@ -188,6 +233,10 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         destroyExistingTaskbar();
         mDisplayController.removeChangeListener(this);
         mSysUINavigationMode.removeModeChangeListener(this);
+        SettingsCache.INSTANCE.get(mContext).unregister(USER_SETUP_COMPLETE_URI,
+                mUserSetupCompleteListener);
+        mContext.unregisterComponentCallbacks(mComponentCallbacks);
+        mContext.unregisterReceiver(mShutdownReceiver);
     }
 
     public @Nullable TaskbarActivityContext getCurrentActivityContext() {

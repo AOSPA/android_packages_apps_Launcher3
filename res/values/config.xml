@@ -34,6 +34,9 @@
     <!-- View tag key used to determine if we should fade in the child views.. -->
     <string name="popup_container_iterate_children" translatable="false">popup_container_iterate_children</string>
 
+    <!-- config used to determine if header protection is supported in AllApps -->
+    <bool name="config_header_protection_supported">false</bool>
+
     <!-- Workspace -->
     <!-- The duration (in ms) of the fade animation on the object outlines, used when
          we are dragging objects around on the home screen. -->
@@ -173,7 +176,7 @@
 
     <item name="staggered_damping_ratio" type="dimen" format="float">0.7</item>
     <item name="staggered_stiffness" type="dimen" format="float">150</item>
-    <dimen name="unlock_staggered_velocity_dp_per_s">4dp</dimen>
+    <dimen name="unlock_staggered_velocity_dp_per_s">2dp</dimen>
 
     <item name="hint_scale_damping_ratio" type="dimen" format="float">0.7</item>
     <item name="hint_scale_stiffness" type="dimen" format="float">200</item>
@@ -181,8 +184,8 @@
 
     <!-- Swipe up to home related -->
     <dimen name="swipe_up_fling_min_visible_change">18dp</dimen>
-    <dimen name="swipe_up_y_overshoot">10dp</dimen>
     <dimen name="swipe_up_max_workspace_trans_y">-60dp</dimen>
+    <dimen name="swipe_up_max_velocity">7.619dp</dimen>
 
     <array name="dynamic_resources">
         <item>@dimen/swipe_up_duration</item>
@@ -198,6 +201,7 @@
         <item>@dimen/swipe_up_launcher_alpha_max_progress</item>
         <item>@dimen/swipe_up_rect_2_y_stiffness_low_swipe_multiplier</item>
         <item>@dimen/swipe_up_low_swipe_duration_multiplier</item>
+        <item>@dimen/swipe_up_max_velocity</item>
 
         <item>@dimen/c1_a</item>
         <item>@dimen/c1_b</item>

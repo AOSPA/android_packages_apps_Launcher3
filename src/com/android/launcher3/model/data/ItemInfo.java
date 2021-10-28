@@ -164,6 +164,7 @@ public class ItemInfo {
 
     public void copyFrom(ItemInfo info) {
         id = info.id;
+        title = info.title;
         cellX = info.cellX;
         cellY = info.cellY;
         spanX = info.spanX;
@@ -232,9 +233,9 @@ public class ItemInfo {
      * Write the fields of this item to the DB
      */
     public void onAddToDatabase(ContentWriter writer) {
-        if (screenId == Workspace.EXTRA_EMPTY_SCREEN_ID) {
+        if (Workspace.EXTRA_EMPTY_SCREEN_IDS.contains(screenId)) {
             // We should never persist an item on the extra empty screen.
-            throw new RuntimeException("Screen id should not be EXTRA_EMPTY_SCREEN_ID");
+            throw new RuntimeException("Screen id should not be extra empty screen: " + screenId);
         }
 
         writeToValues(writer);

@@ -31,11 +31,17 @@ import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.SystemUiProxy;
 
+import java.util.function.IntPredicate;
+
 /**
  * Coordinates between controllers such as TaskbarViewController and StashedHandleViewController to
  * create a cohesive animation between stashed/unstashed states.
  */
 public class TaskbarStashController {
+
+    public static final int FLAG_IN_APP = 1 << 0;
+    public static final int FLAG_STASHED_IN_APP = 1 << 1;
+    public static final int FLAG_IN_STASHED_LAUNCHER_STATE = 1 << 2;
 
     /**
      * How long to stash/unstash when manually invoked via long press.
@@ -94,8 +100,21 @@ public class TaskbarStashController {
     private boolean mIsStashedInApp;
     /** Whether we are currently visually stashed (might change based on launcher state). */
     private boolean mIsStashed = false;
+    private int mState;
 
     private @Nullable AnimatorSet mAnimator;
+
+    // Evaluate whether the handle should be stashed
+    private final StatePropertyHolder mStatePropertyHolder = new StatePropertyHolder(
+            flags -> {
+                if (!supportsVisualStashing()) {
+                    return false;
+                }
+                boolean inApp = (flags & FLAG_IN_APP) != 0;
+                boolean stashedInApp = (flags & FLAG_STASHED_IN_APP) != 0;
+                boolean stashedLauncherState = (flags & FLAG_IN_STASHED_LAUNCHER_STATE) != 0;
+                return (inApp && stashedInApp) || (!inApp && stashedLauncherState);
+            });
 
     public TaskbarStashController(TaskbarActivityContext activity) {
         mActivity = activity;
@@ -122,18 +141,27 @@ public class TaskbarStashController {
         mTaskbarStashedHandleAlpha = stashedHandleController.getStashedHandleAlpha();
         mTaskbarStashedHandleHintScale = stashedHandleController.getStashedHandleHintScale();
 
-        mIsStashedInApp = supportsStashing()
+        mIsStashedInApp = supportsManualStashing()
                 && mPrefs.getBoolean(SHARED_PREFS_STASHED_KEY, DEFAULT_STASHED_PREF);
+        updateStateForFlag(FLAG_STASHED_IN_APP, mIsStashedInApp);
 
         SystemUiProxy.INSTANCE.get(mActivity)
                 .notifyTaskbarStatus(/* visible */ true, /* stashed */ mIsStashedInApp);
     }
 
     /**
+     * Returns whether the taskbar can visually stash into a handle based on the current device
+     * state.
+     */
+    private boolean supportsVisualStashing() {
+        return !mActivity.isThreeButtonNav();
+    }
+
+    /**
      * Returns whether the user can manually stash the taskbar based on the current device state.
      */
-    private boolean supportsStashing() {
-        return !mActivity.isThreeButtonNav()
+    private boolean supportsManualStashing() {
+        return supportsVisualStashing()
                 && (!Utilities.IS_RUNNING_IN_TEST_HARNESS || supportsStashingForTests());
     }
 
@@ -186,36 +214,21 @@ public class TaskbarStashController {
      * @return Whether we started an animation to either be newly stashed or unstashed.
      */
     public boolean updateAndAnimateIsStashedInApp(boolean isStashedInApp) {
-        if (!supportsStashing()) {
+        if (!supportsManualStashing()) {
             return false;
         }
         if (mIsStashedInApp != isStashedInApp) {
-            boolean wasStashed = mIsStashedInApp;
             mIsStashedInApp = isStashedInApp;
             mPrefs.edit().putBoolean(SHARED_PREFS_STASHED_KEY, mIsStashedInApp).apply();
-            boolean isStashed = mIsStashedInApp;
-            if (wasStashed != isStashed) {
-                SystemUiProxy.INSTANCE.get(mActivity)
-                        .notifyTaskbarStatus(/* visible */ true, /* stashed */ isStashed);
-                createAnimToIsStashed(isStashed, TASKBAR_STASH_DURATION).start();
-                return true;
-            }
+            updateStateForFlag(FLAG_STASHED_IN_APP, mIsStashedInApp);
+            applyState();
+
+            SystemUiProxy.INSTANCE.get(mActivity)
+                    .notifyTaskbarStatus(/* visible */ true, /* stashed */ mIsStashedInApp);
+            mControllers.uiController.onStashedInAppChanged();
+            return true;
         }
         return false;
-    }
-
-    /**
-     * Starts an animation to the new stashed state with a default duration.
-     */
-    public void animateToIsStashed(boolean isStashed) {
-        animateToIsStashed(isStashed, TASKBAR_STASH_DURATION);
-    }
-
-    /**
-     * Starts an animation to the new stashed state with the specified duration.
-     */
-    public void animateToIsStashed(boolean isStashed, long duration) {
-        createAnimToIsStashed(isStashed, duration).start();
     }
 
     private Animator createAnimToIsStashed(boolean isStashed, long duration) {
@@ -284,6 +297,7 @@ public class TaskbarStashController {
             @Override
             public void onAnimationStart(Animator animation) {
                 mIsStashed = isStashed;
+                onIsStashed(mIsStashed);
             }
 
             @Override
@@ -301,7 +315,7 @@ public class TaskbarStashController {
      *                       unstashed state.
      */
     public void startStashHint(boolean animateForward) {
-        if (isStashed() || !supportsStashing()) {
+        if (isStashed() || !supportsManualStashing()) {
             // Already stashed, no need to hint in that direction.
             return;
         }
@@ -324,5 +338,64 @@ public class TaskbarStashController {
         mTaskbarStashedHandleHintScale.animateToValue(
                 animateForward ? UNSTASHED_TASKBAR_HANDLE_HINT_SCALE : 1)
                 .setDuration(TASKBAR_HINT_STASH_DURATION).start();
+    }
+
+    private void onIsStashed(boolean isStashed) {
+        mControllers.stashedHandleViewController.onIsStashed(isStashed);
+    }
+
+    public void applyState() {
+        applyState(TASKBAR_STASH_DURATION);
+    }
+
+    public void applyState(long duration) {
+        mStatePropertyHolder.setState(mState, duration, true);
+    }
+
+    public Animator applyStateWithoutStart() {
+        return applyStateWithoutStart(TASKBAR_STASH_DURATION);
+    }
+
+    public Animator applyStateWithoutStart(long duration) {
+        return mStatePropertyHolder.setState(mState, duration, false);
+    }
+
+    /**
+     * Updates the proper flag to indicate whether the task bar should be stashed.
+     *
+     * Note that this only updates the flag. {@link #applyState()} needs to be called separately.
+     *
+     * @param flag The flag to update.
+     * @param enabled Whether to enable the flag: True will cause the task bar to be stashed /
+     *                unstashed.
+     */
+    public void updateStateForFlag(int flag, boolean enabled) {
+        if (enabled) {
+            mState |= flag;
+        } else {
+            mState &= ~flag;
+        }
+    }
+
+    private class StatePropertyHolder {
+        private final IntPredicate mStashCondition;
+
+        private boolean mIsStashed;
+
+        StatePropertyHolder(IntPredicate stashCondition) {
+            mStashCondition = stashCondition;
+        }
+
+        public Animator setState(int flags, long duration, boolean start) {
+            boolean isStashed = mStashCondition.test(flags);
+            if (mIsStashed != isStashed) {
+                mIsStashed = isStashed;
+                Animator animator = createAnimToIsStashed(mIsStashed, duration);
+                if (start) {
+                    animator.start();
+                }
+            }
+            return mAnimator;
+        }
     }
 }
