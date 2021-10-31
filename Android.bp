@@ -369,6 +369,7 @@ android_library {
     name: "Launcher3ResLib",
     defaults: [
         "launcher_compose_defaults",
+        "SettingsLibDefaults",
     ],
     srcs: [],
     resource_dirs: ["res"],
@@ -402,6 +403,7 @@ android_library {
         "dagger2",
         "jsr330",
         "com_android_systemui_shared_flags_lib",
+        "SettingsLib",
     ],
     manifest: "AndroidManifest-common.xml",
     sdk_version: "current",
