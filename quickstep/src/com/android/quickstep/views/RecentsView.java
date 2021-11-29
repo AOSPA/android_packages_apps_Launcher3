@@ -189,6 +189,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         TaskThumbnailCache.HighResLoadingState.HighResLoadingStateChangedCallback,
         TaskVisualsChangeListener, SplitScreenBounds.OnChangeListener {
 
+    private static final String TAG = "RecentsView";
+    private static final boolean DEBUG = false;
+
     // TODO(b/184899234): We use this timeout to wait a fixed period after switching to the
     // screenshot when dismissing the current live task to ensure the app can try and get stopped.
     private static final int REMOVE_TASK_WAIT_FOR_APP_STOP_MS = 100;
@@ -1056,11 +1059,11 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     /**
-     * Returns true if the task is snapped.
+     * Returns true if the task is in expected scroll position.
      *
      * @param taskIndex the index of the task
      */
-    public boolean isTaskSnapped(int taskIndex) {
+    public boolean isTaskInExpectedScrollPosition(int taskIndex) {
         return getScrollForPage(taskIndex) == getPagedOrientationHandler().getPrimaryScroll(this);
     }
 
@@ -1727,8 +1730,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         if (showAsGrid()) {
             TaskView focusedTaskView = getFocusedTaskView();
             hiddenFocusedScroll = focusedTaskView == null
-                    || getScrollForPage(indexOfChild(focusedTaskView))
-                    != mOrientationHandler.getPrimaryScroll(this);
+                    || !isTaskInExpectedScrollPosition(indexOfChild(focusedTaskView));
         } else {
             hiddenFocusedScroll = false;
         }
@@ -2644,8 +2646,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      * and then animates it into the split position that was desired
      */
     private void createInitialSplitSelectAnimation(PendingAnimation anim) {
-        float placeholderHeight = getResources().getDimension(R.dimen.split_placeholder_size);
-        mOrientationHandler.getInitialSplitPlaceholderBounds((int) placeholderHeight,
+        mOrientationHandler.getInitialSplitPlaceholderBounds(mSplitPlaceholderSize,
                 mActivity.getDeviceProfile(),
                 mSplitSelectStateController.getActiveSplitStagePosition(), mTempRect);
 
@@ -3239,14 +3240,13 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
 
         Rect splitBounds = new Rect();
-        float placeholderSize = getResources().getDimension(R.dimen.split_placeholder_size);
         // This acts as a best approximation on where the splitplaceholder view would be,
         // doesn't need to be exact necessarily. This also doesn't need to take translations
         // into account since placeholder view is not translated
         if (stagePosition == SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT) {
-            splitBounds.set((int) (getWidth() - placeholderSize), 0, getWidth(), getHeight());
+            splitBounds.set(getWidth() - mSplitPlaceholderSize, 0, getWidth(), getHeight());
         } else {
-            splitBounds.set(0, 0, (int) (placeholderSize), getHeight());
+            splitBounds.set(0, 0, mSplitPlaceholderSize, getHeight());
         }
         Rect taskBounds = new Rect();
         int taskCount = getTaskViewCount();
@@ -3747,6 +3747,50 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     /**
+     * Apply scroll offset to children of RecentsView when entering split select.
+     */
+    public void applySplitPrimaryScrollOffset() {
+        if (!mActivity.getDeviceProfile().isLandscape || !showAsGrid()) {
+            return;
+        }
+
+        @StagePosition int position = mSplitSelectStateController.getActiveSplitStagePosition();
+        boolean shouldShiftThumbnailsForSplitSelect = shouldShiftThumbnailsForSplitSelect(
+                position);
+        boolean expandLeft = false;
+        boolean expandRight = false;
+        if (mIsRtl) {
+            if (position == SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT
+                    && shouldShiftThumbnailsForSplitSelect) {
+                expandLeft = true;
+            } else if (position == SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT) {
+                if (shouldShiftThumbnailsForSplitSelect) {
+                    expandRight = true;
+                } else {
+                    expandLeft = true;
+                }
+            }
+        } // TODO(b/200537659): Handle system RTL.
+        if (expandRight) {
+            for (int i = 0; i < getTaskViewCount(); i++) {
+                getTaskViewAt(i).setSplitScrollOffsetPrimary(mSplitPlaceholderSize);
+            }
+        } else if (expandLeft) {
+            mClearAllButton.setSplitSelectScrollOffsetPrimary(-mSplitPlaceholderSize);
+        }
+    }
+
+    /**
+     * Reset scroll offset on children of RecentsView when exiting split select.
+     */
+    public void resetSplitPrimaryScrollOffset() {
+        for (int i = 0; i < getTaskViewCount(); i++) {
+            getTaskViewAt(i).setSplitScrollOffsetPrimary(0);
+        }
+        mClearAllButton.setSplitSelectScrollOffsetPrimary(0);
+    }
+
+    /**
      * Resets the visuals when exit modal state.
      */
     public void resetModalVisuals() {
@@ -3919,7 +3963,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
     /** TODO(b/181707736) More gracefully handle exiting split selection state */
     private void resetFromSplitSelectionState() {
-        mSplitHiddenTaskView.setTranslationY(0);
         if (!showAsGrid()) {
             int pageToSnapTo = mCurrentPage;
             if (mSplitHiddenTaskViewIndex <= pageToSnapTo) {
@@ -3931,9 +3974,12 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
         onLayout(false /*  changed */, getLeft(), getTop(), getRight(), getBottom());
         resetTaskVisuals();
-        mSplitHiddenTaskView.setVisibility(VISIBLE);
-        mSplitHiddenTaskView = null;
         mSplitHiddenTaskViewIndex = -1;
+        if (mSplitHiddenTaskView != null) {
+            mSplitHiddenTaskView.setTranslationY(0);
+            mSplitHiddenTaskView.setVisibility(VISIBLE);
+            mSplitHiddenTaskView = null;
+        }
         if (mFirstFloatingTaskView != null) {
             mActivity.getRootView().removeView(mFirstFloatingTaskView);
             mFirstFloatingTaskView = null;
@@ -4354,26 +4400,27 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     @Override
+    protected void updateMinAndMaxScrollX() {
+        super.updateMinAndMaxScrollX();
+        if (DEBUG) {
+            Log.d(TAG, "updateMinAndMaxScrollX - mMinScroll: " + mMinScroll);
+            Log.d(TAG, "updateMinAndMaxScrollX - mMaxScroll: " + mMaxScroll);
+        }
+    }
+
+    @Override
     protected int computeMinScroll() {
         if (getTaskViewCount() > 0) {
-            int minScroll;
             if (mIsRtl) {
                 // If we aren't showing the clear all button, use the rightmost task as the min
                 // scroll.
-                minScroll = getScrollForPage(mDisallowScrollToClearAll ? indexOfChild(
+                return getScrollForPage(mDisallowScrollToClearAll ? indexOfChild(
                         getTaskViewAt(getTaskViewCount() - 1)) : indexOfChild(mClearAllButton));
-                if (showAsGrid() && isSplitSelectionActive()
-                        && mSplitSelectStateController.getActiveSplitStagePosition()
-                        == SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT) {
-                    minScroll -= mSplitPlaceholderSize;
-                }
             } else {
                 TaskView focusedTaskView = mShowAsGridLastOnLayout ? getFocusedTaskView() : null;
-                minScroll = getScrollForPage(focusedTaskView != null ? indexOfChild(focusedTaskView)
+                return getScrollForPage(focusedTaskView != null ? indexOfChild(focusedTaskView)
                         : 0);
-                // TODO(b/200537659): Adjust according to mSplitPlaceholderSize.
             }
-            return minScroll;
         }
         return super.computeMinScroll();
     }
@@ -4381,24 +4428,16 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     @Override
     protected int computeMaxScroll() {
         if (getTaskViewCount() > 0) {
-            int maxScroll;
             if (mIsRtl) {
                 TaskView focusedTaskView = mShowAsGridLastOnLayout ? getFocusedTaskView() : null;
-                maxScroll = getScrollForPage(focusedTaskView != null ? indexOfChild(focusedTaskView)
+                return getScrollForPage(focusedTaskView != null ? indexOfChild(focusedTaskView)
                         : 0);
-                if (showAsGrid() && isSplitSelectionActive()
-                        && mSplitSelectStateController.getActiveSplitStagePosition()
-                        == SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT) {
-                    maxScroll += mSplitPlaceholderSize;
-                }
             } else {
                 // If we aren't showing the clear all button, use the leftmost task as the min
                 // scroll.
-                maxScroll = getScrollForPage(mDisallowScrollToClearAll ? indexOfChild(
+                return getScrollForPage(mDisallowScrollToClearAll ? indexOfChild(
                         getTaskViewAt(getTaskViewCount() - 1)) : indexOfChild(mClearAllButton));
-                // TODO(b/200537659): Adjust according to mSplitPlaceholderSize.
             }
-            return maxScroll;
         }
         return super.computeMaxScroll();
     }
@@ -4453,6 +4492,12 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 pageScrollChanged = true;
                 outPageScrolls[i] = pageScroll;
             }
+            if (DEBUG) {
+                Log.d(TAG, "getPageScrolls - outPageScrolls[" + i + "]: " + outPageScrolls[i]);
+            }
+        }
+        if (DEBUG) {
+            Log.d(TAG, "getPageScrolls - clearAllScroll: " + clearAllScroll);
         }
         return pageScrollChanged;
     }
