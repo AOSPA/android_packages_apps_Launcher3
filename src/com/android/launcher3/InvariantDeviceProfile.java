@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.model.DeviceGridState;
+import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.IntArray;
@@ -68,11 +69,6 @@ public class InvariantDeviceProfile {
     // We do not need any synchronization for this variable as its only written on UI thread.
     public static final MainThreadInitializedObject<InvariantDeviceProfile> INSTANCE =
             new MainThreadInitializedObject<>(InvariantDeviceProfile::new);
-
-    private static final int DEFAULT_TRUE = -1;
-    private static final int DEFAULT_SPLIT_DISPLAY = 2;
-    private static final int GRID_ENABLED_ALL_DISPLAYS = 0;
-    private static final int GRID_ENABLED_SINGLE_DISPLAY = 1;
 
     private static final String KEY_IDP_GRID_NAME = "idp_grid_name";
 
@@ -204,11 +200,11 @@ public class InvariantDeviceProfile {
         // Get the display info based on default display and interpolate it to existing display
         DisplayOption defaultDisplayOption = invDistWeightedInterpolate(
                 DisplayController.INSTANCE.get(context).getInfo(),
-                getPredefinedDeviceProfiles(context, gridName, false), false);
+                getPredefinedDeviceProfiles(context, gridName, false, false), false);
 
         Info myInfo = new Info(context, display);
         DisplayOption myDisplayOption = invDistWeightedInterpolate(
-                myInfo, getPredefinedDeviceProfiles(context, gridName, false), false);
+                myInfo, getPredefinedDeviceProfiles(context, gridName, false, false), false);
 
         DisplayOption result = new DisplayOption(defaultDisplayOption.grid)
                 .add(myDisplayOption);
@@ -227,6 +223,29 @@ public class InvariantDeviceProfile {
         initGrid(context, myInfo, result, false);
     }
 
+    /**
+     * Reinitialize the current grid after a restore, where some grids might now be disabled.
+     */
+    public void reinitializeAfterRestore(Context context) {
+        String currentDbFile = dbFile;
+        String gridName = getCurrentGridName(context);
+        String newGridName = initGrid(context, gridName);
+        if (!newGridName.equals(gridName)) {
+            Log.d(TAG, "Restored grid is disabled : " + gridName
+                    + ", migrating to: " + newGridName
+                    + ", removing all other grid db files");
+            for (String gridDbFile : LauncherFiles.GRID_DB_FILES) {
+                if (gridDbFile.equals(currentDbFile)) {
+                    continue;
+                }
+                if (context.getDatabasePath(gridDbFile).delete()) {
+                    Log.d(TAG, "Removed old grid db file: " + gridDbFile);
+                }
+            }
+            setCurrentGrid(context, gridName);
+        }
+    }
+
     public static String getCurrentGridName(Context context) {
         return Utilities.isGridOptionsEnabled(context)
                 ? Utilities.getPrefs(context).getString(KEY_IDP_GRID_NAME, null) : null;
@@ -240,7 +259,8 @@ public class InvariantDeviceProfile {
                 displayInfo.supportedBounds.size() >= 4 && ENABLE_TWO_PANEL_HOME.get();
 
         ArrayList<DisplayOption> allOptions =
-                getPredefinedDeviceProfiles(context, gridName, isSplitDisplay);
+                getPredefinedDeviceProfiles(context, gridName, isSplitDisplay,
+                        RestoreDbTask.isPending(context));
         DisplayOption displayOption =
                 invDistWeightedInterpolate(displayInfo, allOptions, isSplitDisplay);
         initGrid(context, displayInfo, displayOption, isSplitDisplay);
@@ -366,9 +386,11 @@ public class InvariantDeviceProfile {
     }
 
     private static ArrayList<DisplayOption> getPredefinedDeviceProfiles(
-            Context context, String gridName, boolean isSplitDisplay) {
+            Context context, String gridName, boolean isSplitDisplay, boolean allowDisabledGrid) {
         ArrayList<DisplayOption> profiles = new ArrayList<>();
-        try (XmlResourceParser parser = context.getResources().getXml(R.xml.device_profiles)) {
+        int xmlResource = isSplitDisplay ? R.xml.device_profiles_split : R.xml.device_profiles;
+
+        try (XmlResourceParser parser = context.getResources().getXml(xmlResource)) {
             final int depth = parser.getDepth();
             int type;
             while (((type = parser.next()) != XmlPullParser.END_TAG ||
@@ -378,7 +400,7 @@ public class InvariantDeviceProfile {
 
                     GridOption gridOption =
                             new GridOption(context, Xml.asAttributeSet(parser), isSplitDisplay);
-                    if (gridOption.isEnabled) {
+                    if (gridOption.isEnabled || allowDisabledGrid) {
                         final int displayDepth = parser.getDepth();
                         while (((type = parser.next()) != XmlPullParser.END_TAG
                                 || parser.getDepth() > displayDepth)
@@ -386,8 +408,7 @@ public class InvariantDeviceProfile {
                             if ((type == XmlPullParser.START_TAG) && "display-option".equals(
                                     parser.getName())) {
                                 profiles.add(new DisplayOption(gridOption, context,
-                                        Xml.asAttributeSet(parser),
-                                        isSplitDisplay ? DEFAULT_SPLIT_DISPLAY : DEFAULT_TRUE));
+                                        Xml.asAttributeSet(parser)));
                             }
                         }
                     }
@@ -400,7 +421,8 @@ public class InvariantDeviceProfile {
         ArrayList<DisplayOption> filteredProfiles = new ArrayList<>();
         if (!TextUtils.isEmpty(gridName)) {
             for (DisplayOption option : profiles) {
-                if (gridName.equals(option.grid.name) && option.grid.isEnabled) {
+                if (gridName.equals(option.grid.name)
+                        && (option.grid.isEnabled || allowDisabledGrid)) {
                     filteredProfiles.add(option);
                 }
             }
@@ -424,7 +446,9 @@ public class InvariantDeviceProfile {
      */
     public List<GridOption> parseAllGridOptions(Context context) {
         List<GridOption> result = new ArrayList<>();
-        try (XmlResourceParser parser = context.getResources().getXml(R.xml.device_profiles)) {
+        int xmlResource = isSplitDisplay ? R.xml.device_profiles_split : R.xml.device_profiles;
+
+        try (XmlResourceParser parser = context.getResources().getXml(xmlResource)) {
             final int depth = parser.getDepth();
             int type;
             while (((type = parser.next()) != XmlPullParser.END_TAG
@@ -676,11 +700,7 @@ public class InvariantDeviceProfile {
             devicePaddingId = a.getResourceId(
                     R.styleable.GridDisplayOption_devicePaddingId, 0);
 
-            final int enabledInt =
-                    a.getInteger(R.styleable.GridDisplayOption_gridEnabled,
-                            GRID_ENABLED_ALL_DISPLAYS);
-            isEnabled = enabledInt == GRID_ENABLED_ALL_DISPLAYS
-                    || enabledInt == GRID_ENABLED_SINGLE_DISPLAY && !isSplitDisplay;
+            isEnabled = a.getBoolean(R.styleable.GridDisplayOption_gridEnabled, true);
 
             a.recycle();
             extraAttrs = Themes.createValueMap(context, attrs,
@@ -706,17 +726,15 @@ public class InvariantDeviceProfile {
         private final float[] iconSizes = new float[COUNT_SIZES];
         private final float[] textSizes = new float[COUNT_SIZES];
 
-        DisplayOption(GridOption grid, Context context, AttributeSet attrs, int defaultFlagValue) {
+        DisplayOption(GridOption grid, Context context, AttributeSet attrs) {
             this.grid = grid;
 
-            TypedArray a = context.obtainStyledAttributes(
-                    attrs, R.styleable.ProfileDisplayOption);
+            TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ProfileDisplayOption);
 
             minWidthDps = a.getFloat(R.styleable.ProfileDisplayOption_minWidthDps, 0);
             minHeightDps = a.getFloat(R.styleable.ProfileDisplayOption_minHeightDps, 0);
 
-            canBeDefault = a.getInt(R.styleable.ProfileDisplayOption_canBeDefault, 0)
-                    == defaultFlagValue;
+            canBeDefault = a.getBoolean(R.styleable.ProfileDisplayOption_canBeDefault, false);
 
             float x;
             float y;
