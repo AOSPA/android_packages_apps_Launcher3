@@ -62,7 +62,6 @@ import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
-import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.R;
@@ -137,6 +136,8 @@ public class TouchInteractionService extends Service
     private static final int SYSTEM_ACTION_ID_ALL_APPS = 14;
 
     private int mBackGestureNotificationCounter = -1;
+
+    private final TISBinder mTISBinder = new TISBinder();
 
     /**
      * Local IOverviewProxy implementation with some methods for local components
@@ -450,6 +451,12 @@ public class TouchInteractionService extends Service
         } else {
             am.unregisterSystemAction(SYSTEM_ACTION_ID_ALL_APPS);
         }
+
+        StatefulActivity newOverviewActivity = mOverviewComponentObserver.getActivityInterface()
+                .getCreatedActivity();
+        if (newOverviewActivity != null) {
+            mTaskbarManager.setActivity(newOverviewActivity);
+        }
     }
 
     @UiThread
@@ -509,7 +516,7 @@ public class TouchInteractionService extends Service
     @Override
     public IBinder onBind(Intent intent) {
         Log.d(TAG, "Touch service connected: user=" + getUserId());
-        return new TISBinder();
+        return mTISBinder;
     }
 
     private void onInputEvent(InputEvent ev) {
@@ -953,22 +960,6 @@ public class TouchInteractionService extends Service
         return new FallbackSwipeHandler(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
                 mInputConsumer);
-    }
-
-    protected boolean shouldNotifyBackGesture() {
-        return mBackGestureNotificationCounter > 0 &&
-                !mDeviceState.getGestureBlockedActivityPackages().isEmpty();
-    }
-
-    @WorkerThread
-    protected void tryNotifyBackGesture() {
-        if (shouldNotifyBackGesture()) {
-            mBackGestureNotificationCounter--;
-            Utilities.getDevicePrefs(this).edit()
-                    .putInt(KEY_BACK_NOTIFICATION_COUNT, mBackGestureNotificationCounter).apply();
-            mDeviceState.getGestureBlockedActivityPackages().forEach(blockedPackage ->
-                    sendBroadcast(new Intent(NOTIFY_ACTION_BACK).setPackage(blockedPackage)));
-        }
     }
 
     @Override

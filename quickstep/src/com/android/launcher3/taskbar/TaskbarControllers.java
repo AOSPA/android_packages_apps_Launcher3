@@ -30,6 +30,7 @@ public class TaskbarControllers {
     public final NavbarButtonsViewController navbarButtonsViewController;
     public final RotationButtonController rotationButtonController;
     public final TaskbarDragLayerController taskbarDragLayerController;
+    public final TaskbarScrimViewController taskbarScrimViewController;
     public final TaskbarViewController taskbarViewController;
     public final TaskbarUnfoldAnimationController taskbarUnfoldAnimationController;
     public final TaskbarKeyguardController taskbarKeyguardController;
@@ -47,6 +48,7 @@ public class TaskbarControllers {
             RotationButtonController rotationButtonController,
             TaskbarDragLayerController taskbarDragLayerController,
             TaskbarViewController taskbarViewController,
+            TaskbarScrimViewController taskbarScrimViewController,
             TaskbarUnfoldAnimationController taskbarUnfoldAnimationController,
             TaskbarKeyguardController taskbarKeyguardController,
             StashedHandleViewController stashedHandleViewController,
@@ -59,6 +61,7 @@ public class TaskbarControllers {
         this.rotationButtonController = rotationButtonController;
         this.taskbarDragLayerController = taskbarDragLayerController;
         this.taskbarViewController = taskbarViewController;
+        this.taskbarScrimViewController = taskbarScrimViewController;
         this.taskbarUnfoldAnimationController = taskbarUnfoldAnimationController;
         this.taskbarKeyguardController = taskbarKeyguardController;
         this.stashedHandleViewController = stashedHandleViewController;
@@ -71,17 +74,18 @@ public class TaskbarControllers {
      * TaskbarControllers instance, but should be careful to only access things that were created
      * in constructors for now, as some controllers may still be waiting for init().
      */
-    public void init() {
-        navbarButtonsViewController.init(this);
+    public void init(TaskbarSharedState sharedState) {
+        navbarButtonsViewController.init(this, sharedState);
         if (taskbarActivityContext.isThreeButtonNav()) {
             rotationButtonController.init();
         }
         taskbarDragLayerController.init(this);
         taskbarViewController.init(this);
+        taskbarScrimViewController.init(this);
         taskbarUnfoldAnimationController.init(this);
         taskbarKeyguardController.init(navbarButtonsViewController);
         stashedHandleViewController.init(this);
-        taskbarStashController.init(this);
+        taskbarStashController.init(this, sharedState);
         taskbarEduController.init(this);
     }
 

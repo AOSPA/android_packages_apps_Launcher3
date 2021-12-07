@@ -88,7 +88,10 @@ public class TaskbarViewController {
         mTaskbarIconScaleForStash.updateValue(1f);
 
         mModelCallbacks.init(controllers);
-        LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
+        if (mActivity.isUserSetupComplete()) {
+            // Only load the callbacks if user setup is completed
+            LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
+        }
         mTaskbarNavButtonTranslationY =
                 controllers.navbarButtonsViewController.getTaskbarNavButtonTranslationY();
     }
@@ -248,6 +251,14 @@ public class TaskbarViewController {
             return;
         }
         mTaskbarNavButtonTranslationY.updateValue(-deviceProfile.getTaskbarOffsetY());
+    }
+
+    /**
+     * Returns whether the given MotionEvent, *in screen coorindates*, is within any Taskbar item's
+     * touch bounds.
+     */
+    public boolean isEventOverAnyItem(MotionEvent ev) {
+        return mTaskbarView.isEventOverAnyItem(ev);
     }
 
     /**

@@ -343,6 +343,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                         }
                     });
                     view.setTaskViewsResistanceTranslation(view.mTaskViewsSecondaryTranslation);
+                    view.updateTaskViewsSnapshotRadius();
                     view.updatePageOffsets();
                 }
 
@@ -1482,6 +1483,20 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             }
         }
         return groupViewCount;
+    }
+
+    /**
+     * Returns the number of tasks in the top row of the overview grid.
+     */
+    public int getTopRowTaskCountForTablet() {
+        return mTopRowIdSet.size();
+    }
+
+    /**
+     * Returns the number of tasks in the bottom row of the overview grid.
+     */
+    public int getBottomRowTaskCountForTablet() {
+        return getTaskViewCount() - mTopRowIdSet.size() - 1;
     }
 
     protected void onTaskStackUpdated() {
@@ -3170,7 +3185,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      * Returns all the tasks in the bottom row, without the focused task
      */
     private IntArray getBottomRowIdArray() {
-        int bottomRowIdArraySize = getTaskViewCount() - mTopRowIdSet.size() - 1;
+        int bottomRowIdArraySize = getBottomRowTaskCountForTablet();
         if (bottomRowIdArraySize <= 0) {
             return new IntArray(0);
         }
@@ -3725,6 +3740,12 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         runActionOnRemoteHandles(
                 remoteTargetHandle -> remoteTargetHandle.getTaskViewSimulator()
                         .recentsViewSecondaryTranslation.value = translation);
+    }
+
+    private void updateTaskViewsSnapshotRadius() {
+        for (int i = 0; i < getTaskViewCount(); i++) {
+            getTaskViewAt(i).updateSnapshotRadius();
+        }
     }
 
     protected void setTaskViewsPrimarySplitTranslation(float translation) {
