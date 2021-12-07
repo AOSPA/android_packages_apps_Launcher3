@@ -144,7 +144,7 @@ public final class FeatureFlags {
             "ENABLE_OVERVIEW_SELECTIONS", true, "Show Select Mode button in Overview Actions");
 
     public static final BooleanFlag ENABLE_WIDGETS_PICKER_AIAI_SEARCH = new DeviceFlag(
-            "ENABLE_WIDGETS_PICKER_AIAI_SEARCH", false, "Enable AiAi search in the widgets picker");
+            "ENABLE_WIDGETS_PICKER_AIAI_SEARCH", true, "Enable AiAi search in the widgets picker");
 
     public static final BooleanFlag ENABLE_OVERVIEW_SHARING_TO_PEOPLE = getDebugFlag(
             "ENABLE_OVERVIEW_SHARING_TO_PEOPLE", true,
@@ -251,6 +251,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_BACK_SWIPE_HOME_ANIMATION = getDebugFlag(
             "ENABLE_BACK_SWIPE_HOME_ANIMATION", true,
             "Enables home animation to icon when user swipes back.");
+
+    public static final BooleanFlag ENABLE_ICON_LABEL_AUTO_SCALING = getDebugFlag(
+            "ENABLE_ICON_LABEL_AUTO_SCALING", true,
+            "Enables scaling/spacing for icon labels to make more characters visible");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
