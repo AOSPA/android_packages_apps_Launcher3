@@ -89,6 +89,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
     @Nullable View mHotseatIconView;
     final ClipIconView mFakeIconView;
     final FrameLayout mFakeTaskView;
+    final AnimatedTaskbarView mFakeTaskbarView;
     final AnimatedTaskView mFakePreviousTaskView;
     final View mRippleView;
     final RippleDrawable mRippleDrawable;
@@ -104,6 +105,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
     private final Runnable mTitleViewCallback;
     @Nullable private Runnable mFeedbackViewCallback;
     @Nullable private Runnable mFakeTaskViewCallback;
+    @Nullable private Runnable mFakeTaskbarViewCallback;
     private final Runnable mShowFeedbackRunnable;
 
     TutorialController(TutorialFragment tutorialFragment, TutorialType tutorialType) {
@@ -122,6 +124,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
         mFakeHotseatView = rootView.findViewById(R.id.gesture_tutorial_fake_hotseat_view);
         mFakeIconView = rootView.findViewById(R.id.gesture_tutorial_fake_icon_view);
         mFakeTaskView = rootView.findViewById(R.id.gesture_tutorial_fake_task_view);
+        mFakeTaskbarView = rootView.findViewById(R.id.gesture_tutorial_fake_taskbar_view);
         mFakePreviousTaskView =
                 rootView.findViewById(R.id.gesture_tutorial_fake_previous_task_view);
         mRippleView = rootView.findViewById(R.id.gesture_tutorial_ripple_view);
@@ -271,7 +274,6 @@ abstract class TutorialController implements BackGestureAttemptCallback,
                 mFeedbackView.findViewById(R.id.gesture_tutorial_fragment_feedback_subtitle);
         subtitle.setText(subtitleResId);
         if (isGestureSuccessful) {
-            hideCloseButton();
             if (mTutorialFragment.isAtFinalStep()) {
                 showActionButton();
             }
@@ -318,6 +320,10 @@ abstract class TutorialController implements BackGestureAttemptCallback,
         if (mFakeTaskViewCallback != null) {
             mFakeTaskView.removeCallbacks(mFakeTaskViewCallback);
             mFakeTaskViewCallback = null;
+        }
+        if (mFakeTaskbarViewCallback != null) {
+            mFakeTaskbarView.removeCallbacks(mFakeTaskbarViewCallback);
+            mFakeTaskbarViewCallback = null;
         }
         mFeedbackTitleView.removeCallbacks(mTitleViewCallback);
     }
@@ -395,6 +401,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
     void transitToController() {
         hideFeedback();
         hideActionButton();
+        updateCloseButton();
         updateSubtext();
         updateDrawables();
         updateLayout();
@@ -405,28 +412,55 @@ abstract class TutorialController implements BackGestureAttemptCallback,
         }
     }
 
-    void hideCloseButton() {
-        mCloseButton.setVisibility(GONE);
-    }
-
-    void showCloseButton() {
-        mCloseButton.setVisibility(View.VISIBLE);
+    void updateCloseButton() {
         mCloseButton.setTextAppearance(Utilities.isDarkTheme(mContext)
                 ? R.style.TextAppearance_GestureTutorial_Feedback_Subtext
                 : R.style.TextAppearance_GestureTutorial_Feedback_Subtext_Dark);
     }
 
     void hideActionButton() {
-        showCloseButton();
+        mCloseButton.setVisibility(View.VISIBLE);
         // Invisible to maintain the layout.
         mActionButton.setVisibility(View.INVISIBLE);
         mActionButton.setOnClickListener(null);
     }
 
     void showActionButton() {
-        hideCloseButton();
+        mCloseButton.setVisibility(GONE);
         mActionButton.setVisibility(View.VISIBLE);
         mActionButton.setOnClickListener(this::onActionButtonClicked);
+    }
+
+    void hideFakeTaskbar(boolean animateToHotseat) {
+        if (!mTutorialFragment.isLargeScreen()) {
+            return;
+        }
+        if (mFakeTaskbarViewCallback != null) {
+            mFakeTaskbarView.removeCallbacks(mFakeTaskbarViewCallback);
+        }
+        if (animateToHotseat) {
+            mFakeTaskbarViewCallback = () ->
+                    mFakeTaskbarView.animateDisappearanceToHotseat(mFakeHotseatView);
+        } else {
+            mFakeTaskbarViewCallback = mFakeTaskbarView::animateDisappearanceToBottom;
+        }
+        mFakeTaskbarView.post(mFakeTaskbarViewCallback);
+    }
+
+    void showFakeTaskbar(boolean animateFromHotseat) {
+        if (!mTutorialFragment.isLargeScreen()) {
+            return;
+        }
+        if (mFakeTaskbarViewCallback != null) {
+            mFakeTaskbarView.removeCallbacks(mFakeTaskbarViewCallback);
+        }
+        if (animateFromHotseat) {
+            mFakeTaskbarViewCallback = () ->
+                    mFakeTaskbarView.animateAppearanceFromHotseat(mFakeHotseatView);
+        } else {
+            mFakeTaskbarViewCallback = mFakeTaskbarView::animateAppearanceFromBottom;
+        }
+        mFakeTaskbarView.post(mFakeTaskbarViewCallback);
     }
 
     void updateFakeAppTaskViewLayout(@LayoutRes int mockAppTaskLayoutResId) {
@@ -480,6 +514,8 @@ abstract class TutorialController implements BackGestureAttemptCallback,
                     mTutorialFragment.isLargeScreen()
                             ? R.dimen.gesture_tutorial_foldable_feedback_margin_start_end
                             : R.dimen.gesture_tutorial_feedback_margin_start_end));
+
+            mFakeTaskbarView.setVisibility(mTutorialFragment.isLargeScreen() ? View.VISIBLE : GONE);
         }
     }
 
