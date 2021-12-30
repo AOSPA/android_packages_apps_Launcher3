@@ -326,7 +326,7 @@ public class FloatingHeaderView extends LinearLayout implements
 
         mTabLayout.setTranslationY(mTranslationY);
 
-        int clipTop = getPaddingTop() - mTabsAdditionalPaddingTop;
+        int clipTop = getPaddingTop() * 2 - mTabsAdditionalPaddingTop;
         if (mTabsHidden) {
             // Add back spacing that is otherwise covered by the tabs.
             clipTop += mTabsAdditionalPaddingTop;
