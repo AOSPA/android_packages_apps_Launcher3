@@ -94,6 +94,9 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ONE_SEARCH = new DeviceFlag("ENABLE_ONE_SEARCH", false,
             "Use homescreen search box to complete allApps searches");
 
+    public static final BooleanFlag ENABLE_TWOLINE_ALLAPPS = getDebugFlag(
+            "ENABLE_TWOLINE_ALLAPPS", false, "Enables two line label inside all apps.");
+
     public static final BooleanFlag ENABLE_DEVICE_SEARCH_PERFORMANCE_LOGGING = new DeviceFlag(
             "ENABLE_DEVICE_SEARCH_PERFORMANCE_LOGGING", true,
             "Allows on device search in all apps logging");
@@ -154,15 +157,6 @@ public final class FeatureFlags {
             "ENABLE_DATABASE_RESTORE", false,
             "Enable database restore when new restore session is created");
 
-    public static final BooleanFlag ENABLE_SMARTSPACE_UNIVERSAL = getDebugFlag(
-            "ENABLE_SMARTSPACE_UNIVERSAL", false,
-            "Replace Smartspace with a version rendered by System UI.");
-
-    public static final BooleanFlag ENABLE_SMARTSPACE_ENHANCED = getDebugFlag(
-            "ENABLE_SMARTSPACE_ENHANCED", true,
-            "Replace Smartspace with the enhanced version. "
-                    + "Ignored if ENABLE_SMARTSPACE_UNIVERSAL is enabled.");
-
     public static final BooleanFlag ENABLE_SMARTSPACE_DISMISS = getDebugFlag(
             "ENABLE_SMARTSPACE_DISMISS", true,
             "Adds a menu option to dismiss the current Enhanced Smartspace card.");
@@ -204,6 +198,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_TASKBAR_EDU = getDebugFlag("ENABLE_TASKBAR_EDU", true,
             "Enables showing taskbar education the first time an app is opened.");
 
+    public static final BooleanFlag ENABLE_TASKBAR_POPUP_MENU = getDebugFlag(
+            "ENABLE_TASKBAR_POPUP_MENU", false, "Enables long pressing taskbar icons to show the"
+                    + " popup menu.");
+
     public static final BooleanFlag ENABLE_OVERVIEW_GRID = getDebugFlag(
             "ENABLE_OVERVIEW_GRID", true, "Uses grid overview layout. "
             + "Only applicable on large screen devices.");
@@ -232,9 +230,6 @@ public final class FeatureFlags {
 
     public static final BooleanFlag NOTIFY_CRASHES = getDebugFlag("NOTIFY_CRASHES", false,
             "Sends a notification whenever launcher encounters an uncaught exception.");
-
-    public static final BooleanFlag PROTOTYPE_APP_CLOSE = getDebugFlag(
-            "PROTOTYPE_APP_CLOSE", false, "Enables new app close");
 
     public static final BooleanFlag ENABLE_WALLPAPER_SCRIM = getDebugFlag(
             "ENABLE_WALLPAPER_SCRIM", false,

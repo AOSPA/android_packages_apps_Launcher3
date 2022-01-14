@@ -39,6 +39,7 @@ import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Helper class to handle various atomic commands for switching between Overview.
@@ -116,11 +117,12 @@ public class OverviewCommandHelper {
         mPendingCommands.clear();
     }
 
+    @Nullable
     private TaskView getNextTask(RecentsView view) {
         final TaskView runningTaskView = view.getRunningTaskView();
 
         if (runningTaskView == null) {
-            return view.getTaskViewCount() > 0 ? view.getTaskViewAt(0) : null;
+            return view.getTaskViewAt(0);
         } else {
             final TaskView nextTask = view.getNextTaskView();
             return nextTask != null ? nextTask : runningTaskView;
@@ -211,7 +213,7 @@ public class OverviewCommandHelper {
             }
 
             @Override
-            public void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {
+            public void onRecentsAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
                 interactionHandler.onGestureCancelled();
                 cmd.removeListener(this);
 
@@ -255,8 +257,8 @@ public class OverviewCommandHelper {
                 // Ensure that recents view has focus so that it receives the followup key inputs
                 TaskView taskView = rv.getNextTaskView();
                 if (taskView == null) {
-                    if (rv.getTaskViewCount() > 0) {
-                        taskView = rv.getTaskViewAt(0);
+                    taskView = rv.getTaskViewAt(0);
+                    if (taskView != null) {
                         taskView.requestFocus();
                     } else {
                         rv.requestFocus();

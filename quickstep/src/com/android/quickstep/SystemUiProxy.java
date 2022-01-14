@@ -15,6 +15,8 @@
  */
 package com.android.quickstep;
 
+import static android.app.ActivityManager.RECENT_IGNORE_UNAVAILABLE;
+
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import android.app.PendingIntent;
@@ -37,6 +39,7 @@ import android.view.RemoteAnimationAdapter;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.systemui.shared.recents.ISystemUiProxy;
@@ -47,6 +50,9 @@ import com.android.systemui.shared.system.smartspace.ISmartspaceTransitionContro
 import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.pip.IPip;
 import com.android.wm.shell.pip.IPipAnimationListener;
+import com.android.wm.shell.recents.IRecentTasks;
+import com.android.wm.shell.recents.IRecentTasksListener;
+import com.android.wm.shell.util.GroupedRecentTaskInfo;
 import com.android.wm.shell.splitscreen.ISplitScreen;
 import com.android.wm.shell.splitscreen.ISplitScreenListener;
 import com.android.wm.shell.startingsurface.IStartingWindow;
@@ -54,6 +60,7 @@ import com.android.wm.shell.startingsurface.IStartingWindowListener;
 import com.android.wm.shell.transition.IShellTransitions;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Holds the reference to SystemUI.
@@ -72,6 +79,7 @@ public class SystemUiProxy implements ISystemUiProxy,
     private IOneHanded mOneHanded;
     private IShellTransitions mShellTransitions;
     private IStartingWindow mStartingWindow;
+    private IRecentTasks mRecentTasks;
     private final DeathRecipient mSystemUiProxyDeathRecipient = () -> {
         MAIN_EXECUTOR.execute(() -> clearProxy());
     };
@@ -82,6 +90,7 @@ public class SystemUiProxy implements ISystemUiProxy,
     private ISplitScreenListener mPendingSplitScreenListener;
     private IStartingWindowListener mPendingStartingWindowListener;
     private ISmartspaceCallback mPendingSmartspaceCallback;
+    private IRecentTasksListener mPendingRecentTasksListener;
     private final ArrayList<RemoteTransitionCompat> mPendingRemoteTransitions = new ArrayList<>();
 
     // Used to dedupe calls to SystemUI
@@ -117,6 +126,17 @@ public class SystemUiProxy implements ISystemUiProxy,
     }
 
     @Override
+    public void onImeSwitcherPressed() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.onImeSwitcherPressed();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call onImeSwitcherPressed", e);
+            }
+        }
+    }
+
+    @Override
     public void setHomeRotationEnabled(boolean enabled) {
         if (mSystemUiProxy != null) {
             try {
@@ -135,7 +155,7 @@ public class SystemUiProxy implements ISystemUiProxy,
 
     public void setProxy(ISystemUiProxy proxy, IPip pip, ISplitScreen splitScreen,
             IOneHanded oneHanded, IShellTransitions shellTransitions,
-            IStartingWindow startingWindow,
+            IStartingWindow startingWindow, IRecentTasks recentTasks,
             ISmartspaceTransitionController smartSpaceTransitionController) {
         unlinkToDeath();
         mSystemUiProxy = proxy;
@@ -145,6 +165,7 @@ public class SystemUiProxy implements ISystemUiProxy,
         mShellTransitions = shellTransitions;
         mStartingWindow = startingWindow;
         mSmartspaceTransitionController = smartSpaceTransitionController;
+        mRecentTasks = recentTasks;
         linkToDeath();
         // re-attach the listeners once missing due to setProxy has not been initialized yet.
         if (mPendingPipAnimationListener != null && mPip != null) {
@@ -167,6 +188,10 @@ public class SystemUiProxy implements ISystemUiProxy,
             registerRemoteTransition(mPendingRemoteTransitions.get(i));
         }
         mPendingRemoteTransitions.clear();
+        if (mPendingRecentTasksListener != null && mRecentTasks != null) {
+            registerRecentTasksListener(mPendingRecentTasksListener);
+            mPendingRecentTasksListener = null;
+        }
 
         if (mPendingSetNavButtonAlpha != null) {
             mPendingSetNavButtonAlpha.run();
@@ -175,7 +200,7 @@ public class SystemUiProxy implements ISystemUiProxy,
     }
 
     public void clearProxy() {
-        setProxy(null, null, null, null, null, null, null);
+        setProxy(null, null, null, null, null, null, null, null);
     }
 
     // TODO(141886704): Find a way to remove this
@@ -444,6 +469,8 @@ public class SystemUiProxy implements ISystemUiProxy,
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call handleImageBundleAsScreenshot");
             }
+        } else if (TestProtocol.sDebugTracing) {
+            Log.d(TestProtocol.NO_SCREENSHOT, "sysuiproxy, no proxy available");
         }
     }
 
@@ -543,53 +570,6 @@ public class SystemUiProxy implements ISystemUiProxy,
             }
         }
         mPendingSplitScreenListener = null;
-    }
-
-    public void setSideStageVisibility(boolean visible) {
-        if (mSplitScreen != null) {
-            try {
-                mSplitScreen.setSideStageVisibility(visible);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call setSideStageVisibility");
-            }
-        }
-    }
-
-    /**
-     * To be called whenever the user exits out of split screen apps (either by launching another
-     * app or by swiping home)
-     * @param topTaskId The taskId of the new app that was launched. System will then move this task
-     *                  to the front of what the user sees while removing all other split stages.
-     *                  If swiping to home (or there is no task to put at the top), can pass in -1.
-     */
-    public void exitSplitScreen(int topTaskId) {
-        if (mSplitScreen != null) {
-            try {
-                mSplitScreen.exitSplitScreen(topTaskId);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call exitSplitScreen");
-            }
-        }
-    }
-
-    public void exitSplitScreenOnHide(boolean exitSplitScreenOnHide) {
-        if (mSplitScreen != null) {
-            try {
-                mSplitScreen.exitSplitScreenOnHide(exitSplitScreenOnHide);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call exitSplitScreen");
-            }
-        }
-    }
-
-    public void startTask(int taskId, int stage, int position, Bundle options) {
-        if (mSplitScreen != null) {
-            try {
-                mSplitScreen.startTask(taskId, stage, position, options);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call startTask");
-            }
-        }
     }
 
     /** Start multiple tasks in split-screen simultaneously. */
@@ -745,7 +725,6 @@ public class SystemUiProxy implements ISystemUiProxy,
         }
     }
 
-
     //
     // SmartSpace transitions
     //
@@ -760,5 +739,44 @@ public class SystemUiProxy implements ISystemUiProxy,
         } else {
             mPendingSmartspaceCallback = callback;
         }
+    }
+
+    //
+    // Recents
+    //
+
+    public void registerRecentTasksListener(IRecentTasksListener listener) {
+        if (mRecentTasks != null) {
+            try {
+                mRecentTasks.registerRecentTasksListener(listener);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call registerRecentTasksListener", e);
+            }
+        } else {
+            mPendingRecentTasksListener = listener;
+        }
+    }
+
+    public void unregisterRecentTasksListener(IRecentTasksListener listener) {
+        if (mRecentTasks != null) {
+            try {
+                mRecentTasks.unregisterRecentTasksListener(listener);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call unregisterRecentTasksListener");
+            }
+        }
+        mPendingRecentTasksListener = null;
+    }
+
+    public ArrayList<GroupedRecentTaskInfo> getRecentTasks(int numTasks, int userId) {
+        if (mRecentTasks != null) {
+            try {
+                return new ArrayList<>(Arrays.asList(mRecentTasks.getRecentTasks(numTasks,
+                        RECENT_IGNORE_UNAVAILABLE, userId)));
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call getRecentTasks", e);
+            }
+        }
+        return new ArrayList<>();
     }
 }

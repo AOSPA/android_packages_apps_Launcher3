@@ -31,6 +31,7 @@ import androidx.test.uiautomator.Until;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.tapl.AllApps;
 import com.android.launcher3.tapl.Background;
 import com.android.launcher3.tapl.LauncherInstrumentation.NavigationModel;
 import com.android.launcher3.tapl.Overview;
@@ -43,12 +44,16 @@ import com.android.quickstep.views.RecentsView;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 @LargeTest
 @RunWith(AndroidJUnit4.class)
 public class TaplTestsQuickstep extends AbstractQuickStepTest {
+
+    private static final String APP_NAME = "LauncherTestApp";
+
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -266,7 +271,9 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         background.quickSwitchToPreviousAppSwipeLeft();
         assertTrue("The 2nd app we should have quick switched to is not running",
                 isTestActivityRunning(3));
-        getAndAssertBackground();
+
+        background = getAndAssertBackground();
+        background.switchToOverview();
     }
 
     private boolean isTestActivityRunning(int activityNumber) {
@@ -284,6 +291,31 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         assertTrue("The most recent task is not running after quick switching from home",
                 isTestActivityRunning(2));
         getAndAssertBackground();
+    }
+
+    // TODO(b/204830798): test with all navigation modes(add @NavigationModeSwitch annotation)
+    //  after the bug resolved.
+    @Ignore("b/205027405")
+    @Test
+    @PortraitLandscape
+    @ScreenRecord
+    public void testPressBack() throws Exception {
+        mLauncher.getWorkspace().switchToAllApps();
+        mLauncher.pressBack();
+        mLauncher.getWorkspace();
+        waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
+
+        AllApps allApps = mLauncher.getWorkspace().switchToAllApps();
+        allApps.freeze();
+        try {
+            allApps.getAppIcon(APP_NAME).dragToWorkspace(false, false);
+        } finally {
+            allApps.unfreeze();
+        }
+        mLauncher.getWorkspace().getWorkspaceAppIcon(APP_NAME).launch(getAppPackageName());
+        mLauncher.pressBack();
+        mLauncher.getWorkspace();
+        waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
     }
 
     @Test

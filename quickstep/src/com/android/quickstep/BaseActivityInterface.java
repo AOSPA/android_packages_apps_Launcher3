@@ -66,6 +66,7 @@ import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
+import java.util.HashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -192,7 +193,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public void closeOverlay() { }
 
-    public void switchRunningTaskViewToScreenshot(ThumbnailData thumbnailData, Runnable runnable) {
+    public void switchRunningTaskViewToScreenshot(HashMap<Integer, ThumbnailData> thumbnailDatas,
+            Runnable runnable) {
         ACTIVITY_TYPE activity = getCreatedActivity();
         if (activity == null) {
             return;
@@ -204,7 +206,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             }
             return;
         }
-        recentsView.switchToScreenshot(thumbnailData, runnable);
+        recentsView.switchToScreenshot(thumbnailDatas, runnable);
     }
 
     /**
@@ -304,11 +306,10 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * Calculates the overview grid size for the provided device configuration.
      */
     public final void calculateGridSize(Context context, DeviceProfile dp, Rect outRect) {
-        Resources res = context.getResources();
         Rect insets = dp.getInsets();
         int topMargin = dp.overviewTaskThumbnailTopMarginPx;
         int bottomMargin = getOverviewActionsHeight(context, dp);
-        int sideMargin = res.getDimensionPixelSize(R.dimen.overview_grid_side_margin);
+        int sideMargin = dp.overviewGridSideMargin;
 
         outRect.set(0, 0, dp.widthPx, dp.heightPx);
         outRect.inset(Math.max(insets.left, sideMargin), insets.top + topMargin,
@@ -321,11 +322,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public final void calculateGridTaskSize(Context context, DeviceProfile dp, Rect outRect,
             PagedOrientationHandler orientedState) {
         Resources res = context.getResources();
-        Rect gridRect = new Rect();
-        calculateGridSize(context, dp, gridRect);
+        Rect taskRect = new Rect();
+        calculateTaskSize(context, dp, taskRect);
 
         float rowHeight =
-                (gridRect.height() + dp.overviewTaskThumbnailTopMarginPx - dp.overviewRowSpacing)
+                (taskRect.height() + dp.overviewTaskThumbnailTopMarginPx - dp.overviewRowSpacing)
                         / 2f;
 
         PointF taskDimension = getTaskDimension(context, dp);
@@ -335,7 +336,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
         int gravity = Gravity.TOP;
         gravity |= orientedState.getRecentsRtlSetting(res) ? Gravity.RIGHT : Gravity.LEFT;
-        Gravity.apply(gravity, outWidth, outHeight, gridRect, outRect);
+        Gravity.apply(gravity, outWidth, outHeight, taskRect, outRect);
     }
 
     /**

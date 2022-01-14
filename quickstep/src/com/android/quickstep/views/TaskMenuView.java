@@ -16,6 +16,7 @@
 
 package com.android.quickstep.views;
 
+import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_UNDEFINED;
 import static com.android.quickstep.views.TaskThumbnailView.DIM_ALPHA;
@@ -33,11 +34,12 @@ import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.ViewTreeObserver.OnScrollChangedListener;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseDraggingActivity;
@@ -67,6 +69,7 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
 
     private BaseDraggingActivity mActivity;
     private TextView mTaskName;
+    @Nullable
     private AnimatorSet mOpenCloseAnimator;
     private TaskView mTaskView;
     private TaskIdAttributeContainer mTaskContainer;
@@ -210,7 +213,7 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
 
     @Override
     public void onScrollChanged() {
-        RecentsView rv = mTaskView.getRecentsView();
+        RecentsView rv = mActivity.getOverviewPanel();
         setPosition(mTaskView.getX() - rv.getScrollX(), mTaskView.getY() - rv.getScrollY(),
                 rv.getOverScrollShift());
     }
@@ -242,7 +245,17 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
         LayoutParams lp = (LayoutParams) menuOptionView.getLayoutParams();
         mTaskView.getPagedOrientationHandler().setLayoutParamsForTaskMenuOptionItem(lp,
                 menuOptionView, mActivity.getDeviceProfile());
-        menuOptionView.setOnClickListener(menuOption::onClick);
+        menuOptionView.setOnClickListener(view -> {
+            if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
+                RecentsView recentsView = mTaskView.getRecentsView();
+                recentsView.switchToScreenshot(null,
+                        () -> recentsView.finishRecentsAnimation(true /* toRecents */,
+                                false /* shouldPip */,
+                                () -> menuOption.onClick(view)));
+            } else {
+                menuOption.onClick(view);
+            }
+        });
         mOptionLayout.addView(menuOptionView);
     }
 
@@ -259,15 +272,9 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
         BaseDragLayer.LayoutParams params = (BaseDragLayer.LayoutParams) getLayoutParams();
         int padding = getResources()
                 .getDimensionPixelSize(R.dimen.task_menu_vertical_padding);
-        if (deviceProfile.overviewShowAsGrid) {
-            // TODO(b/193432925) temporary so it doesn't look terrible on large screen
-            params.width =
-                    getContext().getResources().getDimensionPixelSize(R.dimen.task_menu_width_grid);
-        } else {
-            params.width = orientationHandler
-                    .getTaskMenuWidth(taskContainer.getThumbnailView(),
-                            deviceProfile) - (2 * padding);
-        }
+        params.width = orientationHandler
+                .getTaskMenuWidth(taskContainer.getThumbnailView(),
+                        deviceProfile) - (2 * padding);
         // Gravity set to Left instead of Start as sTempRect.left measures Left distance not Start
         params.gravity = Gravity.LEFT;
         setLayoutParams(params);
@@ -338,13 +345,4 @@ public class TaskMenuView extends AbstractFloatingView implements OnScrollChange
         return new RoundedRectRevealOutlineProvider(radius, radius, fromRect, toRect);
     }
 
-    public View findMenuItemByText(String text) {
-        for (int i = mOptionLayout.getChildCount() - 1; i >= 0; --i) {
-            final ViewGroup menuOptionView = (ViewGroup) mOptionLayout.getChildAt(i);
-            if (text.equals(menuOptionView.<TextView>findViewById(R.id.text).getText())) {
-                return menuOptionView;
-            }
-        }
-        return null;
-    }
 }
