@@ -32,6 +32,7 @@ import com.android.systemui.shared.system.RecentsAnimationControllerCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Set;
 
 /**
@@ -125,20 +126,20 @@ public class RecentsAnimationCallbacks implements
 
     @BinderThread
     @Override
-    public final void onAnimationCanceled(ThumbnailData thumbnailData) {
+    public final void onAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
             for (RecentsAnimationListener listener : getListeners()) {
-                listener.onRecentsAnimationCanceled(thumbnailData);
+                listener.onRecentsAnimationCanceled(thumbnailDatas);
             }
         });
     }
 
     @BinderThread
     @Override
-    public void onTaskAppeared(RemoteAnimationTargetCompat app) {
+    public void onTasksAppeared(RemoteAnimationTargetCompat[] apps) {
         Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
             for (RecentsAnimationListener listener : getListeners()) {
-                listener.onTaskAppeared(app);
+                listener.onTasksAppeared(apps);
             }
         });
     }
@@ -166,7 +167,7 @@ public class RecentsAnimationCallbacks implements
          * Callback from the system when the recents animation is canceled. {@param thumbnailData}
          * is passed back for rendering screenshot to replace live tile.
          */
-        default void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {}
+        default void onRecentsAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {}
 
         /**
          * Callback made whenever the recents animation is finished.
@@ -176,6 +177,6 @@ public class RecentsAnimationCallbacks implements
         /**
          * Callback made when a task started from the recents is ready for an app transition.
          */
-        default void onTaskAppeared(RemoteAnimationTargetCompat appearedTaskTarget) {}
+        default void onTasksAppeared(RemoteAnimationTargetCompat[] appearedTaskTarget) {}
     }
 }

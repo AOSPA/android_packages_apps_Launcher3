@@ -31,6 +31,8 @@ import android.graphics.ColorFilter;
 import android.graphics.Insets;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -41,6 +43,7 @@ import android.util.Property;
 import android.view.Surface;
 import android.view.View;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.graphics.ColorUtils;
 
@@ -75,9 +78,11 @@ public class TaskThumbnailView extends View {
             };
 
     private final BaseActivity mActivity;
+    @Nullable
     private TaskOverlay mOverlay;
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mClearPaint = new Paint();
     private final Paint mDimmingPaintAfterClearing = new Paint();
     private final int mDimColor;
 
@@ -86,8 +91,11 @@ public class TaskThumbnailView extends View {
     private final PreviewPositionHelper mPreviewPositionHelper = new PreviewPositionHelper();
     private TaskView.FullscreenDrawParams mFullscreenParams;
 
+    @Nullable
     private Task mTask;
+    @Nullable
     private ThumbnailData mThumbnailData;
+    @Nullable
     protected BitmapShader mBitmapShader;
 
     /** How much this thumbnail is dimmed, 0 not dimmed at all, 1 totally dimmed. */
@@ -99,14 +107,15 @@ public class TaskThumbnailView extends View {
         this(context, null);
     }
 
-    public TaskThumbnailView(Context context, AttributeSet attrs) {
+    public TaskThumbnailView(Context context, @Nullable AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public TaskThumbnailView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public TaskThumbnailView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mPaint.setFilterBitmap(true);
         mBackgroundPaint.setColor(Color.WHITE);
+        mClearPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
         mActivity = BaseActivity.fromContext(context);
         // Initialize with placeholder value. It is overridden later by TaskView
         mFullscreenParams = TEMP_PARAMS.get(context);
@@ -136,7 +145,8 @@ public class TaskThumbnailView extends View {
      *                   upon swipe up so that a usable screenshot is accessible immediately when
      *                   recents animation needs to be finished / cancelled.
      */
-    public void setThumbnail(Task task, ThumbnailData thumbnailData, boolean refreshNow) {
+    public void setThumbnail(@Nullable Task task, @Nullable ThumbnailData thumbnailData,
+            boolean refreshNow) {
         mTask = task;
         mThumbnailData =
                 (thumbnailData != null && thumbnailData.thumbnail != null) ? thumbnailData : null;
@@ -146,7 +156,7 @@ public class TaskThumbnailView extends View {
     }
 
     /** See {@link #setThumbnail(Task, ThumbnailData, boolean)} */
-    public void setThumbnail(Task task, ThumbnailData thumbnailData) {
+    public void setThumbnail(@Nullable Task task, @Nullable ThumbnailData thumbnailData) {
         setThumbnail(task, thumbnailData, true /* refreshNow */);
     }
 
@@ -271,6 +281,7 @@ public class TaskThumbnailView extends View {
             float cornerRadius) {
         if (ENABLE_QUICKSTEP_LIVE_TILE.get()) {
             if (mTask != null && getTaskView().isRunningTask() && !getTaskView().showScreenshot()) {
+                canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius, mClearPaint);
                 canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius,
                         mDimmingPaintAfterClearing);
                 return;
@@ -360,6 +371,10 @@ public class TaskThumbnailView extends View {
         return Utilities.makeColorTintingColorFilter(mDimColor, dimAmount);
     }
 
+    /**
+     * Returns current thumbnail or null if none is set.
+     */
+    @Nullable
     public Bitmap getThumbnail() {
         if (mThumbnailData == null) {
             return null;

@@ -211,7 +211,8 @@ public abstract class AbstractLauncherUiTest {
     }
 
     protected TestRule getRulesInsideActivityMonitor() {
-        final RuleChain inner = RuleChain.outerRule(new PortraitLandscapeRunner(this))
+        final RuleChain inner = RuleChain
+                .outerRule(new PortraitLandscapeRunner(this))
                 .around(new FailureWatcher(mDevice, mLauncher));
 
         return TestHelpers.isInLauncherProcess()
@@ -345,11 +346,18 @@ public abstract class AbstractLauncherUiTest {
     }
 
     // Cannot be used in TaplTests between a Tapl call injecting a gesture and a tapl call
-    // expecting
-    // the results of that gesture because the wait can hide flakeness.
+    // expecting the results of that gesture because the wait can hide flakeness.
     protected void waitForState(String message, Supplier<LauncherState> state) {
         waitForLauncherCondition(message,
                 launcher -> launcher.getStateManager().getCurrentStableState() == state.get());
+    }
+
+    // Cannot be used in TaplTests between a Tapl call injecting a gesture and a tapl call
+    // expecting the results of that gesture because the wait can hide flakeness.
+    protected void waitForStateTransitionToEnd(String message, Supplier<LauncherState> state) {
+        waitForLauncherCondition(message,
+                launcher -> launcher.getStateManager().isInStableState(state.get())
+                        && !launcher.getStateManager().isInTransition());
     }
 
     protected void waitForResumed(String message) {

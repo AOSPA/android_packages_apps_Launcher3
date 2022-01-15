@@ -22,6 +22,7 @@ import static com.android.launcher3.allapps.AllAppsStore.DEFER_UPDATES_TEST;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import android.util.Log;
 import android.view.View;
 
 import com.android.launcher3.R;
@@ -31,6 +32,7 @@ import com.android.launcher3.allapps.WorkAdapterProvider;
 import com.android.launcher3.allapps.WorkEduCard;
 import com.android.launcher3.allapps.WorkProfileManager;
 import com.android.launcher3.tapl.LauncherInstrumentation;
+import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 
 import org.junit.After;
 import org.junit.Before;
@@ -51,11 +53,21 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
         String output =
                 mDevice.executeShellCommand(
                         "pm create-user --profileOf 0 --managed TestProfile");
+        Log.d("b/203817455", "pm create-user; output: " + output);
         assertTrue("Failed to create work profile", output.startsWith("Success"));
 
         String[] tokens = output.split("\\s+");
         mProfileUserId = Integer.parseInt(tokens[tokens.length - 1]);
         mDevice.executeShellCommand("am start-user " + mProfileUserId);
+
+        mDevice.pressHome();
+        waitForLauncherCondition("Launcher didn't start", Objects::nonNull);
+        waitForStateTransitionToEnd("Launcher internal state didn't switch to Normal",
+                () -> NORMAL);
+        waitForResumed("Launcher internal state is still Background");
+        executeOnLauncher(launcher -> launcher.getStateManager().goToState(ALL_APPS));
+        waitForStateTransitionToEnd("Launcher internal state didn't switch to All Apps",
+                () -> ALL_APPS);
     }
 
     @After
@@ -84,12 +96,8 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
     }
 
     @Test
+    @ScreenRecord // b/202735477
     public void workTabExists() {
-        mDevice.pressHome();
-        waitForLauncherCondition("Launcher didn't start", Objects::nonNull);
-        waitForState("Launcher internal state didn't switch to Normal", () -> NORMAL);
-        executeOnLauncher(launcher -> launcher.getStateManager().goToState(ALL_APPS));
-        waitForState("Launcher internal state didn't switch to All Apps", () -> ALL_APPS);
         waitForLauncherCondition("Personal tab is missing",
                 launcher -> launcher.getAppsView().isPersonalTabVisible(),
                 LauncherInstrumentation.WAIT_TIME_MS);
@@ -100,12 +108,6 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
 
     @Test
     public void toggleWorks() {
-        mDevice.pressHome();
-        waitForLauncherCondition("Launcher didn't start", Objects::nonNull);
-        waitForState("Launcher internal state didn't switch to Normal", () -> NORMAL);
-        executeOnLauncher(launcher -> launcher.getStateManager().goToState(ALL_APPS));
-        waitForState("Launcher internal state didn't switch to All Apps", () -> ALL_APPS);
-
         waitForWorkTabSetup();
 
         executeOnLauncher(launcher -> {
@@ -147,11 +149,6 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
 
     @Test
     public void testEdu() {
-        mDevice.pressHome();
-        waitForLauncherCondition("Launcher didn't start", Objects::nonNull);
-        waitForState("Launcher internal state didn't switch to Normal", () -> NORMAL);
-        executeOnLauncher(launcher -> launcher.getStateManager().goToState(ALL_APPS));
-        waitForState("Launcher internal state didn't switch to All Apps", () -> ALL_APPS);
         waitForWorkTabSetup();
         executeOnLauncher(l -> {
             l.getSharedPrefs().edit().putInt(WorkAdapterProvider.KEY_WORK_EDU_STEP, 0).commit();

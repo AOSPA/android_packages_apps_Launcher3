@@ -44,6 +44,8 @@ import com.android.quickstep.TaskAnimationManager;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.InputMonitorCompat;
 
+import java.util.HashMap;
+
 /**
  * Input consumer which delegates the swipe-progress handling
  */
@@ -151,10 +153,8 @@ public class ProgressDelegateInputConsumer implements InputConsumer,
 
         ObjectAnimator anim = mProgress.animateToValue(endValue);
         anim.setDuration(duration).setInterpolator(scrollInterpolatorForVelocity(velocity));
-        if (mRecentsAnimationController != null) {
-            anim.addListener(AnimatorListeners.forSuccessCallback(
-                    () -> mStateCallback.setState(STATE_FLING_FINISHED)));
-        }
+        anim.addListener(AnimatorListeners.forSuccessCallback(
+                () -> mStateCallback.setState(STATE_FLING_FINISHED)));
         anim.start();
     }
 
@@ -174,7 +174,7 @@ public class ProgressDelegateInputConsumer implements InputConsumer,
     }
 
     @Override
-    public void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {
+    public void onRecentsAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
         mRecentsAnimationController = null;
     }
 
