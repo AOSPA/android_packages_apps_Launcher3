@@ -55,6 +55,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
@@ -96,6 +97,7 @@ import com.android.quickstep.GestureState.GestureEndTarget;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.ActivityInitListener;
+import com.android.launcher3.util.ActivityLifecycleCallbacksAdapter;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.InputConsumerProxy;
 import com.android.quickstep.util.InputProxyHandlerFactory;
@@ -121,8 +123,8 @@ import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.function.Consumer;
 
 /**
@@ -153,6 +155,17 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     protected MultiStateCallback mStateCallback;
     protected boolean mCanceled;
     private boolean mRecentsViewScrollLinked = false;
+    private final ActivityLifecycleCallbacksAdapter mLifecycleCallbacks =
+            new ActivityLifecycleCallbacksAdapter() {
+                @Override
+                public void onActivityDestroyed(Activity activity) {
+                    if (mActivity != activity) {
+                        return;
+                    }
+                    mRecentsView = null;
+                    mActivity = null;
+                }
+            };
 
     private static int getFlagForIndex(int index, String name) {
         if (DEBUG_STATES) {
@@ -416,6 +429,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         setupRecentsViewUi();
         linkRecentsViewScroll();
 
+        mActivity.registerActivityLifecycleCallbacks(mLifecycleCallbacks);
         return true;
     }
 
@@ -687,14 +701,17 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     private void onAnimatorPlaybackControllerCreated(AnimatorControllerWithResistance anim) {
+        boolean isFirstCreation = mLauncherTransitionController == null;
         mLauncherTransitionController = anim;
-        mStateCallback.runOnceAtState(STATE_GESTURE_STARTED, () -> {
-            // Wait until the gesture is started (touch slop was passed) to start in sync with
-            // mWindowTransitionController. This ensures we don't hide the taskbar background when
-            // long pressing to stash it, for instance.
-            mLauncherTransitionController.getNormalController().dispatchOnStart();
-            updateLauncherTransitionProgress();
-        });
+        if (isFirstCreation) {
+            mStateCallback.runOnceAtState(STATE_GESTURE_STARTED, () -> {
+                // Wait until the gesture is started (touch slop was passed) to start in sync with
+                // mWindowTransitionController. This ensures we don't hide the taskbar background
+                // when long pressing to stash it, for instance.
+                mLauncherTransitionController.getNormalController().dispatchOnStart();
+                updateLauncherTransitionProgress();
+            });
+        }
     }
 
     public Intent getLaunchIntent() {
@@ -1539,6 +1556,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     private void reset() {
         mStateCallback.setStateOnUiThread(STATE_HANDLER_INVALIDATED);
+        if (mActivity != null) {
+            mActivity.unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
+        }
     }
 
     /**

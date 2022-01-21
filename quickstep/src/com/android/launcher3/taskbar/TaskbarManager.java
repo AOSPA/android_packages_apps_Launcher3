@@ -15,10 +15,10 @@
  */
 package com.android.launcher3.taskbar;
 
+import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
-import static com.android.launcher3.testing.TestProtocol.TASKBAR_WINDOW_CRASH;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
@@ -30,8 +30,8 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
 import android.net.Uri;
+import android.os.Handler;
 import android.provider.Settings;
-import android.util.Log;
 import android.view.Display;
 
 import androidx.annotation.NonNull;
@@ -42,7 +42,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StatefulActivity;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.SettingsCache;
@@ -95,7 +94,8 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         Display display =
                 service.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
         mContext = service.createWindowContext(display, TYPE_NAVIGATION_BAR_PANEL, null);
-        mNavButtonController = new TaskbarNavButtonController(service);
+        mNavButtonController = new TaskbarNavButtonController(service,
+                SystemUiProxy.INSTANCE.get(mContext), new Handler());
         mUserSetupCompleteListener = isUserSetupComplete -> recreateTaskbar();
         mComponentCallbacks = new ComponentCallbacks() {
             private Configuration mOldConfig = mContext.getResources().getConfiguration();
@@ -108,6 +108,11 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
                 if ((configDiff & configsRequiringRecreate) != 0) {
                     // Color has changed, recreate taskbar to reload background color & icons.
                     recreateTaskbar();
+                } else {
+                    // Config change might be handled without re-creating the taskbar
+                    if (mTaskbarActivityContext != null) {
+                        mTaskbarActivityContext.onConfigurationChanged(configDiff);
+                    }
                 }
                 mOldConfig = newConfig;
             }
@@ -185,6 +190,9 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
      */
     private TaskbarUIController createTaskbarUIControllerForActivity(StatefulActivity activity) {
         if (activity instanceof BaseQuickstepLauncher) {
+            if (mTaskbarActivityContext.getPackageManager().hasSystemFeature(FEATURE_PC)) {
+                return new DesktopTaskbarUIController((BaseQuickstepLauncher) activity);
+            }
             return new LauncherTaskbarUIController((BaseQuickstepLauncher) activity);
         }
         if (activity instanceof RecentsActivity) {
@@ -207,8 +215,6 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
     }
 
     private void recreateTaskbar() {
-        Log.d(TASKBAR_WINDOW_CRASH, "Recreating taskbar: mTaskbarActivityContext="
-                + mTaskbarActivityContext);
         destroyExistingTaskbar();
 
         DeviceProfile dp =
@@ -231,7 +237,6 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
             mTaskbarActivityContext.setUIController(
                     createTaskbarUIControllerForActivity(mActivity));
         }
-        Log.d(TASKBAR_WINDOW_CRASH, "Finished recreating taskbar");
     }
 
     public void onSystemUiFlagsChanged(int systemUiStateFlags) {
@@ -266,6 +271,12 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
     public void onSystemBarAttributesChanged(int displayId, int behavior) {
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.onSystemBarAttributesChanged(displayId, behavior);
+        }
+    }
+
+    public void onNavButtonsDarkIntensityChanged(float darkIntensity) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.onNavButtonsDarkIntensityChanged(darkIntensity);
         }
     }
 

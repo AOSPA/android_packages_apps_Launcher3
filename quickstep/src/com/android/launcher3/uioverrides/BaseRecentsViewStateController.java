@@ -16,7 +16,6 @@
 
 package com.android.launcher3.uioverrides;
 
-import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.anim.Interpolators.AGGRESSIVE_EASE_IN_OUT;
 import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
 import static com.android.launcher3.anim.Interpolators.INSTANT;
@@ -35,6 +34,7 @@ import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_SPLIT_TRANS
 import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
 
 import android.util.FloatProperty;
+import android.util.Pair;
 
 import androidx.annotation.NonNull;
 
@@ -73,8 +73,6 @@ public abstract class BaseRecentsViewStateController<T extends RecentsView>
         getTaskModalnessProperty().set(mRecentsView, state.getOverviewModalness());
         RECENTS_GRID_PROGRESS.set(mRecentsView,
                 state.displayOverviewTasksAsGrid(mLauncher.getDeviceProfile()) ? 1f : 0f);
-
-        applySplitScrollOffset(state);
     }
 
     @Override
@@ -104,11 +102,13 @@ public abstract class BaseRecentsViewStateController<T extends RecentsView>
                 config.getInterpolator(ANIM_OVERVIEW_TRANSLATE_Y, LINEAR));
         PagedOrientationHandler orientationHandler =
                 ((RecentsView) mLauncher.getOverviewPanel()).getPagedOrientationHandler();
-        FloatProperty taskViewsFloat = orientationHandler.getSplitSelectTaskOffset(
-                TASK_PRIMARY_SPLIT_TRANSLATION, TASK_SECONDARY_SPLIT_TRANSLATION,
-                mLauncher.getDeviceProfile());
-        setter.setFloat(mRecentsView, taskViewsFloat,
+        Pair<FloatProperty, FloatProperty> taskViewsFloat =
+                orientationHandler.getSplitSelectTaskOffset(
+                        TASK_PRIMARY_SPLIT_TRANSLATION, TASK_SECONDARY_SPLIT_TRANSLATION,
+                        mLauncher.getDeviceProfile());
+        setter.setFloat(mRecentsView, taskViewsFloat.first,
                 toState.getSplitSelectTranslation(mLauncher), LINEAR);
+        setter.setFloat(mRecentsView, taskViewsFloat.second, 0, LINEAR);
 
         setter.setFloat(mRecentsView, getContentAlphaProperty(), toState.overviewUi ? 1 : 0,
                 config.getInterpolator(ANIM_OVERVIEW_FADE, AGGRESSIVE_EASE_IN_OUT));
@@ -120,16 +120,6 @@ public abstract class BaseRecentsViewStateController<T extends RecentsView>
         boolean showAsGrid = toState.displayOverviewTasksAsGrid(mLauncher.getDeviceProfile());
         setter.setFloat(mRecentsView, RECENTS_GRID_PROGRESS, showAsGrid ? 1f : 0f,
                 showAsGrid ? INSTANT : FINAL_FRAME);
-
-        applySplitScrollOffset(toState);
-    }
-
-    private void applySplitScrollOffset(@NonNull final LauncherState state) {
-        if (state == OVERVIEW_SPLIT_SELECT) {
-            mRecentsView.applySplitPrimaryScrollOffset();
-        } else {
-            mRecentsView.resetSplitPrimaryScrollOffset();
-        }
     }
 
     abstract FloatProperty getTaskModalnessProperty();

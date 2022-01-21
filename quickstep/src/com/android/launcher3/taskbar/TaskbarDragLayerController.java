@@ -44,6 +44,7 @@ public class TaskbarDragLayerController {
     private final AnimatedFloat mKeyguardBgTaskbar = new AnimatedFloat(this::updateBackgroundAlpha);
     private final AnimatedFloat mNotificationShadeBgTaskbar = new AnimatedFloat(
             this::updateBackgroundAlpha);
+    private final AnimatedFloat mImeBgTaskbar = new AnimatedFloat(this::updateBackgroundAlpha);
     // Used to hide our background color when someone else (e.g. ScrimView) is handling it.
     private final AnimatedFloat mBgOverride = new AnimatedFloat(this::updateBackgroundAlpha);
 
@@ -52,6 +53,9 @@ public class TaskbarDragLayerController {
 
     // Initialized in init.
     private TaskbarControllers mControllers;
+    private AnimatedFloat mNavButtonDarkIntensityMultiplier;
+
+    private float mLastSetBackgroundAlpha;
 
     public TaskbarDragLayerController(TaskbarActivityContext activity,
             TaskbarDragLayer taskbarDragLayer) {
@@ -65,9 +69,13 @@ public class TaskbarDragLayerController {
         mControllers = controllers;
         mTaskbarDragLayer.init(new TaskbarDragLayerCallbacks());
 
+        mNavButtonDarkIntensityMultiplier = mControllers.navbarButtonsViewController
+                .getNavButtonDarkIntensityMultiplier();
+
         mBgTaskbar.value = 1;
         mKeyguardBgTaskbar.value = 1;
         mNotificationShadeBgTaskbar.value = 1;
+        mImeBgTaskbar.value = 1;
         mBgOverride.value = 1;
         updateBackgroundAlpha();
     }
@@ -102,6 +110,10 @@ public class TaskbarDragLayerController {
         return mNotificationShadeBgTaskbar;
     }
 
+    public AnimatedFloat getImeBgTaskbar() {
+        return mImeBgTaskbar;
+    }
+
     public AnimatedFloat getOverrideBackgroundAlpha() {
         return mBgOverride;
     }
@@ -113,14 +125,23 @@ public class TaskbarDragLayerController {
     private void updateBackgroundAlpha() {
         final float bgNavbar = mBgNavbar.value;
         final float bgTaskbar = mBgTaskbar.value * mKeyguardBgTaskbar.value
-                * mNotificationShadeBgTaskbar.value;
-        mTaskbarDragLayer.setTaskbarBackgroundAlpha(
-                mBgOverride.value * Math.max(bgNavbar, bgTaskbar)
-        );
+                * mNotificationShadeBgTaskbar.value * mImeBgTaskbar.value;
+        mLastSetBackgroundAlpha = mBgOverride.value * Math.max(bgNavbar, bgTaskbar);
+        mTaskbarDragLayer.setTaskbarBackgroundAlpha(mLastSetBackgroundAlpha);
+
+        updateNavBarDarkIntensityMultiplier();
     }
 
     private void updateBackgroundOffset() {
         mTaskbarDragLayer.setTaskbarBackgroundOffset(mBgOffset.value);
+
+        updateNavBarDarkIntensityMultiplier();
+    }
+
+    private void updateNavBarDarkIntensityMultiplier() {
+        // Zero out the app-requested dark intensity when we're drawing our own background.
+        float effectiveBgAlpha = mLastSetBackgroundAlpha * (1 - mBgOffset.value);
+        mNavButtonDarkIntensityMultiplier.updateValue(1 - effectiveBgAlpha);
     }
 
     /**
@@ -143,8 +164,7 @@ public class TaskbarDragLayerController {
                 // Let touches pass through us.
                 insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
             } else if (mControllers.navbarButtonsViewController.isImeVisible()) {
-                insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_CONTENT);
-                insetsIsTouchableRegion = false;
+                insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
             } else if (!mControllers.uiController.isTaskbarTouchable()) {
                 // Let touches pass through us.
                 insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
