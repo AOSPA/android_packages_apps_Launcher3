@@ -63,6 +63,15 @@ public final class RecentsViewStateController extends
         }
         setAlphas(PropertySetter.NO_ANIM_PROPERTY_SETTER, new StateAnimationConfig(), state);
         mRecentsView.setFullscreenProgress(state.getOverviewFullscreenProgress());
+        // In Overview, we may be layering app surfaces behind Launcher, so we need to notify
+        // DepthController to prevent optimizations which might occlude the layers behind
+        mLauncher.getDepthController().setHasContentBehindLauncher(state.overviewUi);
+
+        if (isSplitSelectionState(state)) {
+            mRecentsView.applySplitPrimaryScrollOffset();
+        } else {
+            mRecentsView.resetSplitPrimaryScrollOffset();
+        }
     }
 
     @Override
@@ -78,13 +87,20 @@ public final class RecentsViewStateController extends
             builder.addListener(
                     AnimatorListeners.forSuccessCallback(mRecentsView::resetTaskVisuals));
         }
+        // In Overview, we may be layering app surfaces behind Launcher, so we need to notify
+        // DepthController to prevent optimizations which might occlude the layers behind
+        builder.addListener(AnimatorListeners.forSuccessCallback(() ->
+                mLauncher.getDepthController().setHasContentBehindLauncher(toState.overviewUi)));
 
         // Create or dismiss split screen select animations
         LauncherState currentState = mLauncher.getStateManager().getState();
         if (isSplitSelectionState(toState) && !isSplitSelectionState(currentState)) {
             builder.add(mRecentsView.createSplitSelectInitAnimation().buildAnim());
-        } else if (!isSplitSelectionState(toState) && isSplitSelectionState(currentState)) {
-            builder.add(mRecentsView.cancelSplitSelect(true).buildAnim());
+        }
+        if (isSplitSelectionState(toState)) {
+            mRecentsView.applySplitPrimaryScrollOffset();
+        } else {
+            mRecentsView.resetSplitPrimaryScrollOffset();
         }
 
         setAlphas(builder, config, toState);

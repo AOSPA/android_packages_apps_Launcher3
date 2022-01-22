@@ -115,7 +115,7 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
     public List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp) {
         // Add "right" option which is actually the top
         return Collections.singletonList(new SplitPositionOption(
-                R.drawable.ic_split_screen, R.string.split_screen_position_right,
+                R.drawable.ic_split_right, R.string.split_screen_position_right,
                 STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
     }
 
@@ -132,10 +132,10 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
 
     @Override
     public void setSplitIconParams(View primaryIconView, View secondaryIconView,
-            int taskIconHeight, Rect primarySnapshotBounds, Rect secondarySnapshotBounds,
+            int taskIconHeight, int primarySnapshotWidth, int primarySnapshotHeight,
             boolean isRtl, DeviceProfile deviceProfile, StagedSplitBounds splitConfig) {
         super.setSplitIconParams(primaryIconView, secondaryIconView, taskIconHeight,
-                primarySnapshotBounds, secondarySnapshotBounds, isRtl, deviceProfile, splitConfig);
+                primarySnapshotWidth, primarySnapshotHeight, isRtl, deviceProfile, splitConfig);
         FrameLayout.LayoutParams primaryIconParams =
                 (FrameLayout.LayoutParams) primaryIconView.getLayoutParams();
         FrameLayout.LayoutParams secondaryIconParams =

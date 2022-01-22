@@ -36,6 +36,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ShapeDrawable;
 import android.util.FloatProperty;
+import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.VelocityTracker;
@@ -101,18 +102,24 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public <T> void set(T target, Int2DAction<T> action, int param) {
+    public <T> void setPrimary(T target, Int2DAction<T> action, int param) {
         action.call(target, 0, param);
     }
 
     @Override
-    public <T> void set(T target, Float2DAction<T> action, float param) {
+    public <T> void setPrimary(T target, Float2DAction<T> action, float param) {
         action.call(target, 0, param);
     }
 
     @Override
     public <T> void setSecondary(T target, Float2DAction<T> action, float param) {
         action.call(target, param, 0);
+    }
+
+    @Override
+    public <T> void set(T target, Int2DAction<T> action, int primaryParam,
+            int secondaryParam) {
+        action.call(target, secondaryParam, primaryParam);
     }
 
     @Override
@@ -350,7 +357,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     public List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp) {
         // Add "left" side of phone which is actually the top
         return Collections.singletonList(new SplitPositionOption(
-                R.drawable.ic_split_screen, R.string.split_screen_position_left,
+                R.drawable.ic_split_left, R.string.split_screen_position_left,
                 STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
     }
 
@@ -429,7 +436,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public void setSplitIconParams(View primaryIconView, View secondaryIconView,
-            int taskIconHeight, Rect primarySnapshotBounds, Rect secondarySnapshotBounds,
+            int taskIconHeight, int primarySnapshotWidth, int primarySnapshotHeight,
             boolean isRtl, DeviceProfile deviceProfile, StagedSplitBounds splitConfig) {
         FrameLayout.LayoutParams primaryIconParams =
                 (FrameLayout.LayoutParams) primaryIconView.getLayoutParams();
@@ -439,13 +446,12 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
                 splitConfig.visualDividerBounds.height() :
                 splitConfig.visualDividerBounds.width());
 
-        int primaryHeight = primarySnapshotBounds.height();
         primaryIconParams.gravity = (isRtl ? START : END) | TOP;
-        primaryIconView.setTranslationY(primaryHeight - primaryIconView.getHeight() / 2f);
+        primaryIconView.setTranslationY(primarySnapshotHeight - primaryIconView.getHeight() / 2f);
         primaryIconView.setTranslationX(0);
 
         secondaryIconParams.gravity = (isRtl ? START : END) | TOP;
-        secondaryIconView.setTranslationY(primaryHeight + taskIconHeight + dividerBar);
+        secondaryIconView.setTranslationY(primarySnapshotHeight + taskIconHeight + dividerBar);
         secondaryIconView.setTranslationX(0);
         primaryIconView.setLayoutParams(primaryIconParams);
         secondaryIconView.setLayoutParams(secondaryIconParams);
@@ -457,8 +463,8 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public FloatProperty getSplitSelectTaskOffset(FloatProperty primary, FloatProperty secondary,
-            DeviceProfile deviceProfile) {
-        return primary;
+    public Pair<FloatProperty, FloatProperty> getSplitSelectTaskOffset(FloatProperty primary,
+            FloatProperty secondary, DeviceProfile deviceProfile) {
+        return new Pair<>(primary, secondary);
     }
 }

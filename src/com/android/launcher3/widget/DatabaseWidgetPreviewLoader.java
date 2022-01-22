@@ -29,7 +29,6 @@ import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Handler;
-import android.os.Process;
 import android.util.Log;
 import android.util.Size;
 
@@ -264,8 +263,8 @@ public class DatabaseWidgetPreviewLoader {
             LauncherIcons li = LauncherIcons.obtain(mContext);
             Drawable icon = li.createBadgedIconBitmap(
                     mutateOnMainThread(info.getFullResIcon(
-                            LauncherAppState.getInstance(mContext).getIconCache())),
-                    Process.myUserHandle(), 0).newIcon(mContext);
+                            LauncherAppState.getInstance(mContext).getIconCache())))
+                    .newIcon(mContext);
             li.recycle();
 
             icon.setBounds(padding, padding, padding + iconSize, padding + iconSize);

@@ -18,6 +18,8 @@ package com.android.launcher3;
 
 import static com.android.launcher3.config.FeatureFlags.ENABLE_ICON_LABEL_AUTO_SCALING;
 import static com.android.launcher3.graphics.PreloadIconDrawable.newPendingIcon;
+import static com.android.launcher3.icons.BitmapInfo.FLAG_NO_BADGE;
+import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
 
 import android.animation.Animator;
@@ -48,7 +50,7 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
-import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
+import com.android.launcher3.accessibility.BaseAccessibilityDelegate;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.FolderIcon;
@@ -144,6 +146,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private final boolean mIsRtl;
     private final int mIconSize;
 
+    @ViewDebug.ExportedProperty(category = "launcher")
+    private boolean mHideBadge = false;
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mIsIconVisible = true;
     @ViewDebug.ExportedProperty(category = "launcher")
@@ -241,6 +245,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         super.onFocusChanged(focused, direction, previouslyFocusedRect);
     }
 
+    public void setHideBadge(boolean hideBadge) {
+        mHideBadge = hideBadge;
+    }
+
     /**
      * Resets the view so it can be recycled.
      */
@@ -296,7 +304,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @Override
     public void setAccessibilityDelegate(AccessibilityDelegate delegate) {
-        if (delegate instanceof LauncherAccessibilityDelegate) {
+        if (delegate instanceof BaseAccessibilityDelegate) {
             super.setAccessibilityDelegate(delegate);
         } else {
             // NO-OP
@@ -364,7 +372,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     protected void applyIconAndLabel(ItemInfoWithIcon info) {
         boolean useTheme = mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER
                 || mDisplay == DISPLAY_TASKBAR;
-        FastBitmapDrawable iconDrawable = info.newIcon(getContext(), useTheme);
+        int flags = useTheme ? FLAG_THEMED : 0;
+        if (mHideBadge) {
+            flags |= FLAG_NO_BADGE;
+        }
+        FastBitmapDrawable iconDrawable = info.newIcon(getContext(), flags);
         mDotParams.color = IconPalette.getMutedColor(iconDrawable.getIconColor(), 0.54f);
 
         setIcon(iconDrawable);

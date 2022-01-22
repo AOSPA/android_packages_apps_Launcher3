@@ -20,7 +20,6 @@ import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_M
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
-import static com.android.launcher3.testing.TestProtocol.TASKBAR_WINDOW_CRASH;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 import static com.android.systemui.shared.system.WindowManagerWrapper.ITYPE_BOTTOM_TAPPABLE_ELEMENT;
@@ -31,6 +30,7 @@ import android.app.ActivityOptions;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo.Config;
 import android.content.pm.LauncherApps;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
@@ -53,14 +53,18 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.R;
+import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.model.data.FolderInfo;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.SettingsCache;
@@ -110,6 +114,8 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
     // The flag to know if the window is excluded from magnification region computation.
     private boolean mIsExcludeFromMagnificationRegion = false;
 
+    private final TaskbarShortcutMenuAccessibilityDelegate mAccessibilityDelegate;
+
     public TaskbarActivityContext(Context windowContext, DeviceProfile dp,
             TaskbarNavButtonController buttonController, ScopedUnfoldTransitionProgressProvider
             unfoldTransitionProgressProvider) {
@@ -145,14 +151,16 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         mLeftCorner = display.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT);
         mRightCorner = display.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT);
 
+        mAccessibilityDelegate = new TaskbarShortcutMenuAccessibilityDelegate(this);
+
         // Construct controllers.
         mControllers = new TaskbarControllers(this,
                 new TaskbarDragController(this),
                 buttonController,
                 new NavbarButtonsViewController(this, navButtonsView),
                 new RotationButtonController(this,
-                        c.getColor(R.color.rotation_button_light_color),
-                        c.getColor(R.color.rotation_button_dark_color),
+                        c.getColor(R.color.taskbar_nav_icon_light_color),
+                        c.getColor(R.color.taskbar_nav_icon_dark_color),
                         R.drawable.ic_sysbar_rotate_button_ccw_start_0,
                         R.drawable.ic_sysbar_rotate_button_ccw_start_90,
                         R.drawable.ic_sysbar_rotate_button_cw_start_0,
@@ -168,7 +176,7 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                 new TaskbarStashController(this),
                 new TaskbarEduController(this),
                 new TaskbarAutohideSuspendController(this),
-                new TaskbarPopupController());
+                new TaskbarPopupController(this));
     }
 
     public void init(TaskbarSharedState sharedState) {
@@ -204,7 +212,10 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         updateSysuiStateFlags(sharedState.sysuiStateFlags, true /* fromInit */);
 
         mWindowManager.addView(mDragLayer, mWindowLayoutParams);
-        Log.d(TASKBAR_WINDOW_CRASH, "Adding taskbar window");
+    }
+
+    public void onConfigurationChanged(@Config int configChanges) {
+        mControllers.onConfigurationChanged(configChanges);
     }
 
     public boolean isThreeButtonNav() {
@@ -316,6 +327,22 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         }
     }
 
+    @Override
+    public DotInfo getDotInfoForItem(ItemInfo info) {
+        return getPopupDataProvider().getDotInfoForItem(info);
+    }
+
+    @NonNull
+    @Override
+    public PopupDataProvider getPopupDataProvider() {
+        return mControllers.taskbarPopupController.getPopupDataProvider();
+    }
+
+    @Override
+    public View.AccessibilityDelegate getAccessibilityDelegate() {
+        return mAccessibilityDelegate;
+    }
+
     /**
      * Sets a new data-source for this taskbar instance
      */
@@ -340,7 +367,6 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         setUIController(TaskbarUIController.DEFAULT);
         mControllers.onDestroy();
         mWindowManager.removeViewImmediate(mDragLayer);
-        Log.d(TASKBAR_WINDOW_CRASH, "Removing taskbar window");
     }
 
     public void updateSysuiStateFlags(int systemUiStateFlags, boolean fromInit) {
@@ -359,6 +385,7 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
         mControllers.taskbarStashController.updateStateForSysuiFlags(systemUiStateFlags, fromInit);
         mControllers.taskbarScrimViewController.updateStateForSysuiFlags(systemUiStateFlags,
                 fromInit);
+        mControllers.navButtonController.updateSysuiFlags(systemUiStateFlags);
     }
 
     /**
@@ -392,6 +419,11 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
 
     public void onSystemBarAttributesChanged(int displayId, int behavior) {
         mControllers.rotationButtonController.onBehaviorChanged(displayId, behavior);
+    }
+
+    public void onNavButtonsDarkIntensityChanged(float darkIntensity) {
+        mControllers.navbarButtonsViewController.getTaskbarNavButtonDarkIntensity()
+                .updateValue(darkIntensity);
     }
 
     /**
@@ -541,5 +573,10 @@ public class TaskbarActivityContext extends ContextThemeWrapper implements Activ
                     ~WindowManager.LayoutParams.PRIVATE_FLAG_EXCLUDE_FROM_SCREEN_MAGNIFICATION;
         }
         mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
+    }
+
+    public void showPopupMenuForIcon(BubbleTextView btv) {
+        setTaskbarWindowFullscreen(true);
+        btv.post(() -> mControllers.taskbarPopupController.showForIcon(btv));
     }
 }

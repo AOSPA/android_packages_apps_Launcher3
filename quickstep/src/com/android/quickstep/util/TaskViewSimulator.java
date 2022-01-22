@@ -102,6 +102,8 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
     private StagedSplitBounds mStagedSplitBounds;
     private boolean mDrawsBelowRecents;
     private boolean mIsGridTask;
+    private int mTaskRectTranslationX;
+    private int mTaskRectTranslationY;
 
     public TaskViewSimulator(Context context, BaseActivityInterface sizeStrategy) {
         mContext = context;
@@ -156,9 +158,11 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
             fullTaskSize = new Rect(mTaskRect);
             mOrientationState.getOrientationHandler()
                     .setSplitTaskSwipeRect(mDp, mTaskRect, mStagedSplitBounds, mStagePosition);
+            mTaskRect.offset(mTaskRectTranslationX, mTaskRectTranslationY);
         } else {
             fullTaskSize = mTaskRect;
         }
+        fullTaskSize.offset(mTaskRectTranslationX, mTaskRectTranslationY);
         return mOrientationState.getFullScreenScaleAndPivot(fullTaskSize, mDp, mPivot);
     }
 
@@ -215,6 +219,14 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
      */
     public void setIsGridTask(boolean isGridTask) {
         mIsGridTask = isGridTask;
+    }
+
+    /**
+     * Apply translations on TaskRect's starting location.
+     */
+    public void setTaskRectTranslation(int taskRectTranslationX, int taskRectTranslationY) {
+        mTaskRectTranslationX = taskRectTranslationX;
+        mTaskRectTranslationY = taskRectTranslationY;
     }
 
     /**
@@ -320,20 +332,20 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
         mMatrix.postTranslate(insets.left, insets.top);
         mMatrix.postScale(scale, scale);
 
-        // Apply TaskView matrix: translate, scroll
+        // Apply TaskView matrix: taskRect, translate
         mMatrix.postTranslate(mTaskRect.left, mTaskRect.top);
-        mOrientationState.getOrientationHandler().set(mMatrix, MATRIX_POST_TRANSLATE,
+        mOrientationState.getOrientationHandler().setPrimary(mMatrix, MATRIX_POST_TRANSLATE,
                 taskPrimaryTranslation.value);
         mOrientationState.getOrientationHandler().setSecondary(mMatrix, MATRIX_POST_TRANSLATE,
                 taskSecondaryTranslation.value);
-        mOrientationState.getOrientationHandler().set(
+        mOrientationState.getOrientationHandler().setPrimary(
                 mMatrix, MATRIX_POST_TRANSLATE, recentsViewScroll.value);
 
         // Apply RecentsView matrix
         mMatrix.postScale(recentsViewScale.value, recentsViewScale.value, mPivot.x, mPivot.y);
         mOrientationState.getOrientationHandler().setSecondary(mMatrix, MATRIX_POST_TRANSLATE,
                 recentsViewSecondaryTranslation.value);
-        mOrientationState.getOrientationHandler().set(mMatrix, MATRIX_POST_TRANSLATE,
+        mOrientationState.getOrientationHandler().setPrimary(mMatrix, MATRIX_POST_TRANSLATE,
                 recentsViewPrimaryTranslation.value);
         applyWindowToHomeRotation(mMatrix);
 

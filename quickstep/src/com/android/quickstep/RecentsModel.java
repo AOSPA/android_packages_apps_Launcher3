@@ -24,6 +24,7 @@ import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.content.ComponentCallbacks2;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
@@ -42,6 +43,7 @@ import com.android.systemui.shared.system.KeyguardManagerCompat;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -176,7 +178,7 @@ public class RecentsModel extends TaskStackChangeListener implements IconChangeL
 
     @Override
     public void onTaskRemoved(int taskId) {
-        Task.TaskKey stubKey = new Task.TaskKey(taskId, 0, null, null, 0, 0);
+        Task.TaskKey stubKey = new Task.TaskKey(taskId, 0, new Intent(), null, 0, 0);
         mThumbnailCache.remove(stubKey);
         mIconCache.onTaskRemoved(stubKey);
     }
@@ -217,6 +219,11 @@ public class RecentsModel extends TaskStackChangeListener implements IconChangeL
      */
     public void removeThumbnailChangeListener(TaskVisualsChangeListener listener) {
         mThumbnailChangeListeners.remove(listener);
+    }
+
+    public void dump(String prefix, PrintWriter writer) {
+        writer.println(prefix + "RecentsModel:");
+        mTaskList.dump("  ", writer);
     }
 
     /**

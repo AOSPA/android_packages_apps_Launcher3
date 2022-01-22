@@ -71,9 +71,34 @@ public class FloatingTaskView extends FrameLayout {
         mImageView.setLayerType(LAYER_TYPE_HARDWARE, null);
         mSplitPlaceholderView = findViewById(R.id.split_placeholder);
         mSplitPlaceholderView.setAlpha(0);
-        mSplitPlaceholderView.setBackgroundColor(getResources().getColor(android.R.color.white));
     }
 
+    private void init(StatefulActivity launcher, TaskView originalView, RectF positionOut) {
+        mStartingPosition = positionOut;
+        updateInitialPositionForView(originalView);
+        final InsettableFrameLayout.LayoutParams lp =
+                (InsettableFrameLayout.LayoutParams) getLayoutParams();
+
+        mSplitPlaceholderView.setLayoutParams(new FrameLayout.LayoutParams(lp.width, lp.height));
+        positionOut.round(mOutline);
+        setPivotX(0);
+        setPivotY(0);
+
+        // Copy bounds of exiting thumbnail into ImageView
+        TaskThumbnailView thumbnail = originalView.getThumbnail();
+        mImageView.setImageBitmap(thumbnail.getThumbnail());
+        mImageView.setVisibility(VISIBLE);
+
+        mOrientationHandler = originalView.getRecentsView().getPagedOrientationHandler();
+        mSplitPlaceholderView.setIconView(originalView.getIconView(),
+                launcher.getDeviceProfile().overviewTaskIconDrawableSizePx);
+        mSplitPlaceholderView.getIconView().setRotation(mOrientationHandler.getDegreesRotated());
+    }
+
+    /**
+     * Configures and returns a an instance of {@link FloatingTaskView} initially matching the
+     * appearance of {@code originalView}.
+     */
     public static FloatingTaskView getFloatingTaskView(StatefulActivity launcher,
             TaskView originalView, RectF positionOut) {
         final BaseDragLayer dragLayer = launcher.getDragLayer();
@@ -81,28 +106,7 @@ public class FloatingTaskView extends FrameLayout {
         final FloatingTaskView floatingView = (FloatingTaskView) launcher.getLayoutInflater()
                 .inflate(R.layout.floating_split_select_view, parent, false);
 
-        floatingView.mStartingPosition = positionOut;
-        floatingView.updateInitialPositionForView(originalView);
-        final InsettableFrameLayout.LayoutParams lp =
-                (InsettableFrameLayout.LayoutParams) floatingView.getLayoutParams();
-
-        floatingView.mSplitPlaceholderView.setLayoutParams(
-                new FrameLayout.LayoutParams(lp.width, lp.height));
-        positionOut.round(floatingView.mOutline);
-        floatingView.setPivotX(0);
-        floatingView.setPivotY(0);
-
-        // Copy bounds of exiting thumbnail into ImageView
-        TaskThumbnailView thumbnail = originalView.getThumbnail();
-        floatingView.mImageView.setImageBitmap(thumbnail.getThumbnail());
-        floatingView.mImageView.setVisibility(VISIBLE);
-
-        floatingView.mOrientationHandler =
-                originalView.getRecentsView().getPagedOrientationHandler();
-        floatingView.mSplitPlaceholderView.setIconView(originalView.getIconView(),
-                launcher.getDeviceProfile().overviewTaskIconDrawableSizePx);
-        floatingView.mSplitPlaceholderView.getIconView()
-                .setRotation(floatingView.mOrientationHandler.getDegreesRotated());
+        floatingView.init(launcher, originalView, positionOut);
         parent.addView(floatingView);
         return floatingView;
     }
@@ -125,9 +129,7 @@ public class FloatingTaskView extends FrameLayout {
     public void update(RectF position, float progress, float windowRadius) {
         MarginLayoutParams lp = (MarginLayoutParams) getLayoutParams();
 
-        float dX = mIsRtl
-                ? position.left - (lp.getMarginStart() - lp.width)
-                : position.left - lp.getMarginStart();
+        float dX = position.left - lp.getMarginStart();
         float dY = position.top - lp.topMargin;
 
         setTranslationX(dX);
@@ -153,16 +155,10 @@ public class FloatingTaskView extends FrameLayout {
         lp.ignoreInsets = true;
         // Position the floating view exactly on top of the original
         lp.topMargin = Math.round(pos.top);
-        if (mIsRtl) {
-            lp.setMarginStart(Math.round(mLauncher.getDeviceProfile().widthPx - pos.right));
-        } else {
-            lp.setMarginStart(Math.round(pos.left));
-        }
+        lp.setMarginStart(Math.round(pos.left));
         // Set the properties here already to make sure they are available when running the first
         // animation frame.
-        int left = mIsRtl
-                ? mLauncher.getDeviceProfile().widthPx - lp.getMarginStart() - lp.width
-                : lp.leftMargin;
+        int left = lp.leftMargin;
         layout(left, lp.topMargin, left + lp.width, lp.topMargin + lp.height);
     }
 

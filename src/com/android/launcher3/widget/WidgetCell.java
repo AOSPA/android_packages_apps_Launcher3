@@ -26,6 +26,7 @@ import static com.android.launcher3.Utilities.ATLEAST_S;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
+import android.os.Process;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Size;
@@ -36,6 +37,7 @@ import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RemoteViews;
 import android.widget.TextView;
@@ -111,6 +113,7 @@ public class WidgetCell extends LinearLayout {
 
     private FrameLayout mWidgetImageContainer;
     private WidgetImageView mWidgetImage;
+    private ImageView mWidgetBadge;
     private TextView mWidgetName;
     private TextView mWidgetDims;
     private TextView mWidgetDescription;
@@ -166,6 +169,7 @@ public class WidgetCell extends LinearLayout {
 
         mWidgetImageContainer = findViewById(R.id.widget_preview_container);
         mWidgetImage = findViewById(R.id.widget_preview);
+        mWidgetBadge = findViewById(R.id.widget_badge);
         mWidgetName = findViewById(R.id.widget_name);
         mWidgetDims = findViewById(R.id.widget_dims);
         mWidgetDescription = findViewById(R.id.widget_description);
@@ -195,6 +199,8 @@ public class WidgetCell extends LinearLayout {
         mWidgetImage.animate().cancel();
         mWidgetImage.setDrawable(null);
         mWidgetImage.setVisibility(View.VISIBLE);
+        mWidgetBadge.setImageDrawable(null);
+        mWidgetBadge.setVisibility(View.GONE);
         mWidgetName.setText(null);
         mWidgetDims.setText(null);
         mWidgetDescription.setText(null);
@@ -349,6 +355,7 @@ public class WidgetCell extends LinearLayout {
                 mAppWidgetHostViewPreview = null;
             }
         }
+
         if (mAnimatePreview) {
             mWidgetImageContainer.setAlpha(0f);
             ViewPropertyAnimator anim = mWidgetImageContainer.animate();
@@ -359,6 +366,17 @@ public class WidgetCell extends LinearLayout {
         if (mActiveRequest != null) {
             mActiveRequest.cancel();
             mActiveRequest = null;
+        }
+    }
+
+    /** Used to show the badge when the widget is in the recommended section
+     */
+    public void showBadge() {
+        if (Process.myUserHandle().equals(mItem.user)) {
+            mWidgetBadge.setVisibility(View.GONE);
+        } else {
+            mWidgetBadge.setVisibility(View.VISIBLE);
+            mWidgetBadge.setImageResource(R.drawable.ic_work_app_badge);
         }
     }
 

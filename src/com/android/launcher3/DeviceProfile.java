@@ -16,13 +16,10 @@
 
 package com.android.launcher3;
 
-import static android.util.DisplayMetrics.DENSITY_DEVICE_STABLE;
-
 import static com.android.launcher3.ResourceUtils.pxFromDp;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.Utilities.pxFromSp;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
-import static com.android.launcher3.util.WindowManagerCompat.MIN_TABLET_WIDTH;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -64,7 +61,6 @@ public class DeviceProfile {
     public final boolean isPhone;
     public final boolean transposeLayoutWithOrientation;
     public final boolean isTwoPanels;
-    public final boolean allowRotation;
 
     // Device properties in current orientation
     public final boolean isLandscape;
@@ -244,15 +240,9 @@ public class DeviceProfile {
         availableHeightPx = windowBounds.availableSize.y;
 
         mInfo = info;
-        // If the device's pixel density was scaled (usually via settings for A11y), use the
-        // original dimensions to determine if rotation is allowed of not.
-        float originalSmallestWidth = dpiFromPx(Math.min(widthPx, heightPx), DENSITY_DEVICE_STABLE);
-        allowRotation = originalSmallestWidth >= MIN_TABLET_WIDTH;
-        // Tablet UI does not support emulated landscape.
-        isTablet = allowRotation && info.isTablet(windowBounds);
+        isTablet = info.isTablet(windowBounds);
         isPhone = !isTablet;
-        isTwoPanels = isTablet && useTwoPanels
-                && (isLandscape || FeatureFlags.ENABLE_TWO_PANEL_HOME_IN_PORTRAIT.get());
+        isTwoPanels = isTablet && useTwoPanels;
 
         aspectRatio = ((float) Math.max(widthPx, heightPx)) / Math.min(widthPx, heightPx);
         boolean isTallDevice = Float.compare(aspectRatio, TALL_DEVICE_ASPECT_RATIO_THRESHOLD) >= 0;
@@ -824,13 +814,21 @@ public class DeviceProfile {
         Point padding = getTotalWorkspacePadding();
 
         int numColumns = isTwoPanels ? inv.numColumns * 2 : inv.numColumns;
-        int cellLayoutTotalPadding =
-                isTwoPanels ? 4 * cellLayoutPaddingLeftRightPx : 2 * cellLayoutPaddingLeftRightPx;
-        int screenWidthPx = availableWidthPx - padding.x - cellLayoutTotalPadding;
+        int screenWidthPx = getWorkspaceWidth(padding);
         result.x = calculateCellWidth(screenWidthPx, cellLayoutBorderSpacePx.x, numColumns);
         result.y = calculateCellHeight(availableHeightPx - padding.y
                 - cellLayoutBottomPaddingPx, cellLayoutBorderSpacePx.y, inv.numRows);
         return result;
+    }
+
+    public int getWorkspaceWidth() {
+        return getWorkspaceWidth(getTotalWorkspacePadding());
+    }
+
+    public int getWorkspaceWidth(Point workspacePadding) {
+        int cellLayoutTotalPadding =
+                isTwoPanels ? 4 * cellLayoutPaddingLeftRightPx : 2 * cellLayoutPaddingLeftRightPx;
+        return availableWidthPx - workspacePadding.x - cellLayoutTotalPadding;
     }
 
     public Point getTotalWorkspacePadding() {
@@ -1033,7 +1031,6 @@ public class DeviceProfile {
         writer.println(prefix + "DeviceProfile:");
         writer.println(prefix + "\t1 dp = " + mMetrics.density + " px");
 
-        writer.println(prefix + "\tallowRotation:" + allowRotation);
         writer.println(prefix + "\tisTablet:" + isTablet);
         writer.println(prefix + "\tisPhone:" + isPhone);
         writer.println(prefix + "\ttransposeLayoutWithOrientation:"
