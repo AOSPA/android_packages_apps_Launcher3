@@ -91,6 +91,7 @@ import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.util.Log;
+import android.util.Pair;
 import android.util.SparseBooleanArray;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
@@ -629,7 +630,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      * this doesn't get adjusted to reflect the new child count after the taskView is dismissed/
      * removed from recentsView
      */
-    private int mSplitHiddenTaskViewIndex;
+    private int mSplitHiddenTaskViewIndex = -1;
     @Nullable
     private FloatingTaskView mFirstFloatingTaskView;
     @Nullable
@@ -1263,7 +1264,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     @Override
     protected void onNotSnappingToPageInFreeScroll() {
         int finalPos = mScroller.getFinalX();
-        if (!showAsGrid() && finalPos > mMinScroll && finalPos < mMaxScroll) {
+        if (finalPos > mMinScroll && finalPos < mMaxScroll) {
             int firstPageScroll = getScrollForPage(!mIsRtl ? 0 : getPageCount() - 1);
             int lastPageScroll = getScrollForPage(!mIsRtl ? getPageCount() - 1 : 0);
 
@@ -1276,6 +1277,19 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                     : finalPos > (lastPageScroll + mMaxScroll) / 2
                             ? mMaxScroll
                             : getScrollForPage(mNextPage);
+
+            if (showAsGrid()) {
+                if (isSplitSelectionActive()) {
+                    return;
+                }
+                TaskView taskView = getTaskViewAt(mNextPage);
+                // Only snap to fully visible focused task.
+                if (taskView == null
+                        || !taskView.isFocusedTask()
+                        || !isTaskViewFullyVisible(taskView)) {
+                    return;
+                }
+            }
 
             mScroller.setFinalX(pageSnapped);
             // Ensure the scroll/snap doesn't happen too fast;
@@ -1620,7 +1634,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 || !mOrientationHandler.equals(oldOrientationHandler)) {
             // Changed orientations, update controllers so they intercept accordingly.
             mActivity.getDragLayer().recreateControllers();
-            setModalStateEnabled(false);
+            onOrientationChanged();
         }
 
         boolean isInLandscape = mOrientationState.getTouchRotation() != ROTATION_0
@@ -1637,6 +1651,15 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         requestLayout();
         // Reapply the current page to update page scrolls.
         setCurrentPage(mCurrentPage);
+    }
+
+    private void onOrientationChanged() {
+        // If overview is in modal state when rotate, reset it to overview state without running
+        // animation.
+        setModalStateEnabled(false);
+        if (isSplitSelectionActive()) {
+            onRotateInSplitSelectionState();
+        }
     }
 
     // Update task size and padding that are dependent on DeviceProfile and insets.
@@ -3333,7 +3356,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      * {@link #mFirstFloatingTaskView}.
      */
     public boolean shouldShiftThumbnailsForSplitSelect() {
-        return !mActivity.getDeviceProfile().isTablet;
+        return !mActivity.getDeviceProfile().isTablet || !mActivity.getDeviceProfile().isLandscape;
     }
 
     protected void onDismissAnimationEnds() {
@@ -3519,6 +3542,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     protected void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         updateRecentsRotation();
+        onOrientationChanged();
     }
 
     /**
@@ -3833,13 +3857,18 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      * Apply scroll offset to children of RecentsView when entering split select.
      */
     public void applySplitPrimaryScrollOffset() {
+        float taskSplitScrollOffsetPrimary = 0f;
+        float clearAllSplitScrollOffsetPrimar = 0f;
         if (isSplitPlaceholderFirstInGrid()) {
-            for (int i = 0; i < getTaskViewCount(); i++) {
-                requireTaskViewAt(i).setSplitScrollOffsetPrimary(mSplitPlaceholderSize);
-            }
+            taskSplitScrollOffsetPrimary = mSplitPlaceholderSize;
         } else if (isSplitPlaceholderLastInGrid()) {
-            mClearAllButton.setSplitSelectScrollOffsetPrimary(-mSplitPlaceholderSize);
+            clearAllSplitScrollOffsetPrimar = -mSplitPlaceholderSize;
         }
+
+        for (int i = 0; i < getTaskViewCount(); i++) {
+            requireTaskViewAt(i).setSplitScrollOffsetPrimary(taskSplitScrollOffsetPrimary);
+        }
+        mClearAllButton.setSplitSelectScrollOffsetPrimary(clearAllSplitScrollOffsetPrimar);
     }
 
     /**
@@ -3959,6 +3988,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
     /** TODO(b/181707736) More gracefully handle exiting split selection state */
     private void resetFromSplitSelectionState() {
+        if (mSplitHiddenTaskViewIndex == -1) {
+            return;
+        }
         if (!mActivity.getDeviceProfile().overviewShowAsGrid) {
             int pageToSnapTo = mCurrentPage;
             if (mSplitHiddenTaskViewIndex <= pageToSnapTo) {
@@ -3985,6 +4017,41 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             mSecondSplitHiddenTaskView.setVisibility(VISIBLE);
             mSecondSplitHiddenTaskView = null;
         }
+    }
+
+    /**
+     * Returns how much additional translation there should be for each of the child TaskViews.
+     * Note that the translation can be its primary or secondary dimension.
+     */
+    public float getSplitSelectTranslation() {
+        int splitPosition = getSplitPlaceholder().getActiveSplitStagePosition();
+        if (!shouldShiftThumbnailsForSplitSelect()) {
+            return 0f;
+        }
+        PagedOrientationHandler orientationHandler = getPagedOrientationHandler();
+        int direction = orientationHandler.getSplitTranslationDirectionFactor(
+                splitPosition, mActivity.getDeviceProfile());
+        return mActivity.getResources().getDimension(R.dimen.split_placeholder_size) * direction;
+    }
+
+    protected void onRotateInSplitSelectionState() {
+        mOrientationHandler.getInitialSplitPlaceholderBounds(mSplitPlaceholderSize,
+                mActivity.getDeviceProfile(),
+                mSplitSelectStateController.getActiveSplitStagePosition(), mTempRect);
+        mTempRectF.set(mTempRect);
+        // TODO(194414938) set correct corner radius
+        mFirstFloatingTaskView.updateOrientationHandler(mOrientationHandler);
+        mFirstFloatingTaskView.update(mTempRectF, /*progress=*/1f, /*windowRadius=*/0f);
+
+        PagedOrientationHandler orientationHandler = getPagedOrientationHandler();
+        Pair<FloatProperty, FloatProperty> taskViewsFloat =
+                orientationHandler.getSplitSelectTaskOffset(
+                        TASK_PRIMARY_SPLIT_TRANSLATION, TASK_SECONDARY_SPLIT_TRANSLATION,
+                        mActivity.getDeviceProfile());
+        taskViewsFloat.first.set(this, getSplitSelectTranslation());
+        taskViewsFloat.second.set(this, 0f);
+
+        applySplitPrimaryScrollOffset();
     }
 
     private void updateDeadZoneRects() {

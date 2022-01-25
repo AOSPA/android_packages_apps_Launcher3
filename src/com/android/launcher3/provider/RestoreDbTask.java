@@ -16,8 +16,8 @@
 
 package com.android.launcher3.provider;
 
-import static com.android.launcher3.model.DeviceGridState.TYPE_MULTI_DISPLAY;
-import static com.android.launcher3.model.DeviceGridState.TYPE_PHONE;
+import static com.android.launcher3.InvariantDeviceProfile.TYPE_MULTI_DISPLAY;
+import static com.android.launcher3.InvariantDeviceProfile.TYPE_PHONE;
 import static com.android.launcher3.provider.LauncherDbUtils.dropTable;
 
 import android.app.backup.BackupManager;
@@ -87,12 +87,6 @@ public class RestoreDbTask {
     }
 
     private static boolean performRestore(Context context, DatabaseHelper helper) {
-        if (!DeviceGridState.deviceTypeCompatible(
-                new DeviceGridState(LauncherAppState.getIDP(context)).getDeviceType(),
-                Utilities.getPrefs(context).getInt(RESTORED_DEVICE_TYPE, TYPE_PHONE))) {
-            // DO NOT restore if the device types are incompatible.
-            return false;
-        }
         SQLiteDatabase db = helper.getWritableDatabase();
         try (SQLiteTransaction t = new SQLiteTransaction(db)) {
             RestoreDbTask task = new RestoreDbTask();
