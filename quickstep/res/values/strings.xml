@@ -53,8 +53,6 @@
 
     <!-- Accessibility title for the row of all-apps containing app predictions. [CHAR LIMIT=50] -->
     <string name="title_app_suggestions">App suggestions</string>
-    <!-- Label for the header text of the All Apps section in All Apps view, used to separate Predicted Apps and Actions section from All Apps section. [CHAR_LIMIT=50] -->
-    <string name="all_apps_label">All apps</string>
     <!-- Text of the tip when user lands in all apps view for the first time, indicating where the tip toast points to is the predicted apps section. [CHAR_LIMIT=50] -->
     <string name="all_apps_prediction_tip">Your predicted apps</string>
 
@@ -195,6 +193,8 @@
     <string name="action_split">Split</string>
     <!-- Label for toast with instructions for split screen selection mode. [CHAR_LIMIT=50] -->
     <string name="toast_split_select_app">Tap another app to use splitscreen</string>
+    <!-- Label for toast when app selected for split isn't supported. [CHAR_LIMIT=50] -->
+    <string name="toast_split_app_unsupported">App does not support split-screen.</string>
     <!-- Message shown when an action is blocked by a policy enforced by the app or the organization managing the device. [CHAR_LIMIT=NONE] -->
     <string name="blocked_by_policy">This action isn\'t allowed by the app or your organization</string>
 
@@ -207,6 +207,9 @@
     <string name="gesture_tutorial_action_button_label_cancel">Cancel</string>
     <!-- Button text shown on a button on the tutorial skip dialog to exit the tutorial. [CHAR LIMIT=14] -->
     <string name="gesture_tutorial_action_button_label_skip">Skip</string>
+
+    <!-- Accessibility label for the rotation suggestion button -->
+    <string name="accessibility_rotate_button">Rotate screen</string>
 
     <!-- ******* Taskbar Edu ******* -->
     <!-- Accessibility text spoken when the taskbar education panel appears [CHAR_LIMIT=NONE] -->

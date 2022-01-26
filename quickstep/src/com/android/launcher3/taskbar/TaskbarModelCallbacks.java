@@ -23,6 +23,7 @@ import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
@@ -30,6 +31,7 @@ import com.android.launcher3.util.LauncherBindableItemsContainer;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
@@ -45,12 +47,19 @@ public class TaskbarModelCallbacks implements
     private final TaskbarActivityContext mContext;
     private final TaskbarView mContainer;
 
+    // Initialized in init.
+    private TaskbarControllers mControllers;
+
     private boolean mBindInProgress = false;
 
     public TaskbarModelCallbacks(
             TaskbarActivityContext context, TaskbarView container) {
         mContext = context;
         mContainer = container;
+    }
+
+    public void init(TaskbarControllers controllers) {
+        mControllers = controllers;
     }
 
     @Override
@@ -161,6 +170,7 @@ public class TaskbarModelCallbacks implements
         int predictionSize = mPredictedItems.size();
         int predictionNextIndex = 0;
 
+        boolean isHotseatEmpty = true;
         for (int i = 0; i < hotseatItemInfos.length; i++) {
             hotseatItemInfos[i] = mHotseatItems.get(i);
             if (hotseatItemInfos[i] == null && predictionNextIndex < predictionSize) {
@@ -168,7 +178,19 @@ public class TaskbarModelCallbacks implements
                 hotseatItemInfos[i].screenId = i;
                 predictionNextIndex++;
             }
+            if (hotseatItemInfos[i] != null) {
+                isHotseatEmpty = false;
+            }
         }
         mContainer.updateHotseatItems(hotseatItemInfos);
+
+        mControllers.taskbarStashController.updateStateForFlag(
+                TaskbarStashController.FLAG_STASHED_IN_APP_EMPTY, isHotseatEmpty);
+        mControllers.taskbarStashController.applyState();
+    }
+
+    @Override
+    public void bindDeepShortcutMap(HashMap<ComponentKey, Integer> deepShortcutMapCopy) {
+        mControllers.taskbarPopupController.setDeepShortcutMap(deepShortcutMapCopy);
     }
 }

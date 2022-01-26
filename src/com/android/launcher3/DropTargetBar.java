@@ -283,12 +283,4 @@ public class DropTargetBar extends FrameLayout
             }
         }
     }
-
-    @Override
-    public void onVisibilityAggregated(boolean isVisible) {
-        super.onVisibilityAggregated(isVisible);
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.NO_DROP_TARGET, "onVisibilityAggregated: " + isVisible);
-        }
-    }
 }

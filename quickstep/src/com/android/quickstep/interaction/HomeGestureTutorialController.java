@@ -42,8 +42,17 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
     }
 
     @Override
+    public Integer getSuccessFeedbackSubtitle() {
+        return mTutorialFragment.isAtFinalStep()
+                ? R.string.home_gesture_feedback_complete_without_follow_up
+                : R.string.home_gesture_feedback_complete_with_follow_up;
+    }
+
+    @Override
     protected int getMockAppTaskLayoutResId() {
-        return R.layout.gesture_tutorial_mock_webpage;
+        return mTutorialFragment.isLargeScreen()
+                ? R.layout.gesture_tutorial_foldable_mock_webpage
+                : R.layout.gesture_tutorial_mock_webpage;
     }
 
     @Override
@@ -82,10 +91,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
                     case HOME_GESTURE_COMPLETED: {
                         mTutorialFragment.releaseFeedbackAnimation();
                         animateFakeTaskViewHome(finalVelocity, null);
-                        int subtitleResId = mTutorialFragment.isAtFinalStep()
-                                ? R.string.home_gesture_feedback_complete_without_follow_up
-                                : R.string.home_gesture_feedback_complete_with_follow_up;
-                        showFeedback(subtitleResId, true);
+                        showSuccessFeedback();
                         break;
                     }
                     case HOME_NOT_STARTED_TOO_FAR_FROM_EDGE:
@@ -93,8 +99,10 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
                         showFeedback(R.string.home_gesture_feedback_swipe_too_far_from_edge);
                         break;
                     case OVERVIEW_GESTURE_COMPLETED:
-                        fadeOutFakeTaskView(true, true, () ->
-                                showFeedback(R.string.home_gesture_feedback_overview_detected));
+                        fadeOutFakeTaskView(true, true, () -> {
+                            showFeedback(R.string.home_gesture_feedback_overview_detected);
+                            showFakeTaskbar(/* animateFromHotseat= */ false);
+                        });
                         break;
                     case HOME_OR_OVERVIEW_NOT_STARTED_WRONG_SWIPE_DIRECTION:
                     case HOME_OR_OVERVIEW_CANCELLED:

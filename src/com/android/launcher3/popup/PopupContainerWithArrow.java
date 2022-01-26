@@ -46,7 +46,6 @@ import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.Launcher;
-import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.accessibility.ShortcutMenuAccessibilityDelegate;
@@ -64,10 +63,10 @@ import com.android.launcher3.notification.NotificationKeyData;
 import com.android.launcher3.popup.PopupDataProvider.PopupDataChangeListener;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.shortcuts.ShortcutDragPreviewProvider;
-import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.ShortcutUtil;
+import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 
 import java.util.ArrayList;
@@ -83,7 +82,7 @@ import java.util.stream.Collectors;
  *
  * @param <T> The activity on with the popup shows
  */
-public class PopupContainerWithArrow<T extends StatefulActivity<LauncherState>>
+public class PopupContainerWithArrow<T extends Context & ActivityContext>
         extends ArrowPopup<T> implements DragSource, DragController.DragListener {
 
     private final List<DeepShortcutView> mShortcuts = new ArrayList<>();
@@ -192,10 +191,10 @@ public class PopupContainerWithArrow<T extends StatefulActivity<LauncherState>>
     }
 
     /**
-     * Shows the notifications and deep shortcuts associated with {@param icon}.
+     * Shows the notifications and deep shortcuts associated with a Launcher {@param icon}.
      * @return the container if shown or null.
      */
-    public static PopupContainerWithArrow showForIcon(BubbleTextView icon) {
+    public static PopupContainerWithArrow<Launcher> showForIcon(BubbleTextView icon) {
         Launcher launcher = Launcher.getLauncher(icon.getContext());
         if (getOpen(launcher) != null) {
             // There is already an items container open, so don't open this one.
@@ -207,7 +206,7 @@ public class PopupContainerWithArrow<T extends StatefulActivity<LauncherState>>
             return null;
         }
 
-        final PopupContainerWithArrow container =
+        final PopupContainerWithArrow<Launcher> container =
                 (PopupContainerWithArrow) launcher.getLayoutInflater().inflate(
                         R.layout.popup_container, launcher.getDragLayer(), false);
         container.configureForLauncher(launcher);
@@ -365,11 +364,6 @@ public class PopupContainerWithArrow<T extends StatefulActivity<LauncherState>>
     }
 
     private void initializeSystemShortcut(int resId, ViewGroup container, SystemShortcut info) {
-        if (!info.isEnabled()) {
-            // If the shortcut is disabled, do not display it
-            return;
-        }
-
         View view = inflateAndAdd(
                 resId, container, getInsertIndexForSystemShortcut(container, info));
         if (view instanceof DeepShortcutView) {
@@ -496,8 +490,8 @@ public class PopupContainerWithArrow<T extends StatefulActivity<LauncherState>>
     /**
      * Returns a PopupContainerWithArrow which is already open or null
      */
-    public static PopupContainerWithArrow getOpen(BaseDraggingActivity launcher) {
-        return getOpenView(launcher, TYPE_ACTION_POPUP);
+    public static <T extends Context & ActivityContext> PopupContainerWithArrow getOpen(T context) {
+        return getOpenView(context, TYPE_ACTION_POPUP);
     }
 
     /**

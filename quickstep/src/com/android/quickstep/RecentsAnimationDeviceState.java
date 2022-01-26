@@ -59,7 +59,6 @@ import android.os.SystemProperties;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.text.TextUtils;
-import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.Surface;
 
@@ -84,7 +83,6 @@ import com.android.systemui.shared.system.TaskStackChangeListeners;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Manages the state of the system during a swipe up gesture.
@@ -398,14 +396,6 @@ public class RecentsAnimationDeviceState implements
     }
 
     /**
-     * @return the packages of gesture-blocked activities.
-     */
-    public List<String> getGestureBlockedActivityPackages() {
-        return mGestureBlockedActivities.stream().map(ComponentName::getPackageName)
-                .collect(Collectors.toList());
-    }
-
-    /**
      * Updates the system ui state flags from SystemUI.
      */
     public void setSystemUiFlags(int stateFlags) {
@@ -590,8 +580,7 @@ public class RecentsAnimationDeviceState implements
             final Info displayInfo = mDisplayController.getInfo();
             return (mRotationTouchHelper.touchInOneHandedModeRegion(ev)
                 && displayInfo.rotation != Surface.ROTATION_90
-                && displayInfo.rotation != Surface.ROTATION_270
-                && displayInfo.densityDpi < DisplayMetrics.DENSITY_600);
+                && displayInfo.rotation != Surface.ROTATION_270);
         }
         return false;
     }

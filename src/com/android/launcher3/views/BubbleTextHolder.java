@@ -17,6 +17,7 @@ package com.android.launcher3.views;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
 
 /**
  * Views that contain {@link BubbleTextView} should implement this interface.
@@ -29,6 +30,6 @@ public interface BubbleTextHolder {
      *
      * @param itemInfo the new itemInfo
      */
-    default void onItemInfoChanged(ItemInfo itemInfo) {
+    default void onItemInfoUpdated(ItemInfoWithIcon itemInfo) {
     }
 }

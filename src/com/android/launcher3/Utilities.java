@@ -45,6 +45,7 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.InsetDrawable;
@@ -68,6 +69,7 @@ import android.view.ViewConfiguration;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
 
+import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.os.BuildCompat;
 
@@ -80,6 +82,7 @@ import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.icons.ShortcutCachingLogic;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
+import com.android.launcher3.model.data.SearchActionItemInfo;
 import com.android.launcher3.pm.ShortcutConfigActivityInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
@@ -524,6 +527,18 @@ public final class Utilities {
     }
 
     /**
+     * Using the view's bounds and icon size, calculate where the icon bounds will
+     * be if it was positioned at the center of the view.
+     */
+    public static void setRectToViewCenter(View iconView, int iconSize, Rect outBounds) {
+        int top = (iconView.getHeight() - iconSize) / 2;
+        int left = (iconView.getWidth() - iconSize) / 2;
+        int right = left + iconSize;
+        int bottom = top + iconSize;
+        outBounds.set(left, top, right, bottom);
+    }
+
+    /**
      * Ensures that a value is within given bounds. Specifically:
      * If value is less than lowerBound, return lowerBound; else if value is greater than upperBound,
      * return upperBound; else return value unchanged.
@@ -705,6 +720,10 @@ public final class Utilities {
             }
             outObj[0] = icon;
             return icon;
+        } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_SEARCH_ACTION
+                && info instanceof SearchActionItemInfo) {
+            return new AdaptiveIconDrawable(
+                    new FastBitmapDrawable(((SearchActionItemInfo) info).bitmap), null);
         } else {
             return null;
         }
@@ -838,6 +857,12 @@ public final class Utilities {
         LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) view.getLayoutParams();
         lp.setMarginStart(margin);
         view.setLayoutParams(lp);
+    }
+
+    public static Rect getViewBounds(@NonNull View v) {
+        int[] pos = new int[2];
+        v.getLocationOnScreen(pos);
+        return new Rect(pos[0], pos[1], pos[0] + v.getWidth(), pos[1] + v.getHeight());
     }
 
     private static class FixedSizeEmptyDrawable extends ColorDrawable {

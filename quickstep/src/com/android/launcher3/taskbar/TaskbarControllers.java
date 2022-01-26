@@ -17,7 +17,7 @@ package com.android.launcher3.taskbar;
 
 import androidx.annotation.NonNull;
 
-import com.android.launcher3.taskbar.contextual.RotationButtonController;
+import com.android.systemui.shared.rotation.RotationButtonController;
 
 /**
  * Hosts various taskbar controllers to facilitate passing between one another.
@@ -30,12 +30,15 @@ public class TaskbarControllers {
     public final NavbarButtonsViewController navbarButtonsViewController;
     public final RotationButtonController rotationButtonController;
     public final TaskbarDragLayerController taskbarDragLayerController;
+    public final TaskbarScrimViewController taskbarScrimViewController;
     public final TaskbarViewController taskbarViewController;
     public final TaskbarUnfoldAnimationController taskbarUnfoldAnimationController;
     public final TaskbarKeyguardController taskbarKeyguardController;
     public final StashedHandleViewController stashedHandleViewController;
     public final TaskbarStashController taskbarStashController;
     public final TaskbarEduController taskbarEduController;
+    public final TaskbarAutohideSuspendController taskbarAutohideSuspendController;
+    public final TaskbarPopupController taskbarPopupController;
 
     /** Do not store this controller, as it may change at runtime. */
     @NonNull public TaskbarUIController uiController = TaskbarUIController.DEFAULT;
@@ -47,11 +50,14 @@ public class TaskbarControllers {
             RotationButtonController rotationButtonController,
             TaskbarDragLayerController taskbarDragLayerController,
             TaskbarViewController taskbarViewController,
+            TaskbarScrimViewController taskbarScrimViewController,
             TaskbarUnfoldAnimationController taskbarUnfoldAnimationController,
             TaskbarKeyguardController taskbarKeyguardController,
             StashedHandleViewController stashedHandleViewController,
             TaskbarStashController taskbarStashController,
-            TaskbarEduController taskbarEduController) {
+            TaskbarEduController taskbarEduController,
+            TaskbarAutohideSuspendController taskbarAutoHideSuspendController,
+            TaskbarPopupController taskbarPopupController) {
         this.taskbarActivityContext = taskbarActivityContext;
         this.taskbarDragController = taskbarDragController;
         this.navButtonController = navButtonController;
@@ -59,11 +65,14 @@ public class TaskbarControllers {
         this.rotationButtonController = rotationButtonController;
         this.taskbarDragLayerController = taskbarDragLayerController;
         this.taskbarViewController = taskbarViewController;
+        this.taskbarScrimViewController = taskbarScrimViewController;
         this.taskbarUnfoldAnimationController = taskbarUnfoldAnimationController;
         this.taskbarKeyguardController = taskbarKeyguardController;
         this.stashedHandleViewController = stashedHandleViewController;
         this.taskbarStashController = taskbarStashController;
         this.taskbarEduController = taskbarEduController;
+        this.taskbarAutohideSuspendController = taskbarAutoHideSuspendController;
+        this.taskbarPopupController = taskbarPopupController;
     }
 
     /**
@@ -71,17 +80,17 @@ public class TaskbarControllers {
      * TaskbarControllers instance, but should be careful to only access things that were created
      * in constructors for now, as some controllers may still be waiting for init().
      */
-    public void init() {
+    public void init(TaskbarSharedState sharedState) {
+        taskbarDragController.init(this);
         navbarButtonsViewController.init(this);
-        if (taskbarActivityContext.isThreeButtonNav()) {
-            rotationButtonController.init();
-        }
+        rotationButtonController.init();
         taskbarDragLayerController.init(this);
         taskbarViewController.init(this);
+        taskbarScrimViewController.init(this);
         taskbarUnfoldAnimationController.init(this);
         taskbarKeyguardController.init(navbarButtonsViewController);
         stashedHandleViewController.init(this);
-        taskbarStashController.init(this);
+        taskbarStashController.init(this, sharedState);
         taskbarEduController.init(this);
     }
 
@@ -89,6 +98,7 @@ public class TaskbarControllers {
      * Cleans up all controllers.
      */
     public void onDestroy() {
+        navbarButtonsViewController.onDestroy();
         uiController.onDestroy();
         rotationButtonController.onDestroy();
         taskbarDragLayerController.onDestroy();
@@ -96,5 +106,6 @@ public class TaskbarControllers {
         taskbarUnfoldAnimationController.onDestroy();
         taskbarViewController.onDestroy();
         stashedHandleViewController.onDestroy();
+        taskbarAutohideSuspendController.onDestroy();
     }
 }

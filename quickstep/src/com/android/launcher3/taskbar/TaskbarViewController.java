@@ -60,6 +60,7 @@ public class TaskbarViewController {
             this::updateTranslationY);
     private final AnimatedFloat mTaskbarIconTranslationYForStash = new AnimatedFloat(
             this::updateTranslationY);
+    private AnimatedFloat mTaskbarNavButtonTranslationY;
 
     private final TaskbarModelCallbacks mModelCallbacks;
 
@@ -85,7 +86,14 @@ public class TaskbarViewController {
         mTaskbarView.getLayoutParams().height = mActivity.getDeviceProfile().taskbarSize;
 
         mTaskbarIconScaleForStash.updateValue(1f);
-        LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
+
+        mModelCallbacks.init(controllers);
+        if (mActivity.isUserSetupComplete()) {
+            // Only load the callbacks if user setup is completed
+            LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
+        }
+        mTaskbarNavButtonTranslationY =
+                controllers.navbarButtonsViewController.getTaskbarNavButtonTranslationY();
     }
 
     public void onDestroy() {
@@ -105,16 +113,6 @@ public class TaskbarViewController {
      */
     public void setImeIsVisible(boolean isImeVisible) {
         mTaskbarView.setTouchesEnabled(!isImeVisible);
-    }
-
-    /**
-     * Should be called when the notification shade is expanded, so we can hide taskbar icons as
-     * well. Note that we are animating icons to appear / disappear.
-     */
-    public void setNotificationShadeIsExpanded(boolean isNotificationShadeExpanded) {
-        mTaskbarIconAlpha.getProperty(ALPHA_INDEX_NOTIFICATION_EXPANDED)
-                .animateToValue(isNotificationShadeExpanded ? 0 : 1)
-                .start();
     }
 
     /**
@@ -212,6 +210,7 @@ public class TaskbarViewController {
 
         int offsetY = launcherDp.getTaskbarOffsetY();
         setter.setFloat(mTaskbarIconTranslationYForHome, VALUE, -offsetY, LINEAR);
+        setter.setFloat(mTaskbarNavButtonTranslationY, VALUE, -offsetY, LINEAR);
 
         int collapsedHeight = mActivity.getDefaultTaskbarWindowHeight();
         int expandedHeight = Math.max(collapsedHeight,
@@ -236,6 +235,22 @@ public class TaskbarViewController {
         return controller;
     }
 
+    public void onRotationChanged(DeviceProfile deviceProfile) {
+        if (areIconsVisible()) {
+            // We only translate on rotation when on home
+            return;
+        }
+        mTaskbarNavButtonTranslationY.updateValue(-deviceProfile.getTaskbarOffsetY());
+    }
+
+    /**
+     * Returns whether the given MotionEvent, *in screen coorindates*, is within any Taskbar item's
+     * touch bounds.
+     */
+    public boolean isEventOverAnyItem(MotionEvent ev) {
+        return mTaskbarView.isEventOverAnyItem(ev);
+    }
+
     /**
      * Callbacks for {@link TaskbarView} to interact with its controller.
      */
@@ -246,7 +261,7 @@ public class TaskbarViewController {
         private boolean mCanceledStashHint;
 
         public View.OnClickListener getIconOnClickListener() {
-            return mActivity::onTaskbarIconClicked;
+            return mActivity.getItemOnClickListener();
         }
 
         public View.OnLongClickListener getIconOnLongClickListener() {
@@ -254,7 +269,8 @@ public class TaskbarViewController {
         }
 
         public View.OnLongClickListener getBackgroundOnLongClickListener() {
-            return view -> mControllers.taskbarStashController.updateAndAnimateIsStashedInApp(true);
+            return view -> mControllers.taskbarStashController
+                    .updateAndAnimateIsManuallyStashedInApp(true);
         }
 
         /**

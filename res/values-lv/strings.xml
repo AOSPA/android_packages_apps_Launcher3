@@ -57,6 +57,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"Vaicājumam “<xliff:g id="QUERY">%1$s</xliff:g>” neatbilda neviena lietotne"</string>
     <string name="all_apps_search_market_message" msgid="1366263386197059176">"Meklēt citas lietotnes"</string>
     <string name="label_application" msgid="8531721983832654978">"Lietotne"</string>
+    <string name="all_apps_label" msgid="5015784846527570951">"Visas lietotnes"</string>
     <string name="notifications_header" msgid="1404149926117359025">"Paziņojumi"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"Lai pārvietotu saīsni, pieskarieties un turiet."</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"Lai pārvietotu saīsni, uz tās veiciet dubultskārienu un turiet. Varat arī veikt pielāgotas darbības."</string>
@@ -80,10 +81,8 @@
     <string name="permdesc_write_settings" msgid="5440712911516509985">"Ļauj lietotnei mainīt iestatījumus un saīsnes sākuma ekrānā."</string>
     <string name="msg_no_phone_permission" msgid="9208659281529857371">"Lietotnei <xliff:g id="APP_NAME">%1$s</xliff:g> nav atļauts veikt tālruņa zvanus."</string>
     <string name="gadget_error_text" msgid="740356548025791839">"Nevar ielādēt logrīku."</string>
-    <!-- no translation found for gadget_setup_text (8348374825537681407) -->
-    <skip />
-    <!-- no translation found for gadget_complete_setup_text (309040266978007925) -->
-    <skip />
+    <string name="gadget_setup_text" msgid="8348374825537681407">"Logrīka iestatījumi"</string>
+    <string name="gadget_complete_setup_text" msgid="309040266978007925">"Pieskarieties, lai pabeigtu iestatīšanu"</string>
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"Šī ir sistēmas lietotne, un to nevar atinstalēt."</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"Nosaukuma rediģēšana"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"Lietotne <xliff:g id="APP_NAME">%1$s</xliff:g> ir atspējota"</string>

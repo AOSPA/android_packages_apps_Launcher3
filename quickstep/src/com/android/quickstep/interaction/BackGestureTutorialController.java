@@ -43,18 +43,29 @@ final class BackGestureTutorialController extends TutorialController {
     }
 
     @Override
+    public Integer getSuccessFeedbackSubtitle() {
+        return mTutorialFragment.isAtFinalStep()
+                ? R.string.back_gesture_feedback_complete_without_follow_up
+                : R.string.back_gesture_feedback_complete_with_overview_follow_up;
+    }
+
+    @Override
     protected int getMockAppTaskLayoutResId() {
         return getMockAppTaskCurrentPageLayoutResId();
     }
 
     @LayoutRes
     int getMockAppTaskCurrentPageLayoutResId() {
-        return R.layout.gesture_tutorial_mock_conversation;
+        return mTutorialFragment.isLargeScreen()
+                ? R.layout.gesture_tutorial_foldable_mock_conversation
+                : R.layout.gesture_tutorial_mock_conversation;
     }
 
     @LayoutRes
     int getMockAppTaskPreviousPageLayoutResId() {
-        return R.layout.gesture_tutorial_mock_conversation_list;
+        return mTutorialFragment.isLargeScreen()
+                ? R.layout.gesture_tutorial_foldable_mock_conversation_list
+                : R.layout.gesture_tutorial_mock_conversation_list;
     }
 
     @Override
@@ -81,10 +92,7 @@ final class BackGestureTutorialController extends TutorialController {
             case BACK_COMPLETED_FROM_RIGHT:
                 mTutorialFragment.releaseFeedbackAnimation();
                 updateFakeAppTaskViewLayout(getMockAppTaskPreviousPageLayoutResId());
-                int subtitleResId = mTutorialFragment.isAtFinalStep()
-                        ? R.string.back_gesture_feedback_complete_without_follow_up
-                        : R.string.back_gesture_feedback_complete_with_overview_follow_up;
-                showFeedback(subtitleResId, true);
+                showSuccessFeedback();
                 break;
             case BACK_CANCELLED_FROM_LEFT:
             case BACK_CANCELLED_FROM_RIGHT:

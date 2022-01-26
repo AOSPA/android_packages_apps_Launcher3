@@ -42,6 +42,8 @@ public class TaskbarDragLayerController {
     private final AnimatedFloat mBgTaskbar = new AnimatedFloat(this::updateBackgroundAlpha);
     private final AnimatedFloat mBgNavbar = new AnimatedFloat(this::updateBackgroundAlpha);
     private final AnimatedFloat mKeyguardBgTaskbar = new AnimatedFloat(this::updateBackgroundAlpha);
+    private final AnimatedFloat mNotificationShadeBgTaskbar = new AnimatedFloat(
+            this::updateBackgroundAlpha);
     // Used to hide our background color when someone else (e.g. ScrimView) is handling it.
     private final AnimatedFloat mBgOverride = new AnimatedFloat(this::updateBackgroundAlpha);
 
@@ -62,8 +64,12 @@ public class TaskbarDragLayerController {
     public void init(TaskbarControllers controllers) {
         mControllers = controllers;
         mTaskbarDragLayer.init(new TaskbarDragLayerCallbacks());
+
+        mBgTaskbar.value = 1;
         mKeyguardBgTaskbar.value = 1;
+        mNotificationShadeBgTaskbar.value = 1;
         mBgOverride.value = 1;
+        updateBackgroundAlpha();
     }
 
     public void onDestroy() {
@@ -92,6 +98,10 @@ public class TaskbarDragLayerController {
         return mKeyguardBgTaskbar;
     }
 
+    public AnimatedFloat getNotificationShadeBgTaskbar() {
+        return mNotificationShadeBgTaskbar;
+    }
+
     public AnimatedFloat getOverrideBackgroundAlpha() {
         return mBgOverride;
     }
@@ -102,7 +112,8 @@ public class TaskbarDragLayerController {
 
     private void updateBackgroundAlpha() {
         final float bgNavbar = mBgNavbar.value;
-        final float bgTaskbar = mBgTaskbar.value * mKeyguardBgTaskbar.value;
+        final float bgTaskbar = mBgTaskbar.value * mKeyguardBgTaskbar.value
+                * mNotificationShadeBgTaskbar.value;
         mTaskbarDragLayer.setTaskbarBackgroundAlpha(
                 mBgOverride.value * Math.max(bgNavbar, bgTaskbar)
         );
@@ -126,12 +137,14 @@ public class TaskbarDragLayerController {
             // Always have nav buttons be touchable
             mControllers.navbarButtonsViewController.addVisibleButtonsRegion(
                     mTaskbarDragLayer, insetsInfo.touchableRegion);
+            boolean insetsIsTouchableRegion = true;
 
             if (mTaskbarDragLayer.getAlpha() < AlphaUpdateListener.ALPHA_CUTOFF_THRESHOLD) {
                 // Let touches pass through us.
                 insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
             } else if (mControllers.navbarButtonsViewController.isImeVisible()) {
                 insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_CONTENT);
+                insetsIsTouchableRegion = false;
             } else if (!mControllers.uiController.isTaskbarTouchable()) {
                 // Let touches pass through us.
                 insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
@@ -140,9 +153,11 @@ public class TaskbarDragLayerController {
                 // Taskbar has some touchable elements, take over the full taskbar area
                 insetsInfo.setTouchableInsets(mActivity.isTaskbarWindowFullscreen()
                         ? TOUCHABLE_INSETS_FRAME : TOUCHABLE_INSETS_CONTENT);
+                insetsIsTouchableRegion = false;
             } else {
                 insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
             }
+            mActivity.excludeFromMagnificationRegion(insetsIsTouchableRegion);
         }
 
         /**

@@ -57,6 +57,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"لم يتم العثور على أي تطبيقات تتطابق مع \"<xliff:g id="QUERY">%1$s</xliff:g>\""</string>
     <string name="all_apps_search_market_message" msgid="1366263386197059176">"البحث عن مزيد من التطبيقات"</string>
     <string name="label_application" msgid="8531721983832654978">"تطبيق"</string>
+    <string name="all_apps_label" msgid="5015784846527570951">"جميع التطبيقات"</string>
     <string name="notifications_header" msgid="1404149926117359025">"الإشعارات"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"انقر مع الاستمرار لنقل اختصار"</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"انقر مرتين مع تثبيت إصبعك لنقل اختصار أو استخدام الإجراءات المخصّصة."</string>
@@ -80,10 +81,8 @@
     <string name="permdesc_write_settings" msgid="5440712911516509985">"للسماح للتطبيق بتغيير الإعدادات والاختصارات في الشاشة الرئيسية."</string>
     <string name="msg_no_phone_permission" msgid="9208659281529857371">"<xliff:g id="APP_NAME">%1$s</xliff:g> غير مسموح به لإجراء مكالمات هاتفية"</string>
     <string name="gadget_error_text" msgid="740356548025791839">"يتعذّر تحميل الأداة."</string>
-    <!-- no translation found for gadget_setup_text (8348374825537681407) -->
-    <skip />
-    <!-- no translation found for gadget_complete_setup_text (309040266978007925) -->
-    <skip />
+    <string name="gadget_setup_text" msgid="8348374825537681407">"إعدادات الأداة"</string>
+    <string name="gadget_complete_setup_text" msgid="309040266978007925">"انقر لإكمال الإعداد."</string>
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"هذا تطبيق نظام وتتعذر إزالته."</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"تعديل الاسم"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"تم إيقاف <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>

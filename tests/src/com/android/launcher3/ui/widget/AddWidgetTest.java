@@ -25,8 +25,10 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.tapl.Widget;
+import com.android.launcher3.tapl.WidgetResizeFrame;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.ui.TestViewHelpers;
+import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.launcher3.util.rule.ShellCommandRule;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 
@@ -46,6 +48,7 @@ public class AddWidgetTest extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
+    @ScreenRecord // b/204807156
     public void testDragIcon() throws Throwable {
         clearHomescreen();
         mDevice.pressHome();
@@ -53,18 +56,19 @@ public class AddWidgetTest extends AbstractLauncherUiTest {
         final LauncherAppWidgetProviderInfo widgetInfo =
                 TestViewHelpers.findWidgetProvider(this, false /* hasConfigureScreen */);
 
-        mLauncher.
+        WidgetResizeFrame resizeFrame = mLauncher.
                 getWorkspace().
                 openAllWidgets().
                 getWidget(widgetInfo.getLabel(mTargetContext.getPackageManager())).
-                dragToWorkspace(false, false);
-        // Dismiss widget resize frame.
-        mDevice.pressHome();
+                dragWidgetToWorkspace();
 
         assertTrue(mActivityMonitor.itemExists(
                 (info, view) -> info instanceof LauncherAppWidgetInfo &&
                         ((LauncherAppWidgetInfo) info).providerName.getClassName().equals(
                                 widgetInfo.provider.getClassName())).call());
+
+        assertNotNull("Widget resize frame not shown after widget add", resizeFrame);
+        resizeFrame.dismiss();
 
         final Widget widget = mLauncher.getWorkspace().tryGetWidget(widgetInfo.label,
                 DEFAULT_UI_TIMEOUT);

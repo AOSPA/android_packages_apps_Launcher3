@@ -57,6 +57,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"\"<xliff:g id="QUERY">%1$s</xliff:g>\"ৰ সৈতে মিলা কোনো এপ্ বিচাৰি পোৱা নগ\'ল"</string>
     <string name="all_apps_search_market_message" msgid="1366263386197059176">"আৰু অধিক এপবোৰ সন্ধান কৰক"</string>
     <string name="label_application" msgid="8531721983832654978">"এপ্"</string>
+    <string name="all_apps_label" msgid="5015784846527570951">"আটাইবোৰ এপ্"</string>
     <string name="notifications_header" msgid="1404149926117359025">"জাননীসমূহ"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"শ্বৰ্টকাট স্থানান্তৰ কৰিবলৈ দুবাৰ টিপি ধৰি ৰাখক।"</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"কোনো শ্বৰ্টকাট স্থানান্তৰ কৰিবলৈ দুবাৰ টিপি ধৰি ৰাখক অথবা কাষ্টম কাৰ্য ব্যৱহাৰ কৰক।"</string>
@@ -80,10 +81,8 @@
     <string name="permdesc_write_settings" msgid="5440712911516509985">"এপটোক গৃহ পৃষ্ঠাত ছেটিং আৰু শ্বৰ্টকাটসমূহ সলনি কৰাৰ অনুমতি দিয়ে।"</string>
     <string name="msg_no_phone_permission" msgid="9208659281529857371">"<xliff:g id="APP_NAME">%1$s</xliff:g>ক ফ\'ন কলবোৰ কৰাৰ অনুমতি দিয়া হোৱা নাই"</string>
     <string name="gadget_error_text" msgid="740356548025791839">"ৱিজেট ল’ড কৰিব নোৱাৰি"</string>
-    <!-- no translation found for gadget_setup_text (8348374825537681407) -->
-    <skip />
-    <!-- no translation found for gadget_complete_setup_text (309040266978007925) -->
-    <skip />
+    <string name="gadget_setup_text" msgid="8348374825537681407">"ৱিজেটৰ ছেটিং"</string>
+    <string name="gadget_complete_setup_text" msgid="309040266978007925">"ছেটআপ সমাপ্ত কৰিবলৈ টিপক"</string>
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"এইটো এটা ছিষ্টেম এপ আৰু ইয়াক আনইনষ্টল কৰিব নোৱৰি"</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"নাম সম্পাদনা কৰক"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"<xliff:g id="APP_NAME">%1$s</xliff:g> অক্ষম কৰা হ’ল"</string>

@@ -52,6 +52,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
+import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.views.ScrimView;
@@ -65,6 +66,7 @@ import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
+import java.util.HashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -77,12 +79,14 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public final boolean rotationSupportedByActivity;
 
-    private final STATE_TYPE mOverviewState, mBackgroundState;
+    private final STATE_TYPE mBackgroundState;
+
+    private STATE_TYPE mTargetState;
 
     protected BaseActivityInterface(boolean rotationSupportedByActivity,
             STATE_TYPE overviewState, STATE_TYPE backgroundState) {
         this.rotationSupportedByActivity = rotationSupportedByActivity;
-        mOverviewState = overviewState;
+        mTargetState = overviewState;
         mBackgroundState = backgroundState;
     }
 
@@ -136,6 +140,9 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         return null;
     }
 
+    @Nullable
+    public abstract TaskbarUIController getTaskbarController();
+
     public final boolean isResumed() {
         ACTIVITY_TYPE activity = getCreatedActivity();
         return activity != null && activity.hasBeenResumed();
@@ -186,7 +193,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public void closeOverlay() { }
 
-    public void switchRunningTaskViewToScreenshot(ThumbnailData thumbnailData, Runnable runnable) {
+    public void switchRunningTaskViewToScreenshot(HashMap<Integer, ThumbnailData> thumbnailDatas,
+            Runnable runnable) {
         ACTIVITY_TYPE activity = getCreatedActivity();
         if (activity == null) {
             return;
@@ -198,7 +206,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             }
             return;
         }
-        recentsView.switchToScreenshot(thumbnailData, runnable);
+        recentsView.switchToScreenshot(thumbnailDatas, runnable);
     }
 
     /**
@@ -298,11 +306,10 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * Calculates the overview grid size for the provided device configuration.
      */
     public final void calculateGridSize(Context context, DeviceProfile dp, Rect outRect) {
-        Resources res = context.getResources();
         Rect insets = dp.getInsets();
         int topMargin = dp.overviewTaskThumbnailTopMarginPx;
         int bottomMargin = getOverviewActionsHeight(context, dp);
-        int sideMargin = res.getDimensionPixelSize(R.dimen.overview_grid_side_margin);
+        int sideMargin = dp.overviewGridSideMargin;
 
         outRect.set(0, 0, dp.widthPx, dp.heightPx);
         outRect.inset(Math.max(insets.left, sideMargin), insets.top + topMargin,
@@ -315,11 +322,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public final void calculateGridTaskSize(Context context, DeviceProfile dp, Rect outRect,
             PagedOrientationHandler orientedState) {
         Resources res = context.getResources();
-        Rect gridRect = new Rect();
-        calculateGridSize(context, dp, gridRect);
+        Rect taskRect = new Rect();
+        calculateTaskSize(context, dp, taskRect);
 
         float rowHeight =
-                (gridRect.height() + dp.overviewTaskThumbnailTopMarginPx - dp.overviewRowSpacing)
+                (taskRect.height() + dp.overviewTaskThumbnailTopMarginPx - dp.overviewRowSpacing)
                         / 2f;
 
         PointF taskDimension = getTaskDimension(context, dp);
@@ -329,7 +336,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
         int gravity = Gravity.TOP;
         gravity |= orientedState.getRecentsRtlSetting(res) ? Gravity.RIGHT : Gravity.LEFT;
-        Gravity.apply(gravity, outWidth, outHeight, gridRect, outRect);
+        Gravity.apply(gravity, outWidth, outHeight, taskRect, outRect);
     }
 
     /**
@@ -412,6 +419,9 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         default boolean hasRecentsEverAttachedToAppWindow() {
             return false;
         }
+
+        /** Called when the gesture ends and we know what state it is going towards */
+        default void setEndTarget(GestureState.GestureEndTarget endTarget) { }
     }
 
     class DefaultAnimationFactory implements AnimationFactory {
@@ -449,7 +459,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
             // Since we are changing the start position of the UI, reapply the state, at the end
             controller.setEndAction(() -> mActivity.getStateManager().goToState(
-                    controller.getInterpolatedProgress() > 0.5 ? mOverviewState : mBackgroundState,
+                    controller.getInterpolatedProgress() > 0.5 ? mTargetState : mBackgroundState,
                     false));
 
             RecentsView recentsView = mActivity.getOverviewPanel();
@@ -510,6 +520,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         @Override
         public boolean hasRecentsEverAttachedToAppWindow() {
             return mHasEverAttachedToWindow;
+        }
+
+        @Override
+        public void setEndTarget(GestureState.GestureEndTarget endTarget) {
+            mTargetState = stateFromGestureEndTarget(endTarget);
         }
 
         protected void createBackgroundToOverviewAnim(ACTIVITY_TYPE activity, PendingAnimation pa) {

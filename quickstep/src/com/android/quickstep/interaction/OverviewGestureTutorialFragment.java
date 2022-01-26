@@ -57,17 +57,6 @@ public class OverviewGestureTutorialFragment extends TutorialFragment {
             }
         });
 
-        Animator swipeAnimator =
-                controller.createFingerDotOverviewSwipeAnimator(fingerDotStartTranslationY);
-        swipeAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                super.onAnimationEnd(animation);
-                mFakePreviousTaskView.setVisibility(View.VISIBLE);
-                controller.onMotionPaused(true /*arbitrary value*/);
-            }
-        });
-
         AnimatorSet fingerDotDisappearanceAnimator =
                 controller.createFingerDotDisappearanceAnimatorSet();
         fingerDotDisappearanceAnimator.addListener(new AnimatorListenerAdapter() {
@@ -83,13 +72,13 @@ public class OverviewGestureTutorialFragment extends TutorialFragment {
             @Override
             public void onAnimationEnd(Animator animation) {
                 super.onAnimationEnd(animation);
-                controller.resetFakeTaskView();
+                controller.resetFakeTaskView(false);
             }
         });
         ArrayList<Animator> animators = new ArrayList<>();
 
         animators.add(fingerDotAppearanceAnimator);
-        animators.add(swipeAnimator);
+        animators.add(controller.createFingerDotOverviewSwipeAnimator(fingerDotStartTranslationY));
         animators.add(controller.createAnimationPause());
         animators.add(fingerDotDisappearanceAnimator);
         animators.add(animationPause);
@@ -99,7 +88,7 @@ public class OverviewGestureTutorialFragment extends TutorialFragment {
             @Override
             public void onAnimationCancel(Animator animation) {
                 super.onAnimationCancel(animation);
-                controller.resetFakeTaskView();
+                controller.resetFakeTaskView(false);
             }
         });
         finalAnimation.playSequentially(animators);

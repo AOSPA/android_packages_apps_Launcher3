@@ -21,6 +21,7 @@ import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.widget.Button;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.touch.PagedOrientationHandler;
 
@@ -66,6 +67,7 @@ public class ClearAllButton extends Button {
     private float mGridTranslationPrimary;
     private float mGridScrollOffset;
     private float mScrollOffsetPrimary;
+    private float mSplitSelectScrollOffsetPrimary;
 
     private int mSidePadding;
 
@@ -167,6 +169,10 @@ public class ClearAllButton extends Button {
         mScrollOffsetPrimary = scrollOffsetPrimary;
     }
 
+    public void setSplitSelectScrollOffsetPrimary(float splitSelectScrollOffsetPrimary) {
+        mSplitSelectScrollOffsetPrimary = splitSelectScrollOffsetPrimary;
+    }
+
     public float getScrollAdjustment(boolean fullscreenEnabled, boolean gridEnabled) {
         float scrollAdjustment = 0;
         if (fullscreenEnabled) {
@@ -176,6 +182,7 @@ public class ClearAllButton extends Button {
             scrollAdjustment += mGridTranslationPrimary + mGridScrollOffset;
         }
         scrollAdjustment += mScrollOffsetPrimary;
+        scrollAdjustment += mSplitSelectScrollOffsetPrimary;
         return scrollAdjustment;
     }
 
@@ -239,6 +246,9 @@ public class ClearAllButton extends Button {
      * Get the Y translation that is set in the original layout position, before scrolling.
      */
     private float getOriginalTranslationY() {
-        return mActivity.getDeviceProfile().overviewTaskThumbnailTopMarginPx / 2.0f;
+        DeviceProfile deviceProfile = mActivity.getDeviceProfile();
+        return deviceProfile.overviewShowAsGrid
+                ? deviceProfile.overviewRowSpacing
+                : deviceProfile.overviewTaskThumbnailTopMarginPx / 2.0f;
     }
 }

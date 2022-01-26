@@ -15,6 +15,9 @@
  */
 package com.android.launcher3.taskbar;
 
+import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
+
+import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_A11Y;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_A11Y_LONG_CLICK;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_BACK;
@@ -29,18 +32,23 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_B
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_OVERVIEW_DISABLED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 
 import android.animation.ObjectAnimator;
 import android.annotation.DrawableRes;
 import android.annotation.IdRes;
 import android.annotation.LayoutRes;
+import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.Region.Op;
 import android.graphics.drawable.AnimatedVectorDrawable;
-import android.provider.Settings;
 import android.util.Property;
+import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnHoverListener;
@@ -53,11 +61,12 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AlphaUpdateListener;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarButton;
-import com.android.launcher3.taskbar.contextual.RotationButton;
-import com.android.launcher3.taskbar.contextual.RotationButtonController;
 import com.android.launcher3.util.MultiValueAlpha;
-import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.Themes;
 import com.android.quickstep.AnimatedFloat;
+import com.android.systemui.shared.rotation.FloatingRotationButton;
+import com.android.systemui.shared.rotation.RotationButton;
+import com.android.systemui.shared.rotation.RotationButtonController;
 
 import java.util.ArrayList;
 import java.util.function.IntPredicate;
@@ -79,6 +88,7 @@ public class NavbarButtonsViewController {
     private static final int FLAG_DISABLE_HOME = 1 << 7;
     private static final int FLAG_DISABLE_RECENTS = 1 << 8;
     private static final int FLAG_DISABLE_BACK = 1 << 9;
+    private static final int FLAG_NOTIFICATION_SHADE_EXPANDED = 1 << 10;
 
     private static final int MASK_IME_SWITCHER_VISIBLE = FLAG_SWITCHER_SUPPORTED | FLAG_IME_VISIBLE;
 
@@ -94,11 +104,20 @@ public class NavbarButtonsViewController {
     private final ViewGroup mEndContextualContainer;
     private final ViewGroup mStartContextualContainer;
 
+    private final AnimatedFloat mTaskbarNavButtonTranslationY = new AnimatedFloat(
+            this::updateNavButtonTranslationY);
+    private final AnimatedFloat mNavButtonTranslationYMultiplier = new AnimatedFloat(
+            this::updateNavButtonTranslationY);
+    private final RotationButtonListener mRotationButtonListener = new RotationButtonListener();
+
+    private final Rect mFloatingRotationButtonBounds = new Rect();
+
     // Initialized in init.
     private TaskbarControllers mControllers;
     private View mA11yButton;
     private int mSysuiStateFlags;
     private View mBackButton;
+    private FloatingRotationButton mFloatingRotationButton;
 
     public NavbarButtonsViewController(TaskbarActivityContext context, FrameLayout navButtonsView) {
         mContext = context;
@@ -114,6 +133,7 @@ public class NavbarButtonsViewController {
     public void init(TaskbarControllers controllers) {
         mControllers = controllers;
         mNavButtonsView.getLayoutParams().height = mContext.getDeviceProfile().taskbarSize;
+        mNavButtonTranslationYMultiplier.value = 1;
 
         mA11yLongClickListener = view -> {
             mControllers.navButtonController.onButtonClick(BUTTON_A11Y_LONG_CLICK);
@@ -132,8 +152,7 @@ public class NavbarButtonsViewController {
                 mControllers.navButtonController, R.id.ime_switcher);
         mPropertyHolders.add(new StatePropertyHolder(imeSwitcherButton,
                 flags -> ((flags & MASK_IME_SWITCHER_VISIBLE) == MASK_IME_SWITCHER_VISIBLE)
-                        && ((flags & FLAG_ROTATION_BUTTON_VISIBLE) == 0)
-                        && ((flags & FLAG_A11Y_VISIBLE) == 0)));
+                        && ((flags & FLAG_ROTATION_BUTTON_VISIBLE) == 0)));
 
         mPropertyHolders.add(new StatePropertyHolder(
                 mControllers.taskbarViewController.getTaskbarIconAlpha()
@@ -144,28 +163,65 @@ public class NavbarButtonsViewController {
                 .getKeyguardBgTaskbar(),
                 flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0, AnimatedFloat.VALUE, 1, 0));
 
+        // Make sure to remove nav bar buttons translation when notification shade is expanded.
+        mPropertyHolders.add(new StatePropertyHolder(mNavButtonTranslationYMultiplier,
+                flags -> (flags & FLAG_NOTIFICATION_SHADE_EXPANDED) != 0, AnimatedFloat.VALUE,
+                0, 1));
+
         // Force nav buttons (specifically back button) to be visible during setup wizard.
-        boolean areButtonsForcedVisible = !SettingsCache.INSTANCE.get(mContext).getValue(
-                Settings.Secure.getUriFor(Settings.Secure.USER_SETUP_COMPLETE), 0);
-        if (isThreeButtonNav || areButtonsForcedVisible) {
+        boolean isInSetup = !mContext.isUserSetupComplete();
+        if (isThreeButtonNav || isInSetup) {
             initButtons(mNavButtonContainer, mEndContextualContainer,
                     mControllers.navButtonController);
 
-            // Animate taskbar background when IME shows
+            if (isInSetup) {
+                // Since setup wizard only has back button enabled, it looks strange to be
+                // end-aligned, so start-align instead.
+                FrameLayout.LayoutParams navButtonsLayoutParams = (FrameLayout.LayoutParams)
+                        mNavButtonContainer.getLayoutParams();
+                navButtonsLayoutParams.setMarginStart(navButtonsLayoutParams.getMarginEnd());
+                navButtonsLayoutParams.setMarginEnd(0);
+                navButtonsLayoutParams.gravity = Gravity.START;
+                mNavButtonContainer.requestLayout();
+
+                if (!isThreeButtonNav) {
+                    // Tint all the nav buttons since there's no taskbar background in SUW.
+                    for (int i = 0; i < mNavButtonContainer.getChildCount(); i++) {
+                        if (!(mNavButtonContainer.getChildAt(i) instanceof ImageView)) continue;
+                        ImageView button = (ImageView) mNavButtonContainer.getChildAt(i);
+                        button.setImageTintList(ColorStateList.valueOf(Themes.getAttrColor(
+                                button.getContext(), android.R.attr.textColorPrimary)));
+                    }
+                }
+            }
+
+            // Animate taskbar background when any of these flags are enabled
+            int flagsToShowBg = FLAG_IME_VISIBLE | FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE
+                    | FLAG_NOTIFICATION_SHADE_EXPANDED;
             mPropertyHolders.add(new StatePropertyHolder(
                     mControllers.taskbarDragLayerController.getNavbarBackgroundAlpha(),
-                    flags -> (flags & FLAG_IME_VISIBLE) != 0 ||
-                            (flags & FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE) != 0,
-                    AnimatedFloat.VALUE, 1, 0));
+                    flags -> (flags & flagsToShowBg) != 0, AnimatedFloat.VALUE, 1, 0));
 
             // Rotation button
             RotationButton rotationButton = new RotationButtonImpl(
                     addButton(mEndContextualContainer, R.id.rotate_suggestion,
                             R.layout.taskbar_contextual_button));
             rotationButton.hide();
-            mControllers.rotationButtonController.setRotationButton(rotationButton);
+            mControllers.rotationButtonController.setRotationButton(rotationButton, null);
         } else {
-            mControllers.rotationButtonController.setRotationButton(new RotationButton() {});
+            mFloatingRotationButton = new FloatingRotationButton(mContext,
+                    R.string.accessibility_rotate_button,
+                    R.layout.rotate_suggestion,
+                    R.id.rotate_suggestion,
+                    R.dimen.floating_rotation_button_min_margin,
+                    R.dimen.rounded_corner_content_padding,
+                    R.dimen.floating_rotation_button_taskbar_left_margin,
+                    R.dimen.floating_rotation_button_taskbar_bottom_margin,
+                    R.dimen.floating_rotation_button_diameter,
+                    R.dimen.key_button_ripple_max_width);
+            mControllers.rotationButtonController.setRotationButton(mFloatingRotationButton,
+                    mRotationButtonListener);
+
             View imeDownButton = addButton(R.drawable.ic_sysbar_back, BUTTON_BACK,
                     mStartContextualContainer, mControllers.navButtonController, R.id.back);
             imeDownButton.setRotation(Utilities.isRtl(mContext.getResources()) ? 90 : -90);
@@ -194,6 +250,14 @@ public class NavbarButtonsViewController {
                 flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0 ||
                         (flags & FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE) != 0 ||
                         (flags & FLAG_KEYGUARD_OCCLUDED) != 0));
+        // Translate back button to be at end/start of other buttons for keyguard
+        int navButtonSize = mContext.getResources().getDimensionPixelSize(
+                R.dimen.taskbar_nav_buttons_size);
+        mPropertyHolders.add(new StatePropertyHolder(
+                mBackButton, flags -> (flags & FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE) != 0
+                        || (flags & FLAG_KEYGUARD_VISIBLE) != 0,
+                VIEW_TRANSLATE_X, navButtonSize * (isRtl ? -2 : 2), 0));
+
 
         // home and recents buttons
         View homeButton = addButton(R.drawable.ic_sysbar_home, BUTTON_HOME, navContainer,
@@ -217,36 +281,44 @@ public class NavbarButtonsViewController {
         mA11yButton.setOnLongClickListener(mA11yLongClickListener);
     }
 
-    public void updateStateForSysuiFlags(int systemUiStateFlags, boolean forceUpdate) {
-        boolean isImeVisible = (systemUiStateFlags & SYSUI_STATE_IME_SHOWING) != 0;
-        boolean isImeSwitcherShowing = (systemUiStateFlags & SYSUI_STATE_IME_SWITCHER_SHOWING) != 0;
-        boolean a11yVisible = (systemUiStateFlags & SYSUI_STATE_A11Y_BUTTON_CLICKABLE) != 0;
-        boolean a11yLongClickable =
-                (systemUiStateFlags & SYSUI_STATE_A11Y_BUTTON_LONG_CLICKABLE) != 0;
-        boolean isHomeDisabled =
-                (systemUiStateFlags & SYSUI_STATE_HOME_DISABLED) != 0;
-        boolean isRecentsDisabled =
-                (systemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0;
-        boolean isBackDisabled =
-                (systemUiStateFlags & SYSUI_STATE_BACK_DISABLED) != 0;
+    private void parseSystemUiFlags(int sysUiStateFlags) {
+        mSysuiStateFlags = sysUiStateFlags;
+        boolean isImeVisible = (sysUiStateFlags & SYSUI_STATE_IME_SHOWING) != 0;
+        boolean isImeSwitcherShowing = (sysUiStateFlags & SYSUI_STATE_IME_SWITCHER_SHOWING) != 0;
+        boolean a11yVisible = (sysUiStateFlags & SYSUI_STATE_A11Y_BUTTON_CLICKABLE) != 0;
+        boolean isHomeDisabled = (sysUiStateFlags & SYSUI_STATE_HOME_DISABLED) != 0;
+        boolean isRecentsDisabled = (sysUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0;
+        boolean isBackDisabled = (sysUiStateFlags & SYSUI_STATE_BACK_DISABLED) != 0;
+        int shadeExpandedFlags = SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED
+                | SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
+        boolean isNotificationShadeExpanded = (sysUiStateFlags & shadeExpandedFlags) != 0;
 
-        if (!forceUpdate && systemUiStateFlags == mSysuiStateFlags) {
-            return;
-        }
-        mSysuiStateFlags = systemUiStateFlags;
-
+        // TODO(b/202218289) we're getting IME as not visible on lockscreen from system
         updateStateForFlag(FLAG_IME_VISIBLE, isImeVisible);
         updateStateForFlag(FLAG_SWITCHER_SUPPORTED, isImeSwitcherShowing);
         updateStateForFlag(FLAG_A11Y_VISIBLE, a11yVisible);
         updateStateForFlag(FLAG_DISABLE_HOME, isHomeDisabled);
         updateStateForFlag(FLAG_DISABLE_RECENTS, isRecentsDisabled);
         updateStateForFlag(FLAG_DISABLE_BACK, isBackDisabled);
+        updateStateForFlag(FLAG_NOTIFICATION_SHADE_EXPANDED, isNotificationShadeExpanded);
 
         if (mA11yButton != null) {
             // Only used in 3 button
+            boolean a11yLongClickable =
+                    (sysUiStateFlags & SYSUI_STATE_A11Y_BUTTON_LONG_CLICKABLE) != 0;
             mA11yButton.setLongClickable(a11yLongClickable);
         }
+    }
+
+    public void updateStateForSysuiFlags(int systemUiStateFlags, boolean skipAnim) {
+        if (systemUiStateFlags == mSysuiStateFlags) {
+            return;
+        }
+        parseSystemUiFlags(systemUiStateFlags);
         applyState();
+        if (skipAnim) {
+            mPropertyHolders.forEach(StatePropertyHolder::endAnimation);
+        }
     }
 
     /**
@@ -275,6 +347,13 @@ public class NavbarButtonsViewController {
     }
 
     /**
+     * Returns true if the home button is disabled
+     */
+    public boolean isHomeDisabled() {
+        return (mState & FLAG_DISABLE_HOME) != 0;
+    }
+
+    /**
      * Returns true if the recents (overview) button is disabled
      */
     public boolean isRecentsDisabled() {
@@ -295,6 +374,11 @@ public class NavbarButtonsViewController {
         }
     }
 
+    /** Use to set the translationY for the all nav+contextual buttons */
+    public AnimatedFloat getTaskbarNavButtonTranslationY() {
+        return mTaskbarNavButtonTranslationY;
+    }
+
     /**
      * Does not call {@link #applyState()}. Don't forget to!
      */
@@ -311,6 +395,11 @@ public class NavbarButtonsViewController {
         for (int i = 0; i < count; i++) {
             mPropertyHolders.get(i).setState(mState);
         }
+    }
+
+    private void updateNavButtonTranslationY() {
+        mNavButtonsView.setTranslationY(mTaskbarNavButtonTranslationY.value
+                * mNavButtonTranslationYMultiplier.value);
     }
 
     private ImageView addButton(@DrawableRes int drawableId, @TaskbarButton int buttonType,
@@ -337,6 +426,30 @@ public class NavbarButtonsViewController {
         return buttonView;
     }
 
+    public boolean isEventOverAnyItem(MotionEvent ev) {
+        return mFloatingRotationButtonBounds.contains((int) ev.getX(), (int) ev.getY());
+    }
+
+    public void onDestroy() {
+        mPropertyHolders.clear();
+        mControllers.rotationButtonController.unregisterListeners();
+        if (mFloatingRotationButton != null) {
+            mFloatingRotationButton.hide();
+        }
+    }
+
+    private class RotationButtonListener implements RotationButton.RotationButtonUpdatesCallback {
+        @Override
+        public void onVisibilityChanged(boolean isVisible) {
+            if (isVisible) {
+                mFloatingRotationButton.getCurrentView()
+                        .getBoundsOnScreen(mFloatingRotationButtonBounds);
+            } else {
+                mFloatingRotationButtonBounds.setEmpty();
+            }
+        }
+    }
+
     private class RotationButtonImpl implements RotationButton {
 
         private final ImageView mButton;
@@ -352,6 +465,8 @@ public class NavbarButtonsViewController {
             mImageDrawable = (AnimatedVectorDrawable) mButton.getContext()
                     .getDrawable(rotationButtonController.getIconResId());
             mButton.setImageDrawable(mImageDrawable);
+            mButton.setContentDescription(mButton.getResources()
+                    .getString(R.string.accessibility_rotate_button));
             mImageDrawable.setCallback(mButton);
         }
 
@@ -361,17 +476,19 @@ public class NavbarButtonsViewController {
         }
 
         @Override
-        public void show() {
+        public boolean show() {
             mButton.setVisibility(View.VISIBLE);
             mState |= FLAG_ROTATION_BUTTON_VISIBLE;
             applyState();
+            return true;
         }
 
         @Override
-        public void hide() {
+        public boolean hide() {
             mButton.setVisibility(View.GONE);
             mState &= ~FLAG_ROTATION_BUTTON_VISIBLE;
             applyState();
+            return true;
         }
 
         @Override

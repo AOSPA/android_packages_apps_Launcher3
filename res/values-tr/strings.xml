@@ -57,6 +57,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"\"<xliff:g id="QUERY">%1$s</xliff:g>\" ile eşleşen uygulama bulunamadı"</string>
     <string name="all_apps_search_market_message" msgid="1366263386197059176">"Başka uygulamalar ara"</string>
     <string name="label_application" msgid="8531721983832654978">"Uygulama"</string>
+    <string name="all_apps_label" msgid="5015784846527570951">"Tüm uygulamalar"</string>
     <string name="notifications_header" msgid="1404149926117359025">"Bildirimler"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"Kısayolu taşımak için dokunup basılı tutun."</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"Kısayolu taşımak veya özel işlemleri kullanmak için iki kez dokunup basılı tutun."</string>
@@ -66,7 +67,7 @@
     <string name="all_apps_search_results" msgid="5889367432531296759">"Arama sonuçları"</string>
     <string name="all_apps_button_personal_label" msgid="1315764287305224468">"Kişisel uygulamalar listesi"</string>
     <string name="all_apps_button_work_label" msgid="7270707118948892488">"İş uygulamaları listesi"</string>
-    <string name="remove_drop_target_label" msgid="7812859488053230776">"Kaldır"</string>
+    <string name="remove_drop_target_label" msgid="7812859488053230776">"Sil"</string>
     <string name="uninstall_drop_target_label" msgid="4722034217958379417">"Kaldır"</string>
     <string name="app_info_drop_target_label" msgid="692894985365717661">"Uygulama bilgileri"</string>
     <string name="install_drop_target_label" msgid="2539096853673231757">"Yükle"</string>

@@ -121,7 +121,7 @@
             launcher:minHeightDps="694"
             launcher:iconImageSize="56"
             launcher:iconTextSize="14.4"
-            launcher:canBeDefault="split_display" />
+            launcher:canBeDefault="true" />
 
         <display-option
             launcher:name="Shorter Stubby"

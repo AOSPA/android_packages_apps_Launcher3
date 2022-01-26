@@ -61,6 +61,7 @@ import android.widget.Toast;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
@@ -91,12 +92,12 @@ import com.android.quickstep.TaskThumbnailCache;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.util.CancellableTask;
-import com.android.quickstep.util.LauncherSplitScreenListener;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.util.TaskCornerRadius;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.views.TaskThumbnailView.PreviewPositionHelper;
 import com.android.systemui.shared.recents.model.Task;
+import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.ActivityOptionsCompat;
 import com.android.systemui.shared.system.QuickStepContract;
@@ -105,6 +106,7 @@ import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -115,6 +117,7 @@ import java.util.stream.Stream;
 public class TaskView extends FrameLayout implements Reusable {
 
     private static final String TAG = TaskView.class.getSimpleName();
+    private static final boolean DEBUG = false;
 
     public static final int FLAG_UPDATE_ICON = 1;
     public static final int FLAG_UPDATE_THUMBNAIL = FLAG_UPDATE_ICON << 1;
@@ -357,6 +360,7 @@ public class TaskView extends FrameLayout implements Reusable {
 
     private final TaskOutlineProvider mOutlineProvider;
 
+    @Nullable
     protected Task mTask;
     protected TaskThumbnailView mSnapshotView;
     protected IconView mIconView;
@@ -365,7 +369,7 @@ public class TaskView extends FrameLayout implements Reusable {
     private float mGridProgress;
     private float mNonGridScale = 1;
     private float mDismissScale = 1;
-    private final FullscreenDrawParams mCurrentFullscreenParams;
+    protected final FullscreenDrawParams mCurrentFullscreenParams;
     protected final StatefulActivity mActivity;
 
     // Various causes of changing primary translation, which we aggregate to setTranslationX/Y().
@@ -389,7 +393,9 @@ public class TaskView extends FrameLayout implements Reusable {
     // Used when in SplitScreenSelectState
     private float mSplitSelectTranslationY;
     private float mSplitSelectTranslationX;
+    private float mSplitSelectScrollOffsetPrimary;
 
+    @Nullable
     private ObjectAnimator mIconAndDimAnimator;
     private float mIconScaleAnimStartProgress = 0;
     private float mFocusTransitionProgress = 1;
@@ -407,7 +413,9 @@ public class TaskView extends FrameLayout implements Reusable {
     private boolean mShowScreenshot;
 
     // The current background requests to load the task thumbnail and icon
+    @Nullable
     private CancellableTask mThumbnailLoadRequest;
+    @Nullable
     private CancellableTask mIconLoadRequest;
 
     private boolean mEndQuickswitchCuj;
@@ -420,11 +428,11 @@ public class TaskView extends FrameLayout implements Reusable {
         this(context, null);
     }
 
-    public TaskView(Context context, AttributeSet attrs) {
+    public TaskView(Context context, @Nullable AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public TaskView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public TaskView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mActivity = StatefulActivity.fromContext(context);
         setOnClickListener(this::onClick);
@@ -540,6 +548,7 @@ public class TaskView extends FrameLayout implements Reusable {
         return mTaskIdAttributeContainer;
     }
 
+    @Nullable
     public Task getTask() {
         return mTask;
     }
@@ -552,8 +561,24 @@ public class TaskView extends FrameLayout implements Reusable {
         return mTaskIdContainer;
     }
 
+    public boolean containsMultipleTasks() {
+        return mTaskIdContainer[1] != -1;
+    }
+
     public TaskThumbnailView getThumbnail() {
         return mSnapshotView;
+    }
+
+    void refreshThumbnails(@Nullable HashMap<Integer, ThumbnailData> thumbnailDatas) {
+        if (mTask != null && thumbnailDatas != null) {
+            final ThumbnailData thumbnailData = thumbnailDatas.get(mTask.key.id);
+            if (thumbnailData != null) {
+                mSnapshotView.setThumbnail(mTask, thumbnailData);
+                return;
+            }
+        }
+
+        mSnapshotView.refresh();
     }
 
     /** TODO(b/197033698) Remove all usages of above method and migrate to this one */
@@ -623,7 +648,21 @@ public class TaskView extends FrameLayout implements Reusable {
                     recentsView.getDepthController());
             anim.addListener(new AnimatorListenerAdapter() {
                 @Override
+                public void onAnimationStart(Animator animator) {
+                    recentsView.runActionOnRemoteHandles(
+                            (Consumer<RemoteTargetHandle>) remoteTargetHandle ->
+                                    remoteTargetHandle
+                                            .getTaskViewSimulator()
+                                            .setDrawsBelowRecents(false));
+                }
+
+                @Override
                 public void onAnimationEnd(Animator animator) {
+                    recentsView.runActionOnRemoteHandles(
+                            (Consumer<RemoteTargetHandle>) remoteTargetHandle ->
+                                    remoteTargetHandle
+                                            .getTaskViewSimulator()
+                                            .setDrawsBelowRecents(true));
                     mIsClickableAsLiveTile = true;
                 }
             });
@@ -652,19 +691,15 @@ public class TaskView extends FrameLayout implements Reusable {
      * Starts the task associated with this view and animates the startup.
      * @return CompletionStage to indicate the animation completion or null if the launch failed.
      */
+    @Nullable
     public RunnableList launchTaskAnimated() {
         if (mTask != null) {
             TestLogging.recordEvent(
                     TestProtocol.SEQUENCE_MAIN, "startActivityFromRecentsAsync", mTask);
             ActivityOptionsWrapper opts =  mActivity.getActivityLaunchOptions(this, null);
             opts.options.setLaunchDisplayId(getRootViewDisplayId());
-            boolean isOldTaskSplit = LauncherSplitScreenListener.INSTANCE.getNoCreate()
-                    .getPersistentSplitIds().length > 0;
             if (ActivityManagerWrapper.getInstance()
                     .startActivityFromRecents(mTask.key, opts.options)) {
-                if (isOldTaskSplit) {
-                    SystemUiProxy.INSTANCE.getNoCreate().exitSplitScreen(mTask.key.id);
-                }
                 RecentsView recentsView = getRecentsView();
                 if (ENABLE_QUICKSTEP_LIVE_TILE.get() && recentsView.getRunningTaskViewId() != -1) {
                     recentsView.onTaskLaunchedInLiveTileMode();
@@ -807,10 +842,14 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     protected boolean showTaskMenuWithContainer(IconView iconView) {
-        return TaskMenuView.showForTask(mTaskIdAttributeContainer[0]);
+        if (mActivity.getDeviceProfile().overviewShowAsGrid) {
+            return TaskMenuViewWithArrow.Companion.showForTask(mTaskIdAttributeContainer[0]);
+        } else {
+            return TaskMenuView.showForTask(mTaskIdAttributeContainer[0]);
+        }
     }
 
-    protected void setIcon(IconView iconView, Drawable icon) {
+    protected void setIcon(IconView iconView, @Nullable Drawable icon) {
         if (icon != null) {
             iconView.setDrawable(icon);
             iconView.setOnClickListener(v -> {
@@ -844,7 +883,7 @@ public class TaskView extends FrameLayout implements Reusable {
         LayoutParams snapshotParams = (LayoutParams) mSnapshotView.getLayoutParams();
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         snapshotParams.topMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
-        boolean isGridTask = deviceProfile.overviewShowAsGrid && !isFocusedTask();
+        boolean isGridTask = isGridTask();
         int taskIconHeight = deviceProfile.overviewTaskIconSizePx;
         int taskMargin = isGridTask ? deviceProfile.overviewTaskMarginGridPx
                 : deviceProfile.overviewTaskMarginPx;
@@ -862,6 +901,14 @@ public class TaskView extends FrameLayout implements Reusable {
         snapshotParams.topMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
         mSnapshotView.setLayoutParams(snapshotParams);
         mSnapshotView.getTaskOverlay().updateOrientationState(orientationState);
+    }
+
+    /**
+     * Returns whether the task is part of overview grid and not being focused.
+     */
+    public boolean isGridTask() {
+        DeviceProfile deviceProfile = mActivity.getDeviceProfile();
+        return deviceProfile.overviewShowAsGrid && !isFocusedTask();
     }
 
     private void setIconAndDimTransitionProgress(float progress, boolean invert) {
@@ -1031,6 +1078,11 @@ public class TaskView extends FrameLayout implements Reusable {
         mSplitSelectTranslationY = y;
         applyTranslationY();
     }
+
+    public void setSplitScrollOffsetPrimary(float splitSelectScrollOffsetPrimary) {
+        mSplitSelectScrollOffsetPrimary = splitSelectScrollOffsetPrimary;
+    }
+
     private void setDismissTranslationX(float x) {
         mDismissTranslationX = x;
         applyTranslationX();
@@ -1101,6 +1153,7 @@ public class TaskView extends FrameLayout implements Reusable {
         } else {
             scrollAdjustment += getPrimaryNonGridTranslationProperty().get(this);
         }
+        scrollAdjustment += mSplitSelectScrollOffsetPrimary;
         return scrollAdjustment;
     }
 
@@ -1334,7 +1387,7 @@ public class TaskView extends FrameLayout implements Reusable {
         invalidateOutline();
     }
 
-    private void updateSnapshotRadius() {
+    protected void updateSnapshotRadius() {
         updateCurrentFullscreenParams(mSnapshotView.getPreviewPositionHelper());
         mSnapshotView.setFullscreenParams(mCurrentFullscreenParams);
     }

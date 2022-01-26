@@ -154,6 +154,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.notification.NotificationListener;
 import com.android.launcher3.pm.PinRequestHelper;
 import com.android.launcher3.pm.UserCache;
+import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.popup.SystemShortcut;
@@ -1391,22 +1392,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             final LauncherAppWidgetHostView launcherHostView = (LauncherAppWidgetHostView) hostView;
             CellLayout cellLayout = getCellLayout(launcherInfo.container, launcherInfo.screenId);
             if (mStateManager.getState() == NORMAL) {
-                // Show resize frame once the widget layout is drawn.
-                View.OnLayoutChangeListener onLayoutChangeListener =
-                        new View.OnLayoutChangeListener() {
-                            @Override
-                            public void onLayoutChange(View view, int left, int top, int right,
-                                    int bottom, int oldLeft, int oldTop, int oldRight,
-                                    int oldBottom) {
-                                AppWidgetResizeFrame.showForWidget(launcherHostView, cellLayout);
-                                launcherHostView.removeOnLayoutChangeListener(this);
-                            }
-                        };
-                launcherHostView.addOnLayoutChangeListener(onLayoutChangeListener);
-                // There is a small chance that the layout was already drawn before the layout
-                // change listener was registered, which means that the resize frame wouldn't be
-                // shown. Directly call requestLayout to force a layout change.
-                launcherHostView.requestLayout();
+                AppWidgetResizeFrame.showForWidget(launcherHostView, cellLayout);
             } else {
                 mStateManager.addStateListener(new StateManager.StateListener<LauncherState>() {
                     @Override
@@ -3046,5 +3032,14 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     @Override
     public StatsLogManager getStatsLogManager() {
         return super.getStatsLogManager().withDefaultInstanceId(mAllAppsSessionLogId);
+    }
+
+    /**
+     * Returns the current popup for testing, if any.
+     */
+    @VisibleForTesting
+    @Nullable
+    public ArrowPopup<?> getOptionsPopup() {
+        return findViewById(R.id.popup_container);
     }
 }

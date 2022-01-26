@@ -57,6 +57,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"ບໍ່ພົບແອັບທີ່ກົງກັບ \"<xliff:g id="QUERY">%1$s</xliff:g>\""</string>
     <string name="all_apps_search_market_message" msgid="1366263386197059176">"ຊອກຫາແອັບເພີ່ມເຕີມ"</string>
     <string name="label_application" msgid="8531721983832654978">"ແອັບ"</string>
+    <string name="all_apps_label" msgid="5015784846527570951">"ແອັບທັງໝົດ"</string>
     <string name="notifications_header" msgid="1404149926117359025">"ການແຈ້ງເຕືອນ"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"ແຕະຄ້າງໄວ້ເພື່ອຍ້າຍທາງລັດ."</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"ແຕະສອງເທື່ອຄ້າງໄວ້ເພື່ອຍ້າຍທາງລັດ ຫຼື ໃຊ້ຄຳສັ່ງກຳນົດເອງ."</string>
@@ -80,10 +81,8 @@
     <string name="permdesc_write_settings" msgid="5440712911516509985">"ອະນຸຍາດໃຫ້ແອັບຯດັ່ງກ່າວ ປ່ຽນການຕັ້ງຄ່າ ແລະທາງລັດໃນໜ້າຫຼັກ."</string>
     <string name="msg_no_phone_permission" msgid="9208659281529857371">"<xliff:g id="APP_NAME">%1$s</xliff:g> ບໍ່​ໄດ້​ຮັບ​ອະ​ນຸ​ຍາດ​ໃຫ້​ໂທ"</string>
     <string name="gadget_error_text" msgid="740356548025791839">"ບໍ່ສາມາດໂຫຼດວິດເຈັດໄດ້"</string>
-    <!-- no translation found for gadget_setup_text (8348374825537681407) -->
-    <skip />
-    <!-- no translation found for gadget_complete_setup_text (309040266978007925) -->
-    <skip />
+    <string name="gadget_setup_text" msgid="8348374825537681407">"ການຕັ້ງຄ່າວິດເຈັດ"</string>
+    <string name="gadget_complete_setup_text" msgid="309040266978007925">"ແຕະເພື່ອຕັ້ງຄ່າໃຫ້ແລ້ວ"</string>
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"ນີ້ແມ່ນແອັບຯຂອງລະບົບ ແລະບໍ່ສາມາດຖອນການຕິດຕັ້ງອອກໄດ້."</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"ແກ້ໄຂຊື່"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"ປິດການນຳໃຊ້ <xliff:g id="APP_NAME">%1$s</xliff:g> ແລ້ວ"</string>

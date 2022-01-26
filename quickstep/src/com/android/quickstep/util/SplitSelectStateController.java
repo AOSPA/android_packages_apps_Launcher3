@@ -21,8 +21,10 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
 
+import android.app.ActivityOptions;
 import android.app.ActivityThread;
 import android.graphics.Rect;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.view.RemoteAnimationAdapter;
@@ -56,6 +58,7 @@ public class SplitSelectStateController {
     private Task mInitialTask;
     private Task mSecondTask;
     private Rect mInitialBounds;
+    private boolean mRecentsAnimationRunning;
 
     public SplitSelectStateController(Handler handler, SystemUiProxy systemUiProxy) {
         mHandler = handler;
@@ -77,14 +80,15 @@ public class SplitSelectStateController {
      */
     public void setSecondTaskId(Task taskView, Consumer<Boolean> callback) {
         mSecondTask = taskView;
-        launchTasks(mInitialTask, mSecondTask, mStagePosition, callback);
+        launchTasks(mInitialTask, mSecondTask, mStagePosition, callback,
+                false /* freezeTaskList */);
     }
 
     /**
      * @param stagePosition representing location of task1
      */
     public void launchTasks(Task task1, Task task2, @StagePosition int stagePosition,
-            Consumer<Boolean> callback) {
+            Consumer<Boolean> callback, boolean freezeTaskList) {
         // Assume initial task is for top/left part of screen
         final int[] taskIds = stagePosition == STAGE_POSITION_TOP_OR_LEFT
                 ? new int[]{task1.key.id, task2.key.id}
@@ -94,7 +98,8 @@ public class SplitSelectStateController {
                     new RemoteSplitLaunchTransitionRunner(task1, task2);
             mSystemUiProxy.startTasks(taskIds[0], null /* mainOptions */, taskIds[1],
                     null /* sideOptions */, STAGE_POSITION_BOTTOM_OR_RIGHT,
-                    new RemoteTransitionCompat(animationRunner, MAIN_EXECUTOR));
+                    new RemoteTransitionCompat(animationRunner, MAIN_EXECUTOR,
+                            ActivityThread.currentActivityThread().getApplicationThread()));
         } else {
             RemoteSplitLaunchAnimationRunner animationRunner =
                     new RemoteSplitLaunchAnimationRunner(task1, task2, callback);
@@ -103,13 +108,22 @@ public class SplitSelectStateController {
                     300, 150,
                     ActivityThread.currentActivityThread().getApplicationThread());
 
-            mSystemUiProxy.startTasksWithLegacyTransition(taskIds[0], null /* mainOptions */,
-                    taskIds[1], null /* sideOptions */, STAGE_POSITION_BOTTOM_OR_RIGHT, adapter);
+            ActivityOptions mainOpts = ActivityOptions.makeBasic();
+            if (freezeTaskList) {
+                mainOpts.setFreezeRecentTasksReordering();
+            }
+            mSystemUiProxy.startTasksWithLegacyTransition(taskIds[0], mainOpts.toBundle(),
+                    taskIds[1], null /* sideOptions */, STAGE_POSITION_BOTTOM_OR_RIGHT,
+                    adapter);
         }
     }
 
     public @StagePosition int getActiveSplitStagePosition() {
         return mStagePosition;
+    }
+
+    public void setRecentsAnimationRunning(boolean running) {
+        this.mRecentsAnimationRunning = running;
     }
 
     /**
@@ -163,21 +177,20 @@ public class SplitSelectStateController {
                                 if (mSuccessCallback != null) {
                                     mSuccessCallback.accept(true);
                                 }
+                                resetState();
                             }));
-
-            // After successful launch, call resetState
-            resetState();
         }
 
         @Override
         public void onAnimationCancelled() {
             postAsyncCallback(mHandler, () -> {
                 if (mSuccessCallback != null) {
-                    mSuccessCallback.accept(false);
+                    // Launching legacy tasks while recents animation is running will always cause
+                    // onAnimationCancelled to be called (should be fixed w/ shell transitions?)
+                    mSuccessCallback.accept(mRecentsAnimationRunning);
                 }
+                resetState();
             });
-
-            resetState();
         }
     }
 
@@ -189,6 +202,7 @@ public class SplitSelectStateController {
         mSecondTask = null;
         mStagePosition = SplitConfigurationOptions.STAGE_POSITION_UNDEFINED;
         mInitialBounds = null;
+        mRecentsAnimationRunning = false;
     }
 
     /**

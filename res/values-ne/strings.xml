@@ -57,6 +57,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"\"<xliff:g id="QUERY">%1$s</xliff:g>\" सँग मिल्दो कुनै एप भेटिएन"</string>
     <string name="all_apps_search_market_message" msgid="1366263386197059176">"थप एपहरू खोज्नुहोस्"</string>
     <string name="label_application" msgid="8531721983832654978">"एप"</string>
+    <string name="all_apps_label" msgid="5015784846527570951">"सबै एप"</string>
     <string name="notifications_header" msgid="1404149926117359025">"सूचनाहरू"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"कुनै सर्टकट सार्न डबल ट्याप गरेर छोइराख्नुहोस्।"</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"कुनै सर्टकट सार्न वा आफ्नो रोजाइका कारबाही प्रयोग गर्न डबल ट्याप गरेर छोइराख्नुहोस्।"</string>
@@ -80,10 +81,8 @@
     <string name="permdesc_write_settings" msgid="5440712911516509985">"गृहमा एउटा एपलाई सेटिङ र सर्टकट बदल्न अनुमति दिनुहोस्।"</string>
     <string name="msg_no_phone_permission" msgid="9208659281529857371">"<xliff:g id="APP_NAME">%1$s</xliff:g> ले फोन कलहरू गर्न अनुमति छैन"</string>
     <string name="gadget_error_text" msgid="740356548025791839">"विजेट लोड गर्न सकिएन"</string>
-    <!-- no translation found for gadget_setup_text (8348374825537681407) -->
-    <skip />
-    <!-- no translation found for gadget_complete_setup_text (309040266978007925) -->
-    <skip />
+    <string name="gadget_setup_text" msgid="8348374825537681407">"विजेटका सेटिङ"</string>
+    <string name="gadget_complete_setup_text" msgid="309040266978007925">"सेटअप पूरा गर्न ट्याप गर्नुहोस्"</string>
     <string name="uninstall_system_app_text" msgid="4172046090762920660">"यो प्रणाली एप हो र यसलाई स्थापना रद्द गर्न सकिँदैन।"</string>
     <string name="folder_hint_text" msgid="5174843001373488816">"नाम सम्पादन गर्नुहोस्"</string>
     <string name="disabled_app_label" msgid="6673129024321402780">"असक्षम पारिएको <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>

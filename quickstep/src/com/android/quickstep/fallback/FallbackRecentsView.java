@@ -42,6 +42,7 @@ import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
+import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.Task.TaskKey;
 
@@ -144,38 +145,42 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
         RunningTaskInfo runningTaskInfo = runningTaskInfos[0];
         if (mHomeTaskInfo != null && runningTaskInfo != null &&
                 mHomeTaskInfo.taskId == runningTaskInfo.taskId
-                && getTaskViewCount() == 0) {
+                && getTaskViewCount() == 0 && mLoadPlanEverApplied) {
             // Do not add a stub task if we are running over home with empty recents, so that we
             // show the empty recents message instead of showing a stub task and later removing it.
+            // Ignore empty task signal if applyLoadPlan has never run.
             return false;
         }
         return super.shouldAddStubTaskView(runningTaskInfos);
     }
 
     @Override
-    protected void applyLoadPlan(ArrayList<Task> tasks) {
+    protected void applyLoadPlan(ArrayList<GroupTask> taskGroups) {
         // When quick-switching on 3p-launcher, we add a "stub" tile corresponding to Launcher
         // as well. This tile is never shown as we have setCurrentTaskHidden, but allows use to
         // track the index of the next task appropriately, as if we are switching on any other app.
         // TODO(b/195607777) Confirm home task info is front-most task and not mixed in with others
         int runningTaskId = getTaskIdsForRunningTaskView()[0];
-        if (mHomeTaskInfo != null && mHomeTaskInfo.taskId == runningTaskId && !tasks.isEmpty()) {
+        if (mHomeTaskInfo != null && mHomeTaskInfo.taskId == runningTaskId 
+                && !taskGroups.isEmpty()) {
             // Check if the task list has running task
             boolean found = false;
-            for (Task t : tasks) {
-                if (t.key.id == runningTaskId) {
+            for (GroupTask group : taskGroups) {
+                if (group.containsTask(runningTaskId)) {
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                ArrayList<Task> newList = new ArrayList<>(tasks.size() + 1);
-                newList.addAll(tasks);
-                newList.add(Task.from(new TaskKey(mHomeTaskInfo), mHomeTaskInfo, false));
-                tasks = newList;
+                ArrayList<GroupTask> newList = new ArrayList<>(taskGroups.size() + 1);
+                newList.addAll(taskGroups);
+                newList.add(new GroupTask(
+                        Task.from(new TaskKey(mHomeTaskInfo), mHomeTaskInfo, false),
+                        null, null));
+                taskGroups = newList;
             }
         }
-        super.applyLoadPlan(tasks);
+        super.applyLoadPlan(taskGroups);
     }
 
     @Override
@@ -202,6 +207,10 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
 
     @Override
     public void onStateTransitionStart(RecentsState toState) {
+        if (toState == HOME) {
+            // Clean-up logic that occurs when recents is no longer in use/visible.
+            reset();
+        }
         setOverviewStateEnabled(true);
         setOverviewGridEnabled(toState.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()));
         setOverviewFullscreenEnabled(toState.isFullScreen());
@@ -210,10 +219,6 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
 
     @Override
     public void onStateTransitionComplete(RecentsState finalState) {
-        if (finalState == HOME) {
-            // Clean-up logic that occurs when recents is no longer in use/visible.
-            reset();
-        }
         setOverlayEnabled(finalState == DEFAULT || finalState == MODAL_TASK);
         setFreezeViewVisibility(false);
     }

@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
 /*
 * Copyright (C) 2008 The Android Open Source Project
 *
@@ -41,9 +40,9 @@
     <!-- Options for recent tasks -->
     <!-- Title for an option to enter split screen mode for a given app -->
     <string name="recent_task_option_split_screen">Split screen</string>
-    <string translatable="false" name="split_screen_position_top">Pin to top</string>
-    <string translatable="false" name="split_screen_position_left">Pin to left</string>
-    <string translatable="false" name="split_screen_position_right">Pin to right</string>
+    <string translatable="false" name="split_screen_position_top">Split top</string>
+    <string translatable="false" name="split_screen_position_left">Split left</string>
+    <string translatable="false" name="split_screen_position_right">Split right</string>
 
     <!-- Widgets -->
     <!-- Message to tell the user to press and hold on a widget to add it [CHAR_LIMIT=50] -->
@@ -132,6 +131,8 @@
     <string name="all_apps_search_market_message">Search for more apps</string>
     <!-- Label for an icon representing any generic app. [CHAR_LIMIT=50] -->
     <string name="label_application">App</string>
+    <!-- Label for the header text of the All Apps section in All Apps view, used to separate Predicted Apps and Actions section from All Apps section. [CHAR_LIMIT=50] -->
+    <string name="all_apps_label">All apps</string>
 
     <!-- Popup items -->
     <!-- Text to display as the header above notifications. [CHAR_LIMIT=30] -->
@@ -193,7 +194,7 @@
     <string name="msg_no_phone_permission"><xliff:g id="app_name" example="Launcher3">%1$s</xliff:g> is not allowed to make phone calls</string>
 
     <!-- Widgets: -->
-    <skip />    
+    <skip />
 
     <!-- Error text that lets a user know that the widget can't load. -->
     <string name="gadget_error_text">Can\'t load widget</string>
@@ -250,7 +251,7 @@
     <string name="wallpaper_button_text">Wallpapers</string>
     <!-- Text for wallpaper change button [CHAR LIMIT=30]-->
     <string name="styles_wallpaper_button_text">Wallpaper &amp; style</string>
-    <!-- Text for settings button [CHAR LIMIT=30]-->
+    <!-- Text for settings button [CHAR LIMIT=20]-->
     <string name="settings_button_text">Home settings</string>
     <!-- Message shown when a feature is disabled by the administrator -->
     <string name="msg_disabled_by_admin">Disabled by your admin</string>
@@ -308,7 +309,7 @@
     <!-- Text announced by accessibility when the popup containing the list of widgets is closed. [CHAR_LIMIT=100] -->
     <string name="widgets_list_closed">Widgets list closed</string>
 
-<!-- Strings for accessibility actions -->
+    <!-- Strings for accessibility actions -->
     <!-- Accessibility action to add an app to workspace. [CHAR_LIMIT=30] -->
     <string name="action_add_to_workspace">Add to Home screen</string>
 

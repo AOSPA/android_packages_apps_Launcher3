@@ -53,7 +53,6 @@ import com.android.quickstep.RecentsAnimationDeviceState;
 import com.android.quickstep.RemoteTargetGluer;
 import com.android.quickstep.SwipeUpAnimationLogic;
 import com.android.quickstep.SwipeUpAnimationLogic.RunningWindowAnim;
-import com.android.quickstep.util.AppCloseConfig;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.TransformParams;
 import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams;
@@ -198,11 +197,12 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
             }
         }
         AnimatorSet animset = anim.buildAnim();
+        hideFakeTaskbar(/* animateToHotseat= */ false);
         animset.start();
         mRunningWindowAnim = RunningWindowAnim.wrap(animset);
     }
 
-    void resetFakeTaskView() {
+    void resetFakeTaskView(boolean animateFromHome) {
         mFakeTaskView.setVisibility(View.VISIBLE);
         PendingAnimation anim = new PendingAnimation(300);
         anim.setFloat(mTaskViewSwipeUpAnimation
@@ -210,12 +210,14 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
         anim.setViewAlpha(mFakeTaskView, 1, ACCEL);
         anim.addListener(mResetTaskView);
         AnimatorSet animset = anim.buildAnim();
+        showFakeTaskbar(animateFromHome);
         animset.start();
         mRunningWindowAnim = RunningWindowAnim.wrap(animset);
     }
 
     void animateFakeTaskViewHome(PointF finalVelocity, @Nullable Runnable onEndRunnable) {
         cancelRunningAnimation();
+        hideFakeTaskbar(/* animateToHotseat= */ true);
         mFakePreviousTaskView.setVisibility(View.INVISIBLE);
         mFakeHotseatView.setVisibility(View.VISIBLE);
         mShowPreviousTasks = false;
@@ -320,16 +322,15 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
                 @Override
                 public RectF getWindowTargetRect() {
                     int fakeHomeIconSizePx = Utilities.dpToPx(60);
-                    int fakeHomeIconLeft = mFakeHotseatView.getLeft();
-                    int fakeHomeIconTop = mFakeHotseatView.getTop();
+                    int fakeHomeIconLeft = getHotseatIconLeft();
+                    int fakeHomeIconTop = getHotseatIconTop();
                     return new RectF(fakeHomeIconLeft, fakeHomeIconTop,
                             fakeHomeIconLeft + fakeHomeIconSizePx,
                             fakeHomeIconTop + fakeHomeIconSizePx);
                 }
 
                 @Override
-                public void update(@Nullable AppCloseConfig config, RectF rect, float progress,
-                        float radius) {
+                public void update(RectF rect, float progress, float radius) {
                     mFakeIconView.setVisibility(View.VISIBLE);
                     mFakeIconView.update(rect, progress,
                             1f - SHAPE_PROGRESS_DURATION /* shapeProgressStart */,
@@ -374,8 +375,19 @@ abstract class SwipeUpGestureTutorialController extends TutorialController {
     }
 
     protected Animator createFingerDotOverviewSwipeAnimator(float fingerDotStartTranslationY) {
-        return createFingerDotSwipeUpAnimator(fingerDotStartTranslationY)
+        Animator overviewSwipeAnimator = createFingerDotSwipeUpAnimator(fingerDotStartTranslationY)
                 .setDuration(OVERVIEW_SWIPE_ANIMATION_DURATION_MILLIS);
+
+        overviewSwipeAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                mFakePreviousTaskView.setVisibility(View.VISIBLE);
+                onMotionPaused(true /*arbitrary value*/);
+            }
+        });
+
+        return overviewSwipeAnimator;
     }
 
 

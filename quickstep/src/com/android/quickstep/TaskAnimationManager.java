@@ -42,6 +42,8 @@ import com.android.systemui.shared.system.RemoteTransitionCompat;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 
+import java.util.HashMap;
+
 public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAnimationListener {
     public static final boolean ENABLE_SHELL_TRANSITIONS =
             SystemProperties.getBoolean("persist.debug.shell_transit", false);
@@ -107,6 +109,13 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         // But force-finish it anyways
         finishRunningRecentsAnimation(false /* toHome */);
 
+        if (mCallbacks != null) {
+            // If mCallbacks still != null, that means we are getting this startRecentsAnimation()
+            // before the previous one got onRecentsAnimationStart(). In that case, cleanup the
+            // previous animation so it doesn't mess up/listen to state changes in this animation.
+            cleanUpRecentsAnimation();
+        }
+
         final BaseActivityInterface activityInterface = gestureState.getActivityInterface();
         mLastGestureState = gestureState;
         mCallbacks = new RecentsAnimationCallbacks(SystemUiProxy.INSTANCE.get(mCtx),
@@ -128,7 +137,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
             }
 
             @Override
-            public void onRecentsAnimationCanceled(ThumbnailData thumbnailData) {
+            public void onRecentsAnimationCanceled(HashMap<Integer, ThumbnailData> thumbnailDatas) {
                 cleanUpRecentsAnimation();
             }
 
@@ -138,16 +147,16 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
             }
 
             @Override
-            public void onTaskAppeared(RemoteAnimationTargetCompat appearedTaskTarget) {
+            public void onTasksAppeared(RemoteAnimationTargetCompat[] appearedTaskTargets) {
+                RemoteAnimationTargetCompat appearedTaskTarget = appearedTaskTargets[0];
                 BaseActivityInterface activityInterface = mLastGestureState.getActivityInterface();
                 if (ENABLE_QUICKSTEP_LIVE_TILE.get() && activityInterface.isInLiveTileMode()
                         && activityInterface.getCreatedActivity() != null) {
                     RecentsView recentsView =
                             activityInterface.getCreatedActivity().getOverviewPanel();
                     if (recentsView != null) {
-                        RemoteAnimationTargetCompat[] apps = new RemoteAnimationTargetCompat[1];
-                        apps[0] = appearedTaskTarget;
-                        recentsView.launchSideTaskInLiveTileMode(appearedTaskTarget.taskId, apps,
+                        recentsView.launchSideTaskInLiveTileMode(appearedTaskTarget.taskId,
+                                appearedTaskTargets,
                                 new RemoteAnimationTargetCompat[0] /* wallpaper */,
                                 new RemoteAnimationTargetCompat[0] /* nonApps */);
                         return;
@@ -171,7 +180,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
 
         if (ENABLE_SHELL_TRANSITIONS) {
             RemoteTransitionCompat transition = new RemoteTransitionCompat(mCallbacks,
-                    mController != null ? mController.getController() : null);
+                    mController != null ? mController.getController() : null,
+                    mCtx.getIApplicationThread());
             Bundle options = ActivityOptionsCompat.makeRemoteTransition(transition)
                     .setTransientLaunch().toBundle();
             mCtx.startActivity(intent, options);
