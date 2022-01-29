@@ -246,6 +246,10 @@ public final class LauncherActivityInterface extends
 
     private void notifyRecentsOfOrientation() {
         // reset layout on swipe to home
+        Launcher launcher = getCreatedContainer();
+        if (launcher == null) {
+            return;
+        }
         ((RecentsView) getCreatedContainer().getOverviewPanel()).reapplyActiveRotation();
     }
 
