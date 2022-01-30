@@ -106,6 +106,7 @@ import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
@@ -208,7 +209,7 @@ import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
-import com.android.systemui.plugins.OverlayPlugin;
+import com.android.systemui.plugins.LauncherOverlayPlugin;
 import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.plugins.shared.LauncherExterns;
 import com.android.systemui.plugins.shared.LauncherOverlayManager;
@@ -231,8 +232,8 @@ import java.util.stream.Stream;
  * Default launcher application.
  */
 public class Launcher extends StatefulActivity<LauncherState> implements LauncherExterns,
-        Callbacks, InvariantDeviceProfile.OnIDPChangeListener, PluginListener<OverlayPlugin>,
-        LauncherOverlayCallbacks {
+        Callbacks, InvariantDeviceProfile.OnIDPChangeListener,
+        PluginListener<LauncherOverlayPlugin>, LauncherOverlayCallbacks {
     public static final String TAG = "Launcher";
 
     public static final ActivityTracker<Launcher> ACTIVITY_TRACKER = new ActivityTracker<>();
@@ -503,6 +504,23 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL);
 
         setContentView(getRootView());
+        getRootView().getViewTreeObserver().addOnPreDrawListener(
+                new ViewTreeObserver.OnPreDrawListener() {
+                    @Override
+                    public boolean onPreDraw() {
+                        // Checks the status of fade in animation.
+                        final AlphaProperty property =
+                                mDragLayer.getAlphaProperty(ALPHA_INDEX_LAUNCHER_LOAD);
+                        if (property.getValue() == 0) {
+                            // Animation haven't started yet; suspend.
+                            return false;
+                        } else {
+                            // The animation is started; start drawing.
+                            getRootView().getViewTreeObserver().removeOnPreDrawListener(this);
+                            return true;
+                        }
+                    }
+                });
         getRootView().dispatchInsets();
 
         // Listen for broadcasts
@@ -516,7 +534,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         }
         mOverlayManager = getDefaultOverlay();
         PluginManagerWrapper.INSTANCE.get(this).addPluginListener(this,
-                OverlayPlugin.class, false /* allowedMultiple */);
+                LauncherOverlayPlugin.class, false /* allowedMultiple */);
 
         mRotationHelper.initialize();
         TraceHelper.INSTANCE.endSection(traceToken);
@@ -542,12 +560,12 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     }
 
     @Override
-    public void onPluginConnected(OverlayPlugin overlayManager, Context context) {
+    public void onPluginConnected(LauncherOverlayPlugin overlayManager, Context context) {
         switchOverlay(() -> overlayManager.createOverlayManager(this, this));
     }
 
     @Override
-    public void onPluginDisconnected(OverlayPlugin plugin) {
+    public void onPluginDisconnected(LauncherOverlayPlugin plugin) {
         switchOverlay(this::getDefaultOverlay);
     }
 

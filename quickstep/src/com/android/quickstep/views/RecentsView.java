@@ -1396,7 +1396,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
         // Removing views sets the currentPage to 0, so we save this and restore it after
         // the new set of views are added
-        int previousPage = mCurrentPage;
+        int previousCurrentPage = mCurrentPage;
         removeAllViews();
 
         // Add views as children based on whether it's grouped or single task
@@ -1420,7 +1420,14 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         if (!taskGroups.isEmpty()) {
             addView(mClearAllButton);
         }
-        setCurrentPage(previousPage);
+
+        boolean settlingOnNewTask = mNextPage != INVALID_PAGE;
+        if (settlingOnNewTask) {
+            // Restore mCurrentPage but don't call setCurrentPage() as that clobbers the scroll.
+            mCurrentPage = previousCurrentPage;
+        } else {
+            setCurrentPage(previousCurrentPage);
+        }
 
         // Keep same previous focused task
         TaskView newFocusedTaskView = getTaskViewByTaskId(focusedTaskId);
@@ -1446,7 +1453,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
 
         int targetPage = -1;
-        if (mNextPage == INVALID_PAGE) {
+        if (!settlingOnNewTask) {
             // Set the current page to the running task, but not if settling on new task.
             if (runningTaskId != -1) {
                 targetPage = indexOfChild(newRunningTaskView);
@@ -2254,7 +2261,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         updateChildTaskOrientations();
 
         // Reload the task list
-        mTaskListChangeId = mModel.getTasks(this::applyLoadPlan);
+        reloadIfNeeded();
     }
 
     /**
@@ -3987,7 +3994,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     /** TODO(b/181707736) More gracefully handle exiting split selection state */
-    private void resetFromSplitSelectionState() {
+    protected void resetFromSplitSelectionState() {
         if (mSplitHiddenTaskViewIndex == -1) {
             return;
         }
@@ -4239,8 +4246,10 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         mPendingAnimation.addEndListener(isSuccess -> {
             if (isSuccess) {
                 if (tv.getTaskIds()[1] != -1) {
+                    // TODO(b/194414938): make this part of the animations instead.
                     TaskViewUtils.setSplitAuxiliarySurfacesShown(mRemoteTargetHandles[0]
-                            .getTransformParams().getTargetSet().nonApps, true);
+                            .getTransformParams().getTargetSet().nonApps,
+                            true /*shown*/, false /*animate*/);
                 }
                 if (ENABLE_QUICKSTEP_LIVE_TILE.get() && tv.isRunningTask()) {
                     finishRecentsAnimation(false /* toRecents */, null);
