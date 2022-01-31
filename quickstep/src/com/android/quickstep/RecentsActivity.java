@@ -141,6 +141,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         mTaskbarManager.setActivity(this);
     }
 
+    @Override
+    public void runOnBindToTouchInteractionService(Runnable r) {
+        mTISBindHelper.runOnBindToTouchInteractionService(r);
+    }
+
     public void setTaskbarUIController(FallbackTaskbarUIController taskbarUIController) {
         mTaskbarUIController = taskbarUIController;
     }
@@ -250,7 +255,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         final ActivityOptionsWrapper activityOptions = new ActivityOptionsWrapper(
                 ActivityOptionsCompat.makeRemoteAnimation(adapterCompat),
                 onEndCallback);
-        activityOptions.options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+        activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
         return activityOptions;
     }
 

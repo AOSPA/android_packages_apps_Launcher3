@@ -320,6 +320,11 @@ public abstract class BaseQuickstepLauncher extends Launcher
         mOverviewCommandHelper = binder.getOverviewCommandHelper();
     }
 
+    @Override
+    public void runOnBindToTouchInteractionService(Runnable r) {
+        mTISBindHelper.runOnBindToTouchInteractionService(r);
+    }
+
     private void initUnfoldTransitionProgressProvider() {
         final UnfoldTransitionConfig config = UnfoldTransitionFactory.createConfig(this);
         if (config.isEnabled()) {
@@ -331,7 +336,8 @@ public abstract class BaseQuickstepLauncher extends Launcher
                             getSystemService(DeviceStateManager.class),
                             getSystemService(SensorManager.class),
                             getMainThreadHandler(),
-                            getMainExecutor()
+                            getMainExecutor(),
+                            /* tracingTagPrefix= */ "launcher"
                     );
 
             mLauncherUnfoldAnimationController = new LauncherUnfoldAnimationController(
@@ -502,7 +508,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
             ActivityOptionsCompat.setLauncherSourceInfo(
                     activityOptions.options, mLastTouchUpTime);
         }
-        activityOptions.options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+        activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
         addLaunchCookie(item, activityOptions.options);
         return activityOptions;
     }

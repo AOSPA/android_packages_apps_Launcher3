@@ -176,6 +176,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
     private static final int LAUNCHER_RESUME_START_DELAY = 100;
     private static final int CLOSING_TRANSITION_DURATION_MS = 250;
     public static final int SPLIT_LAUNCH_DURATION = 370;
+    public static final int SPLIT_DIVIDER_ANIM_DURATION = 100;
 
     public static final int CONTENT_ALPHA_DURATION = 217;
     protected static final int CONTENT_SCALE_DURATION = 350;
@@ -660,10 +661,10 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         AnimOpenProperties prop = new AnimOpenProperties(mLauncher.getResources(), mDeviceProfile,
                 windowTargetBounds, launcherIconBounds, v, dragLayerBounds[0], dragLayerBounds[1],
                 hasSplashScreen, floatingView.isDifferentFromAppIcon());
-        int left = (int) (prop.cropCenterXStart - prop.cropWidthStart / 2);
-        int top = (int) (prop.cropCenterYStart - prop.cropHeightStart / 2);
-        int right = (int) (left + prop.cropWidthStart);
-        int bottom = (int) (top + prop.cropHeightStart);
+        int left = prop.cropCenterXStart - prop.cropWidthStart / 2;
+        int top = prop.cropCenterYStart - prop.cropHeightStart / 2;
+        int right = left + prop.cropWidthStart;
+        int bottom = top + prop.cropHeightStart;
         // Set the crop here so we can calculate the corner radius below.
         crop.set(left, top, right, bottom);
 
@@ -1329,6 +1330,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 mDeviceProfile);
 
         // Hook up floating views to the closing window animators.
+        final int rotationChange = getRotationChange(targets);
+        Rect windowTargetBounds = getWindowTargetBounds(targets, rotationChange);
         if (floatingIconView != null) {
             anim.addAnimatorListener(floatingIconView);
             floatingIconView.setOnTargetChangeListener(anim::onTargetPositionChanged);
@@ -1339,7 +1342,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
             // FolderIconView can be seen morphing into the icon shape.
             final float windowAlphaThreshold = 1f - SHAPE_PROGRESS_DURATION;
 
-            RectFSpringAnim.OnUpdateListener runner = new SpringAnimRunner(targets, targetRect) {
+            RectFSpringAnim.OnUpdateListener runner = new SpringAnimRunner(targets, targetRect,
+                    windowTargetBounds) {
                 @Override
                 public void onUpdate(RectF currentRectF, float progress) {
                     finalFloatingIconView.update(1f, 255 /* fgAlpha */, currentRectF, progress,
@@ -1356,7 +1360,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
             final float floatingWidgetAlpha = isTransluscent ? 0 : 1;
             FloatingWidgetView finalFloatingWidget = floatingWidget;
-            RectFSpringAnim.OnUpdateListener  runner = new SpringAnimRunner(targets, targetRect) {
+            RectFSpringAnim.OnUpdateListener  runner = new SpringAnimRunner(targets, targetRect,
+                    windowTargetBounds) {
                 @Override
                 public void onUpdate(RectF currentRectF, float progress) {
                     final float fallbackBackgroundAlpha =
@@ -1767,12 +1772,17 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         private final float mStartRadius;
         private final float mEndRadius;
         private final SurfaceTransactionApplier mSurfaceApplier;
+        private final Rect mWindowTargetBounds = new Rect();
 
-        SpringAnimRunner(RemoteAnimationTargetCompat[] appTargets, RectF targetRect) {
+        private final Rect mTmpRect = new Rect();
+
+        SpringAnimRunner(RemoteAnimationTargetCompat[] appTargets, RectF targetRect,
+                Rect windowTargetBounds) {
             mAppTargets = appTargets;
             mStartRadius = QuickStepContract.getWindowCornerRadius(mLauncher);
             mEndRadius = Math.max(1, targetRect.width()) / 2f;
             mSurfaceApplier = new SurfaceTransactionApplier(mDragLayer);
+            mWindowTargetBounds.set(windowTargetBounds);
         }
 
         public float getCornerRadius(float progress) {
@@ -1793,13 +1803,36 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 }
 
                 if (target.mode == MODE_CLOSING) {
-                    float alpha = getWindowAlpha(progress);
                     currentRectF.round(mCurrentRect);
 
+                    // Scale the target window to match the currentRectF.
+                    final float scale;
+
+                    // We need to infer the crop (we crop the window to match the currentRectF).
+                    if (mWindowTargetBounds.height() > mWindowTargetBounds.width()) {
+                        scale = Math.min(1f, currentRectF.width() / mWindowTargetBounds.width());
+
+                        int unscaledHeight = (int) (mCurrentRect.height() * (1f / scale));
+                        int croppedHeight = mWindowTargetBounds.height() - unscaledHeight;
+                        mTmpRect.set(0, 0, mWindowTargetBounds.width(),
+                                mWindowTargetBounds.height() - croppedHeight);
+                    } else {
+                        scale = Math.min(1f, currentRectF.height() / mWindowTargetBounds.height());
+
+                        int unscaledWidth = (int) (mCurrentRect.width() * (1f / scale));
+                        int croppedWidth = mWindowTargetBounds.width() - unscaledWidth;
+                        mTmpRect.set(0, 0, mWindowTargetBounds.width() - croppedWidth,
+                                mWindowTargetBounds.height());
+                    }
+
+                    // Match size and position of currentRect.
+                    mMatrix.setScale(scale, scale);
+                    mMatrix.postTranslate(mCurrentRect.left, mCurrentRect.top);
+
                     builder.withMatrix(mMatrix)
-                            .withWindowCrop(mCurrentRect)
-                            .withAlpha(alpha)
-                            .withCornerRadius(getCornerRadius(progress));
+                            .withWindowCrop(mTmpRect)
+                            .withAlpha(getWindowAlpha(progress))
+                            .withCornerRadius(getCornerRadius(progress) / scale);
                 } else if (target.mode == MODE_OPENING) {
                     mMatrix.setTranslate(mTmpPos.x, mTmpPos.y);
                     builder.withMatrix(mMatrix)

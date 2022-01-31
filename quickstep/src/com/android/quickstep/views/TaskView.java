@@ -366,7 +366,7 @@ public class TaskView extends FrameLayout implements Reusable {
     protected Task mTask;
     protected TaskThumbnailView mSnapshotView;
     protected IconView mIconView;
-    private final DigitalWellBeingToast mDigitalWellBeingToast;
+    protected final DigitalWellBeingToast mDigitalWellBeingToast;
     private float mFullscreenProgress;
     private float mGridProgress;
     private float mNonGridScale = 1;
@@ -628,11 +628,8 @@ public class TaskView extends FrameLayout implements Reusable {
                         Arrays.stream(topLeftParams.getTargetSet().wallpapers),
                         Arrays.stream(rightBottomParams.getTargetSet().wallpapers))
                         .toArray(RemoteAnimationTargetCompat[]::new);
-                RemoteAnimationTargetCompat[] nonApps = Stream.concat(
-                        Arrays.stream(topLeftParams.getTargetSet().nonApps),
-                        Arrays.stream(rightBottomParams.getTargetSet().nonApps))
-                        .toArray(RemoteAnimationTargetCompat[]::new);
-                targets = new RemoteAnimationTargets(apps, wallpapers, nonApps,
+                targets = new RemoteAnimationTargets(apps, wallpapers,
+                        topLeftParams.getTargetSet().nonApps,
                         topLeftParams.getTargetSet().targetMode);
             }
             if (targets == null) {
