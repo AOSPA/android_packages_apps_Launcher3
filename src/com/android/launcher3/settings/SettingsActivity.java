@@ -27,6 +27,7 @@ import static com.android.launcher3.InvariantDeviceProfile.TYPE_TABLET;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_DESKTOP_LABELS;
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_DOCK_SEARCH;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_DRAWER_LABELS;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_DT_GESTURE;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_MINUS_ONE;
@@ -62,6 +63,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.launcher3.BuildConfig;
 import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
+import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherFiles;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
@@ -133,6 +135,9 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         switch (key) {
+            case KEY_DOCK_SEARCH:
+                LauncherAppState.setNeedsRestart();
+                break;
             case KEY_DT_GESTURE:
                 Settings.System.putIntForUser(getContentResolver(),
                         Settings.System.GESTURE_DOUBLE_TAP_SLEEP,
@@ -203,6 +208,7 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
         private boolean mPreferenceHighlighted = false;
 
         private Preference mShowGoogleAppPref;
+        private Preference mShowGoogleBarPref;
 
         @Override
         public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -335,6 +341,10 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                     // Initialize the UI once
                     preference.setDefaultValue(RotationHelper.getAllowRotationDefaultValue(info));
                     return true;
+                case KEY_DOCK_SEARCH:
+                    mShowGoogleBarPref = preference;
+                    preference.setEnabled(Utilities.isGSAEnabled(getContext()));
+                    return true;
                 case KEY_MINUS_ONE:
                     mShowGoogleAppPref = preference;
                     preference.setEnabled(Utilities.isGSAEnabled(getContext()));
@@ -384,6 +394,9 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
 
             if (mShowGoogleAppPref != null) {
                 mShowGoogleAppPref.setEnabled(Utilities.isGSAEnabled(getContext()));
+            }
+            if (mShowGoogleBarPref != null) {
+                mShowGoogleBarPref.setEnabled(Utilities.isGSAEnabled(getContext()));
             }
 
             if (mRestartOnResume) {

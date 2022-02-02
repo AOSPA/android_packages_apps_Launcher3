@@ -56,6 +56,12 @@
             android:summary="@string/google_feed_summary"
             android:defaultValue="true" />
 
+        <SwitchPreference
+            android:key="pref_dock_search"
+            android:title="@string/hotseat_dock_search_title"
+            android:summary="@string/hotseat_dock_search_summary"
+            android:defaultValue="true" />
+
         <Preference
             android:key="pref_suggestions"
             android:title="@string/suggestion_screen_title"

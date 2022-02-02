@@ -28,6 +28,8 @@
     <string name="drawer_labels_summary">Show icon labels in drawer</string>
 
     <!-- Hotseat searchbar -->
+    <string name="hotseat_dock_search_title">Google search bar</string>
+    <string name="hotseat_dock_search_summary">Search bar in the bottom dock</string>
     <string name="hotseat_label_search">Search</string>
     <string name="hotseat_label_lens">Google Lens</string>
     <string name="hotseat_label_voice_search">Voice search</string>
