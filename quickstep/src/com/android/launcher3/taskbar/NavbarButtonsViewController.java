@@ -15,15 +15,11 @@
  */
 package com.android.launcher3.taskbar;
 
-import static android.content.pm.PackageManager.FEATURE_PC;
-
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_A11Y;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_BACK;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_HOME;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_IME_SWITCH;
-import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_NOTIFICATIONS;
-import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_QUICK_SETTINGS;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_RECENTS;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_KEYGUARD;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A11Y_BUTTON_CLICKABLE;
@@ -36,6 +32,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_N
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_OVERVIEW_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
+import static com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo.TOUCHABLE_INSETS_REGION;
 
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
@@ -45,19 +42,24 @@ import android.annotation.LayoutRes;
 import android.content.pm.ActivityInfo.Config;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.Region.Op;
 import android.graphics.drawable.AnimatedVectorDrawable;
+import android.graphics.drawable.PaintDrawable;
 import android.util.Property;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.OnAttachStateChangeListener;
 import android.view.View.OnClickListener;
 import android.view.View.OnHoverListener;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import com.android.launcher3.LauncherAnimUtils;
 import com.android.launcher3.R;
@@ -65,10 +67,13 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AlphaUpdateListener;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarButton;
 import com.android.launcher3.util.MultiValueAlpha;
+import com.android.launcher3.util.TouchController;
+import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.AnimatedFloat;
 import com.android.systemui.shared.rotation.FloatingRotationButton;
 import com.android.systemui.shared.rotation.RotationButton;
 import com.android.systemui.shared.rotation.RotationButtonController;
+import com.android.systemui.shared.system.ViewTreeObserverWrapper;
 
 import java.util.ArrayList;
 import java.util.function.IntPredicate;
@@ -94,6 +99,8 @@ public class NavbarButtonsViewController {
     private static final int FLAG_SCREEN_PINNING_ACTIVE = 1 << 11;
 
     private static final int MASK_IME_SWITCHER_VISIBLE = FLAG_SWITCHER_SUPPORTED | FLAG_IME_VISIBLE;
+
+    private static final String NAV_BUTTONS_SEPARATE_WINDOW_TITLE = "Taskbar Nav Buttons";
 
     private final ArrayList<StatePropertyHolder> mPropertyHolders = new ArrayList<>();
     private final ArrayList<ImageView> mAllButtons = new ArrayList<>();
@@ -128,7 +135,14 @@ public class NavbarButtonsViewController {
     private View mA11yButton;
     private int mSysuiStateFlags;
     private View mBackButton;
+    private View mHomeButton;
     private FloatingRotationButton mFloatingRotationButton;
+
+    // Variables for moving nav buttons to a separate window above IME
+    private boolean mAreNavButtonsInSeparateWindow = false;
+    private BaseDragLayer<TaskbarActivityContext> mSeparateWindowParent; // Initialized in init.
+    private final ViewTreeObserverWrapper.OnComputeInsetsListener mSeparateWindowInsetsComputer =
+            this::onComputeInsetsForSeparateWindow;
 
     public NavbarButtonsViewController(TaskbarActivityContext context, FrameLayout navButtonsView) {
         mContext = context;
@@ -171,6 +185,7 @@ public class NavbarButtonsViewController {
 
         // Force nav buttons (specifically back button) to be visible during setup wizard.
         boolean isInSetup = !mContext.isUserSetupComplete();
+        boolean isInKidsMode = mContext.isNavBarKidsModeActive();
         boolean alwaysShowButtons = isThreeButtonNav || isInSetup;
 
         // Make sure to remove nav bar buttons translation when notification shade is expanded or
@@ -208,6 +223,64 @@ public class NavbarButtonsViewController {
                         & Configuration.UI_MODE_NIGHT_MASK;
                 boolean isDarkTheme = mode == Configuration.UI_MODE_NIGHT_YES;
                 mTaskbarNavButtonDarkIntensity.updateValue(isDarkTheme ? 0 : 1);
+            } else if (isInKidsMode) {
+                int iconSize = mContext.getResources().getDimensionPixelSize(
+                        R.dimen.taskbar_icon_size_kids);
+                int buttonWidth = mContext.getResources().getDimensionPixelSize(
+                        R.dimen.taskbar_nav_buttons_width_kids);
+                int buttonHeight = mContext.getResources().getDimensionPixelSize(
+                        R.dimen.taskbar_nav_buttons_height_kids);
+                int buttonRadius = mContext.getResources().getDimensionPixelSize(
+                        R.dimen.taskbar_nav_buttons_corner_radius_kids);
+                int paddingleft = (buttonWidth - iconSize) / 2;
+                int paddingRight = paddingleft;
+                int paddingTop = (buttonHeight - iconSize) / 2;
+                int paddingBottom = paddingTop;
+
+                // Update icons
+                ((ImageView) mBackButton).setImageDrawable(
+                        mBackButton.getContext().getDrawable(R.drawable.ic_sysbar_back_kids));
+                ((ImageView) mBackButton).setScaleType(ImageView.ScaleType.FIT_CENTER);
+                mBackButton.setPadding(paddingleft, paddingTop, paddingRight, paddingBottom);
+                ((ImageView) mHomeButton).setImageDrawable(
+                        mHomeButton.getContext().getDrawable(R.drawable.ic_sysbar_home_kids));
+                ((ImageView) mHomeButton).setScaleType(ImageView.ScaleType.FIT_CENTER);
+                mHomeButton.setPadding(paddingleft, paddingTop, paddingRight, paddingBottom);
+
+                // Home button layout
+                LinearLayout.LayoutParams homeLayoutparams = new LinearLayout.LayoutParams(
+                        buttonWidth,
+                        buttonHeight
+                );
+                int homeButtonLeftMargin = mContext.getResources().getDimensionPixelSize(
+                        R.dimen.taskbar_home_button_left_margin_kids);
+                homeLayoutparams.setMargins(homeButtonLeftMargin, 0, 0, 0);
+                mHomeButton.setLayoutParams(homeLayoutparams);
+
+                // Back button layout
+                LinearLayout.LayoutParams backLayoutParams = new LinearLayout.LayoutParams(
+                        buttonWidth,
+                        buttonHeight
+                );
+                int backButtonLeftMargin = mContext.getResources().getDimensionPixelSize(
+                        R.dimen.taskbar_back_button_left_margin_kids);
+                backLayoutParams.setMargins(backButtonLeftMargin, 0, 0, 0);
+                mBackButton.setLayoutParams(backLayoutParams);
+
+                // Button backgrounds
+                int whiteWith10PctAlpha = Color.argb(0.1f, 1, 1, 1);
+                PaintDrawable buttonBackground = new PaintDrawable(whiteWith10PctAlpha);
+                buttonBackground.setCornerRadius(buttonRadius);
+                mHomeButton.setBackground(buttonBackground);
+                mBackButton.setBackground(buttonBackground);
+
+                // Update alignment within taskbar
+                FrameLayout.LayoutParams navButtonsLayoutParams = (FrameLayout.LayoutParams)
+                        mNavButtonContainer.getLayoutParams();
+                navButtonsLayoutParams.setMarginStart(navButtonsLayoutParams.getMarginEnd() / 2);
+                navButtonsLayoutParams.setMarginEnd(navButtonsLayoutParams.getMarginStart());
+                navButtonsLayoutParams.gravity = Gravity.CENTER;
+                mNavButtonContainer.requestLayout();
             }
 
             // Animate taskbar background when any of these flags are enabled
@@ -248,16 +321,21 @@ public class NavbarButtonsViewController {
         applyState();
         mPropertyHolders.forEach(StatePropertyHolder::endAnimation);
 
-        // quick setting and notification buttons
-        if (mContext.getPackageManager().hasSystemFeature(FEATURE_PC)) {
-            addButton(R.drawable.ic_sysbar_quick_settings, BUTTON_QUICK_SETTINGS,
-                    mNavButtonContainer, mControllers.navButtonController,
-                    R.id.quick_settings_button);
-            addButton(R.drawable.ic_sysbar_notifications, BUTTON_NOTIFICATIONS,
-                    mNavButtonContainer, mControllers.navButtonController,
-                    R.id.notifications_button);
-        }
+        // Initialize things needed to move nav buttons to separate window.
+        mSeparateWindowParent = new BaseDragLayer<TaskbarActivityContext>(mContext, null, 0) {
+            @Override
+            public void recreateControllers() {
+                mControllers = new TouchController[0];
+            }
 
+            @Override
+            protected boolean canFindActiveController() {
+                // We don't have any controllers, but we don't want any floating views such as
+                // folder to intercept, either. This ensures nav buttons can always be pressed.
+                return false;
+            }
+        };
+        mSeparateWindowParent.recreateControllers();
     }
 
     private void initButtons(ViewGroup navContainer, ViewGroup endContainer,
@@ -276,9 +354,9 @@ public class NavbarButtonsViewController {
                             && ((flags & FLAG_KEYGUARD_VISIBLE) == 0 || showingOnKeyguard);
                 }));
         boolean isRtl = Utilities.isRtl(mContext.getResources());
-        mPropertyHolders.add(new StatePropertyHolder(
-                mBackButton, flags -> (flags & FLAG_IME_VISIBLE) != 0, View.ROTATION,
-                isRtl ? 90 : -90, 0));
+        mPropertyHolders.add(new StatePropertyHolder(mBackButton,
+                flags -> (flags & FLAG_IME_VISIBLE) != 0 && !mContext.isNavBarKidsModeActive(),
+                View.ROTATION, isRtl ? 90 : -90, 0));
         // Translate back button to be at end/start of other buttons for keyguard
         int navButtonSize = mContext.getResources().getDimensionPixelSize(
                 R.dimen.taskbar_nav_buttons_size);
@@ -289,16 +367,16 @@ public class NavbarButtonsViewController {
 
 
         // home and recents buttons
-        View homeButton = addButton(R.drawable.ic_sysbar_home, BUTTON_HOME, navContainer,
+        mHomeButton = addButton(R.drawable.ic_sysbar_home, BUTTON_HOME, navContainer,
                 navButtonController, R.id.home);
-        mPropertyHolders.add(new StatePropertyHolder(homeButton,
+        mPropertyHolders.add(new StatePropertyHolder(mHomeButton,
                 flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0 &&
                         (flags & FLAG_DISABLE_HOME) == 0));
         View recentsButton = addButton(R.drawable.ic_sysbar_recent, BUTTON_RECENTS,
                 navContainer, navButtonController, R.id.recent_apps);
         mPropertyHolders.add(new StatePropertyHolder(recentsButton,
-                flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0 &&
-                        (flags & FLAG_DISABLE_RECENTS) == 0));
+                flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0 && (flags & FLAG_DISABLE_RECENTS) == 0
+                        && !mContext.isNavBarKidsModeActive()));
 
         // A11y button
         mA11yButton = addButton(R.drawable.ic_sysbar_accessibility_button, BUTTON_A11Y,
@@ -393,7 +471,7 @@ public class NavbarButtonsViewController {
     /**
      * Adds the bounds corresponding to all visible buttons to provided region
      */
-    public void addVisibleButtonsRegion(TaskbarDragLayer parent, Region outRegion) {
+    public void addVisibleButtonsRegion(BaseDragLayer<?> parent, Region outRegion) {
         int count = mAllButtons.size();
         for (int i = 0; i < count; i++) {
             View button = mAllButtons.get(i);
@@ -454,7 +532,7 @@ public class NavbarButtonsViewController {
         }
     }
 
-    private ImageView addButton(@DrawableRes int drawableId, @TaskbarButton int buttonType,
+    protected ImageView addButton(@DrawableRes int drawableId, @TaskbarButton int buttonType,
             ViewGroup parent, TaskbarNavButtonController navButtonController, @IdRes int id) {
         return addButton(drawableId, buttonType, parent, navButtonController, id,
                 R.layout.taskbar_nav_button);
@@ -498,6 +576,59 @@ public class NavbarButtonsViewController {
         if (mFloatingRotationButton != null) {
             mFloatingRotationButton.hide();
         }
+
+        moveNavButtonsBackToTaskbarWindow();
+    }
+
+    /**
+     * Moves mNavButtonsView from TaskbarDragLayer to a placeholder BaseDragLayer on a new window.
+     */
+    public void moveNavButtonsToNewWindow() {
+        if (mAreNavButtonsInSeparateWindow) {
+            return;
+        }
+
+        mSeparateWindowParent.addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View view) {
+                ViewTreeObserverWrapper.addOnComputeInsetsListener(
+                        mSeparateWindowParent.getViewTreeObserver(), mSeparateWindowInsetsComputer);
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View view) {
+                mSeparateWindowParent.removeOnAttachStateChangeListener(this);
+                ViewTreeObserverWrapper.removeOnComputeInsetsListener(
+                        mSeparateWindowInsetsComputer);
+            }
+        });
+
+        mAreNavButtonsInSeparateWindow = true;
+        mContext.getDragLayer().removeView(mNavButtonsView);
+        mSeparateWindowParent.addView(mNavButtonsView);
+        WindowManager.LayoutParams windowLayoutParams = mContext.createDefaultWindowLayoutParams();
+        windowLayoutParams.setTitle(NAV_BUTTONS_SEPARATE_WINDOW_TITLE);
+        mContext.addWindowView(mSeparateWindowParent, windowLayoutParams);
+
+    }
+
+    /**
+     * Moves mNavButtonsView from its temporary window and reattaches it to TaskbarDragLayer.
+     */
+    public void moveNavButtonsBackToTaskbarWindow() {
+        if (!mAreNavButtonsInSeparateWindow) {
+            return;
+        }
+
+        mAreNavButtonsInSeparateWindow = false;
+        mContext.removeWindowView(mSeparateWindowParent);
+        mSeparateWindowParent.removeView(mNavButtonsView);
+        mContext.getDragLayer().addView(mNavButtonsView);
+    }
+
+    private void onComputeInsetsForSeparateWindow(ViewTreeObserverWrapper.InsetsInfo insetsInfo) {
+        addVisibleButtonsRegion(mSeparateWindowParent, insetsInfo.touchableRegion);
+        insetsInfo.setTouchableInsets(TOUCHABLE_INSETS_REGION);
     }
 
     private class RotationButtonListener implements RotationButton.RotationButtonUpdatesCallback {

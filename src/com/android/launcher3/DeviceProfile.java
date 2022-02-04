@@ -161,7 +161,7 @@ public class DeviceProfile {
     public final int hotseatBarSidePaddingStartPx;
     public final int hotseatBarSidePaddingEndPx;
     public final int hotseatQsbHeight;
-    public final int hotseatBorderSpace;
+    public int hotseatBorderSpace;
 
     public final float qsbBottomMarginOriginalPx;
     public int qsbBottomMarginPx;
@@ -716,6 +716,7 @@ public class DeviceProfile {
         }
 
         // Hotseat
+        hotseatBorderSpace = pxFromDp(inv.hotseatBorderSpaces[mTypeIndex], mMetrics, scale);
         updateHotseatIconSize(iconSizePx);
 
         if (!isVerticalLayout) {
@@ -1061,8 +1062,10 @@ public class DeviceProfile {
 
         writer.println(prefix + "\tisScalableGrid:" + isScalableGrid);
 
-        writer.println(prefix + "\tinv.numColumns: " + inv.numColumns);
         writer.println(prefix + "\tinv.numRows: " + inv.numRows);
+        writer.println(prefix + "\tinv.numColumns: " + inv.numColumns);
+        writer.println(prefix + "\tinv.numSearchContainerColumns: "
+                + inv.numSearchContainerColumns);
 
         writer.println(prefix + "\tminCellSize: " + inv.minCellSize[mTypeIndex] + "dp");
 
