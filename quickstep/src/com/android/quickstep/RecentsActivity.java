@@ -38,6 +38,7 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Display;
 import android.view.SurfaceControl.Transaction;
 import android.view.View;
 import android.window.SplashScreen;
@@ -256,6 +257,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                 ActivityOptionsCompat.makeRemoteAnimation(adapterCompat),
                 onEndCallback);
         activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+        activityOptions.options.setLaunchDisplayId(
+                (v != null && v.getDisplay() != null) ? v.getDisplay().getDisplayId()
+                        : Display.DEFAULT_DISPLAY);
         return activityOptions;
     }
 
@@ -419,7 +423,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
             RemoteAnimationTargets targets = new RemoteAnimationTargets(
                     appTargets, wallpaperTargets, nonAppTargets, MODE_OPENING);
             for (RemoteAnimationTargetCompat app : targets.apps) {
-                new Transaction().setAlpha(app.leash.getSurfaceControl(), 1).apply();
+                new Transaction().setAlpha(app.leash, 1).apply();
             }
             AnimatorSet anim = new AnimatorSet();
             anim.play(controller.getAnimationPlayer());

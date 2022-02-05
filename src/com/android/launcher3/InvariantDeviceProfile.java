@@ -105,6 +105,7 @@ public class InvariantDeviceProfile {
      */
     public int numRows;
     public int numColumns;
+    public int numSearchContainerColumns;
 
     /**
      * Number of icons per row and column in the folder.
@@ -304,6 +305,7 @@ public class InvariantDeviceProfile {
         GridOption closestProfile = displayOption.grid;
         numRows = closestProfile.numRows;
         numColumns = closestProfile.numColumns;
+        numSearchContainerColumns = closestProfile.numSearchContainerColumns;
         dbFile = closestProfile.dbFile;
         defaultLayoutId = closestProfile.defaultLayoutId;
         demoModeLayoutId = closestProfile.demoModeLayoutId;
@@ -401,8 +403,8 @@ public class InvariantDeviceProfile {
 
     private Object[] toModelState() {
         return new Object[]{
-                numColumns, numRows, numDatabaseHotseatIcons, iconBitmapSize, fillResIconDpi,
-                numDatabaseAllAppsColumns, dbFile};
+                numColumns, numRows, numSearchContainerColumns, numDatabaseHotseatIcons,
+                iconBitmapSize, fillResIconDpi, numDatabaseAllAppsColumns, dbFile};
     }
 
     private void onConfigChanged(Context context) {
@@ -679,6 +681,7 @@ public class InvariantDeviceProfile {
         public final String name;
         public final int numRows;
         public final int numColumns;
+        public final int numSearchContainerColumns;
         public final boolean isEnabled;
 
         private final int numFolderRows;
@@ -705,6 +708,8 @@ public class InvariantDeviceProfile {
             name = a.getString(R.styleable.GridDisplayOption_name);
             numRows = a.getInt(R.styleable.GridDisplayOption_numRows, 0);
             numColumns = a.getInt(R.styleable.GridDisplayOption_numColumns, 0);
+            numSearchContainerColumns = a.getInt(
+                    R.styleable.GridDisplayOption_numSearchContainerColumns, numColumns);
 
             dbFile = a.getString(R.styleable.GridDisplayOption_dbFile);
             defaultLayoutId = a.getResourceId(deviceType == TYPE_MULTI_DISPLAY && a.hasValue(
@@ -789,6 +794,11 @@ public class InvariantDeviceProfile {
             x = a.getFloat(R.styleable.ProfileDisplayOption_minCellWidth, 0);
             y = a.getFloat(R.styleable.ProfileDisplayOption_minCellHeight, 0);
             minCellSize[INDEX_DEFAULT] = new PointF(x, y);
+
+            x = a.getFloat(R.styleable.ProfileDisplayOption_minCellWidthLandscape,
+                    minCellSize[INDEX_DEFAULT].x);
+            y = a.getFloat(R.styleable.ProfileDisplayOption_minCellHeightLandscape,
+                    minCellSize[INDEX_DEFAULT].y);
             minCellSize[INDEX_LANDSCAPE] = new PointF(x, y);
 
             x = a.getFloat(R.styleable.ProfileDisplayOption_minCellWidthTwoPanelPortrait,
@@ -891,7 +901,9 @@ public class InvariantDeviceProfile {
 
             horizontalMargin[INDEX_DEFAULT] = a.getFloat(
                     R.styleable.ProfileDisplayOption_horizontalMargin, 0);
-            horizontalMargin[INDEX_LANDSCAPE] = horizontalMargin[INDEX_DEFAULT];
+            horizontalMargin[INDEX_LANDSCAPE] = a.getFloat(
+                    R.styleable.ProfileDisplayOption_horizontalMarginLandscape,
+                    horizontalMargin[INDEX_DEFAULT]);
             horizontalMargin[INDEX_TWO_PANEL_LANDSCAPE] = a.getFloat(
                     R.styleable.ProfileDisplayOption_horizontalMarginTwoPanelLandscape,
                     horizontalMargin[INDEX_DEFAULT]);
@@ -901,7 +913,9 @@ public class InvariantDeviceProfile {
 
             hotseatBorderSpaces[INDEX_DEFAULT] = a.getFloat(
                     R.styleable.ProfileDisplayOption_hotseatBorderSpace, borderSpace);
-            hotseatBorderSpaces[INDEX_LANDSCAPE] = hotseatBorderSpaces[INDEX_DEFAULT];
+            hotseatBorderSpaces[INDEX_LANDSCAPE] = a.getFloat(
+                    R.styleable.ProfileDisplayOption_hotseatBorderSpaceLandscape,
+                    hotseatBorderSpaces[INDEX_DEFAULT]);
             hotseatBorderSpaces[INDEX_TWO_PANEL_LANDSCAPE] = a.getFloat(
                     R.styleable.ProfileDisplayOption_hotseatBorderSpaceTwoPanelLandscape,
                     hotseatBorderSpaces[INDEX_DEFAULT]);

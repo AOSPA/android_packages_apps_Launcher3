@@ -16,6 +16,7 @@
 
 package com.android.quickstep.views;
 
+import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
@@ -51,6 +52,7 @@ import android.os.Bundle;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.util.Log;
+import android.view.Display;
 import android.view.MotionEvent;
 import android.view.TouchDelegate;
 import android.view.View;
@@ -470,7 +472,9 @@ public class TaskView extends FrameLayout implements Reusable {
         stubInfo.user = componentKey.user;
         stubInfo.intent = new Intent().setComponent(componentKey.componentName);
         stubInfo.title = task.title;
-        stubInfo.screenId = getRecentsView().indexOfChild(this);
+        if (getRecentsView() != null) {
+            stubInfo.screenId = getRecentsView().indexOfChild(this);
+        }
         return stubInfo;
     }
 
@@ -636,6 +640,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 // If the recents animation is cancelled somehow between the parent if block and
                 // here, try to launch the task as a non live tile task.
                 launchTaskAnimated();
+                mIsClickableAsLiveTile = true;
                 return;
             }
 
@@ -657,6 +662,9 @@ public class TaskView extends FrameLayout implements Reusable {
 
                 @Override
                 public void onAnimationEnd(Animator animator) {
+                    if (mTask != null && mTask.key.displayId != getRootViewDisplayId()) {
+                        launchTaskAnimated();
+                    }
                     mIsClickableAsLiveTile = true;
                 }
             });
@@ -1517,7 +1525,8 @@ public class TaskView extends FrameLayout implements Reusable {
 
 
     private int getRootViewDisplayId() {
-        return getRootView().getDisplay().getDisplayId();
+        Display  display = getRootView().getDisplay();
+        return display != null ? display.getDisplayId() : DEFAULT_DISPLAY;
     }
 
     /**
