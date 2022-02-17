@@ -108,6 +108,7 @@ public final class TestProtocol {
             "get-focused-task-height-for-tablet";
     public static final String REQUEST_GET_GRID_TASK_SIZE_RECT_FOR_TABLET =
             "get-grid-task-size-rect-for-tablet";
+    public static final String REQUEST_GET_OVERVIEW_PAGE_SPACING = "get-overview-page-spacing";
     public static final String REQUEST_ENABLE_ROTATION = "enable_rotation";
 
     public static Long sForcePauseTimeout;
@@ -122,9 +123,7 @@ public final class TestProtocol {
     public static final String REQUEST_MOCK_SENSOR_ROTATION = "mock-sensor-rotation";
 
     public static final String PERMANENT_DIAG_TAG = "TaplTarget";
-    public static final String TASKBAR_WINDOW_CRASH = "b/201305599";
     public static final String TASK_VIEW_ID_CRASH = "b/195430732";
     public static final String NO_DROP_TARGET = "b/195031154";
     public static final String NULL_INT_SET = "b/200572078";
-    public static final String NO_SCREENSHOT = "b/202414125";
 }

@@ -30,6 +30,7 @@ import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
 import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
 
 import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -220,6 +221,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
             PointF taskDimension = getTaskDimension(context, dp);
             float scale = gridRect.height() / taskDimension.y;
+            scale = Math.min(scale, res.getFloat(R.dimen.overview_max_scale));
             int outWidth = Math.round(scale * taskDimension.x);
             int outHeight = Math.round(scale * taskDimension.y);
 
@@ -398,6 +400,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
      * (This is a hack to ensure Taskbar draws its background first to avoid flickering.)
      */
     public @Nullable View onSettledOnEndTarget(GestureState.GestureEndTarget endTarget) {
+        TaskbarUIController taskbarUIController = getTaskbarController();
+        if (taskbarUIController != null) {
+            taskbarUIController.setSystemGestureInProgress(false);
+            return taskbarUIController.getRootView();
+        }
         return null;
     }
 
@@ -533,6 +540,16 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             pa.addFloat(recentsView, RECENTS_SCALE_PROPERTY,
                     recentsView.getMaxScaleForFullScreen(), 1, LINEAR);
             pa.addFloat(recentsView, FULLSCREEN_PROGRESS, 1, 0, LINEAR);
+
+            pa.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    TaskbarUIController taskbarUIController = getTaskbarController();
+                    if (taskbarUIController != null) {
+                        taskbarUIController.setSystemGestureInProgress(true);
+                    }
+                }
+            });
         }
     }
 }

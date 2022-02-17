@@ -38,6 +38,7 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Display;
 import android.view.SurfaceControl.Transaction;
 import android.view.View;
 import android.window.SplashScreen;
@@ -128,7 +129,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         SYSUI_PROGRESS.set(getRootView().getSysUiScrim(), 0f);
 
         SplitSelectStateController controller =
-                new SplitSelectStateController(mHandler, SystemUiProxy.INSTANCE.get(this));
+                new SplitSelectStateController(mHandler, SystemUiProxy.INSTANCE.get(this),
+                        getStateManager(), null /*depthController*/);
         mDragLayer.recreateControllers();
         mFallbackRecentsView.init(mActionsView, controller);
 
@@ -138,6 +140,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     private void onTISConnected(TouchInteractionService.TISBinder binder) {
         mTaskbarManager = binder.getTaskbarManager();
         mTaskbarManager.setActivity(this);
+    }
+
+    @Override
+    public void runOnBindToTouchInteractionService(Runnable r) {
+        mTISBindHelper.runOnBindToTouchInteractionService(r);
     }
 
     public void setTaskbarUIController(FallbackTaskbarUIController taskbarUIController) {
@@ -249,7 +256,10 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         final ActivityOptionsWrapper activityOptions = new ActivityOptionsWrapper(
                 ActivityOptionsCompat.makeRemoteAnimation(adapterCompat),
                 onEndCallback);
-        activityOptions.options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+        activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+        activityOptions.options.setLaunchDisplayId(
+                (v != null && v.getDisplay() != null) ? v.getDisplay().getDisplayId()
+                        : Display.DEFAULT_DISPLAY);
         return activityOptions;
     }
 
@@ -413,7 +423,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
             RemoteAnimationTargets targets = new RemoteAnimationTargets(
                     appTargets, wallpaperTargets, nonAppTargets, MODE_OPENING);
             for (RemoteAnimationTargetCompat app : targets.apps) {
-                new Transaction().setAlpha(app.leash.getSurfaceControl(), 1).apply();
+                new Transaction().setAlpha(app.leash, 1).apply();
             }
             AnimatorSet anim = new AnimatorSet();
             anim.play(controller.getAnimationPlayer());

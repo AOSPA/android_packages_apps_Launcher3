@@ -24,7 +24,6 @@ import static com.android.launcher3.LauncherState.SPRING_LOADED;
 
 import android.annotation.TargetApi;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -32,6 +31,7 @@ import android.view.Surface;
 
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.statehandlers.DepthController;
@@ -70,6 +70,7 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
     @Override
     public void startHome() {
         mActivity.getStateManager().goToState(NORMAL);
+        AbstractFloatingView.closeAllOpenViews(mActivity, mActivity.isStarted());
     }
 
     @Override
@@ -92,10 +93,6 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
 
     @Override
     public void onStateTransitionStart(LauncherState toState) {
-        if (toState == NORMAL || toState == SPRING_LOADED) {
-            // Clean-up logic that occurs when recents is no longer in use/visible.
-            reset();
-        }
         setOverviewStateEnabled(toState.overviewUi);
         setOverviewGridEnabled(toState.displayOverviewTasksAsGrid(mActivity.getDeviceProfile()));
         setOverviewFullscreenEnabled(toState.getOverviewFullscreenProgress() == 1);
@@ -104,8 +101,18 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
 
     @Override
     public void onStateTransitionComplete(LauncherState finalState) {
-        setOverlayEnabled(finalState == OVERVIEW || finalState == OVERVIEW_MODAL_TASK);
+        if (finalState == NORMAL || finalState == SPRING_LOADED) {
+            // Clean-up logic that occurs when recents is no longer in use/visible.
+            reset();
+        }
+        boolean isOverlayEnabled = finalState == OVERVIEW || finalState == OVERVIEW_MODAL_TASK;
+        setOverlayEnabled(isOverlayEnabled);
         setFreezeViewVisibility(false);
+
+        if (isOverlayEnabled) {
+            runActionOnRemoteHandles(remoteTargetHandle ->
+                    remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(true));
+        }
     }
 
     @Override
@@ -160,13 +167,5 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
             @SplitConfigurationOptions.StagePosition int stagePosition) {
         super.initiateSplitSelect(taskView, stagePosition);
         mActivity.getStateManager().goToState(LauncherState.OVERVIEW_SPLIT_SELECT);
-    }
-
-    @Override
-    protected void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        // If overview is in modal state when rotate, reset it to overview state without running
-        // animation.
-        setModalStateEnabled(false);
     }
 }

@@ -17,8 +17,6 @@
 package com.android.launcher3.uioverrides.states;
 
 import com.android.launcher3.Launcher;
-import com.android.launcher3.R;
-import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.quickstep.views.RecentsView;
 
 /**
@@ -31,11 +29,6 @@ public class SplitScreenSelectState extends OverviewState {
     }
 
     @Override
-    public void onBackPressed(Launcher launcher) {
-        launcher.getStateManager().goToState(OVERVIEW);
-    }
-
-    @Override
     public int getVisibleElements(Launcher launcher) {
         return SPLIT_PLACHOLDER_VIEW;
     }
@@ -43,12 +36,6 @@ public class SplitScreenSelectState extends OverviewState {
     @Override
     public float getSplitSelectTranslation(Launcher launcher) {
         RecentsView recentsView = launcher.getOverviewPanel();
-        int splitPosition = recentsView.getSplitPlaceholder().getActiveSplitStagePosition();
-        if (!recentsView.shouldShiftThumbnailsForSplitSelect()) {
-            return 0f;
-        }
-        PagedOrientationHandler orientationHandler = recentsView.getPagedOrientationHandler();
-        int direction = orientationHandler.getSplitTranslationDirectionFactor(splitPosition);
-        return launcher.getResources().getDimension(R.dimen.split_placeholder_size) * direction;
+        return recentsView.getSplitSelectTranslation();
     }
 }

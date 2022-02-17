@@ -15,10 +15,10 @@
  */
 package com.android.launcher3.taskbar;
 
+import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
-import static com.android.launcher3.testing.TestProtocol.TASKBAR_WINDOW_CRASH;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
 import static com.android.launcher3.util.DisplayController.CHANGE_SUPPORTED_BOUNDS;
@@ -30,8 +30,8 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
 import android.net.Uri;
+import android.os.Handler;
 import android.provider.Settings;
-import android.util.Log;
 import android.view.Display;
 
 import androidx.annotation.NonNull;
@@ -42,7 +42,6 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StatefulActivity;
-import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.SettingsCache;
@@ -64,11 +63,15 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
     private static final Uri USER_SETUP_COMPLETE_URI = Settings.Secure.getUriFor(
             Settings.Secure.USER_SETUP_COMPLETE);
 
+    private static final Uri NAV_BAR_KIDS_MODE = Settings.Secure.getUriFor(
+            Settings.Secure.NAV_BAR_KIDS_MODE);
+
     private final Context mContext;
     private final DisplayController mDisplayController;
     private final SysUINavigationMode mSysUINavigationMode;
     private final TaskbarNavButtonController mNavButtonController;
     private final SettingsCache.OnChangeListener mUserSetupCompleteListener;
+    private final SettingsCache.OnChangeListener mNavBarKidsModeListener;
     private final ComponentCallbacks mComponentCallbacks;
     private final SimpleBroadcastReceiver mShutdownReceiver;
 
@@ -95,8 +98,10 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         Display display =
                 service.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
         mContext = service.createWindowContext(display, TYPE_NAVIGATION_BAR_PANEL, null);
-        mNavButtonController = new TaskbarNavButtonController(service);
+        mNavButtonController = new TaskbarNavButtonController(service,
+                SystemUiProxy.INSTANCE.get(mContext), new Handler());
         mUserSetupCompleteListener = isUserSetupComplete -> recreateTaskbar();
+        mNavBarKidsModeListener = isNavBarKidsMode -> recreateTaskbar();
         mComponentCallbacks = new ComponentCallbacks() {
             private Configuration mOldConfig = mContext.getResources().getConfiguration();
 
@@ -108,6 +113,11 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
                 if ((configDiff & configsRequiringRecreate) != 0) {
                     // Color has changed, recreate taskbar to reload background color & icons.
                     recreateTaskbar();
+                } else {
+                    // Config change might be handled without re-creating the taskbar
+                    if (mTaskbarActivityContext != null) {
+                        mTaskbarActivityContext.onConfigurationChanged(configDiff);
+                    }
                 }
                 mOldConfig = newConfig;
             }
@@ -121,6 +131,8 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         mSysUINavigationMode.addModeChangeListener(this);
         SettingsCache.INSTANCE.get(mContext).register(USER_SETUP_COMPLETE_URI,
                 mUserSetupCompleteListener);
+        SettingsCache.INSTANCE.get(mContext).register(NAV_BAR_KIDS_MODE,
+                mNavBarKidsModeListener);
         mContext.registerComponentCallbacks(mComponentCallbacks);
         mShutdownReceiver.register(mContext, Intent.ACTION_SHUTDOWN);
 
@@ -185,6 +197,9 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
      */
     private TaskbarUIController createTaskbarUIControllerForActivity(StatefulActivity activity) {
         if (activity instanceof BaseQuickstepLauncher) {
+            if (mTaskbarActivityContext.getPackageManager().hasSystemFeature(FEATURE_PC)) {
+                return new DesktopTaskbarUIController((BaseQuickstepLauncher) activity);
+            }
             return new LauncherTaskbarUIController((BaseQuickstepLauncher) activity);
         }
         if (activity instanceof RecentsActivity) {
@@ -207,8 +222,6 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
     }
 
     private void recreateTaskbar() {
-        Log.d(TASKBAR_WINDOW_CRASH, "Recreating taskbar: mTaskbarActivityContext="
-                + mTaskbarActivityContext);
         destroyExistingTaskbar();
 
         DeviceProfile dp =
@@ -231,7 +244,6 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
             mTaskbarActivityContext.setUIController(
                     createTaskbarUIControllerForActivity(mActivity));
         }
-        Log.d(TASKBAR_WINDOW_CRASH, "Finished recreating taskbar");
     }
 
     public void onSystemUiFlagsChanged(int systemUiStateFlags) {
@@ -269,6 +281,12 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         }
     }
 
+    public void onNavButtonsDarkIntensityChanged(float darkIntensity) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.onNavButtonsDarkIntensityChanged(darkIntensity);
+        }
+    }
+
     /**
      * Called when the manager is no longer needed
      */
@@ -278,6 +296,8 @@ public class TaskbarManager implements DisplayController.DisplayInfoChangeListen
         mSysUINavigationMode.removeModeChangeListener(this);
         SettingsCache.INSTANCE.get(mContext).unregister(USER_SETUP_COMPLETE_URI,
                 mUserSetupCompleteListener);
+        SettingsCache.INSTANCE.get(mContext).unregister(NAV_BAR_KIDS_MODE,
+                mNavBarKidsModeListener);
         mContext.unregisterComponentCallbacks(mComponentCallbacks);
         mContext.unregisterReceiver(mShutdownReceiver);
     }

@@ -72,6 +72,7 @@ public final class FeatureFlags {
             "PROMISE_APPS_NEW_INSTALLS", true,
             "Adds a promise icon to the home screen for new install sessions.");
 
+    // TODO: b/206508141: Long pressing on some icons on home screen cause launcher to crash.
     public static final BooleanFlag ENABLE_LOCAL_COLOR_POPUPS = getDebugFlag(
             "ENABLE_LOCAL_COLOR_POPUPS", false, "Enable local color extraction for popups.");
 
@@ -93,6 +94,9 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_ONE_SEARCH = new DeviceFlag("ENABLE_ONE_SEARCH", false,
             "Use homescreen search box to complete allApps searches");
+
+    public static final BooleanFlag COLLECT_SEARCH_HISTORY = new DeviceFlag(
+            "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
 
     public static final BooleanFlag ENABLE_TWOLINE_ALLAPPS = getDebugFlag(
             "ENABLE_TWOLINE_ALLAPPS", false, "Enables two line label inside all apps.");
@@ -210,10 +214,6 @@ public final class FeatureFlags {
             "ENABLE_TWO_PANEL_HOME", true,
             "Uses two panel on home screen. Only applicable on large screen devices.");
 
-    public static final BooleanFlag ENABLE_TWO_PANEL_HOME_IN_PORTRAIT = getDebugFlag(
-            "ENABLE_TWO_PANEL_HOME_IN_PORTRAIT", true,
-            "Uses two panel on home screen in portrait if ENABLE_TWO_PANEL_HOME is enabled.");
-
     public static final BooleanFlag ENABLE_SCRIM_FOR_APP_LAUNCH = getDebugFlag(
             "ENABLE_SCRIM_FOR_APP_LAUNCH", false,
             "Enables scrim during app launch animation.");
@@ -250,6 +250,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ICON_LABEL_AUTO_SCALING = getDebugFlag(
             "ENABLE_ICON_LABEL_AUTO_SCALING", true,
             "Enables scaling/spacing for icon labels to make more characters visible");
+
+    public static final BooleanFlag ENABLE_ALL_APPS_IN_TASKBAR = getDebugFlag(
+            "ENABLE_ALL_APPS_IN_TASKBAR", false,
+            "Enables accessing All Apps from the system Taskbar.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

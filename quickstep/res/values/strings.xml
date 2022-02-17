@@ -39,6 +39,9 @@
     <!-- Accessibility title for the list of recent apps [CHAR_LIMIT=none] -->
     <string name="accessibility_recent_apps">Recent apps</string>
 
+    <!-- Accessibility confirmation for task closed -->
+    <string name="task_view_closed">Task Closed</string>
+
     <!-- Accessibility title for an app card in Recents for apps that have time limit set
      [CHAR_LIMIT=none] -->
     <string name="task_contents_description_with_remaining_time"><xliff:g id="task_description" example="GMail">%1$s</xliff:g>, <xliff:g id="remaining_time" example="7 minutes left today">%2$s</xliff:g></string>
@@ -218,10 +221,10 @@
     <string name="taskbar_edu_closed">Taskbar education closed</string>
     <!-- Text in dialog that lets a user know how they can use the taskbar to switch apps on their device.
          [CHAR_LIMIT=60] -->
-    <string name="taskbar_edu_switch_apps" translatable="false">Use the taskbar to switch apps</string>
+    <string name="taskbar_edu_switch_apps">Use the taskbar to switch apps</string>
     <!-- Text in dialog that lets a user know how they can use the taskbar to use multiple apps at once on their device.
          [CHAR_LIMIT=60] -->
-    <string name="taskbar_edu_splitscreen" translatable="false">Drag to the side to use two apps at once</string>
+    <string name="taskbar_edu_splitscreen">Drag to the side to use two apps at once</string>
     <!-- Text in dialog that lets a user know how they can hide the taskbar on their device.
          [CHAR_LIMIT=60] -->
     <string name="taskbar_edu_stashing">Touch &amp; hold to hide the taskbar</string>
@@ -233,4 +236,23 @@
     <string name="taskbar_edu_close">Close</string>
     <!-- Text on button to finish a tutorial [CHAR_LIMIT=16] -->
     <string name="taskbar_edu_done">Done</string>
+        <!-- Content description for home button [CHAR_LIMIT=16] -->
+    <string name="taskbar_button_home">Home</string>
+    <!-- Content description for accessibility button [CHAR_LIMIT=16] -->
+    <string name="taskbar_button_a11y">Accessibility</string>
+    <!-- Content description for back button [CHAR_LIMIT=16] -->
+    <string name="taskbar_button_back">Back</string>
+    <!-- Content description for ime switcher button [CHAR_LIMIT=16] -->
+    <string name="taskbar_button_ime_switcher">IME switcher</string>
+    <!-- Content description for recents button [CHAR_LIMIT=16] -->
+    <string name="taskbar_button_recents">Recents</string>
+    <!-- Content description for notifications button [CHAR_LIMIT=16] -->
+    <string name="taskbar_button_notifications">Notifications</string>
+    <!-- Content description for quick settings button [CHAR_LIMIT=16] -->
+    <string name="taskbar_button_quick_settings">Quick Settings</string>
+
+    <!-- Label for moving drop target to the top or left side of the screen, depending on orientation (from the taskbar only). -->
+    <string name="move_drop_target_top_or_left">Move to top&#47;left</string>
+    <!-- Label for moving drop target to the bottom or right side of the screen, depending on orientation (from the taskbar only). -->
+    <string name="move_drop_target_bottom_or_right">Move to bottom&#47;right</string>
 </resources>

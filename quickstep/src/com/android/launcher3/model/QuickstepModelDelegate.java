@@ -64,6 +64,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.util.IntSparseArrayMap;
 import com.android.launcher3.util.PersistedItemArray;
+import com.android.quickstep.logging.SettingsChangeLogger;
 import com.android.quickstep.logging.StatsLogCompatManager;
 import com.android.systemui.shared.system.SysUiStatsLog;
 
@@ -97,10 +98,12 @@ public class QuickstepModelDelegate extends ModelDelegate {
     private final InvariantDeviceProfile mIDP;
     private final AppEventProducer mAppEventProducer;
     private final StatsManager mStatsManager;
+    private final Context mContext;
 
     protected boolean mActive = false;
 
     public QuickstepModelDelegate(Context context) {
+        mContext = context;
         mAppEventProducer = new AppEventProducer(context, this::onAppTargetEvent);
 
         mIDP = InvariantDeviceProfile.INSTANCE.get(context);
@@ -116,18 +119,19 @@ public class QuickstepModelDelegate extends ModelDelegate {
 
         WorkspaceItemFactory allAppsFactory = new WorkspaceItemFactory(
                 mApp, ums, pinnedShortcuts, mIDP.numDatabaseAllAppsColumns);
-        mAllAppsState.items.setItems(
+        FixedContainerItems allAppsItems = new FixedContainerItems(mAllAppsState.containerId,
                 mAllAppsState.storage.read(mApp.getContext(), allAppsFactory, ums.allUsers::get));
-        mDataModel.extraItems.put(CONTAINER_PREDICTION, mAllAppsState.items);
+        mDataModel.extraItems.put(mAllAppsState.containerId, allAppsItems);
 
         WorkspaceItemFactory hotseatFactory =
                 new WorkspaceItemFactory(mApp, ums, pinnedShortcuts, mIDP.numDatabaseHotseatIcons);
-        mHotseatState.items.setItems(
+        FixedContainerItems hotseatItems = new FixedContainerItems(mHotseatState.containerId,
                 mHotseatState.storage.read(mApp.getContext(), hotseatFactory, ums.allUsers::get));
-        mDataModel.extraItems.put(CONTAINER_HOTSEAT_PREDICTION, mHotseatState.items);
+        mDataModel.extraItems.put(mHotseatState.containerId, hotseatItems);
 
         // Widgets prediction isn't used frequently. And thus, it is not persisted on disk.
-        mDataModel.extraItems.put(CONTAINER_WIDGETS_PREDICTION, mWidgetsRecommendationState.items);
+        mDataModel.extraItems.put(mWidgetsRecommendationState.containerId,
+                new FixedContainerItems(mWidgetsRecommendationState.containerId));
         mActive = true;
     }
 
@@ -161,8 +165,7 @@ public class QuickstepModelDelegate extends ModelDelegate {
             }
             InstanceId instanceId = new InstanceIdSequence().newInstanceId();
             for (ItemInfo info : itemsIdMap) {
-                FolderInfo parent = info.container > 0
-                        ? (FolderInfo) itemsIdMap.get(info.container) : null;
+                FolderInfo parent = getContainer(info, itemsIdMap);
                 StatsLogCompatManager.writeSnapshot(info.buildProto(parent), instanceId);
             }
             additionalSnapshotEvents(instanceId);
@@ -199,8 +202,7 @@ public class QuickstepModelDelegate extends ModelDelegate {
                         }
 
                         for (ItemInfo info : itemsIdMap) {
-                            FolderInfo parent = info.container > 0
-                                    ? (FolderInfo) itemsIdMap.get(info.container) : null;
+                            FolderInfo parent = getContainer(info, itemsIdMap);
                             LauncherAtom.ItemInfo itemInfo = info.buildProto(parent);
                             Log.d(TAG, itemInfo.toString());
                             StatsEvent statsEvent = StatsLogCompatManager.buildStatsEvent(itemInfo,
@@ -212,6 +214,7 @@ public class QuickstepModelDelegate extends ModelDelegate {
                                         "Successfully logged %d workspace items with instanceId=%d",
                                         itemsIdMap.size(), instanceId.getId()));
                         additionalSnapshotEvents(instanceId);
+                        SettingsChangeLogger.INSTANCE.get(mContext).logSnapshot(instanceId);
                         return StatsManager.PULL_SUCCESS;
                     }
             );
@@ -220,6 +223,22 @@ public class QuickstepModelDelegate extends ModelDelegate {
             Log.e(TAG, "Failed to register launcher snapshot logging callback with StatsManager",
                     e);
         }
+    }
+
+    private static FolderInfo getContainer(ItemInfo info, IntSparseArrayMap<ItemInfo> itemsIdMap) {
+        if (info.container > 0) {
+            ItemInfo containerInfo = itemsIdMap.get(info.container);
+
+            if (!(containerInfo instanceof FolderInfo)) {
+                Log.e(TAG, String.format(
+                        "Item info: %s found with invalid container: %s",
+                        info,
+                        containerInfo));
+            }
+            // Allow crash to help debug b/173838775
+            return (FolderInfo) containerInfo;
+        }
+        return null;
     }
 
     @Override
@@ -353,14 +372,14 @@ public class QuickstepModelDelegate extends ModelDelegate {
 
     static class PredictorState {
 
-        public final FixedContainerItems items;
+        public final int containerId;
         public final PersistedItemArray<ItemInfo> storage;
         public AppPredictor predictor;
 
         private List<AppTarget> mLastTargets;
 
-        PredictorState(int container, String storageName) {
-            items = new FixedContainerItems(container);
+        PredictorState(int containerId, String storageName) {
+            this.containerId = containerId;
             storage = new PersistedItemArray<>(storageName);
             mLastTargets = Collections.emptyList();
         }

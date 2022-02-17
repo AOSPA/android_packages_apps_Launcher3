@@ -39,6 +39,7 @@ import android.hardware.SensorManager;
 import android.hardware.devicestate.DeviceStateManager;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.view.Display;
 import android.view.View;
 import android.view.WindowInsets;
 import android.window.SplashScreen;
@@ -301,7 +302,8 @@ public abstract class BaseQuickstepLauncher extends Launcher
         mActionsView = findViewById(R.id.overview_actions_view);
         RecentsView overviewPanel = (RecentsView) getOverviewPanel();
         SplitSelectStateController controller =
-                new SplitSelectStateController(mHandler, SystemUiProxy.INSTANCE.get(this));
+                new SplitSelectStateController(mHandler, SystemUiProxy.INSTANCE.get(this),
+                        getStateManager(), getDepthController());
         overviewPanel.init(mActionsView, controller);
         mActionsView.setDp(getDeviceProfile());
         mActionsView.updateVerticalMargin(SysUINavigationMode.getMode(this));
@@ -319,6 +321,11 @@ public abstract class BaseQuickstepLauncher extends Launcher
         mOverviewCommandHelper = binder.getOverviewCommandHelper();
     }
 
+    @Override
+    public void runOnBindToTouchInteractionService(Runnable r) {
+        mTISBindHelper.runOnBindToTouchInteractionService(r);
+    }
+
     private void initUnfoldTransitionProgressProvider() {
         final UnfoldTransitionConfig config = UnfoldTransitionFactory.createConfig(this);
         if (config.isEnabled()) {
@@ -330,7 +337,8 @@ public abstract class BaseQuickstepLauncher extends Launcher
                             getSystemService(DeviceStateManager.class),
                             getSystemService(SensorManager.class),
                             getMainThreadHandler(),
-                            getMainExecutor()
+                            getMainExecutor(),
+                            /* tracingTagPrefix= */ "launcher"
                     );
 
             mLauncherUnfoldAnimationController = new LauncherUnfoldAnimationController(
@@ -501,7 +509,10 @@ public abstract class BaseQuickstepLauncher extends Launcher
             ActivityOptionsCompat.setLauncherSourceInfo(
                     activityOptions.options, mLastTouchUpTime);
         }
-        activityOptions.options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+        activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+        activityOptions.options.setLaunchDisplayId(
+                (v != null && v.getDisplay() != null) ? v.getDisplay().getDisplayId()
+                        : Display.DEFAULT_DISPLAY);
         addLaunchCookie(item, activityOptions.options);
         return activityOptions;
     }

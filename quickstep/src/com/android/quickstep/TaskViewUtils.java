@@ -28,11 +28,11 @@ import static com.android.launcher3.QuickstepTransitionManager.ANIMATION_NAV_FAD
 import static com.android.launcher3.QuickstepTransitionManager.NAV_FADE_IN_INTERPOLATOR;
 import static com.android.launcher3.QuickstepTransitionManager.NAV_FADE_OUT_INTERPOLATOR;
 import static com.android.launcher3.QuickstepTransitionManager.RECENTS_LAUNCH_DURATION;
+import static com.android.launcher3.QuickstepTransitionManager.SPLIT_DIVIDER_ANIM_DURATION;
 import static com.android.launcher3.QuickstepTransitionManager.SPLIT_LAUNCH_DURATION;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.Interpolators.TOUCH_RESPONSE_INTERPOLATOR;
-import static com.android.launcher3.anim.Interpolators.TOUCH_RESPONSE_INTERPOLATOR_ACCEL_DEACCEL;
 import static com.android.launcher3.anim.Interpolators.clampToProgress;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.statehandlers.DepthController.DEPTH;
@@ -57,6 +57,7 @@ import android.view.View;
 import android.window.TransitionInfo;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
@@ -73,6 +74,7 @@ import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.quickstep.util.SurfaceTransactionApplier;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TransformParams;
+import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskThumbnailView;
 import com.android.quickstep.views.TaskView;
@@ -82,6 +84,7 @@ import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Utility class for helpful methods related to {@link TaskView} objects and their tasks.
@@ -150,10 +153,12 @@ public final class TaskViewUtils {
         return taskView;
     }
 
-    public static void createRecentsWindowAnimator(TaskView v, boolean skipViewChanges,
-            RemoteAnimationTargetCompat[] appTargets,
-            RemoteAnimationTargetCompat[] wallpaperTargets,
-            RemoteAnimationTargetCompat[] nonAppTargets, DepthController depthController,
+    public static void createRecentsWindowAnimator(
+            @NonNull TaskView v, boolean skipViewChanges,
+            @NonNull RemoteAnimationTargetCompat[] appTargets,
+            @NonNull RemoteAnimationTargetCompat[] wallpaperTargets,
+            @NonNull RemoteAnimationTargetCompat[] nonAppTargets,
+            @Nullable DepthController depthController,
             PendingAnimation out) {
         RecentsView recentsView = v.getRecentsView();
         boolean isQuickSwitch = v.isEndQuickswitchCuj();
@@ -193,8 +198,8 @@ public final class TaskViewUtils {
         boolean showAsGrid = dp.overviewShowAsGrid;
         boolean parallaxCenterAndAdjacentTask =
                 taskIndex != recentsView.getCurrentPage() && !showAsGrid;
-        float gridTranslationSecondary = recentsView.getGridTranslationSecondary(taskIndex);
-        int startScroll = recentsView.getScrollOffset(taskIndex);
+        int taskRectTranslationPrimary = recentsView.getScrollOffset(taskIndex);
+        int taskRectTranslationSecondary = showAsGrid ? (int) v.getGridTranslationY() : 0;
 
         RemoteTargetHandle[] topMostSimulators = null;
 
@@ -211,11 +216,10 @@ public final class TaskViewUtils {
 
                 tvsLocal.fullScreenProgress.value = 0;
                 tvsLocal.recentsViewScale.value = 1;
-                if (showAsGrid) {
-                    tvsLocal.taskSecondaryTranslation.value = gridTranslationSecondary;
-                }
-                tvsLocal.setScroll(startScroll);
                 tvsLocal.setIsGridTask(v.isGridTask());
+                tvsLocal.getOrientationState().getOrientationHandler().set(tvsLocal,
+                        TaskViewSimulator::setTaskRectTranslation, taskRectTranslationPrimary,
+                        taskRectTranslationSecondary);
 
                 // Fade in the task during the initial 20% of the animation
                 out.addFloat(targetHandle.getTransformParams(), TransformParams.TARGET_ALPHA, 0, 1,
@@ -230,10 +234,6 @@ public final class TaskViewUtils {
             out.setFloat(tvsLocal.recentsViewScale,
                     AnimatedFloat.VALUE, tvsLocal.getFullScreenScale(),
                     TOUCH_RESPONSE_INTERPOLATOR);
-            if (showAsGrid) {
-                out.setFloat(tvsLocal.taskSecondaryTranslation, AnimatedFloat.VALUE, 0,
-                        TOUCH_RESPONSE_INTERPOLATOR_ACCEL_DEACCEL);
-            }
             out.setFloat(tvsLocal.recentsViewScroll, AnimatedFloat.VALUE, 0,
                     TOUCH_RESPONSE_INTERPOLATOR);
 
@@ -318,7 +318,7 @@ public final class TaskViewUtils {
                 mt[i] = localMt;
 
                 Matrix localMti = new Matrix();
-                localMti.invert(localMt);
+                localMt.invert(localMti);
                 mti[i] = localMti;
             }
 
@@ -426,19 +426,50 @@ public final class TaskViewUtils {
         finishCallback.run();
     }
 
-    /** Legacy version (until shell transitions are enabled) */
-    public static void composeRecentsSplitLaunchAnimatorLegacy(@NonNull Task initialTask,
+    /**
+     * Legacy version (until shell transitions are enabled)
+     *
+     * If {@param launchingTaskView} is not null, then this will play the tasks launch animation
+     * from the position of the GroupedTaskView (when user taps on the TaskView to start it).
+     * Technically this case should be taken care of by
+     * {@link #composeRecentsSplitLaunchAnimatorLegacy()} below, but the way we launch tasks whether
+     * it's a single task or multiple tasks results in different entry-points.
+     *
+     * If it is null, then it will simply fade in the starting apps and fade out launcher (for the
+     * case where launcher handles animating starting split tasks from app icon) */
+    public static void composeRecentsSplitLaunchAnimatorLegacy(
+            @Nullable GroupedTaskView launchingTaskView,
+            @NonNull Task initialTask,
             @NonNull Task secondTask, @NonNull RemoteAnimationTargetCompat[] appTargets,
             @NonNull RemoteAnimationTargetCompat[] wallpaperTargets,
             @NonNull RemoteAnimationTargetCompat[] nonAppTargets,
+            @NonNull StateManager stateManager,
+            @Nullable DepthController depthController,
             @NonNull Runnable finishCallback) {
+        if (launchingTaskView != null) {
+            AnimatorSet animatorSet = new AnimatorSet();
+            RecentsView recentsView = launchingTaskView.getRecentsView();
+            animatorSet.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    super.onAnimationEnd(animation);
+                    finishCallback.run();
+                }
+            });
+            composeRecentsLaunchAnimator(animatorSet, launchingTaskView,
+                    appTargets, wallpaperTargets, nonAppTargets,
+                    true, stateManager,
+                    recentsView, depthController);
+            animatorSet.start();
+            return;
+        }
+
         final ArrayList<SurfaceControl> openingTargets = new ArrayList<>();
         final ArrayList<SurfaceControl> closingTargets = new ArrayList<>();
-
         for (RemoteAnimationTargetCompat appTarget : appTargets) {
             final int taskId = appTarget.taskInfo != null ? appTarget.taskInfo.taskId : -1;
             final int mode = appTarget.mode;
-            final SurfaceControl leash = appTarget.leash.getSurfaceControl();
+            final SurfaceControl leash = appTarget.leash;
             if (leash == null) {
                 continue;
             }
@@ -453,7 +484,7 @@ public final class TaskViewUtils {
         }
 
         for (int i = 0; i < nonAppTargets.length; ++i) {
-            final SurfaceControl leash = appTargets[i].leash.getSurfaceControl();
+            final SurfaceControl leash = appTargets[i].leash;
             if (nonAppTargets[i].windowType == TYPE_DOCK_DIVIDER && leash != null) {
                 openingTargets.add(leash);
             }
@@ -498,7 +529,7 @@ public final class TaskViewUtils {
             @NonNull RemoteAnimationTargetCompat[] wallpaperTargets,
             @NonNull RemoteAnimationTargetCompat[] nonAppTargets, boolean launcherClosing,
             @NonNull StateManager stateManager, @NonNull RecentsView recentsView,
-            @NonNull DepthController depthController) {
+            @Nullable DepthController depthController) {
         boolean skipLauncherChanges = !launcherClosing;
 
         TaskView taskView = findTaskViewToLaunch(recentsView, v, appTargets);
@@ -507,7 +538,8 @@ public final class TaskViewUtils {
                 nonAppTargets, depthController, pa);
         if (launcherClosing) {
             // TODO(b/182592057): differentiate between "restore split" vs "launch fullscreen app"
-            TaskViewUtils.setSplitAuxiliarySurfacesShown(nonAppTargets, true);
+            TaskViewUtils.setSplitAuxiliarySurfacesShown(nonAppTargets,
+                    true /*shown*/, true /*animate*/, pa);
         }
 
         Animator childStateAnimation = null;
@@ -563,19 +595,88 @@ public final class TaskViewUtils {
     }
 
     public static void setSplitAuxiliarySurfacesShown(RemoteAnimationTargetCompat[] nonApps,
-            boolean shown) {
-        // TODO(b/182592057): make this part of the animations instead.
-        if (nonApps != null && nonApps.length > 0) {
-            SurfaceControl.Transaction t = new SurfaceControl.Transaction();
-            for (int i = 0; i < nonApps.length; ++i) {
-                final RemoteAnimationTargetCompat targ = nonApps[i];
-                final SurfaceControl leash = targ.leash.getSurfaceControl();
-                if (targ.windowType == TYPE_DOCK_DIVIDER && leash != null) {
-                    t.setVisibility(leash, shown);
+            boolean shown, boolean animate) {
+        setSplitAuxiliarySurfacesShown(nonApps, shown, animate,null);
+    }
+
+    private static void setSplitAuxiliarySurfacesShown(
+            @NonNull RemoteAnimationTargetCompat[] nonApps, boolean shown, boolean animate,
+            @Nullable PendingAnimation splitLaunchAnimation) {
+        if (nonApps == null || nonApps.length == 0) {
+            return;
+        }
+
+        SurfaceControl.Transaction t = new SurfaceControl.Transaction();
+        List<SurfaceControl> auxiliarySurfaces = new ArrayList<>(nonApps.length);
+        boolean hasSurfaceToAnimate = false;
+        for (int i = 0; i < nonApps.length; ++i) {
+            final RemoteAnimationTargetCompat targ = nonApps[i];
+            final SurfaceControl leash = targ.leash;
+            if (targ.windowType == TYPE_DOCK_DIVIDER && leash != null) {
+                auxiliarySurfaces.add(leash);
+                hasSurfaceToAnimate = true;
+            }
+        }
+        if (!hasSurfaceToAnimate) {
+            return;
+        }
+
+        if (!animate) {
+            for (SurfaceControl leash : auxiliarySurfaces) {
+                t.setAlpha(leash, shown ? 1 : 0);
+                if (shown) {
+                    t.show(leash);
+                } else {
+                    t.hide(leash);
                 }
             }
             t.apply();
-            t.close();
+            return;
+        }
+
+        ValueAnimator dockFadeAnimator = ValueAnimator.ofFloat(0f, 1f);
+        dockFadeAnimator.addUpdateListener(valueAnimator -> {
+            float progress = valueAnimator.getAnimatedFraction();
+            for (SurfaceControl leash : auxiliarySurfaces) {
+                t.setAlpha(leash, shown ? progress : 1 - progress);
+            }
+            t.apply();
+        });
+        dockFadeAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                super.onAnimationStart(animation);
+                if (shown) {
+                    for (SurfaceControl leash : auxiliarySurfaces) {
+                        t.setAlpha(leash, 0);
+                        t.show(leash);
+                    }
+                    t.apply();
+                }
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                if (!shown) {
+                    for (SurfaceControl leash : auxiliarySurfaces) {
+                        t.hide(leash);
+                    }
+                    t.apply();
+                }
+                t.close();
+            }
+        });
+        dockFadeAnimator.setDuration(SPLIT_DIVIDER_ANIM_DURATION);
+        if (splitLaunchAnimation != null) {
+            // If split apps are launching, we want to delay showing the divider bar until the very
+            // end once the apps are mostly in place. This is because we aren't moving the divider
+            // leash in the relative position with the launching apps.
+            dockFadeAnimator.setStartDelay(
+                    splitLaunchAnimation.getDuration() - SPLIT_DIVIDER_ANIM_DURATION);
+            splitLaunchAnimation.add(dockFadeAnimator);
+        } else {
+            dockFadeAnimator.start();
         }
     }
 }

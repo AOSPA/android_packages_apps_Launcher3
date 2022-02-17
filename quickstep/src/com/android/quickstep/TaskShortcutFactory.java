@@ -72,7 +72,13 @@ public interface TaskShortcutFactory {
         @Override
         public SystemShortcut getShortcut(BaseDraggingActivity activity,
                 TaskIdAttributeContainer taskContainer) {
-            return new AppInfo(activity, taskContainer.getItemInfo());
+            TaskView taskView = taskContainer.getTaskView();
+            AppInfo.SplitAccessibilityInfo accessibilityInfo =
+                    new AppInfo.SplitAccessibilityInfo(taskView.containsMultipleTasks(),
+                            TaskUtils.getTitle(taskView.getContext(), taskContainer.getTask()),
+                            taskContainer.getA11yNodeId()
+                    );
+            return new AppInfo(activity, taskContainer.getItemInfo(), accessibilityInfo);
         }
 
         @Override
@@ -184,7 +190,7 @@ public interface TaskShortcutFactory {
 
             ActivityOptions options = mFactory.makeLaunchOptions(mTarget);
             if (options != null) {
-                options.setSplashscreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+                options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
             }
             if (options != null
                     && ActivityManagerWrapper.getInstance().startActivityFromRecents(taskId,
@@ -236,6 +242,7 @@ public interface TaskShortcutFactory {
         }
     }
 
+    /** @Deprecated */
     TaskShortcutFactory SPLIT_SCREEN = new MultiWindowFactory(R.drawable.ic_split_screen,
             R.string.recent_task_option_split_screen, LAUNCHER_SYSTEM_SHORTCUT_SPLIT_SCREEN_TAP) {
 

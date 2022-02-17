@@ -29,6 +29,7 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_SNACKBAR;
 import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
 import static com.android.launcher3.LauncherAnimUtils.SPRING_LOADED_EXIT_DELAY;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.FLAG_CLOSE_POPUPS;
 import static com.android.launcher3.LauncherState.FLAG_MULTI_PAGE;
@@ -39,6 +40,7 @@ import static com.android.launcher3.LauncherState.NO_SCALE;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
+import static com.android.launcher3.config.FeatureFlags.ADAPTIVE_ICON_WINDOW_ANIM;
 import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_LAUNCHER_LOAD;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -55,6 +57,7 @@ import static com.android.launcher3.popup.SystemShortcut.INSTALL;
 import static com.android.launcher3.popup.SystemShortcut.WIDGETS;
 import static com.android.launcher3.states.RotationHelper.REQUEST_LOCK;
 import static com.android.launcher3.states.RotationHelper.REQUEST_NONE;
+import static com.android.launcher3.util.ItemInfoMatcher.forFolderMatch;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -90,6 +93,7 @@ import android.os.Process;
 import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.Trace;
+import android.os.UserHandle;
 import android.text.TextUtils;
 import android.text.method.TextKeyListener;
 import android.util.Log;
@@ -102,6 +106,7 @@ import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
@@ -115,8 +120,8 @@ import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DropTarget.DragObject;
+import com.android.launcher3.accessibility.BaseAccessibilityDelegate.LauncherAction;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
-import com.android.launcher3.accessibility.LauncherAccessibilityDelegate.LauncherAction;
 import com.android.launcher3.allapps.AllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
@@ -204,7 +209,7 @@ import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
-import com.android.systemui.plugins.OverlayPlugin;
+import com.android.systemui.plugins.LauncherOverlayPlugin;
 import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.plugins.shared.LauncherExterns;
 import com.android.systemui.plugins.shared.LauncherOverlayManager;
@@ -215,6 +220,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -226,8 +232,8 @@ import java.util.stream.Stream;
  * Default launcher application.
  */
 public class Launcher extends StatefulActivity<LauncherState> implements LauncherExterns,
-        Callbacks, InvariantDeviceProfile.OnIDPChangeListener, PluginListener<OverlayPlugin>,
-        LauncherOverlayCallbacks {
+        Callbacks, InvariantDeviceProfile.OnIDPChangeListener,
+        PluginListener<LauncherOverlayPlugin>, LauncherOverlayCallbacks {
     public static final String TAG = "Launcher";
 
     public static final ActivityTracker<Launcher> ACTIVITY_TRACKER = new ActivityTracker<>();
@@ -498,6 +504,23 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL);
 
         setContentView(getRootView());
+        getRootView().getViewTreeObserver().addOnPreDrawListener(
+                new ViewTreeObserver.OnPreDrawListener() {
+                    @Override
+                    public boolean onPreDraw() {
+                        // Checks the status of fade in animation.
+                        final AlphaProperty property =
+                                mDragLayer.getAlphaProperty(ALPHA_INDEX_LAUNCHER_LOAD);
+                        if (property.getValue() == 0) {
+                            // Animation haven't started yet; suspend.
+                            return false;
+                        } else {
+                            // The animation is started; start drawing.
+                            getRootView().getViewTreeObserver().removeOnPreDrawListener(this);
+                            return true;
+                        }
+                    }
+                });
         getRootView().dispatchInsets();
 
         // Listen for broadcasts
@@ -511,7 +534,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         }
         mOverlayManager = getDefaultOverlay();
         PluginManagerWrapper.INSTANCE.get(this).addPluginListener(this,
-                OverlayPlugin.class, false /* allowedMultiple */);
+                LauncherOverlayPlugin.class, false /* allowedMultiple */);
 
         mRotationHelper.initialize();
         TraceHelper.INSTANCE.endSection(traceToken);
@@ -537,12 +560,12 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     }
 
     @Override
-    public void onPluginConnected(OverlayPlugin overlayManager, Context context) {
+    public void onPluginConnected(LauncherOverlayPlugin overlayManager, Context context) {
         switchOverlay(() -> overlayManager.createOverlayManager(this, this));
     }
 
     @Override
-    public void onPluginDisconnected(OverlayPlugin plugin) {
+    public void onPluginDisconnected(LauncherOverlayPlugin plugin) {
         switchOverlay(this::getDefaultOverlay);
     }
 
@@ -669,6 +692,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return !isWorkspaceLoading();
     }
 
+    @NonNull
+    @Override
     public PopupDataProvider getPopupDataProvider() {
         return mPopupDataProvider;
     }
@@ -948,7 +973,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         hideKeyboard();
         logStopAndResume(false /* isResume */);
         mAppWidgetHost.setActivityStarted(false);
-        NotificationListener.removeNotificationsChangedListener();
+        NotificationListener.removeNotificationsChangedListener(getPopupDataProvider());
     }
 
     @Override
@@ -977,7 +1002,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         mModel.validateModelDataOnResume();
 
         // Set the notification listener and fetch updated notifications when we resume
-        NotificationListener.setNotificationsChangedListener(mPopupDataProvider);
+        NotificationListener.addNotificationsChangedListener(mPopupDataProvider);
 
         DiscoveryBounce.showForHomeIfNeeded(this);
         mAppWidgetHost.setActivityResumed(true);
@@ -1631,6 +1656,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         // and we need to make sure this state is reflected.
         AbstractFloatingView.closeOpenViews(this, false, TYPE_ALL & ~TYPE_REBIND_SAFE);
         finishAutoCancelActionMode();
+
+        DragView.removeAllViews(this);
 
         if (mPendingRequestArgs != null) {
             outState.putParcelable(RUNTIME_STATE_PENDING_REQUEST_ARGS, mPendingRequestArgs);
@@ -2672,6 +2699,79 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             return (SystemClock.uptimeMillis() - mLastTouchUpTime)
                     > (NEW_APPS_ANIMATION_INACTIVE_TIMEOUT_SECONDS * 1000);
         }
+    }
+
+    /**
+     * Similar to {@link #getFirstMatch} but optimized to finding a suitable view for the app close
+     * animation.
+     *
+     * @param preferredItemId The id of the preferred item to match to if it exists.
+     * @param packageName The package name of the app to match.
+     * @param user The user of the app to match.
+     */
+    public View getFirstMatchForAppClose(int preferredItemId, String packageName, UserHandle user) {
+        final ItemInfoMatcher preferredItem = (info, cn) ->
+                info != null && info.id == preferredItemId;
+        final ItemInfoMatcher packageAndUserAndApp = (info, cn) ->
+                info != null
+                        && info.itemType == ITEM_TYPE_APPLICATION
+                        && info.user.equals(user)
+                        && info.getTargetComponent() != null
+                        && TextUtils.equals(info.getTargetComponent().getPackageName(),
+                        packageName);
+
+        if (isInState(LauncherState.ALL_APPS)) {
+            return getFirstMatch(Collections.singletonList(mAppsView.getActiveRecyclerView()),
+                    preferredItem, packageAndUserAndApp);
+        } else {
+            List<ViewGroup> containers = new ArrayList<>(mWorkspace.getPanelCount() + 1);
+            containers.add(mWorkspace.getHotseat().getShortcutsAndWidgets());
+            mWorkspace.forEachVisiblePage(page
+                    -> containers.add(((CellLayout) page).getShortcutsAndWidgets()));
+
+            // Order: Preferred item by itself or in folder, then by matching package/user
+            if (ADAPTIVE_ICON_WINDOW_ANIM.get()) {
+                return getFirstMatch(containers, preferredItem, forFolderMatch(preferredItem),
+                        packageAndUserAndApp, forFolderMatch(packageAndUserAndApp));
+            } else {
+                // Do not use Folder as a criteria, since it'll cause a crash when trying to draw
+                // FolderAdaptiveIcon as the background.
+                return getFirstMatch(containers, preferredItem, packageAndUserAndApp);
+            }
+        }
+    }
+
+    /**
+     * Finds the first view matching the ordered operators across the given viewgroups in order.
+     * @param containers List of ViewGroups to scan, in order of preference.
+     * @param operators List of operators, in order starting from best matching operator.
+     */
+    private static View getFirstMatch(Iterable<ViewGroup> containers,
+            final ItemInfoMatcher... operators) {
+        for (ItemInfoMatcher operator : operators) {
+            for (ViewGroup container : containers) {
+                View match = mapOverViewGroup(container, operator);
+                if (match != null) {
+                    return match;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the first view matching the operator in the given ViewGroups, or null if none.
+     * Forward iteration matters.
+     */
+    private static View mapOverViewGroup(ViewGroup container, ItemInfoMatcher op) {
+        final int itemCount = container.getChildCount();
+        for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
+            View item = container.getChildAt(itemIdx);
+            if (op.matchesInfo((ItemInfo) item.getTag())) {
+                return item;
+            }
+        }
+        return null;
     }
 
     private ValueAnimator createNewAppBounceAnimation(View v, int i) {

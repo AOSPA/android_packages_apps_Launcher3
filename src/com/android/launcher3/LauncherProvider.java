@@ -97,7 +97,7 @@ public class LauncherProvider extends ContentProvider {
      * Represents the schema of the database. Changes in scheme need not be backwards compatible.
      * When increasing the scheme version, ensure that downgrade_schema.json is updated
      */
-    public static final int SCHEMA_VERSION = 30;
+    public static final int SCHEMA_VERSION = 31;
 
     public static final String AUTHORITY = BuildConfig.APPLICATION_ID + ".settings";
     public static final String KEY_LAYOUT_PROVIDER_AUTHORITY = "KEY_LAYOUT_PROVIDER_AUTHORITY";
@@ -383,7 +383,7 @@ public class LauncherProvider extends ContentProvider {
             case LauncherSettings.Settings.METHOD_NEW_SCREEN_ID: {
                 Bundle result = new Bundle();
                 result.putInt(LauncherSettings.Settings.EXTRA_VALUE,
-                        mOpenHelper.generateNewScreenId());
+                        mOpenHelper.getNewScreenId());
                 return result;
             }
             case LauncherSettings.Settings.METHOD_CREATE_EMPTY_DB: {
@@ -628,7 +628,6 @@ public class LauncherProvider extends ContentProvider {
         private final Context mContext;
         private final boolean mForMigration;
         private int mMaxItemId = -1;
-        private int mMaxScreenId = -1;
         private boolean mBackupTableExists;
         private boolean mHotseatRestoreTableExists;
 
@@ -672,9 +671,6 @@ public class LauncherProvider extends ContentProvider {
             if (mMaxItemId == -1) {
                 mMaxItemId = initializeMaxItemId(getWritableDatabase());
             }
-            if (mMaxScreenId == -1) {
-                mMaxScreenId = initializeMaxScreenId(getWritableDatabase());
-            }
         }
 
         @Override
@@ -682,7 +678,6 @@ public class LauncherProvider extends ContentProvider {
             if (LOGD) Log.d(TAG, "creating new launcher database");
 
             mMaxItemId = 1;
-            mMaxScreenId = 0;
 
             addFavoritesTable(db, false);
 
@@ -869,6 +864,19 @@ public class LauncherProvider extends ContentProvider {
                             Favorites.SCREEN, IntArray.wrap(-777, -778)), null);
                 }
                 case 30: {
+                    if (FeatureFlags.QSB_ON_FIRST_SCREEN) {
+                        // Clean up first row in screen 0 as it might contain junk data.
+                        Log.d(TAG, "Cleaning up first row");
+                        db.delete(Favorites.TABLE_NAME,
+                                String.format(Locale.ENGLISH,
+                                        "%1$s = %2$d AND %3$s = %4$d AND %5$s = %6$d",
+                                        Favorites.SCREEN, 0,
+                                        Favorites.CONTAINER, Favorites.CONTAINER_DESKTOP,
+                                        Favorites.CELLY, 0), null);
+                    }
+                    return;
+                }
+                case 31: {
                     // DB Upgraded successfully
                     return;
                 }
@@ -1043,36 +1051,19 @@ public class LauncherProvider extends ContentProvider {
         public void checkId(ContentValues values) {
             int id = values.getAsInteger(Favorites._ID);
             mMaxItemId = Math.max(id, mMaxItemId);
-
-            Integer screen = values.getAsInteger(Favorites.SCREEN);
-            Integer container = values.getAsInteger(Favorites.CONTAINER);
-            if (screen != null && container != null
-                    && container.intValue() == Favorites.CONTAINER_DESKTOP) {
-                mMaxScreenId = Math.max(screen, mMaxScreenId);
-            }
         }
 
         private int initializeMaxItemId(SQLiteDatabase db) {
             return getMaxId(db, "SELECT MAX(%1$s) FROM %2$s", Favorites._ID, Favorites.TABLE_NAME);
         }
 
-        // Generates a new ID to use for an workspace screen in your database. This method
-        // should be only called from the main UI thread. As an exception, we do call it when we
-        // call the constructor from the worker thread; however, this doesn't extend until after the
-        // constructor is called, and we only pass a reference to LauncherProvider to LauncherApp
-        // after that point
-        public int generateNewScreenId() {
-            if (mMaxScreenId < 0) {
-                throw new RuntimeException("Error: max screen id was not initialized");
-            }
-            mMaxScreenId += 1;
-            return mMaxScreenId;
-        }
-
-        private int initializeMaxScreenId(SQLiteDatabase db) {
-            return getMaxId(db, "SELECT MAX(%1$s) FROM %2$s WHERE %3$s = %4$d AND %1$s >= 0",
+        // Returns a new ID to use for an workspace screen in your database that is greater than all
+        // existing screen IDs.
+        private int getNewScreenId() {
+            return getMaxId(getWritableDatabase(),
+                    "SELECT MAX(%1$s) FROM %2$s WHERE %3$s = %4$d AND %1$s >= 0",
                     Favorites.SCREEN, Favorites.TABLE_NAME, Favorites.CONTAINER,
-                    Favorites.CONTAINER_DESKTOP);
+                    Favorites.CONTAINER_DESKTOP) + 1;
         }
 
         @Thunk int loadFavorites(SQLiteDatabase db, AutoInstallsLayout loader) {
@@ -1081,7 +1072,6 @@ public class LauncherProvider extends ContentProvider {
 
             // Ensure that the max ids are initialized
             mMaxItemId = initializeMaxItemId(db);
-            mMaxScreenId = initializeMaxScreenId(db);
             return count;
         }
     }

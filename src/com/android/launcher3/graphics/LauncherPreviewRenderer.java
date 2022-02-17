@@ -43,7 +43,6 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Process;
 import android.util.AttributeSet;
 import android.util.SparseIntArray;
 import android.view.ContextThemeWrapper;
@@ -134,23 +133,25 @@ public class LauncherPreviewRenderer extends ContextWrapper
             mObjectMap.put(InvariantDeviceProfile.INSTANCE, idp);
             mObjectMap.put(LauncherAppState.INSTANCE,
                     new LauncherAppState(this, null /* iconCacheFileName */));
-
         }
 
-        public LauncherIcons newLauncherIcons(Context context, boolean shapeDetection) {
+        /**
+         * Creates a new LauncherIcons for the preview, skipping the global pool
+         */
+        public LauncherIcons newLauncherIcons(Context context) {
             LauncherIconsForPreview launcherIconsForPreview = mIconPool.poll();
             if (launcherIconsForPreview != null) {
                 return launcherIconsForPreview;
             }
             return new LauncherIconsForPreview(context, mIdp.fillResIconDpi, mIdp.iconBitmapSize,
-                    -1 /* poolId */, shapeDetection);
+                    -1 /* poolId */);
         }
 
         private final class LauncherIconsForPreview extends LauncherIcons {
 
             private LauncherIconsForPreview(Context context, int fillResIconDpi, int iconBitmapSize,
-                    int poolId, boolean shapeDetection) {
-                super(context, fillResIconDpi, iconBitmapSize, poolId, shapeDetection);
+                    int poolId) {
+                super(context, fillResIconDpi, iconBitmapSize, poolId);
             }
 
             @Override
@@ -202,10 +203,10 @@ public class LauncherPreviewRenderer extends ContextWrapper
 
         BaseIconFactory iconFactory =
                 new BaseIconFactory(context, mIdp.fillResIconDpi, mIdp.iconBitmapSize) { };
-        BitmapInfo iconInfo = iconFactory.createBadgedIconBitmap(new AdaptiveIconDrawable(
-                        new ColorDrawable(Color.WHITE), new ColorDrawable(Color.WHITE)),
-                Process.myUserHandle(),
-                Build.VERSION.SDK_INT);
+        BitmapInfo iconInfo = iconFactory.createBadgedIconBitmap(
+                new AdaptiveIconDrawable(
+                        new ColorDrawable(Color.WHITE),
+                        new ColorDrawable(Color.WHITE)));
 
         mWorkspaceItemInfo = new WorkspaceItemInfo();
         mWorkspaceItemInfo.bitmap = iconInfo;
@@ -457,10 +458,10 @@ public class LauncherPreviewRenderer extends ContextWrapper
         }
         IntArray ranks = getMissingHotseatRanks(currentWorkspaceItems,
                 mDp.numShownHotseatIcons);
-        FixedContainerItems hotseatpredictions =
+        FixedContainerItems hotseatPredictions =
                 dataModel.extraItems.get(CONTAINER_HOTSEAT_PREDICTION);
-        List<ItemInfo> predictions = hotseatpredictions == null
-                ? Collections.emptyList() : hotseatpredictions.items;
+        List<ItemInfo> predictions = hotseatPredictions == null
+                ? Collections.emptyList() : hotseatPredictions.items;
         int count = Math.min(ranks.size(), predictions.size());
         for (int i = 0; i < count; i++) {
             int rank = ranks.get(i);

@@ -1,10 +1,10 @@
 package com.android.quickstep.views;
 
+import static com.android.launcher3.util.SplitConfigurationOptions.DEFAULT_SPLIT_RATIO;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
 
 import android.content.Context;
-import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
@@ -50,19 +50,20 @@ public class GroupedTaskView extends TaskView {
     private final float[] mIcon2CenterCoords = new float[2];
     private TransformingTouchDelegate mIcon2TouchDelegate;
     @Nullable private StagedSplitBounds mSplitBoundsConfig;
-    private final Rect mPrimaryTempRect = new Rect();
-    private final Rect mSecondaryTempRect = new Rect();
+    private final DigitalWellBeingToast mDigitalWellBeingToast2;
+
 
     public GroupedTaskView(Context context) {
-        super(context);
+        this(context, null);
     }
 
     public GroupedTaskView(Context context, AttributeSet attrs) {
-        super(context, attrs);
+        this(context, attrs, 0);
     }
 
     public GroupedTaskView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        mDigitalWellBeingToast2 = new DigitalWellBeingToast(mActivity, this);
     }
 
     @Override
@@ -74,12 +75,12 @@ public class GroupedTaskView extends TaskView {
     }
 
     public void bind(Task primary, Task secondary, RecentsOrientedState orientedState,
-            StagedSplitBounds splitBoundsConfig) {
+            @Nullable StagedSplitBounds splitBoundsConfig) {
         super.bind(primary, orientedState);
         mSecondaryTask = secondary;
         mTaskIdContainer[1] = secondary.key.id;
         mTaskIdAttributeContainer[1] = new TaskIdAttributeContainer(secondary, mSnapshotView2,
-                STAGE_POSITION_BOTTOM_OR_RIGHT);
+                mIconView2, STAGE_POSITION_BOTTOM_OR_RIGHT);
         mTaskIdAttributeContainer[0].setStagePosition(STAGE_POSITION_TOP_OR_LEFT);
         mSnapshotView2.bind(secondary);
         mSplitBoundsConfig = splitBoundsConfig;
@@ -104,7 +105,9 @@ public class GroupedTaskView extends TaskView {
                 mIconLoadRequest2 = iconCache.updateIconInBackground(mSecondaryTask,
                         (task) -> {
                             setIcon(mIconView2, task.icon);
-                            // TODO(199936292) Digital Wellbeing for individual tasks?
+                            mDigitalWellBeingToast2.initialize(mSecondaryTask);
+                            mDigitalWellBeingToast2.setSplitConfiguration(mSplitBoundsConfig);
+                            mDigitalWellBeingToast.setSplitConfiguration(mSplitBoundsConfig);
                         });
             }
         } else {
@@ -120,17 +123,17 @@ public class GroupedTaskView extends TaskView {
         }
     }
 
-    protected boolean showTaskMenuWithContainer(IconView iconView) {
-        if (mActivity.getDeviceProfile().overviewShowAsGrid) {
-            return TaskMenuViewWithArrow.Companion.showForTask(mTaskIdAttributeContainer[0]);
-        } else {
-            return TaskMenuView.showForTask(mTaskIdAttributeContainer[0]);
-        }
-    }
-
     public void updateSplitBoundsConfig(StagedSplitBounds stagedSplitBounds) {
         mSplitBoundsConfig = stagedSplitBounds;
         invalidate();
+    }
+
+    public float getSplitRatio() {
+        if (mSplitBoundsConfig != null) {
+            return mSplitBoundsConfig.appsStackedVertically
+                    ? mSplitBoundsConfig.topTaskPercent : mSplitBoundsConfig.leftTaskPercent;
+        }
+        return DEFAULT_SPLIT_RATIO;
     }
 
     @Override
@@ -159,16 +162,27 @@ public class GroupedTaskView extends TaskView {
     @Nullable
     @Override
     public RunnableList launchTaskAnimated() {
-        getRecentsView().getSplitPlaceholder().launchTasks(mTask, mSecondaryTask,
-                STAGE_POSITION_TOP_OR_LEFT, null /*callback*/,
+        if (mTask == null || mSecondaryTask == null) {
+            return null;
+        }
+
+        RunnableList endCallback = new RunnableList();
+        RecentsView recentsView = getRecentsView();
+        // Callbacks run from remote animation when recents animation not currently running
+        recentsView.getSplitPlaceholder().launchTasks(this /*groupedTaskView*/,
+                success -> endCallback.executeAllAndDestroy(),
                 false /* freezeTaskList */);
-        return null;
+
+        // Callbacks get run from recentsView for case when recents animation already running
+        recentsView.addSideTaskLaunchCallback(endCallback);
+        return endCallback;
     }
 
     @Override
     public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
         getRecentsView().getSplitPlaceholder().launchTasks(mTask, mSecondaryTask,
-                STAGE_POSITION_TOP_OR_LEFT, callback, freezeTaskList);
+                STAGE_POSITION_TOP_OR_LEFT, callback, freezeTaskList,
+                getSplitRatio());
     }
 
     @Override
@@ -239,10 +253,8 @@ public class GroupedTaskView extends TaskView {
         int taskIconHeight = deviceProfile.overviewTaskIconSizePx;
         boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
 
-        mSnapshotView.getBoundsOnScreen(mPrimaryTempRect);
-        mSnapshotView2.getBoundsOnScreen(mSecondaryTempRect);
         getPagedOrientationHandler().setSplitIconParams(mIconView, mIconView2,
-                taskIconHeight, mPrimaryTempRect, mSecondaryTempRect,
+                taskIconHeight, mSnapshotView.getMeasuredWidth(), mSnapshotView.getMeasuredHeight(),
                 isRtl, deviceProfile, mSplitBoundsConfig);
     }
 
@@ -250,5 +262,24 @@ public class GroupedTaskView extends TaskView {
     protected void updateSnapshotRadius() {
         super.updateSnapshotRadius();
         mSnapshotView2.setFullscreenParams(mCurrentFullscreenParams);
+    }
+
+    @Override
+    protected void setIconAndDimTransitionProgress(float progress, boolean invert) {
+        super.setIconAndDimTransitionProgress(progress, invert);
+        // Value set by super call
+        float scale = mIconView.getAlpha();
+        mIconView2.setAlpha(scale);
+        mDigitalWellBeingToast2.updateBannerOffset(1f - scale,
+                mCurrentFullscreenParams.mCurrentDrawnInsets.top
+                        + mCurrentFullscreenParams.mCurrentDrawnInsets.bottom);
+    }
+
+    @Override
+    public void setColorTint(float amount, int tintColor) {
+        super.setColorTint(amount, tintColor);
+        mIconView2.setIconColorTint(tintColor, amount);
+        mSnapshotView2.setDimAlpha(amount);
+        mDigitalWellBeingToast2.setBannerColorTint(tintColor, amount);
     }
 }

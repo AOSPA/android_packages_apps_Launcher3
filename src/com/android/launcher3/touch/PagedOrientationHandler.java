@@ -24,6 +24,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ShapeDrawable;
 import android.util.FloatProperty;
+import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -65,9 +66,10 @@ public interface PagedOrientationHandler {
     Float2DAction<Canvas> CANVAS_TRANSLATE = Canvas::translate;
     Float2DAction<Matrix> MATRIX_POST_TRANSLATE = Matrix::postTranslate;
 
-    <T> void set(T target, Int2DAction<T> action, int param);
-    <T> void set(T target, Float2DAction<T> action, float param);
+    <T> void setPrimary(T target, Int2DAction<T> action, int param);
+    <T> void setPrimary(T target, Float2DAction<T> action, float param);
     <T> void setSecondary(T target, Float2DAction<T> action, float param);
+    <T> void set(T target, Int2DAction<T> action, int primaryParam, int secondaryParam);
     float getPrimaryDirection(MotionEvent event, int pointerIndex);
     float getPrimaryVelocity(VelocityTracker velocityTracker, int pointerId);
     int getMeasuredSize(View view);
@@ -93,7 +95,8 @@ public interface PagedOrientationHandler {
     int getScrollOffsetStart(View view, Rect insets);
     int getScrollOffsetEnd(View view, Rect insets);
     int getSecondaryTranslationDirectionFactor();
-    int getSplitTranslationDirectionFactor(@StagePosition int stagePosition);
+    int getSplitTranslationDirectionFactor(@StagePosition int stagePosition,
+            DeviceProfile deviceProfile);
     ChildBounds getChildBounds(View child, int childStart, int pageCenter, boolean layoutChild);
     void setMaxScroll(AccessibilityEvent event, int maxScroll);
     boolean getRecentsRtlSetting(Resources resources);
@@ -112,8 +115,8 @@ public interface PagedOrientationHandler {
     float getSecondaryValue(float x, float y);
 
     boolean isLayoutNaturalToLauncher();
-    FloatProperty getSplitSelectTaskOffset(FloatProperty primary, FloatProperty secondary,
-            DeviceProfile deviceProfile);
+    Pair<FloatProperty, FloatProperty> getSplitSelectTaskOffset(FloatProperty primary,
+            FloatProperty secondary, DeviceProfile deviceProfile);
     int getDistanceToBottomOfRect(DeviceProfile dp, Rect rect);
     List<SplitPositionOption> getSplitPositionOptions(DeviceProfile dp);
     /**
@@ -152,7 +155,7 @@ public interface PagedOrientationHandler {
     void setIconAndSnapshotParams(View iconView, int taskIconMargin, int taskIconHeight,
             FrameLayout.LayoutParams snapshotParams, boolean isRtl);
     void setSplitIconParams(View primaryIconView, View secondaryIconView,
-            int taskIconHeight, Rect primarySnapshotBounds, Rect secondarySnapshotBounds,
+            int taskIconHeight, int primarySnapshotWidth, int primarySnapshotHeight,
             boolean isRtl, DeviceProfile deviceProfile, StagedSplitBounds splitConfig);
 
     /*
@@ -187,6 +190,10 @@ public interface PagedOrientationHandler {
      * additional adjustments to the positioning based on fake land/seascape
      */
     PointF getAdditionalInsetForTaskMenu(float margin);
+
+    Pair<Float, Float> setDwbLayoutParamsAndGetTranslations(int taskViewWidth,
+            int taskViewHeight, StagedSplitBounds splitBounds, DeviceProfile deviceProfile,
+            View[] thumbnailViews, int desiredTaskId, View banner);
 
     // The following are only used by TaskViewTouchHandler.
     /** @return Either VERTICAL or HORIZONTAL. */

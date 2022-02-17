@@ -308,6 +308,7 @@
     <dimen name="snackbar_elevation">3dp</dimen>
     <dimen name="snackbar_min_text_size">12sp</dimen>
     <dimen name="snackbar_max_text_size">14sp</dimen>
+    <dimen name="snackbar_max_width">504dp</dimen>
 
 <!-- Developer Options -->
     <dimen name="developer_options_filter_margins">10dp</dimen>
@@ -329,6 +330,9 @@
     <!-- Size of the maximum radius for the enforced rounded rectangles. -->
     <dimen name="enforced_rounded_corner_max_radius">16dp</dimen>
 
+<!-- Base Swipe Detector, speed in dp/s -->
+    <dimen name="base_swift_detector_fling_release_velocity">1dp</dimen>
+
 <!-- Overview placeholder to compile in Launcher3 without Quickstep -->
     <dimen name="task_thumbnail_icon_size">0dp</dimen>
     <dimen name="task_thumbnail_icon_drawable_size">0dp</dimen>
@@ -336,6 +340,8 @@
     <dimen name="overview_task_margin">0dp</dimen>
     <dimen name="overview_task_margin_focused">0dp</dimen>
     <dimen name="overview_task_margin_grid">0dp</dimen>
+    <dimen name="overview_actions_button_spacing">0dp</dimen>
+    <dimen name="overview_actions_button_spacing_grid">0dp</dimen>
     <dimen name="overview_actions_margin_gesture">0dp</dimen>
     <dimen name="overview_actions_top_margin_gesture_grid_portrait">0dp</dimen>
     <dimen name="overview_actions_bottom_margin_gesture_grid_portrait">0dp</dimen>
@@ -344,10 +350,10 @@
     <dimen name="overview_actions_margin_three_button">0dp</dimen>
     <dimen name="overview_grid_side_margin_portrait">0dp</dimen>
     <dimen name="overview_grid_side_margin_landscape">0dp</dimen>
-    <dimen name="overview_grid_row_spacing_portrait">0dp</dimen>
-    <dimen name="overview_grid_row_spacing_landscape">0dp</dimen>
-    <dimen name="recents_page_spacing">0dp</dimen>
-    <dimen name="recents_page_spacing_grid">0dp</dimen>
+    <dimen name="overview_grid_row_spacing">0dp</dimen>
+    <dimen name="overview_page_spacing">0dp</dimen>
+    <dimen name="overview_page_spacing_grid_portrait">0dp</dimen>
+    <dimen name="overview_page_spacing_grid_landscape">0dp</dimen>
     <dimen name="split_placeholder_size">110dp</dimen>
     <dimen name="task_menu_width_grid">200dp</dimen>
 

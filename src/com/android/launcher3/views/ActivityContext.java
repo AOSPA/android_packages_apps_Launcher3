@@ -31,6 +31,7 @@ import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.util.ViewCache;
 
 /**
@@ -124,13 +125,6 @@ public interface ActivityContext {
     }
 
     /**
-     * Returns whether we can show the IME for elements hosted by this ActivityContext.
-     */
-    default boolean supportsIme() {
-        return true;
-    }
-
-    /**
      * Called just before logging the given item.
      */
     default void applyOverwritesToLogItem(LauncherAtom.ItemInfo.Builder itemInfoBuilder) { }
@@ -165,5 +159,10 @@ public interface ActivityContext {
         return v -> {
             // No op.
         };
+    }
+
+    @Nullable
+    default PopupDataProvider getPopupDataProvider() {
+        return null;
     }
 }

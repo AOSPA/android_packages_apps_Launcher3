@@ -52,6 +52,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SettingsCache;
 import com.android.quickstep.BaseActivityInterface;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.TaskAnimationManager;
 import com.android.quickstep.views.TaskView;
 
 import java.lang.annotation.Retention;
@@ -162,7 +163,7 @@ public class RecentsOrientedState implements
      */
     public void setDeviceProfile(DeviceProfile deviceProfile) {
         boolean oldMultipleOrientationsSupported = isMultipleOrientationSupportedByDevice();
-        setFlag(FLAG_MULTIPLE_ORIENTATION_SUPPORTED_BY_DENSITY, !deviceProfile.allowRotation);
+        setFlag(FLAG_MULTIPLE_ORIENTATION_SUPPORTED_BY_DENSITY, !deviceProfile.isTablet);
         if (mListenersInitialized) {
             boolean newMultipleOrientationsSupported = isMultipleOrientationSupportedByDevice();
             // If isMultipleOrientationSupportedByDevice is changed, init or destroy listeners
@@ -340,6 +341,11 @@ public class RecentsOrientedState implements
 
     @SurfaceRotation
     public int getDisplayRotation() {
+        if (TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
+            // When shell transitions are enabled, both the display and activity rotations should
+            // be the same once the gesture starts
+            return mRecentsActivityRotation;
+        }
         return mDisplayRotation;
     }
 

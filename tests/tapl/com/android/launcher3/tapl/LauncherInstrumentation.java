@@ -124,7 +124,7 @@ public final class LauncherInstrumentation {
         WORKSPACE, ALL_APPS, OVERVIEW, WIDGETS, BACKGROUND, FALLBACK_OVERVIEW
     }
 
-    public enum NavigationModel {ZERO_BUTTON, TWO_BUTTON, THREE_BUTTON}
+    public enum NavigationModel {ZERO_BUTTON, THREE_BUTTON}
 
     // Where the gesture happens: outside of Launcher, inside or from inside to outside and
     // whether the gesture recognition triggers pilfer.
@@ -342,6 +342,11 @@ public final class LauncherInstrumentation {
                 .getParcelable(TestProtocol.TEST_INFO_RESPONSE_FIELD));
     }
 
+    int getOverviewPageSpacing() {
+        return getTestInfo(TestProtocol.REQUEST_GET_OVERVIEW_PAGE_SPACING)
+                .getInt(TestProtocol.TEST_INFO_RESPONSE_FIELD);
+    }
+
     float getExactScreenCenterX() {
         return getRealDisplaySize().x / 2f;
     }
@@ -386,8 +391,6 @@ public final class LauncherInstrumentation {
     public static NavigationModel getNavigationModel(int currentInteractionMode) {
         if (QuickStepContract.isGesturalMode(currentInteractionMode)) {
             return NavigationModel.ZERO_BUTTON;
-        } else if (QuickStepContract.isSwipeUpMode(currentInteractionMode)) {
-            return NavigationModel.TWO_BUTTON;
         } else if (QuickStepContract.isLegacyMode(currentInteractionMode)) {
             return NavigationModel.THREE_BUTTON;
         }
@@ -421,18 +424,19 @@ public final class LauncherInstrumentation {
         }
     }
 
-    private String getSystemAnomalyMessage(
+    public String getSystemAnomalyMessage(
             boolean ignoreNavmodeChangeStates, boolean ignoreOnlySystemUiViews) {
         try {
             {
                 final StringBuilder sb = new StringBuilder();
 
-                UiObject2 object = mDevice.findObject(By.res("android", "alertTitle"));
+                UiObject2 object =
+                        mDevice.findObject(By.res("android", "alertTitle").pkg("android"));
                 if (object != null) {
                     sb.append("TITLE: ").append(object.getText());
                 }
 
-                object = mDevice.findObject(By.res("android", "message"));
+                object = mDevice.findObject(By.res("android", "message").pkg("android"));
                 if (object != null) {
                     sb.append(" PACKAGE: ").append(object.getApplicationPackage())
                             .append(" MESSAGE: ").append(object.getText());
@@ -544,11 +548,11 @@ public final class LauncherInstrumentation {
                     : TestHelpers.getSystemHealthMessage(getContext(), mTestStartTime);
 
             if (systemHealth != null) {
-                return message
-                        + ";\nPerhaps linked to system health problems:\n<<<<<<<<<<<<<<<<<<\n"
+                message += ";\nPerhaps linked to system health problems:\n<<<<<<<<<<<<<<<<<<\n"
                         + systemHealth + "\n>>>>>>>>>>>>>>>>>>";
             }
         }
+        Log.d(TAG, "About to throw the error: " + message, new Exception());
         return message;
     }
 
@@ -859,7 +863,7 @@ public final class LauncherInstrumentation {
 
                     swipeToState(
                             displaySize.x / 2, displaySize.y - 1,
-                            displaySize.x / 2, 0,
+                            displaySize.x / 2, displaySize.y / 2,
                             ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME, NORMAL_STATE_ORDINAL,
                             gestureStartFromLauncher ? GestureScope.INSIDE_TO_OUTSIDE
                                     : GestureScope.OUTSIDE_WITH_PILFER);
@@ -868,10 +872,6 @@ public final class LauncherInstrumentation {
                 log("Hierarchy before clicking home:");
                 dumpViewHierarchy();
                 action = "clicking home button";
-                if (!isLauncher3() && getNavigationModel() == NavigationModel.TWO_BUTTON) {
-                    expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_DOWN_TIS);
-                    expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_UP_TIS);
-                }
                 if (isTablet()) {
                     expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_DOWN);
                     expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_UP);
@@ -912,9 +912,6 @@ public final class LauncherInstrumentation {
                 if (isTablet()) {
                     expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_DOWN);
                     expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_TOUCH_UP);
-                } else if (!isLauncher3() && getNavigationModel() == NavigationModel.TWO_BUTTON) {
-                    expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_DOWN_TIS);
-                    expectEvent(TestProtocol.SEQUENCE_TIS, EVENT_TOUCH_UP_TIS);
                 }
             }
             if (launcherVisible) {
@@ -1027,6 +1024,10 @@ public final class LauncherInstrumentation {
 
     void waitUntilLauncherObjectGone(String resId) {
         waitUntilGoneBySelector(getLauncherObjectSelector(resId));
+    }
+
+    void waitUntilOverviewObjectGone(String resId) {
+        waitUntilGoneBySelector(getOverviewObjectSelector(resId));
     }
 
     void waitUntilLauncherObjectGone(BySelector selector) {
@@ -1272,18 +1273,22 @@ public final class LauncherInstrumentation {
     }
 
     int getRightGestureStartOnScreen() {
-        return getRealDisplaySize().x - getWindowInsets().right;
+        return getRealDisplaySize().x - getWindowInsets().right - 1;
     }
 
-    void clickLauncherObject(UiObject2 object) {
-        waitForObjectEnabled(object, "clickLauncherObject");
-        expectEvent(TestProtocol.SEQUENCE_MAIN, LauncherInstrumentation.EVENT_TOUCH_DOWN);
-        expectEvent(TestProtocol.SEQUENCE_MAIN, LauncherInstrumentation.EVENT_TOUCH_UP);
+    void clickObject(UiObject2 object) {
+        waitForObjectEnabled(object, "clickObject");
         if (!isLauncher3() && getNavigationModel() != NavigationModel.THREE_BUTTON) {
             expectEvent(TestProtocol.SEQUENCE_TIS, LauncherInstrumentation.EVENT_TOUCH_DOWN_TIS);
             expectEvent(TestProtocol.SEQUENCE_TIS, LauncherInstrumentation.EVENT_TOUCH_UP_TIS);
         }
         object.click();
+    }
+
+    void clickLauncherObject(UiObject2 object) {
+        expectEvent(TestProtocol.SEQUENCE_MAIN, LauncherInstrumentation.EVENT_TOUCH_DOWN);
+        expectEvent(TestProtocol.SEQUENCE_MAIN, LauncherInstrumentation.EVENT_TOUCH_UP);
+        clickObject(object);
     }
 
     void scrollToLastVisibleRow(
@@ -1319,14 +1324,12 @@ public final class LauncherInstrumentation {
     void scrollLeftByDistance(UiObject2 container, int distance) {
         final Rect containerRect = getVisibleBounds(container);
         final int rightGestureMarginInContainer = getRightGestureMarginInContainer(container);
+        final int leftGestureMargin = getTargetInsets().left + getEdgeSensitivityWidth();
         scroll(
                 container,
                 Direction.LEFT,
-                new Rect(
-                        0,
-                        containerRect.width() - distance - rightGestureMarginInContainer,
-                        0,
-                        rightGestureMarginInContainer),
+                new Rect(leftGestureMargin, 0,
+                        containerRect.width() - distance - rightGestureMarginInContainer, 0),
                 10,
                 true);
     }
@@ -1395,14 +1398,15 @@ public final class LauncherInstrumentation {
         final Point start = new Point(startX, startY);
         final Point end = new Point(endX, endY);
         sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN, start, gestureScope);
-        final long endTime = movePointer(start, end, steps, downTime, slowDown, gestureScope);
+        final long endTime = movePointer(
+                start, end, steps, false, downTime, slowDown, gestureScope);
         sendPointer(downTime, endTime, MotionEvent.ACTION_UP, end, gestureScope);
     }
 
-    long movePointer(Point start, Point end, int steps, long downTime, boolean slowDown,
-            GestureScope gestureScope) {
-        long endTime = movePointer(
-                downTime, downTime, steps * GESTURE_STEP_MS, start, end, gestureScope);
+    long movePointer(Point start, Point end, int steps, boolean isDecelerating,
+            long downTime, boolean slowDown, GestureScope gestureScope) {
+        long endTime = movePointer(downTime, downTime, steps * GESTURE_STEP_MS,
+                isDecelerating, start, end, gestureScope);
         if (slowDown) {
             endTime = movePointer(downTime, endTime + GESTURE_STEP_MS, 5 * GESTURE_STEP_MS, end,
                     end, gestureScope);
@@ -1481,21 +1485,55 @@ public final class LauncherInstrumentation {
 
     public long movePointer(long downTime, long startTime, long duration, Point from, Point to,
             GestureScope gestureScope) {
+        return movePointer(
+                downTime, startTime, duration, false, from, to, gestureScope);
+    }
+
+    public long movePointer(long downTime, long startTime, long duration, boolean isDecelerating,
+            Point from, Point to, GestureScope gestureScope) {
         log("movePointer: " + from + " to " + to);
         final Point point = new Point();
         long steps = duration / GESTURE_STEP_MS;
+
         long currentTime = startTime;
-        for (long i = 0; i < steps; ++i) {
-            sleep(GESTURE_STEP_MS);
 
-            currentTime += GESTURE_STEP_MS;
-            final float progress = (currentTime - startTime) / (float) duration;
+        if (isDecelerating) {
+            // formula: V = V0 - D*T, assuming V = 0 when T = duration
 
-            point.x = from.x + (int) (progress * (to.x - from.x));
-            point.y = from.y + (int) (progress * (to.y - from.y));
+            // vx0: initial speed at the x-dimension, set as twice the avg speed
+            // dx: the constant deceleration at the x-dimension
+            double vx0 = 2 * (to.x - from.x) / duration;
+            double dx = vx0 / duration;
+            // vy0: initial speed at the y-dimension, set as twice the avg speed
+            // dy: the constant deceleration at the y-dimension
+            double vy0 = 2 * (to.y - from.y) / duration;
+            double dy = vy0 / duration;
 
-            sendPointer(downTime, currentTime, MotionEvent.ACTION_MOVE, point, gestureScope);
+            for (long i = 0; i < steps; ++i) {
+                sleep(GESTURE_STEP_MS);
+                currentTime += GESTURE_STEP_MS;
+
+                // formula: P = P0 + V0*T - (D*T^2/2)
+                final double t = (i + 1) * GESTURE_STEP_MS;
+                point.x = from.x + (int) (vx0 * t - 0.5 * dx * t * t);
+                point.y = from.y + (int) (vy0 * t - 0.5 * dy * t * t);
+
+                sendPointer(downTime, currentTime, MotionEvent.ACTION_MOVE, point, gestureScope);
+            }
+        } else {
+            for (long i = 0; i < steps; ++i) {
+                sleep(GESTURE_STEP_MS);
+                currentTime += GESTURE_STEP_MS;
+
+                final float progress = (currentTime - startTime) / (float) duration;
+                point.x = from.x + (int) (progress * (to.x - from.x));
+                point.y = from.y + (int) (progress * (to.y - from.y));
+
+                sendPointer(downTime, currentTime, MotionEvent.ACTION_MOVE, point, gestureScope);
+
+            }
         }
+
         return currentTime;
     }
 
