@@ -171,7 +171,7 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
         float slopMultiplier = mDeviceState.isFullyGesturalNavMode()
                 ? QUICKSTEP_TOUCH_SLOP_RATIO_GESTURAL
                 : QUICKSTEP_TOUCH_SLOP_RATIO_TWO_BUTTON;
-        mTouchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        mTouchSlop = ViewConfiguration.get(base).getScaledTouchSlop();
         mSquaredTouchSlop = slopMultiplier * mTouchSlop * mTouchSlop;
 
         mPassedPilferInputSlop = mPassedWindowMoveSlop = continuingPreviousGesture;
