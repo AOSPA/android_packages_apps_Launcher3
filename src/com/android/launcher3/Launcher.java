@@ -40,7 +40,6 @@ import static com.android.launcher3.LauncherState.NO_SCALE;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
-import static com.android.launcher3.config.FeatureFlags.ADAPTIVE_ICON_WINDOW_ANIM;
 import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_LAUNCHER_LOAD;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -2366,6 +2365,9 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 CellLayout cl = mWorkspace.getScreenWithId(item.screenId);
                 if (cl != null && cl.isOccupied(item.cellX, item.cellY)) {
                     View v = cl.getChildAt(item.cellX, item.cellY);
+                    if (v == null) {
+                        Log.e(TAG, "bindItems failed when removing colliding item=" + item);
+                    }
                     Object tag = v.getTag();
                     String desc = "Collision while binding workspace item: " + item
                             + ". Collides with " + tag;
@@ -2730,14 +2732,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                     -> containers.add(((CellLayout) page).getShortcutsAndWidgets()));
 
             // Order: Preferred item by itself or in folder, then by matching package/user
-            if (ADAPTIVE_ICON_WINDOW_ANIM.get()) {
-                return getFirstMatch(containers, preferredItem, forFolderMatch(preferredItem),
-                        packageAndUserAndApp, forFolderMatch(packageAndUserAndApp));
-            } else {
-                // Do not use Folder as a criteria, since it'll cause a crash when trying to draw
-                // FolderAdaptiveIcon as the background.
-                return getFirstMatch(containers, preferredItem, packageAndUserAndApp);
-            }
+            return getFirstMatch(containers, preferredItem, forFolderMatch(preferredItem),
+                    packageAndUserAndApp, forFolderMatch(packageAndUserAndApp));
         }
     }
 
@@ -2785,6 +2781,17 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     private void announceForAccessibility(@StringRes int stringResId) {
         getDragLayer().announceForAccessibility(getString(stringResId));
     }
+
+    /**
+     * Informs us that the overlay (-1 screen, typically), has either become visible or invisible.
+     */
+    public void onOverlayVisibilityChanged(boolean visible) {}
+
+    /**
+     * Informs us that the page transition has ended, so that we can react to the newly selected
+     * page if we want to.
+     */
+    public void onPageEndTransition() {}
 
     /**
      * Add the icons for all apps.
