@@ -25,11 +25,13 @@ import android.view.View.AccessibilityDelegate;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.allapps.BaseAllAppsContainerView;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.util.ViewCache;
@@ -92,6 +94,13 @@ public interface ActivityContext {
      * The root view to support drag-and-drop and popup support.
      */
     BaseDragLayer getDragLayer();
+
+    /**
+     * The all apps container, if it exists in this context.
+     */
+    default BaseAllAppsContainerView<?> getAppsView() {
+        return null;
+    }
 
     DeviceProfile getDeviceProfile();
 
@@ -163,6 +172,11 @@ public interface ActivityContext {
 
     @Nullable
     default PopupDataProvider getPopupDataProvider() {
+        return null;
+    }
+
+    @Nullable
+    default StringCache getStringCache() {
         return null;
     }
 }

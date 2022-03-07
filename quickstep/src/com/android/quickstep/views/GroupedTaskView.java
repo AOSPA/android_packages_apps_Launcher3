@@ -180,8 +180,8 @@ public class GroupedTaskView extends TaskView {
 
     @Override
     public void launchTask(@NonNull Consumer<Boolean> callback, boolean freezeTaskList) {
-        getRecentsView().getSplitPlaceholder().launchTasks(mTask, mSecondaryTask,
-                STAGE_POSITION_TOP_OR_LEFT, callback, freezeTaskList,
+        getRecentsView().getSplitPlaceholder().launchTasks(mTask.key.id, null,
+                mSecondaryTask.key.id, STAGE_POSITION_TOP_OR_LEFT, callback, freezeTaskList,
                 getSplitRatio());
     }
 
@@ -236,7 +236,7 @@ public class GroupedTaskView extends TaskView {
     public void setOrientationState(RecentsOrientedState orientationState) {
         super.setOrientationState(orientationState);
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
-        boolean isGridTask = deviceProfile.overviewShowAsGrid && !isFocusedTask();
+        boolean isGridTask = deviceProfile.isTablet && !isFocusedTask();
         int iconDrawableSize = isGridTask ? deviceProfile.overviewTaskIconDrawableSizeGridPx
                 : deviceProfile.overviewTaskIconDrawableSizePx;
         mIconView2.setDrawableSize(iconDrawableSize, iconDrawableSize);
