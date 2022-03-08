@@ -27,10 +27,8 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.annotation.Nullable;
 import android.content.SharedPreferences;
-import android.content.res.Resources;
 import android.view.ViewConfiguration;
 
-import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.quickstep.AnimatedFloat;
@@ -146,10 +144,9 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     public TaskbarStashController(TaskbarActivityContext activity) {
         mActivity = activity;
         mPrefs = Utilities.getPrefs(mActivity);
-        final Resources resources = mActivity.getResources();
-        mStashedHeight = resources.getDimensionPixelSize(R.dimen.taskbar_stashed_size);
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(activity);
         mUnstashedHeight = mActivity.getDeviceProfile().taskbarSize;
+        mStashedHeight = mActivity.getDeviceProfile().stashedTaskbarSize;
     }
 
     public void init(TaskbarControllers controllers, TaskbarSharedState sharedState) {
@@ -175,8 +172,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 && mPrefs.getBoolean(SHARED_PREFS_STASHED_KEY, DEFAULT_STASHED_PREF);
         boolean isInSetup = !mActivity.isUserSetupComplete() || sharedState.setupUIVisible;
         updateStateForFlag(FLAG_STASHED_IN_APP_MANUAL, isManuallyStashedInApp);
-        // TODO(b/204384193): Temporarily disable SUW specific logic
-        // updateStateForFlag(FLAG_STASHED_IN_APP_SETUP, isInSetup);
+        updateStateForFlag(FLAG_STASHED_IN_APP_SETUP, isInSetup);
         if (isInSetup) {
             // Update the in-app state to ensure isStashed() reflects right state during SUW
             updateStateForFlag(FLAG_IN_APP, true);
@@ -197,7 +193,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * Returns whether the user can manually stash the taskbar based on the current device state.
      */
-    private boolean supportsManualStashing() {
+    protected boolean supportsManualStashing() {
         return supportsVisualStashing()
                 && (!Utilities.IS_RUNNING_IN_TEST_HARNESS || supportsStashingForTests());
     }
