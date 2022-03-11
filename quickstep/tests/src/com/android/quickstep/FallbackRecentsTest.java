@@ -61,6 +61,7 @@ import com.android.quickstep.views.RecentsView;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
@@ -165,7 +166,7 @@ public class FallbackRecentsTest {
         assertTrue("Fallback Launcher not visible", mDevice.wait(Until.hasObject(By.pkg(
                 mOtherLauncherActivity.packageName)), WAIT_TIME_MS));
 
-        mLauncher.getBackground().switchToOverview();
+        mLauncher.getLaunchedAppState().switchToOverview();
     }
 
     // b/143488140
@@ -174,7 +175,7 @@ public class FallbackRecentsTest {
     public void goToOverviewFromApp() {
         startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));
 
-        mLauncher.getBackground().switchToOverview();
+        mLauncher.getLaunchedAppState().switchToOverview();
     }
 
     protected void executeOnRecents(Consumer<RecentsActivity> f) {
@@ -200,11 +201,12 @@ public class FallbackRecentsTest {
 
     private BaseOverview pressHomeAndGoToOverview() {
         mDevice.pressHome();
-        return mLauncher.getBackground().switchToOverview();
+        return mLauncher.getLaunchedAppState().switchToOverview();
     }
 
     // b/143488140
     //@NavigationModeSwitch
+    @Ignore("b/218403080")
     @Test
     public void testOverview() {
         startAppFast(getAppPackageName());
@@ -213,7 +215,7 @@ public class FallbackRecentsTest {
         Wait.atMost("Expected three apps in the task list",
                 () -> mLauncher.getRecentTasks().size() >= 3, DEFAULT_ACTIVITY_TIMEOUT, mLauncher);
 
-        BaseOverview overview = mLauncher.getBackground().switchToOverview();
+        BaseOverview overview = mLauncher.getLaunchedAppState().switchToOverview();
         executeOnRecents(recents -> {
             assertTrue("Don't have at least 3 tasks", getTaskCount(recents) >= 3);
         });

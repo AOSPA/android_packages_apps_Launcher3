@@ -125,6 +125,7 @@ import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
+import com.android.launcher3.allapps.BaseAllAppsContainerView;
 import com.android.launcher3.allapps.DiscoveryBounce;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.PropertyListBuilder;
@@ -350,7 +351,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     // We only want to get the SharedPreferences once since it does an FS stat each time we get
     // it from the context.
     private SharedPreferences mSharedPrefs;
-    private OnboardingPrefs mOnboardingPrefs;
+    private OnboardingPrefs<? extends Launcher> mOnboardingPrefs;
 
     // Activity result which needs to be processed after workspace has loaded.
     private ActivityResultInfo mPendingActivityResult;
@@ -556,11 +557,12 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return new LauncherOverlayManager() { };
     }
 
-    protected OnboardingPrefs createOnboardingPrefs(SharedPreferences sharedPrefs) {
+    protected OnboardingPrefs<? extends Launcher> createOnboardingPrefs(
+            SharedPreferences sharedPrefs) {
         return new OnboardingPrefs<>(this, sharedPrefs);
     }
 
-    public OnboardingPrefs getOnboardingPrefs() {
+    public OnboardingPrefs<? extends Launcher> getOnboardingPrefs() {
         return mOnboardingPrefs;
     }
 
@@ -587,7 +589,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     }
 
     @Override
-    protected void dispatchDeviceProfileChanged() {
+    public void dispatchDeviceProfileChanged() {
         super.dispatchDeviceProfileChanged();
         mOverlayManager.onDeviceProvideChanged();
     }
@@ -1579,6 +1581,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         boolean isActionMain = Intent.ACTION_MAIN.equals(intent.getAction());
         boolean internalStateHandled = ACTIVITY_TRACKER.handleNewIntent(this);
         hideKeyboard();
+
         if (isActionMain) {
             if (!internalStateHandled) {
                 // In all these cases, only animate if we're already on home
@@ -1607,6 +1610,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             handleGestureContract(intent);
         } else if (Intent.ACTION_ALL_APPS.equals(intent.getAction())) {
             showAllAppsFromIntent(alreadyOnHome);
+        } else if (Intent.ACTION_SHOW_WORK_APPS.equals(intent.getAction())) {
+            showAllAppsWorkTabFromIntent(alreadyOnHome);
         }
 
         TraceHelper.INSTANCE.endSection(traceToken);
@@ -1615,6 +1620,11 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     protected void showAllAppsFromIntent(boolean alreadyOnHome) {
         AbstractFloatingView.closeAllOpenViews(this);
         getStateManager().goToState(ALL_APPS, alreadyOnHome);
+    }
+
+    private void showAllAppsWorkTabFromIntent(boolean alreadyOnHome) {
+        showAllAppsFromIntent(alreadyOnHome);
+        mAppsView.switchToTab(BaseAllAppsContainerView.AdapterHolder.WORK);
     }
 
     /**
@@ -1671,8 +1681,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         // and we need to make sure this state is reflected.
         AbstractFloatingView.closeOpenViews(this, false, TYPE_ALL & ~TYPE_REBIND_SAFE);
         finishAutoCancelActionMode();
-
-        DragView.removeAllViews(this);
 
         if (mPendingRequestArgs != null) {
             outState.putParcelable(RUNTIME_STATE_PENDING_REQUEST_ARGS, mPendingRequestArgs);
@@ -1770,6 +1778,11 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     }
 
     public boolean isWorkspaceLoading() {
+        return mWorkspaceLoading;
+    }
+
+    @Override
+    public boolean isBindingItems() {
         return mWorkspaceLoading;
     }
 
@@ -2392,6 +2405,10 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                     } else {
                         Log.d(TAG, desc);
                         getModelWriter().deleteItemFromDatabase(item);
+                        if (TestProtocol.sDebugTracing) {
+                            Log.d(TestProtocol.MISSING_PROMISE_ICON,
+                                    TAG + "bindItems failed for item=" + item);
+                        }
                         continue;
                     }
                 }

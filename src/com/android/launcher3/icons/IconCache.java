@@ -41,9 +41,9 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
-import android.util.Pair;
 
 import androidx.annotation.NonNull;
+import androidx.core.util.Pair;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherFiles;
@@ -339,6 +339,16 @@ public class IconCache extends BaseIconCache {
             List<IconRequestInfo<T>> iconRequestInfos) {
         Map<Pair<UserHandle, Boolean>, List<IconRequestInfo<T>>> iconLoadSubsectionsMap =
                 iconRequestInfos.stream()
+                        .filter(iconRequest -> {
+                            if (iconRequest.itemInfo.getTargetComponent() != null) {
+                                return true;
+                            }
+                            Log.i(TAG,
+                                    "Skipping Item info with null component name: "
+                                            + iconRequest.itemInfo);
+                            iconRequest.itemInfo.bitmap = getDefaultIcon(iconRequest.itemInfo.user);
+                            return false;
+                        })
                         .collect(groupingBy(iconRequest ->
                                 Pair.create(iconRequest.itemInfo.user, iconRequest.useLowResIcon)));
 
@@ -350,41 +360,101 @@ public class IconCache extends BaseIconCache {
                                     iconRequest.itemInfo.getTargetComponent()));
 
             Trace.beginSection("loadIconSubsectionInBulk");
-            try (Cursor c = createBulkQueryCursor(
-                    filteredList,
-                    /* user = */ sectionKey.first,
-                    /* useLowResIcons = */ sectionKey.second)) {
-                int componentNameColumnIndex = c.getColumnIndexOrThrow(IconDB.COLUMN_COMPONENT);
-                while (c.moveToNext()) {
-                    ComponentName cn = ComponentName.unflattenFromString(
-                            c.getString(componentNameColumnIndex));
-                    List<IconRequestInfo<T>> duplicateIconRequests =
-                            duplicateIconRequestsMap.get(cn);
-
-                    if (cn != null) {
-                        CacheEntry entry = cacheLocked(
-                                cn,
-                                /* user = */ sectionKey.first,
-                                () -> duplicateIconRequests.get(0).launcherActivityInfo,
-                                mLauncherActivityInfoCachingLogic,
-                                c,
-                                /* usePackageIcon= */ false,
-                                /* useLowResIcons = */ sectionKey.second);
-
-                        for (IconRequestInfo<T> iconRequest : duplicateIconRequests) {
-                            applyCacheEntry(entry, iconRequest.itemInfo);
-                        }
-                    }
-                }
-            } catch (SQLiteException e) {
-                Log.d(TAG, "Error reading icon cache", e);
-            } finally {
-                Trace.endSection();
-            }
+            loadIconSubsection(sectionKey, filteredList, duplicateIconRequestsMap);
+            Trace.endSection();
         });
         Trace.endSection();
     }
 
+    private <T extends ItemInfoWithIcon> void loadIconSubsection(
+            Pair<UserHandle, Boolean> sectionKey,
+            List<IconRequestInfo<T>> filteredList,
+            Map<ComponentName, List<IconRequestInfo<T>>> duplicateIconRequestsMap) {
+        Trace.beginSection("loadIconSubsectionWithDatabase");
+        try (Cursor c = createBulkQueryCursor(
+                filteredList,
+                /* user = */ sectionKey.first,
+                /* useLowResIcons = */ sectionKey.second)) {
+            // Database title and icon loading
+            int componentNameColumnIndex = c.getColumnIndexOrThrow(IconDB.COLUMN_COMPONENT);
+            while (c.moveToNext()) {
+                ComponentName cn = ComponentName.unflattenFromString(
+                        c.getString(componentNameColumnIndex));
+                List<IconRequestInfo<T>> duplicateIconRequests =
+                        duplicateIconRequestsMap.get(cn);
+
+                if (cn != null) {
+                    CacheEntry entry = cacheLocked(
+                            cn,
+                            /* user = */ sectionKey.first,
+                            () -> duplicateIconRequests.get(0).launcherActivityInfo,
+                            mLauncherActivityInfoCachingLogic,
+                            c,
+                            /* usePackageIcon= */ false,
+                            /* useLowResIcons = */ sectionKey.second);
+
+                    for (IconRequestInfo<T> iconRequest : duplicateIconRequests) {
+                        applyCacheEntry(entry, iconRequest.itemInfo);
+                    }
+                }
+            }
+        } catch (SQLiteException e) {
+            Log.d(TAG, "Error reading icon cache", e);
+        } finally {
+            Trace.endSection();
+        }
+
+        Trace.beginSection("loadIconSubsectionWithFallback");
+        // Fallback title and icon loading
+        for (ComponentName cn : duplicateIconRequestsMap.keySet()) {
+            IconRequestInfo<T> iconRequestInfo = duplicateIconRequestsMap.get(cn).get(0);
+            ItemInfoWithIcon itemInfo = iconRequestInfo.itemInfo;
+            BitmapInfo icon = itemInfo.bitmap;
+            boolean loadFallbackTitle = TextUtils.isEmpty(itemInfo.title);
+            boolean loadFallbackIcon = icon == null
+                    || isDefaultIcon(icon, itemInfo.user)
+                    || icon == BitmapInfo.LOW_RES_INFO;
+
+            if (loadFallbackTitle || loadFallbackIcon) {
+                Log.i(TAG,
+                        "Database bulk icon loading failed, using fallback bulk icon loading "
+                                + "for: " + cn);
+                CacheEntry entry = new CacheEntry();
+                LauncherActivityInfo lai = iconRequestInfo.launcherActivityInfo;
+
+                // Fill fields that are not updated below so they are not subsequently
+                // deleted.
+                entry.title = itemInfo.title;
+                if (icon != null) {
+                    entry.bitmap = icon;
+                }
+                entry.contentDescription = itemInfo.contentDescription;
+
+                if (loadFallbackIcon) {
+                    loadFallbackIcon(
+                            lai,
+                            entry,
+                            mLauncherActivityInfoCachingLogic,
+                            /* usePackageIcon= */ false,
+                            /* usePackageTitle= */ loadFallbackTitle,
+                            cn,
+                            sectionKey.first);
+                }
+                if (loadFallbackTitle && TextUtils.isEmpty(entry.title)) {
+                    loadFallbackTitle(
+                            lai,
+                            entry,
+                            mLauncherActivityInfoCachingLogic,
+                            sectionKey.first);
+                }
+
+                for (IconRequestInfo<T> iconRequest : duplicateIconRequestsMap.get(cn)) {
+                    applyCacheEntry(entry, iconRequest.itemInfo);
+                }
+            }
+        }
+        Trace.endSection();
+    }
 
     /**
      * Fill in {@param infoInOut} with the corresponding icon and label.

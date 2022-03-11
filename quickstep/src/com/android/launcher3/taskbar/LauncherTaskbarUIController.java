@@ -216,9 +216,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      * Starts the taskbar education flow, if the user hasn't seen it yet.
      */
     public void showEdu() {
-        if (!FeatureFlags.ENABLE_TASKBAR_EDU.get()
-                || Utilities.IS_RUNNING_IN_TEST_HARNESS
-                || mLauncher.getOnboardingPrefs().getBoolean(OnboardingPrefs.TASKBAR_EDU_SEEN)) {
+        if (!shouldShowEdu()) {
             return;
         }
         mLauncher.getOnboardingPrefs().markChecked(OnboardingPrefs.TASKBAR_EDU_SEEN);
@@ -227,13 +225,17 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     /**
+     * Whether the taskbar education should be shown.
+     */
+    public boolean shouldShowEdu() {
+        return !Utilities.IS_RUNNING_IN_TEST_HARNESS
+                && !mLauncher.getOnboardingPrefs().getBoolean(OnboardingPrefs.TASKBAR_EDU_SEEN);
+    }
+
+    /**
      * Manually ends the taskbar education flow.
      */
     public void hideEdu() {
-        if (!FeatureFlags.ENABLE_TASKBAR_EDU.get()) {
-            return;
-        }
-
         mControllers.taskbarEduController.hideEdu();
     }
 

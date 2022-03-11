@@ -44,6 +44,7 @@ import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.WindowBounds;
 
 import java.io.PrintWriter;
+import java.util.List;
 
 @SuppressLint("NewApi")
 public class DeviceProfile {
@@ -170,7 +171,8 @@ public class DeviceProfile {
 
     // All apps
     public Point allAppsBorderSpacePx;
-    public int allAppsOpenVerticalTranslate;
+    public int allAppsShiftRange;
+    public int allAppsTopPadding;
     public int allAppsCellHeightPx;
     public int allAppsCellWidthPx;
     public int allAppsIconSizePx;
@@ -243,8 +245,7 @@ public class DeviceProfile {
         isTablet = info.isTablet(windowBounds);
         isPhone = !isTablet;
         isTwoPanels = isTablet && useTwoPanels;
-        isTaskbarPresent = isTablet && ApiWrapper.TASKBAR_DRAWN_IN_PROCESS
-                && FeatureFlags.ENABLE_TASKBAR.get();
+        isTaskbarPresent = isTablet && ApiWrapper.TASKBAR_DRAWN_IN_PROCESS;
 
         // Some more constants.
         context = getContext(context, info, isVerticalBarLayout() || (isTablet && isLandscape)
@@ -287,8 +288,11 @@ public class DeviceProfile {
         desiredWorkspaceHorizontalMarginPx = getHorizontalMarginPx(inv, res);
         desiredWorkspaceHorizontalMarginOriginalPx = desiredWorkspaceHorizontalMarginPx;
 
-        allAppsOpenVerticalTranslate = res.getDimensionPixelSize(
-                R.dimen.all_apps_open_vertical_translate);
+        allAppsTopPadding = res.getDimensionPixelSize(R.dimen.all_apps_top_padding)
+                + (isTablet ? heightPx - availableHeightPx : 0);
+        allAppsShiftRange = isTablet
+                ? heightPx - allAppsTopPadding
+                : res.getDimensionPixelSize(R.dimen.all_apps_starting_vertical_translate);
 
         folderLabelTextScale = res.getFloat(R.dimen.folder_label_text_scale);
         folderContentPaddingLeftRight =
@@ -1221,6 +1225,35 @@ public class DeviceProfile {
          * a one time operation.
          */
         void onDeviceProfileChanged(DeviceProfile dp);
+    }
+
+    /** Allows registering listeners for {@link DeviceProfile} changes. */
+    public interface DeviceProfileListenable {
+
+        /** The current device profile. */
+        DeviceProfile getDeviceProfile();
+
+        /** Registered {@link OnDeviceProfileChangeListener} instances. */
+        List<OnDeviceProfileChangeListener> getOnDeviceProfileChangeListeners();
+
+        /** Notifies listeners of a {@link DeviceProfile} change. */
+        default void dispatchDeviceProfileChanged() {
+            DeviceProfile deviceProfile = getDeviceProfile();
+            List<OnDeviceProfileChangeListener> listeners = getOnDeviceProfileChangeListeners();
+            for (int i = listeners.size() - 1; i >= 0; i--) {
+                listeners.get(i).onDeviceProfileChanged(deviceProfile);
+            }
+        }
+
+        /** Register listener for {@link DeviceProfile} changes. */
+        default void addOnDeviceProfileChangeListener(OnDeviceProfileChangeListener listener) {
+            getOnDeviceProfileChangeListeners().add(listener);
+        }
+
+        /** Unregister listener for {@link DeviceProfile} changes. */
+        default void removeOnDeviceProfileChangeListener(OnDeviceProfileChangeListener listener) {
+            getOnDeviceProfileChangeListeners().remove(listener);
+        }
     }
 
     public static class Builder {

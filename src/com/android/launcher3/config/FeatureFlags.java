@@ -139,12 +139,12 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_BULK_WORKSPACE_ICON_LOADING = getDebugFlag(
             "ENABLE_BULK_WORKSPACE_ICON_LOADING",
-            false,
+            true,
             "Enable loading workspace icons in bulk.");
 
     public static final BooleanFlag ENABLE_BULK_ALL_APPS_ICON_LOADING = getDebugFlag(
             "ENABLE_BULK_ALL_APPS_ICON_LOADING",
-            false,
+            true,
             "Enable loading all apps icons in bulk.");
 
     // Keep as DeviceFlag for remote disable in emergency.
@@ -196,12 +196,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_APP_PREDICTIONS_WHILE_VISIBLE = new DeviceFlag(
             "ENABLE_APP_PREDICTIONS_WHILE_VISIBLE", true, "Allows app "
             + "predictions to be updated while they are visible to the user.");
-
-    public static final BooleanFlag ENABLE_TASKBAR = getDebugFlag(
-            "ENABLE_TASKBAR", true, "Allows a system Taskbar to be shown on larger devices.");
-
-    public static final BooleanFlag ENABLE_TASKBAR_EDU = getDebugFlag("ENABLE_TASKBAR_EDU", true,
-            "Enables showing taskbar education the first time an app is opened.");
 
     public static final BooleanFlag ENABLE_TASKBAR_POPUP_MENU = getDebugFlag(
             "ENABLE_TASKBAR_POPUP_MENU", true, "Enables long pressing taskbar icons to show the"
@@ -255,6 +249,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE = getDebugFlag(
             "ENABLE_SPLIT_FROM_WORKSPACE", true,
             "Enable initiating split screen from workspace.");
+
+    public static final BooleanFlag ENABLE_NEW_MIGRATION_LOGIC = getDebugFlag(
+            "ENABLE_NEW_MIGRATION_LOGIC", true,
+            "Enable the new grid migration logic, keeping pages when src < dest");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

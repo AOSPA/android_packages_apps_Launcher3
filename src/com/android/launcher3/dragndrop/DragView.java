@@ -216,7 +216,8 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
             Object[] outObj = new Object[1];
             int w = mWidth;
             int h = mHeight;
-            Drawable dr = Utilities.getFullDrawable(mActivity, info, w, h, outObj);
+            Drawable dr = Utilities.getFullDrawable(mActivity, info, w, h,
+                    true /* shouldThemeIcon */, outObj);
 
             if (dr instanceof AdaptiveIconDrawable) {
                 int blurMargin = (int) mActivity.getResources()
@@ -563,20 +564,5 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
         ImageView iv = new ImageView(context);
         iv.setImageDrawable(drawable);
         return iv;
-    }
-
-    /**
-     * Removes any stray DragView from the DragLayer.
-     */
-    public static void removeAllViews(ActivityContext activity) {
-        BaseDragLayer dragLayer = activity.getDragLayer();
-        // Iterate in reverse order. DragView is added later to the dragLayer,
-        // and will be one of the last views.
-        for (int i = dragLayer.getChildCount() - 1; i >= 0; i--) {
-            View child = dragLayer.getChildAt(i);
-            if (child instanceof DragView) {
-                dragLayer.removeView(child);
-            }
-        }
     }
 }
