@@ -48,6 +48,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.DeviceProfile.DeviceProfileListenable;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget.DragObject;
@@ -75,9 +76,10 @@ import java.util.List;
  *
  * @param <T> Type of context inflating all apps.
  */
-public abstract class BaseAllAppsContainerView<T extends Context & ActivityContext> extends
-        SpringRelativeLayout implements DragSource, Insettable, OnDeviceProfileChangeListener,
-        OnActivePageChangedListener, ScrimView.ScrimDrawingController {
+public abstract class BaseAllAppsContainerView<T extends Context & ActivityContext
+        & DeviceProfileListenable> extends SpringRelativeLayout implements DragSource, Insettable,
+        OnDeviceProfileChangeListener, OnActivePageChangedListener,
+        ScrimView.ScrimDrawingController {
 
     private static final String BUNDLE_KEY_CURRENT_PAGE = "launcher.allapps.current_page";
 
@@ -110,6 +112,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
     private AllAppsPagedView mViewPager;
 
     protected FloatingHeaderView mHeader;
+    private View mBottomSheetBackground;
+    private View mBottomSheetHandleArea;
 
     protected boolean mUsingTabs;
     private boolean mHasWorkApps;
@@ -146,8 +150,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         mNavBarScrimPaint.setColor(Themes.getAttrColor(context, R.attr.allAppsNavBarScrimColor));
 
         mAllAppsStore.addUpdateListener(this::onAppsUpdated);
-
-        updateBackground(mActivityContext.getDeviceProfile());
+        mActivityContext.addOnDeviceProfileChangeListener(this);
     }
 
     /** Creates the adapter provider for the main section. */
@@ -222,10 +225,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         updateBackground(dp);
     }
 
-    private void updateBackground(DeviceProfile deviceProfile) {
-        setBackground(deviceProfile.isTablet
-                ? getContext().getDrawable(R.drawable.bg_all_apps_bottom_sheet)
-                : null);
+    protected void updateBackground(DeviceProfile deviceProfile) {
+        mBottomSheetBackground.setVisibility(deviceProfile.isTablet ? View.VISIBLE : View.GONE);
     }
 
     private void onAppsUpdated() {
@@ -253,7 +254,9 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (!mActivityContext.getDragLayer().isEventOverView(this, ev)) {
             return true;
         }
-        // TODO(b/216203409) Support dragging down from bottom sheet divider, if present.
+        if (mActivityContext.getDragLayer().isEventOverView(mBottomSheetHandleArea, ev)) {
+            return true;
+        }
         AllAppsRecyclerView rv = getActiveRecyclerView();
         if (rv == null) {
             return true;
@@ -331,6 +334,16 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         return mViewPager.getNextPage() == 0;
     }
 
+    /**
+     * Switches the current page to the provided {@code tab} if tabs are supported, otherwise does
+     * nothing.
+     */
+    public void switchToTab(int tab) {
+        if (mUsingTabs) {
+            mViewPager.setCurrentPage(tab);
+        }
+    }
+
     public LayoutInflater getLayoutInflater() {
         return LayoutInflater.from(getContext());
     }
@@ -365,6 +378,11 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
 
         mHeader = findViewById(R.id.all_apps_header);
         rebindAdapters(true /* force */);
+
+        mBottomSheetBackground = findViewById(R.id.bottom_sheet_background);
+        updateBackground(mActivityContext.getDeviceProfile());
+
+        mBottomSheetHandleArea = findViewById(R.id.bottom_sheet_handle_area);
     }
 
     @Override
@@ -382,7 +400,6 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         }
 
         MarginLayoutParams mlp = (MarginLayoutParams) getLayoutParams();
-        mlp.topMargin = grid.isTablet ? insets.top : 0;
         int leftRightMargin = grid.allAppsLeftRightMargin;
         mlp.leftMargin = insets.left + leftRightMargin;
         mlp.rightMargin = insets.right + leftRightMargin;
@@ -391,7 +408,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (grid.isVerticalBarLayout()) {
             setPadding(grid.workspacePadding.left, 0, grid.workspacePadding.right, 0);
         } else {
-            setPadding(0, 0, 0, 0);
+            setPadding(0, grid.allAppsTopPadding, 0, 0);
         }
 
         InsettableFrameLayout.dispatchInsets(this, insets);
@@ -566,7 +583,10 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
 
     void setupHeader() {
         mHeader.setVisibility(View.VISIBLE);
-        mHeader.setup(mAH, mAH.get(AdapterHolder.WORK).mRecyclerView == null);
+        mHeader.setup(
+                mAH.get(AdapterHolder.MAIN).mRecyclerView,
+                mAH.get(AdapterHolder.WORK).mRecyclerView,
+                mAH.get(AdapterHolder.WORK).mRecyclerView == null);
 
         int padding = mHeader.getMaxTranslation();
         for (int i = 0; i < mAH.size(); i++) {
@@ -744,5 +764,12 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
             mAH.get(AdapterHolder.MAIN).mRecyclerView.setVerticalFadingEdgeEnabled(!mUsingTabs
                     && mVerticalFadingEdge);
         }
+    }
+
+    /**
+     * Returns a view that denotes the visible part of all apps container view.
+     */
+    public View getVisibleContainerView() {
+        return mActivityContext.getDeviceProfile().isTablet ? mBottomSheetBackground : this;
     }
 }

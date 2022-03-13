@@ -32,7 +32,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_ALLOW_GESTURE_IGNORING_BAR_VISIBILITY;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_ASSIST_GESTURE_CONSTRAINED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_GLOBAL_ACTIONS_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_MAGNIFICATION_OVERLAP;
@@ -453,8 +453,8 @@ public class RecentsAnimationDeviceState implements
     /**
      * @return whether the global actions dialog is showing
      */
-    public boolean isGlobalActionsShowing() {
-        return (mSystemUiStateFlags & SYSUI_STATE_GLOBAL_ACTIONS_SHOWING) != 0;
+    public boolean isSystemUiDialogShowing() {
+        return (mSystemUiStateFlags & SYSUI_STATE_DIALOG_SHOWING) != 0;
     }
 
     /**
@@ -550,15 +550,13 @@ public class RecentsAnimationDeviceState implements
 
     /**
      * @param ev An ACTION_DOWN motion event
-     * @param task Info for the currently running task
      * @return whether the given motion event can trigger the assistant over the current task.
      */
-    public boolean canTriggerAssistantAction(MotionEvent ev, ActivityManager.RunningTaskInfo task) {
+    public boolean canTriggerAssistantAction(MotionEvent ev) {
         return mAssistantAvailable
                 && !QuickStepContract.isAssistantGestureDisabled(mSystemUiStateFlags)
                 && mRotationTouchHelper.touchInAssistantRegion(ev)
-                && !isLockToAppActive()
-                && !isGestureBlockedActivity(task);
+                && !isLockToAppActive();
     }
 
     /**

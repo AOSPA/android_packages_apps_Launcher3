@@ -412,9 +412,8 @@ public class StatsLogCompatManager extends StatsLogManager {
                     atomInfo.getFolderIcon().getToLabelState().getNumber() /* toState */,
                     atomInfo.getFolderIcon().getLabelInfo() /* edittext */,
                     getCardinality(atomInfo) /* cardinality */,
-                    getFeatures(atomInfo) /* features */
-                    // TODO(b/217753033) : Add SearchAttributes field after necessary approval
-                    // getSearchAttributes(atomInfo) /* searchAttributes */
+                    getFeatures(atomInfo) /* features */,
+                    getSearchAttributes(atomInfo) /* searchAttributes */
             );
         }
     }
@@ -572,9 +571,14 @@ public class StatsLogCompatManager extends StatsLogManager {
     }
 
     private static int getSearchAttributes(LauncherAtom.ItemInfo info) {
-        if (info.getContainerInfo().getExtendedContainers().getDeviceSearchResultContainer()
-                .hasSearchAttributes()) {
-            return searchAttributesToInt(info.getContainerInfo().getExtendedContainers()
+        ContainerInfo containerInfo = info.getContainerInfo();
+        if (containerInfo.getContainerCase() == EXTENDED_CONTAINERS
+                && containerInfo.getExtendedContainers().getContainerCase()
+                == DEVICE_SEARCH_RESULT_CONTAINER
+                && containerInfo.getExtendedContainers()
+                .getDeviceSearchResultContainer().hasSearchAttributes()
+        ) {
+            return searchAttributesToInt(containerInfo.getExtendedContainers()
                     .getDeviceSearchResultContainer().getSearchAttributes());
         }
         return 0;

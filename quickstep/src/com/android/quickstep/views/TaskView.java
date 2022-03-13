@@ -45,6 +45,7 @@ import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Outline;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
@@ -426,7 +427,10 @@ public class TaskView extends FrameLayout implements Reusable {
 
     private final float[] mIconCenterCoords = new float[2];
 
+    private final PointF mLastTouchDownPosition = new PointF();
+
     private boolean mIsClickableAsLiveTile = true;
+
 
     public TaskView(Context context) {
         this(context, null);
@@ -464,11 +468,15 @@ public class TaskView extends FrameLayout implements Reusable {
         return getItemInfo(mTask);
     }
 
-    protected WorkspaceItemInfo getItemInfo(Task task) {
-        ComponentKey componentKey = TaskUtils.getLaunchComponentKeyForTask(task.key);
+    protected WorkspaceItemInfo getItemInfo(@Nullable Task task) {
         WorkspaceItemInfo stubInfo = new WorkspaceItemInfo();
         stubInfo.itemType = LauncherSettings.Favorites.ITEM_TYPE_TASK;
         stubInfo.container = LauncherSettings.Favorites.CONTAINER_TASKSWITCHER;
+        if (task == null) {
+            return stubInfo;
+        }
+
+        ComponentKey componentKey = TaskUtils.getLaunchComponentKeyForTask(task.key);
         stubInfo.user = componentKey.user;
         stubInfo.intent = new Intent().setComponent(componentKey.componentName);
         stubInfo.title = task.title;
@@ -596,6 +604,14 @@ public class TaskView extends FrameLayout implements Reusable {
         return mIconView;
     }
 
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+            mLastTouchDownPosition.set(ev.getX(), ev.getY());
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
     private void onClick(View view) {
         if (getTask() == null) {
             return;
@@ -684,9 +700,19 @@ public class TaskView extends FrameLayout implements Reusable {
     private boolean confirmSecondSplitSelectApp() {
         boolean isSelectingSecondSplitApp = getRecentsView().isSplitSelectionActive();
         if (isSelectingSecondSplitApp) {
-            getRecentsView().confirmSplitSelect(this);
+            int index = getChildTaskIndexAtPosition(mLastTouchDownPosition);
+            TaskIdAttributeContainer container = mTaskIdAttributeContainer[index];
+            getRecentsView().confirmSplitSelect(this, container.getTask(), container.getIconView(),
+                    container.getThumbnailView());
         }
         return isSelectingSecondSplitApp;
+    }
+
+    /**
+     * Returns the task under the given position in the local coordinates of this task view.
+     */
+    protected int getChildTaskIndexAtPosition(PointF position) {
+        return 0;
     }
 
     /**
@@ -897,6 +923,7 @@ public class TaskView extends FrameLayout implements Reusable {
         LayoutParams iconParams = (LayoutParams) mIconView.getLayoutParams();
         orientationHandler.setIconAndSnapshotParams(mIconView, taskIconMargin, taskIconHeight,
                 snapshotParams, isRtl);
+        updateDwbPlacement();
         mSnapshotView.setLayoutParams(snapshotParams);
         iconParams.width = iconParams.height = taskIconHeight;
         mIconView.setLayoutParams(iconParams);
@@ -907,6 +934,10 @@ public class TaskView extends FrameLayout implements Reusable {
         snapshotParams.topMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
         mSnapshotView.setLayoutParams(snapshotParams);
         mSnapshotView.getTaskOverlay().updateOrientationState(orientationState);
+    }
+
+    private void updateDwbPlacement() {
+        mDigitalWellBeingToast.initialize(mTask);
     }
 
     /**
