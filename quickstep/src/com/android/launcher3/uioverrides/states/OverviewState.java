@@ -116,8 +116,9 @@ public class OverviewState extends LauncherState {
     }
 
     @Override
+    @Override
     public int getVisibleElements(LauncherUiState launcherUiState) {
-        int elements = CLEAR_ALL_BUTTON | OVERVIEW_ACTIONS | ADD_DESK_BUTTON;
+        int elements = OVERVIEW_ACTIONS | ADD_DESK_BUTTON;
         boolean showFloatingSearch;
         DeviceProfile dp = launcherUiState.getDeviceProfileRef().getValue();
         if (dp.getDeviceProperties().isPhone()) {
