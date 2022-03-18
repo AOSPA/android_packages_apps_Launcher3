@@ -96,6 +96,16 @@ public final class FeatureFlags {
             getDebugFlag("ENABLE_FLOATING_SEARCH_BAR", false,
                     "Keep All Apps search bar at the bottom (but above keyboard if open)");
 
+    public static final BooleanFlag INJECT_WEB_TOP = new DeviceFlag("INJECT_WEB_TOP", false,
+            "Show web suggestions on top of the search results");
+
+    public static final BooleanFlag USE_FALLBACK_APP_SEARCH = new DeviceFlag(
+            "USE_FALLBACK_APP_SEARCH", false,
+            "Use fallback launcher app search results instead of AiAi app results");
+
+    public static final BooleanFlag ENABLE_QUICK_SEARCH = new DeviceFlag("ENABLE_QUICK_SEARCH",
+            true, "Use quick search behavior.");
+
     public static final BooleanFlag COLLECT_SEARCH_HISTORY = new DeviceFlag(
             "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
 
@@ -245,6 +255,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ALL_APPS_IN_TASKBAR = getDebugFlag(
             "ENABLE_ALL_APPS_IN_TASKBAR", true,
             "Enables accessing All Apps from the system Taskbar.");
+
+    public static final BooleanFlag ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR = getDebugFlag(
+            "ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR", false,
+            "Enables One Search box in Taskbar All Apps.");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE = getDebugFlag(
             "ENABLE_SPLIT_FROM_WORKSPACE", true,

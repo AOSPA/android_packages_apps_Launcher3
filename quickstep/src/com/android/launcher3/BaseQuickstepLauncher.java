@@ -25,9 +25,10 @@ import static com.android.launcher3.config.FeatureFlags.ENABLE_SPLIT_FROM_WORKSP
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.popup.QuickstepSystemShortcut.getSplitSelectShortcutByPosition;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
+import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
+import static com.android.launcher3.util.DisplayController.NavigationMode.TWO_BUTTONS;
+import static com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.quickstep.SysUINavigationMode.Mode.NO_BUTTON;
-import static com.android.quickstep.SysUINavigationMode.Mode.TWO_BUTTONS;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 
 import android.animation.AnimatorSet;
@@ -36,14 +37,13 @@ import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.graphics.Insets;
 import android.hardware.SensorManager;
 import android.hardware.devicestate.DeviceStateManager;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.IBinder;
 import android.view.Display;
 import android.view.View;
-import android.view.WindowInsets;
 import android.window.SplashScreen;
 
 import androidx.annotation.Nullable;
@@ -63,6 +63,7 @@ import com.android.launcher3.taskbar.TaskbarManager;
 import com.android.launcher3.uioverrides.RecentsViewStateController;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.DisplayController.NavigationMode;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ObjectWrapper;
 import com.android.launcher3.util.RunnableList;
@@ -70,9 +71,6 @@ import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.RecentsModel;
-import com.android.quickstep.SysUINavigationMode;
-import com.android.quickstep.SysUINavigationMode.Mode;
-import com.android.quickstep.SysUINavigationMode.NavigationModeChangeListener;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TouchInteractionService.TISBinder;
@@ -100,8 +98,7 @@ import java.util.stream.Stream;
 /**
  * Extension of Launcher activity to provide quickstep specific functionality
  */
-public abstract class BaseQuickstepLauncher extends Launcher
-        implements NavigationModeChangeListener {
+public abstract class BaseQuickstepLauncher extends Launcher {
 
     private DepthController mDepthController = new DepthController(this);
     private QuickstepTransitionManager mAppTransitionManager;
@@ -129,7 +126,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        SysUINavigationMode.INSTANCE.get(this).addModeChangeListener(this);
         addMultiWindowModeChangedListener(mDepthController);
         initUnfoldTransitionProgressProvider();
     }
@@ -159,8 +155,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
             mUnfoldTransitionProgressProvider.destroy();
         }
 
-        SysUINavigationMode.INSTANCE.get(this).removeModeChangeListener(this);
-
         mTISBindHelper.onDestroy();
         if (mTaskbarManager != null) {
             mTaskbarManager.clearActivity(this);
@@ -184,14 +178,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     public QuickstepTransitionManager getAppTransitionManager() {
         return mAppTransitionManager;
-    }
-
-    @Override
-    public void onNavigationModeChanged(Mode newMode) {
-        getDragLayer().recreateControllers();
-        if (mActionsView != null) {
-            mActionsView.updateVerticalMargin(newMode);
-        }
     }
 
     @Override
@@ -303,7 +289,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
     protected void setupViews() {
         super.setupViews();
 
-        SysUINavigationMode.INSTANCE.get(this).updateMode();
         mActionsView = findViewById(R.id.overview_actions_view);
         RecentsView overviewPanel = (RecentsView) getOverviewPanel();
         SplitSelectStateController controller =
@@ -311,7 +296,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
                         getStateManager(), getDepthController());
         overviewPanel.init(mActionsView, controller);
         mActionsView.setDp(getDeviceProfile());
-        mActionsView.updateVerticalMargin(SysUINavigationMode.getMode(this));
+        mActionsView.updateVerticalMargin(DisplayController.getNavigationMode(this));
 
         mAppTransitionManager = new QuickstepTransitionManager(this);
         mAppTransitionManager.registerRemoteAnimations();
@@ -343,6 +328,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
                             getSystemService(SensorManager.class),
                             getMainThreadHandler(),
                             getMainExecutor(),
+                            /* backgroundExecutor= */ THREAD_POOL_EXECUTOR,
                             /* tracingTagPrefix= */ "launcher"
                     );
 
@@ -431,7 +417,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
 
     @Override
     public float[] getNormalOverviewScaleAndOffset() {
-        return SysUINavigationMode.getMode(this).hasGestures
+        return DisplayController.getNavigationMode(this).hasGestures
                 ? new float[] {1, 1} : new float[] {1.1f, NO_OFFSET};
     }
 
@@ -461,7 +447,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
     }
 
     public boolean shouldBackButtonBeHidden(LauncherState toState) {
-        Mode mode = SysUINavigationMode.getMode(this);
+        NavigationMode mode = DisplayController.getNavigationMode(this);
         boolean shouldBackButtonBeHidden = mode.hasGestures
                 && toState.hasFlag(FLAG_HIDE_BACK_BUTTON)
                 && hasWindowFocus()
@@ -479,7 +465,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
      */
     private void onLauncherStateOrFocusChanged() {
         boolean shouldBackButtonBeHidden = shouldBackButtonBeHidden(getStateManager().getState());
-        if (SysUINavigationMode.getMode(this) == TWO_BUTTONS) {
+        if (DisplayController.getNavigationMode(this) == TWO_BUTTONS) {
             UiThreadHelper.setBackButtonAlphaAsync(this, SET_BACK_BUTTON_ALPHA,
                     shouldBackButtonBeHidden ? 0f : 1f, true /* animate */);
         }
@@ -548,11 +534,26 @@ public abstract class BaseQuickstepLauncher extends Launcher
     }
 
     /**
-     * Adds a new launch cookie for the activity launch of the given {@param info} if supported.
+     * Adds a new launch cookie for the activity launch if supported.
+     *
+     * @param info the item info for the launch
+     * @param opts the options to set the launchCookie on.
      */
     public void addLaunchCookie(ItemInfo info, ActivityOptions opts) {
+        IBinder launchCookie = getLaunchCookie(info);
+        if (launchCookie != null) {
+            opts.setLaunchCookie(launchCookie);
+        }
+    }
+
+    /**
+     * Return a new launch cookie for the activity launch if supported.
+     *
+     * @param info the item info for the launch
+     */
+    public IBinder getLaunchCookie(ItemInfo info) {
         if (info == null) {
-            return;
+            return null;
         }
         switch (info.container) {
             case LauncherSettings.Favorites.CONTAINER_DESKTOP:
@@ -566,8 +567,7 @@ public abstract class BaseQuickstepLauncher extends Launcher
                     break;
                 }
                 // Reset any existing launch cookies associated with the cookie
-                opts.setLaunchCookie(ObjectWrapper.wrap(NO_MATCHING_ID));
-                return;
+                return ObjectWrapper.wrap(NO_MATCHING_ID);
         }
         switch (info.itemType) {
             case LauncherSettings.Favorites.ITEM_TYPE_APPLICATION:
@@ -578,10 +578,9 @@ public abstract class BaseQuickstepLauncher extends Launcher
                 break;
             default:
                 // Reset any existing launch cookies associated with the cookie
-                opts.setLaunchCookie(ObjectWrapper.wrap(NO_MATCHING_ID));
-                return;
+                return ObjectWrapper.wrap(NO_MATCHING_ID);
         }
-        opts.setLaunchCookie(ObjectWrapper.wrap(new Integer(info.id)));
+        return ObjectWrapper.wrap(new Integer(info.id));
     }
 
     public void setHintUserWillBeActive() {
@@ -596,6 +595,13 @@ public abstract class BaseQuickstepLauncher extends Launcher
         if ((flags & CHANGE_ACTIVE_SCREEN) != 0) {
             getStateManager().moveToRestState();
         }
+
+        if ((flags & CHANGE_NAVIGATION_MODE) != 0) {
+            getDragLayer().recreateControllers();
+            if (mActionsView != null) {
+                mActionsView.updateVerticalMargin(info.navigationMode);
+            }
+        }
     }
 
     @Override
@@ -603,19 +609,6 @@ public abstract class BaseQuickstepLauncher extends Launcher
         super.dump(prefix, fd, writer, args);
         if (mDepthController != null) {
             mDepthController.dump(prefix, writer);
-        }
-    }
-
-    @Override
-    public void updateWindowInsets(WindowInsets.Builder updatedInsetsBuilder,
-            WindowInsets oldInsets) {
-        // Override the tappable insets to be 0 on the bottom for gesture nav (otherwise taskbar
-        // would count towards it). This is used for the bottom protection in All Apps for example.
-        if (SysUINavigationMode.getMode(this) == NO_BUTTON) {
-            Insets oldTappableInsets = oldInsets.getInsets(WindowInsets.Type.tappableElement());
-            Insets newTappableInsets = Insets.of(oldTappableInsets.left, oldTappableInsets.top,
-                    oldTappableInsets.right, 0);
-            updatedInsetsBuilder.setInsets(WindowInsets.Type.tappableElement(), newTappableInsets);
         }
     }
 }

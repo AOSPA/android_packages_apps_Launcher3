@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_ALL_APPS;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -55,22 +56,20 @@ import com.android.launcher3.dragndrop.DragDriver;
 import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.dragndrop.DraggableView;
-import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.graphics.DragPreviewProvider;
 import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.shortcuts.ShortcutDragPreviewProvider;
-import com.android.launcher3.util.LauncherBindableItemsContainer;
+import com.android.launcher3.util.IntSet;
+import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.systemui.shared.system.ClipDescriptionCompat;
-import com.android.systemui.shared.system.LauncherAppsCompat;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
+import java.util.Collections;
 
 /**
  * Handles long click on Taskbar items to start a system drag and drop operation.
@@ -314,13 +313,13 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             clipDescription = new ClipDescription(item.title,
                     new String[] {
                             item.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT
-                                    ? ClipDescriptionCompat.MIMETYPE_APPLICATION_SHORTCUT
-                                    : ClipDescriptionCompat.MIMETYPE_APPLICATION_ACTIVITY
+                                    ? ClipDescription.MIMETYPE_APPLICATION_SHORTCUT
+                                    : ClipDescription.MIMETYPE_APPLICATION_ACTIVITY
                     });
             intent = new Intent();
             if (item.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
                 String deepShortcutId = ((WorkspaceItemInfo) item).getDeepShortcutId();
-                intent.putExtra(ClipDescriptionCompat.EXTRA_PENDING_INTENT,
+                intent.putExtra(ClipDescription.EXTRA_PENDING_INTENT,
                         launcherApps.getShortcutIntent(
                                 item.getIntent().getPackage(),
                                 deepShortcutId,
@@ -329,19 +328,19 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                 intent.putExtra(Intent.EXTRA_PACKAGE_NAME, item.getIntent().getPackage());
                 intent.putExtra(Intent.EXTRA_SHORTCUT_ID, deepShortcutId);
             } else {
-                intent.putExtra(ClipDescriptionCompat.EXTRA_PENDING_INTENT,
-                        LauncherAppsCompat.getMainActivityLaunchIntent(launcherApps,
-                                item.getIntent().getComponent(), null, item.user));
+                intent.putExtra(ClipDescription.EXTRA_PENDING_INTENT,
+                        launcherApps.getMainActivityLaunchIntent(item.getIntent().getComponent(),
+                                null, item.user));
             }
             intent.putExtra(Intent.EXTRA_USER, item.user);
         } else if (tag instanceof Task) {
             Task task = (Task) tag;
             clipDescription = new ClipDescription(task.titleDescription,
                     new String[] {
-                            ClipDescriptionCompat.MIMETYPE_APPLICATION_TASK
+                            ClipDescription.MIMETYPE_APPLICATION_TASK
                     });
             intent = new Intent();
-            intent.putExtra(ClipDescriptionCompat.EXTRA_TASK_ID, task.key.id);
+            intent.putExtra(Intent.EXTRA_TASK_ID, task.key.id);
             intent.putExtra(Intent.EXTRA_USER, UserHandle.of(task.key.userId));
         }
 
@@ -393,11 +392,17 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
         return super.isDragging() || mIsSystemDragInProgress;
     }
 
+    /** {@code true} if the system is currently handling the drag. */
+    public boolean isSystemDragInProgress() {
+        return mIsSystemDragInProgress;
+    }
+
     private void maybeOnDragEnd() {
         if (!isDragging()) {
             ((BubbleTextView) mDragObject.originalView).getIcon().setIsDisabled(false);
             mControllers.taskbarAutohideSuspendController.updateFlag(
                     TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_DRAGGING, false);
+            mActivity.onDragEnd();
         }
     }
 
@@ -418,23 +423,18 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
             ItemInfo item = (ItemInfo) tag;
             TaskbarViewController taskbarViewController = mControllers.taskbarViewController;
             if (item.container == CONTAINER_ALL_APPS) {
-                // Since all apps closes when the drag starts, target the all apps button instead
+                // Since all apps closes when the drag starts, target the all apps button instead.
                 target = taskbarViewController.getAllAppsButtonView();
             } else if (item.container >= 0) {
-                // Since folders close when the drag starts, target the folder icon instead
-                LauncherBindableItemsContainer.ItemOperator op = (info, v) -> {
-                    if (info instanceof FolderInfo && v instanceof FolderIcon) {
-                        FolderInfo fi = (FolderInfo) info;
-                        for (WorkspaceItemInfo si : fi.contents) {
-                            if (si.id == item.id) {
-                                // Found the parent
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                };
-                target = taskbarViewController.mapOverItems(op);
+                // Since folders close when the drag starts, target the folder icon instead.
+                ItemInfoMatcher matcher = ItemInfoMatcher.forFolderMatch(
+                        ItemInfoMatcher.ofItemIds(IntSet.wrap(item.id)));
+                target = taskbarViewController.getFirstIconMatch(matcher);
+            } else if (item.itemType == ITEM_TYPE_DEEP_SHORTCUT) {
+                // Find first icon with same package/user as the deep shortcut.
+                ItemInfoMatcher packageUserMatcher = ItemInfoMatcher.ofPackages(
+                        Collections.singleton(item.getTargetPackage()), item.user);
+                target = taskbarViewController.getFirstIconMatch(packageUserMatcher);
             }
         }
 

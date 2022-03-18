@@ -44,7 +44,7 @@ import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVIT
 import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_TRANSITIONS;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.statehandlers.DepthController.DEPTH;
-import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
+import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
 import static com.android.launcher3.views.FloatingIconView.SHAPE_PROGRESS_DURATION;
 import static com.android.launcher3.views.FloatingIconView.getFloatingIconView;
 import static com.android.quickstep.TaskViewUtils.findTaskViewToLaunch;
@@ -579,8 +579,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 }
             }
 
-            // Pause page indicator animations as they lead to layer trashing.
-            mLauncher.getWorkspace().getPageIndicator().pauseAnimations();
+            // Pause expensive view updates as they can lead to layer thrashing and skipped frames.
+            mLauncher.pauseExpensiveViewUpdates();
 
             endListener = () -> {
                 viewsToAnimate.forEach(view -> {
@@ -590,7 +590,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 if (scrimEnabled) {
                     mLauncher.getScrimView().setBackgroundColor(Color.TRANSPARENT);
                 }
-                mLauncher.getWorkspace().getPageIndicator().skipAnimationsToEnd();
+                mLauncher.resumeExpensiveViewUpdates();
             };
         }
 
@@ -1186,6 +1186,19 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         return false;
     }
 
+    private boolean hasMultipleTargetsWithMode(RemoteAnimationTargetCompat[] targets, int mode) {
+        int numTargets = 0;
+        for (RemoteAnimationTargetCompat target : targets) {
+            if (target.mode == mode) {
+                numTargets++;
+            }
+            if (numTargets > 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * @return Runner that plays when user goes to Launcher
      * ie. pressing home, swiping up from nav bar.
@@ -1580,7 +1593,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 View launcherView = findLauncherView(appTargets);
                 boolean playFallBackAnimation = (launcherView == null
                         && launcherIsForceInvisibleOrOpening)
-                        || mLauncher.getWorkspace().isOverlayShown();
+                        || mLauncher.getWorkspace().isOverlayShown()
+                        || hasMultipleTargetsWithMode(appTargets, MODE_CLOSING);
 
                 boolean playWorkspaceReveal = true;
                 boolean skipAllAppsScale = false;
