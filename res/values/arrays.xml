@@ -33,17 +33,4 @@
         <item>@drawable/themed_icon_calendar_30</item>
         <item>@drawable/themed_icon_calendar_31</item>
     </array>
-
-    <array name="grayscale_clock_icons">
-        <item>com.android.launcher3.LEVEL_PER_TICK_ICON_ROUND</item>
-        <item>@drawable/themed_icon_clock</item>
-        <item>com.android.launcher3.HOUR_LAYER_INDEX</item>
-        <item>@null</item>
-        <item>com.android.launcher3.MINUTE_LAYER_INDEX</item>
-        <item>1</item>
-        <item>com.android.launcher3.DEFAULT_HOUR</item>
-        <item>10</item>
-        <item>com.android.launcher3.DEFAULT_MINUTE</item>
-        <item>10</item>
-    </array>
 </resources>

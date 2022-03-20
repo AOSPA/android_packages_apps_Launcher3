@@ -1,22 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <rotate android:fromDegrees="300" android:toDegrees="5300" android:pivotX="50%" android:pivotY="50%">
-            <inset android:inset="16%">
-                <vector android:height="60dp" android:width="60dp" android:viewportWidth="60" android:viewportHeight="60">
-                    <path android:fillColor="@android:color/white" android:pathData="M 30 31 L 30 31 C 30.552 31 31 30.552 31 30 L 31 12 C 31 11.448 30.552 11 30 11 L 30 11 C 29.448 11 29 11.448 29 12 L 29 30 C 29 30.552 29.448 31 30 31 Z"/>
-                </vector>
-            </inset>
-        </rotate>
-    </item>
-    <item>
-        <rotate android:fromDegrees="60" android:toDegrees="60060" android:pivotX="50%" android:pivotY="50%">
-            <inset android:inset="16%">
-                <vector android:height="60dp" android:width="60dp" android:viewportWidth="60" android:viewportHeight="60">
-                    <path android:fillColor="@android:color/white" android:pathData="M 30 7.021 H 30 A 1 1 0 0 1 31 8.021 V 30.021 A 1 1 0 0 1 30 31.021 H 30 A 1 1 0 0 1 29 30.021 V 8.021 A 1 1 0 0 1 30 7.021 Z"/>
-                    <path android:fillColor="@android:color/white" android:pathData="M 33 30 C 33 28.343 31.657 27 30 27 C 28.343 27 27 28.343 27 30 C 27 31.657 28.343 33 30 33 C 31.657 33 33 31.657 33 30 Z"/>
-                </vector>
-            </inset>
-        </rotate>
-    </item>
-</layer-list>
+<vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="36"
+    android:viewportHeight="36">
+    <path
+        android:pathData="M 32.708 10.573 L 20.74 17.393 C 20.751 17.55 20.751 17.709 20.74 17.866 C 20.76 18.43 20.602 18.987 20.291 19.458 C 19.98 19.93 19.529 20.291 19.002 20.495 L 19.002 35.246 C 18.968 35.461 18.859 35.657 18.694 35.798 C 18.528 35.94 18.318 36.018 18.1 36.018 C 17.882 36.018 17.672 35.94 17.506 35.798 C 17.341 35.657 17.232 35.461 17.198 35.246 L 17.198 20.495 C 16.656 20.306 16.187 19.949 15.861 19.476 C 15.535 19.005 15.368 18.44 15.383 17.866 C 15.382 17.64 15.407 17.415 15.46 17.195 L 8.266 11.849 C 8.061 11.724 7.915 11.523 7.858 11.29 C 7.8 11.058 7.836 10.812 7.958 10.606 L 7.958 10.54 C 8.044 10.39 8.169 10.267 8.32 10.182 C 8.471 10.099 8.641 10.056 8.814 10.062 C 8.986 10.066 9.155 10.118 9.3 10.21 L 16.472 15.6 C 16.969 15.317 17.543 15.202 18.111 15.27 C 18.76 15.28 19.386 15.513 19.882 15.93 L 31.795 9 C 31.989 8.857 32.231 8.796 32.468 8.829 C 32.707 8.861 32.924 8.987 33.071 9.176 C 33.217 9.367 33.282 9.609 33.251 9.848 C 33.221 10.087 33.096 10.305 32.906 10.452 L 32.84 10.452 Z"
+        android:fillColor="#000"
+        android:strokeWidth="1"/>
+</vector>

@@ -4,7 +4,7 @@
         drawable="@array/grayscale_calendar_icons"
         package="com.google.android.calendar" />
     <icon
-        drawable="@array/grayscale_clock_icons"
+        drawable="@drawable/themed_icon_clock"
         package="com.google.android.deskclock" />
     <icon
         drawable="@drawable/themed_icon_accubattery"
