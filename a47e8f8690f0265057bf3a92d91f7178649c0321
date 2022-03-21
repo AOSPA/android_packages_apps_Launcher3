@@ -87,6 +87,23 @@
       "parentUuid": "d8230a72_2ac1aa3f",
       "revId": "a47e8f8690f0265057bf3a92d91f7178649c0321",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "556d86a6_9bce1582",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000715
+      },
+      "writtenOn": "2022-03-21T15:30:43Z",
+      "side": 1,
+      "message": "how about we use one of the Google icons? I\u0027m not a fan of this one\n\njust use one of the Google drawables as static.",
+      "revId": "a47e8f8690f0265057bf3a92d91f7178649c0321",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
