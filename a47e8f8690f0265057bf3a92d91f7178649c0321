@@ -52,6 +52,23 @@
       "parentUuid": "6c6c22aa_79b75086",
       "revId": "a47e8f8690f0265057bf3a92d91f7178649c0321",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d8230a72_2ac1aa3f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000579
+      },
+      "writtenOn": "2022-03-21T14:16:44Z",
+      "side": 1,
+      "message": "```Skip clock metadata that has no value\nclock grayscale metadata from Pixel launcher has no hour index, which\nactually be expected to theme just fine without it.```\n\nsupposedly can fix with editing xml",
+      "revId": "a47e8f8690f0265057bf3a92d91f7178649c0321",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
