@@ -41,6 +41,7 @@ import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
 import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_LAUNCHER_LOAD;
+import static com.android.launcher3.logging.StatsLogManager.EventEnum;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_ENTRY;
@@ -121,7 +122,7 @@ import androidx.annotation.VisibleForTesting;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.accessibility.BaseAccessibilityDelegate.LauncherAction;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
-import com.android.launcher3.allapps.AllAppsContainerView;
+import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.DiscoveryBounce;
@@ -141,6 +142,8 @@ import com.android.launcher3.icons.BitmapRenderer;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.logger.LauncherAtom;
+import com.android.launcher3.logger.LauncherAtom.ContainerInfo;
+import com.android.launcher3.logger.LauncherAtom.WorkspaceContainer;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
@@ -149,6 +152,7 @@ import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.model.ModelUtils;
 import com.android.launcher3.model.ModelWriter;
+import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
@@ -314,7 +318,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
 
     // Main container view for the all apps screen.
     @Thunk
-    AllAppsContainerView mAppsView;
+    ActivityAllAppsContainerView<Launcher> mAppsView;
     AllAppsTransitionController mAllAppsController;
 
     // Scrim view for the all apps and overview state.
@@ -378,6 +382,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     // session on the server side.
     protected InstanceId mAllAppsSessionLogId;
     private LauncherState mPrevLauncherState;
+
+    private StringCache mStringCache;
 
     @Override
     @TargetApi(Build.VERSION_CODES.S)
@@ -1100,12 +1106,21 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 && mAllAppsSessionLogId == null) {
             // creates new instance ID since new all apps session is started.
             mAllAppsSessionLogId = new InstanceIdSequence().newInstanceId();
-            getStatsLogManager()
-                    .logger()
-                    .log(FeatureFlags.ENABLE_DEVICE_SEARCH.get()
-                            ? LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH
-                            : LAUNCHER_ALLAPPS_ENTRY);
+            getStatsLogManager().logger().withContainerInfo(
+                    ContainerInfo.newBuilder().setWorkspace(
+                            WorkspaceContainer.newBuilder().setPageIndex(
+                                    getWorkspace().getCurrentPage())).build())
+                    .log(getAllAppsEntryEvent());
         }
+    }
+
+    /**
+     * Returns {@link EventEnum} that should be logged when Launcher enters into AllApps state.
+     */
+    protected EventEnum getAllAppsEntryEvent() {
+        return FeatureFlags.ENABLE_DEVICE_SEARCH.get()
+                ? LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH
+                : LAUNCHER_ALLAPPS_ENTRY;
     }
 
     @Override
@@ -1489,7 +1504,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return mDragLayer;
     }
 
-    public AllAppsContainerView getAppsView() {
+    @Override
+    public ActivityAllAppsContainerView<Launcher> getAppsView() {
         return mAppsView;
     }
 
@@ -2869,6 +2885,16 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     @Override
     public void bindAllWidgets(final List<WidgetsListBaseEntry> allWidgets) {
         mPopupDataProvider.setAllWidgets(allWidgets);
+    }
+
+    @Override
+    public void bindStringCache(StringCache cache) {
+        mStringCache = cache;
+    }
+
+    @Override
+    public StringCache getStringCache() {
+        return mStringCache;
     }
 
     /**
