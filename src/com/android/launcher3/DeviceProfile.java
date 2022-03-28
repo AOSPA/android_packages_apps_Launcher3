@@ -175,6 +175,7 @@ public class DeviceProfile {
     public Point allAppsBorderSpacePx;
     public int allAppsShiftRange;
     public int allAppsTopPadding;
+    public int bottomSheetTopPadding;
     public int allAppsCellHeightPx;
     public int allAppsCellWidthPx;
     public int allAppsIconSizePx;
@@ -191,6 +192,7 @@ public class DeviceProfile {
     public int overviewTaskIconDrawableSizePx;
     public int overviewTaskIconDrawableSizeGridPx;
     public int overviewTaskThumbnailTopMarginPx;
+    public final int overviewActionsHeight;
     public final int overviewActionsMarginThreeButtonPx;
     public final int overviewActionsTopMarginGesturePx;
     public final int overviewActionsBottomMarginGesturePx;
@@ -255,7 +257,8 @@ public class DeviceProfile {
         // Some more constants.
         context = getContext(context, info, isVerticalBarLayout() || (isTablet && isLandscape)
                 ? Configuration.ORIENTATION_LANDSCAPE
-                : Configuration.ORIENTATION_PORTRAIT);
+                : Configuration.ORIENTATION_PORTRAIT,
+                windowBounds);
         final Resources res = context.getResources();
         mMetrics = res.getDisplayMetrics();
 
@@ -293,8 +296,11 @@ public class DeviceProfile {
         desiredWorkspaceHorizontalMarginPx = getHorizontalMarginPx(inv, res);
         desiredWorkspaceHorizontalMarginOriginalPx = desiredWorkspaceHorizontalMarginPx;
 
-        allAppsTopPadding = res.getDimensionPixelSize(R.dimen.all_apps_top_padding)
-                + (isTablet ? heightPx - availableHeightPx : 0);
+        bottomSheetTopPadding = windowBounds.insets.top // statusbar height
+                + res.getDimensionPixelSize(R.dimen.bottom_sheet_extra_top_padding)
+                + (isTablet ? 0 : edgeMarginPx); // phones need edgeMarginPx additional padding
+
+        allAppsTopPadding = isTablet ? bottomSheetTopPadding : 0;
         allAppsShiftRange = isTablet
                 ? heightPx - allAppsTopPadding
                 : res.getDimensionPixelSize(R.dimen.all_apps_starting_vertical_translate);
@@ -407,6 +413,7 @@ public class DeviceProfile {
         overviewPageSpacing = res.getDimensionPixelSize(R.dimen.overview_page_spacing);
         overviewActionsButtonSpacing = res.getDimensionPixelSize(
                 R.dimen.overview_actions_button_spacing);
+        overviewActionsHeight = res.getDimensionPixelSize(R.dimen.overview_actions_height);
         overviewActionsMarginThreeButtonPx = res.getDimensionPixelSize(
                 R.dimen.overview_actions_margin_three_button);
         // Grid task's top margin is only overviewTaskIconSizePx + overviewTaskMarginGridPx, but
@@ -1225,10 +1232,11 @@ public class DeviceProfile {
         writer.println(prefix + pxToDpStr("overviewGridSideMargin", overviewGridSideMargin));
     }
 
-    private static Context getContext(Context c, Info info, int orientation) {
+    private static Context getContext(Context c, Info info, int orientation, WindowBounds bounds) {
         Configuration config = new Configuration(c.getResources().getConfiguration());
         config.orientation = orientation;
         config.densityDpi = info.densityDpi;
+        config.smallestScreenWidthDp = (int) info.smallestSizeDp(bounds);
         return c.createConfigurationContext(config);
     }
 
