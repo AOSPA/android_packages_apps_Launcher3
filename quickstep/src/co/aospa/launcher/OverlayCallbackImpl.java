@@ -43,6 +43,7 @@ public class OverlayCallbackImpl
         implements LauncherOverlay, LauncherClientCallbacks, LauncherOverlayManager,
         OnSharedPreferenceChangeListener {
 
+    public static final String KEY_ALLAPPS_THEMED_ICONS = "pref_allapps_themed_icons";
     public static final String KEY_DESKTOP_LABELS = "pref_desktop_labels";
     public static final String KEY_DOCK_SEARCH = "pref_dock_search";
     public static final String KEY_DRAWER_LABELS = "pref_drawer_labels";

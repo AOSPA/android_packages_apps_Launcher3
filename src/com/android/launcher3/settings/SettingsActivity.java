@@ -26,6 +26,7 @@ import static com.android.launcher3.InvariantDeviceProfile.TYPE_MULTI_DISPLAY;
 import static com.android.launcher3.InvariantDeviceProfile.TYPE_TABLET;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_ALLAPPS_THEMED_ICONS;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_DESKTOP_LABELS;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_DOCK_SEARCH;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_DRAWER_LABELS;
@@ -65,6 +66,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.BuildConfig;
 import com.android.launcher3.Flags;
+import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherFiles;
@@ -188,6 +190,7 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
 
         private Preference mShowGoogleAppPref;
         private Preference mShowGoogleBarPref;
+        private Preference mThemeAllAppsIconsPref;
 
         @Override
         public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -329,6 +332,7 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                 case KEY_FONT_SIZE:
                 case KEY_ICON_SIZE:
                 case KEY_DRAWER_OPEN_KEYBOARD:
+                case KEY_ALLAPPS_THEMED_ICONS:
                     InvariantDeviceProfile.INSTANCE.get(getContext())
                             .onConfigChanged(getActivity().getApplicationContext());
                     break;
@@ -364,6 +368,10 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                 case KEY_MINUS_ONE:
                     mShowGoogleAppPref = preference;
                     preference.setEnabled(Utilities.isGSAEnabled(getContext()));
+                    return true;
+                case KEY_ALLAPPS_THEMED_ICONS:
+                    mThemeAllAppsIconsPref = preference;
+                    updateThemeAllAppsIconsPref();
                     return true;
                 case DEVELOPER_OPTIONS_KEY:
                     if (IS_STUDIO_BUILD) {
@@ -414,10 +422,21 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
             if (mShowGoogleBarPref != null) {
                 mShowGoogleBarPref.setEnabled(Utilities.isGSAEnabled(getContext()));
             }
+            if (mThemeAllAppsIconsPref != null) {
+                updateThemeAllAppsIconsPref();
+            }
 
             if (mRestartOnResume) {
                 recreateActivityNow();
             }
+        }
+
+        private void updateThemeAllAppsIconsPref() {
+            boolean enabled = ThemeManager.INSTANCE.get(getContext()).isMonoThemeEnabled();
+            mThemeAllAppsIconsPref.setEnabled(enabled);
+            mThemeAllAppsIconsPref.setSummary(getContext().getString(enabled
+                    ? R.string.pref_themed_icons_summary
+                    : R.string.themed_icons_disabled_summary));
         }
 
         @Override

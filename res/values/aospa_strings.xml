@@ -76,4 +76,9 @@
     <string name="drawer_open_keyboard_title">Swipe up to start search</string>
     <string name="drawer_open_keyboard_summary">Open keyboard whenever app drawer becomes visible</string>
 
+    <!-- All apps themed icons -->
+    <string name="pref_themed_icons_title">Use themed icons in drawer</string>
+    <string name="pref_themed_icons_summary">Follow themed icons used on home screen</string>
+    <string name="themed_icons_disabled_summary">Themed icons are turned off in Wallpaper &amp; style</string>
+
 </resources>
