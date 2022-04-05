@@ -125,6 +125,7 @@ import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
+import com.android.launcher3.allapps.BaseAllAppsContainerView;
 import com.android.launcher3.allapps.DiscoveryBounce;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.PropertyListBuilder;
@@ -227,6 +228,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -350,7 +352,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     // We only want to get the SharedPreferences once since it does an FS stat each time we get
     // it from the context.
     private SharedPreferences mSharedPrefs;
-    private OnboardingPrefs mOnboardingPrefs;
+    private OnboardingPrefs<? extends Launcher> mOnboardingPrefs;
 
     // Activity result which needs to be processed after workspace has loaded.
     private ActivityResultInfo mPendingActivityResult;
@@ -556,11 +558,12 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return new LauncherOverlayManager() { };
     }
 
-    protected OnboardingPrefs createOnboardingPrefs(SharedPreferences sharedPrefs) {
+    protected OnboardingPrefs<? extends Launcher> createOnboardingPrefs(
+            SharedPreferences sharedPrefs) {
         return new OnboardingPrefs<>(this, sharedPrefs);
     }
 
-    public OnboardingPrefs getOnboardingPrefs() {
+    public OnboardingPrefs<? extends Launcher> getOnboardingPrefs() {
         return mOnboardingPrefs;
     }
 
@@ -587,7 +590,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     }
 
     @Override
-    protected void dispatchDeviceProfileChanged() {
+    public void dispatchDeviceProfileChanged() {
         super.dispatchDeviceProfileChanged();
         mOverlayManager.onDeviceProvideChanged();
     }
@@ -1106,21 +1109,23 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 && mAllAppsSessionLogId == null) {
             // creates new instance ID since new all apps session is started.
             mAllAppsSessionLogId = new InstanceIdSequence().newInstanceId();
-            getStatsLogManager().logger().withContainerInfo(
-                    ContainerInfo.newBuilder().setWorkspace(
-                            WorkspaceContainer.newBuilder().setPageIndex(
-                                    getWorkspace().getCurrentPage())).build())
-                    .log(getAllAppsEntryEvent());
+            if (getAllAppsEntryEvent().isPresent()) {
+                getStatsLogManager().logger()
+                        .withContainerInfo(ContainerInfo.newBuilder()
+                                .setWorkspace(WorkspaceContainer.newBuilder()
+                                        .setPageIndex(getWorkspace().getCurrentPage())).build())
+                        .log(getAllAppsEntryEvent().get());
+            }
         }
     }
 
     /**
      * Returns {@link EventEnum} that should be logged when Launcher enters into AllApps state.
      */
-    protected EventEnum getAllAppsEntryEvent() {
-        return FeatureFlags.ENABLE_DEVICE_SEARCH.get()
+    protected Optional<EventEnum> getAllAppsEntryEvent() {
+        return Optional.of(FeatureFlags.ENABLE_DEVICE_SEARCH.get()
                 ? LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH
-                : LAUNCHER_ALLAPPS_ENTRY;
+                : LAUNCHER_ALLAPPS_ENTRY);
     }
 
     @Override
@@ -1149,15 +1154,16 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                 // Making sure mAllAppsSessionLogId is not null to avoid double logging.
                 && mAllAppsSessionLogId != null) {
             getAppsView().reset(false);
-            getStatsLogManager().logger()
-                    .withContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
-                            .setWorkspace(
-                                    LauncherAtom.WorkspaceContainer.newBuilder()
-                                            .setPageIndex(getWorkspace().getCurrentPage()))
-                            .build())
-                    .log(LAUNCHER_ALLAPPS_EXIT);
+            getAllAppsExitEvent().ifPresent(getStatsLogManager().logger()::log);
             mAllAppsSessionLogId = null;
         }
+    }
+
+    /**
+     * Returns {@link EventEnum} that should be logged when Launcher exists from AllApps state.
+     */
+    protected Optional<EventEnum> getAllAppsExitEvent() {
+        return Optional.of(LAUNCHER_ALLAPPS_EXIT);
     }
 
     @Override
@@ -1579,6 +1585,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         boolean isActionMain = Intent.ACTION_MAIN.equals(intent.getAction());
         boolean internalStateHandled = ACTIVITY_TRACKER.handleNewIntent(this);
         hideKeyboard();
+
         if (isActionMain) {
             if (!internalStateHandled) {
                 // In all these cases, only animate if we're already on home
@@ -1607,6 +1614,8 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             handleGestureContract(intent);
         } else if (Intent.ACTION_ALL_APPS.equals(intent.getAction())) {
             showAllAppsFromIntent(alreadyOnHome);
+        } else if (Intent.ACTION_SHOW_WORK_APPS.equals(intent.getAction())) {
+            showAllAppsWorkTabFromIntent(alreadyOnHome);
         }
 
         TraceHelper.INSTANCE.endSection(traceToken);
@@ -1615,6 +1624,11 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     protected void showAllAppsFromIntent(boolean alreadyOnHome) {
         AbstractFloatingView.closeAllOpenViews(this);
         getStateManager().goToState(ALL_APPS, alreadyOnHome);
+    }
+
+    private void showAllAppsWorkTabFromIntent(boolean alreadyOnHome) {
+        showAllAppsFromIntent(alreadyOnHome);
+        mAppsView.switchToTab(BaseAllAppsContainerView.AdapterHolder.WORK);
     }
 
     /**
@@ -1671,8 +1685,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         // and we need to make sure this state is reflected.
         AbstractFloatingView.closeOpenViews(this, false, TYPE_ALL & ~TYPE_REBIND_SAFE);
         finishAutoCancelActionMode();
-
-        DragView.removeAllViews(this);
 
         if (mPendingRequestArgs != null) {
             outState.putParcelable(RUNTIME_STATE_PENDING_REQUEST_ARGS, mPendingRequestArgs);
@@ -1770,6 +1782,11 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     }
 
     public boolean isWorkspaceLoading() {
+        return mWorkspaceLoading;
+    }
+
+    @Override
+    public boolean isBindingItems() {
         return mWorkspaceLoading;
     }
 
@@ -2392,6 +2409,10 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
                     } else {
                         Log.d(TAG, desc);
                         getModelWriter().deleteItemFromDatabase(item);
+                        if (TestProtocol.sDebugTracing) {
+                            Log.d(TestProtocol.MISSING_PROMISE_ICON,
+                                    TAG + "bindItems failed for item=" + item);
+                        }
                         continue;
                     }
                 }
@@ -3174,5 +3195,16 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     @Nullable
     public ArrowPopup<?> getOptionsPopup() {
         return findViewById(R.id.popup_container);
+    }
+
+    /** Pauses view updates that should not be run during the app launch animation. */
+    public void pauseExpensiveViewUpdates() {
+        // Pause page indicator animations as they lead to layer trashing.
+        getWorkspace().getPageIndicator().pauseAnimations();
+    }
+
+    /** Resumes view updates at the end of the app launch animation. */
+    public void resumeExpensiveViewUpdates() {
+        getWorkspace().getPageIndicator().skipAnimationsToEnd();
     }
 }

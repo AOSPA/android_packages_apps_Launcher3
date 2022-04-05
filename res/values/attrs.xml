@@ -54,6 +54,12 @@
     <attr name="workspaceAccentColor" format="color" />
     <attr name="dropTargetHoverTextColor" format="color" />
 
+    <attr name="allAppsButtonBgColor" format="color" />
+    <attr name="allAppsButtonColor1" format="color" />
+    <attr name="allAppsButtonColor2" format="color" />
+    <attr name="allAppsButtonColor3" format="color" />
+    <attr name="allAppsButtonColor4" format="color" />
+
     <!-- BubbleTextView specific attributes. -->
     <declare-styleable name="BubbleTextView">
         <attr name="layoutHorizontal" format="boolean" />
@@ -146,6 +152,9 @@
 
         <!-- numHotseatIcons defaults to numColumns, if not specified -->
         <attr name="numHotseatIcons" format="integer" />
+        <!-- Number of icons to use when shrinking the hotseat size,
+         defaults to numHotseatIcons / 2 -->
+        <attr name="numShrunkenHotseatIcons" format="integer" />
         <!-- Number of icons to use when extending the hotseat size,
          defaults to 2 * numHotseatIcons -->
         <attr name="numExtendedHotseatIcons" format="integer" />

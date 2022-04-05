@@ -62,7 +62,6 @@ public class ActivityAllAppsContainerView<T extends BaseDraggingActivity> extend
 
     public ActivityAllAppsContainerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        mActivityContext.addOnDeviceProfileChangeListener(this);
     }
 
     public SearchUiManager getSearchUiManager() {
@@ -256,5 +255,12 @@ public class ActivityAllAppsContainerView<T extends BaseDraggingActivity> extend
         RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
         layoutParams.removeRule(RelativeLayout.BELOW);
         layoutParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+    }
+
+    @Override
+    protected BaseAllAppsAdapter getAdapter(AlphabeticalAppsList<T> mAppsList,
+            BaseAdapterProvider[] adapterProviders) {
+        return new AllAppsGridAdapter<>(mActivityContext, getLayoutInflater(), mAppsList,
+                adapterProviders);
     }
 }

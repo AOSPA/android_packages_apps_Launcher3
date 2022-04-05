@@ -37,7 +37,6 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_N
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
 
 import android.annotation.TargetApi;
-import android.app.ActivityManager;
 import android.app.PendingIntent;
 import android.app.RemoteAction;
 import android.app.Service;
@@ -48,7 +47,6 @@ import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.drawable.Icon;
-import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -78,6 +76,7 @@ import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.tracing.LauncherTraceProto;
 import com.android.launcher3.tracing.TouchInteractionServiceProto;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.WindowBounds;
@@ -345,8 +344,6 @@ public class TouchInteractionService extends Service
     private InputMonitorCompat mInputMonitorCompat;
     private InputEventReceiver mInputEventReceiver;
 
-    private DisplayManager mDisplayManager;
-
     private TaskbarManager mTaskbarManager;
     private Function<GestureState, AnimatedFloat> mSwipeUpProxyProvider = i -> null;
 
@@ -358,7 +355,6 @@ public class TouchInteractionService extends Service
         mMainChoreographer = Choreographer.getInstance();
         mAM = ActivityManagerWrapper.getInstance();
         mDeviceState = new RecentsAnimationDeviceState(this, true);
-        mDisplayManager = getSystemService(DisplayManager.class);
         mTaskbarManager = new TaskbarManager(this);
         mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
 
@@ -400,7 +396,7 @@ public class TouchInteractionService extends Service
     /**
      * Called when the navigation mode changes, guaranteed to be after the device state has updated.
      */
-    private void onNavigationModeChanged(SysUINavigationMode.Mode mode) {
+    private void onNavigationModeChanged() {
         initInputMonitor();
         resetHomeBounceSeenOnQuickstepEnabledFirstTime();
     }
@@ -575,26 +571,14 @@ public class TouchInteractionService extends Service
 
                 ActiveGestureLog.INSTANCE.addLog("setInputConsumer: " + mConsumer.getName());
                 mUncheckedConsumer = mConsumer;
-            } else if (mDeviceState.isUserUnlocked() && mDeviceState.isFullyGesturalNavMode()) {
+            } else if (mDeviceState.isUserUnlocked() && mDeviceState.isFullyGesturalNavMode()
+                    && mDeviceState.canTriggerAssistantAction(event)) {
                 mGestureState = createGestureState(mGestureState);
-                ActivityManager.RunningTaskInfo runningTask = mGestureState.getRunningTask();
-                if (mDeviceState.canTriggerAssistantAction(event, runningTask)) {
-                    // Do not change mConsumer as if there is an ongoing QuickSwitch gesture, we
-                    // should not interrupt it. QuickSwitch assumes that interruption can only
-                    // happen if the next gesture is also quick switch.
-                    mUncheckedConsumer = new AssistantInputConsumer(
-                            this,
-                            mGestureState,
-                            InputConsumer.NO_OP, mInputMonitorCompat,
-                            mDeviceState,
-                            event);
-                } else if (mDeviceState.canTriggerOneHandedAction(event)) {
-                    // Consume gesture event for triggering one handed feature.
-                    mUncheckedConsumer = new OneHandedModeInputConsumer(this, mDeviceState,
-                        InputConsumer.NO_OP, mInputMonitorCompat);
-                } else {
-                    mUncheckedConsumer = InputConsumer.NO_OP;
-                }
+                // Do not change mConsumer as if there is an ongoing QuickSwitch gesture, we
+                // should not interrupt it. QuickSwitch assumes that interruption can only
+                // happen if the next gesture is also quick switch.
+                mUncheckedConsumer = tryCreateAssistantInputConsumer(
+                        InputConsumer.NO_OP, mGestureState, event);
             } else if (mDeviceState.canTriggerOneHandedAction(event)) {
                 // Consume gesture event for triggering one handed feature.
                 mUncheckedConsumer = new OneHandedModeInputConsumer(this, mDeviceState,
@@ -639,6 +623,14 @@ public class TouchInteractionService extends Service
         }
         TraceHelper.INSTANCE.endFlagsOverride(traceToken);
         ProtoTracer.INSTANCE.get(this).scheduleFrameUpdate();
+    }
+
+    private InputConsumer tryCreateAssistantInputConsumer(InputConsumer base,
+            GestureState gestureState, MotionEvent motionEvent) {
+        return mDeviceState.isGestureBlockedActivity(gestureState.getRunningTask())
+                ? base
+                : new AssistantInputConsumer(this, gestureState, base, mInputMonitorCompat,
+                        mDeviceState, motionEvent);
     }
 
     public GestureState createGestureState(GestureState previousGestureState) {
@@ -686,9 +678,8 @@ public class TouchInteractionService extends Service
             handleOrientationSetup(base);
         }
         if (mDeviceState.isFullyGesturalNavMode()) {
-            if (mDeviceState.canTriggerAssistantAction(event, newGestureState.getRunningTask())) {
-                base = new AssistantInputConsumer(this, newGestureState, base, mInputMonitorCompat,
-                        mDeviceState, event);
+            if (mDeviceState.canTriggerAssistantAction(event)) {
+                base = tryCreateAssistantInputConsumer(base, newGestureState, event);
             }
 
             // If Taskbar is present, we listen for long press to unstash it.
@@ -701,7 +692,7 @@ public class TouchInteractionService extends Service
 
             // If Bubbles is expanded, use the overlay input consumer, which will close Bubbles
             // instead of going all the way home when a swipe up is detected.
-            if (mDeviceState.isBubblesExpanded() || mDeviceState.isGlobalActionsShowing()) {
+            if (mDeviceState.isBubblesExpanded() || mDeviceState.isSystemUiDialogShowing()) {
                 base = new SysUiOverlayInputConsumer(
                         getBaseContext(), mDeviceState, mInputMonitorCompat);
             }
@@ -768,7 +759,10 @@ public class TouchInteractionService extends Service
         } else if (gestureState.getRunningTask() == null) {
             return getDefaultInputConsumer();
         } else if (previousGestureState.isRunningAnimationToLauncher()
-                || gestureState.getActivityInterface().isResumed()
+                || (gestureState.getActivityInterface().isResumed()
+                        // with shell-transitions, home is resumed during recents animation, so
+                        // explicitly check against recents animation too.
+                        && !previousGestureState.isRecentsAnimationRunning())
                 || forceOverviewInputConsumer) {
             return createOverviewInputConsumer(
                     previousGestureState, gestureState, event, forceOverviewInputConsumer);
@@ -951,7 +945,7 @@ public class TouchInteractionService extends Service
             pw.println("Input state:");
             pw.println("  mInputMonitorCompat=" + mInputMonitorCompat);
             pw.println("  mInputEventReceiver=" + mInputEventReceiver);
-            SysUINavigationMode.INSTANCE.get(this).dump(pw);
+            DisplayController.INSTANCE.get(this).dump(pw);
             pw.println("TouchState:");
             BaseDraggingActivity createdOverviewActivity = mOverviewComponentObserver == null ? null
                     : mOverviewComponentObserver.getActivityInterface().getCreatedActivity();
@@ -965,6 +959,9 @@ public class TouchInteractionService extends Service
             pw.println("ProtoTrace:");
             pw.println("  file=" + ProtoTracer.INSTANCE.get(this).getTraceFile());
             mTaskbarManager.dumpLogs("", pw);
+            if (createdOverviewActivity != null) {
+                createdOverviewActivity.getDeviceProfile().dump("", pw);
+            }
         }
     }
 

@@ -32,10 +32,10 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_GESTURE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_QUICKSWITCH_LEFT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_QUICKSWITCH_RIGHT;
-import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_FULLSCREEN_TASK;
+import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
 import static com.android.quickstep.GestureState.GestureEndTarget.HOME;
 import static com.android.quickstep.GestureState.GestureEndTarget.LAST_TASK;
 import static com.android.quickstep.GestureState.GestureEndTarget.NEW_TASK;
@@ -833,12 +833,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         // Notify when the animation starts
         flushOnRecentsAnimationAndLauncherBound();
 
-        // Start hiding the divider
-        setDividerShown(false /* shown */, false /* immediate */);
-
         // Only add the callback to enable the input consumer after we actually have the controller
         mStateCallback.runOnceAtState(STATE_APP_CONTROLLER_RECEIVED | STATE_GESTURE_STARTED,
-                mRecentsAnimationController::enableInputConsumer);
+                this::startInterceptingTouchesForGesture);
         mStateCallback.setStateOnUiThread(STATE_APP_CONTROLLER_RECEIVED);
 
         mPassedOverviewThreshold = false;
@@ -1198,10 +1195,10 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             // We probably never received an animation controller, skip logging.
             return;
         }
-        int pageIndex = endTarget == LAST_TASK
+        int pageIndex = endTarget == LAST_TASK || mRecentsView == null
                 ? LOG_NO_OP_PAGE_INDEX
                 : mRecentsView.getNextPage();
-        // TODO: set correct container using the pageIndex
+        logger.withRank(pageIndex);
         logger.log(event);
     }
 
@@ -1455,6 +1452,17 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         });
         setupWindowAnimation(new RectFSpringAnim[]{swipePipToHomeAnimator});
         return swipePipToHomeAnimator;
+    }
+
+    private void startInterceptingTouchesForGesture() {
+        if (mRecentsAnimationController == null) {
+            return;
+        }
+
+        mRecentsAnimationController.enableInputConsumer();
+
+        // Start hiding the divider
+        setDividerShown(false /* shown */, true /* immediate */);
     }
 
     private void computeRecentsScrollIfInvisible() {
@@ -1760,6 +1768,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     private void maybeFinishSwipeToHome() {
         if (mIsSwipingPipToHome && mSwipePipToHomeAnimators[0] != null) {
             SystemUiProxy.INSTANCE.get(mContext).stopSwipePipToHome(
+                    mSwipePipToHomeAnimator.getTaskId(),
                     mSwipePipToHomeAnimator.getComponentName(),
                     mSwipePipToHomeAnimator.getDestinationBounds(),
                     mSwipePipToHomeAnimator.getContentOverlay());

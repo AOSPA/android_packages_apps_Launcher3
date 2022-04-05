@@ -23,7 +23,6 @@ import static android.view.Gravity.START;
 
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.HORIZONTAL;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
-import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MAIN;
 
 import android.content.res.Resources;
@@ -106,21 +105,25 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
         return new PointF(-margin, margin);
     }
 
+
+
     @Override
-    public Pair<Float, Float> setDwbLayoutParamsAndGetTranslations(int taskViewWidth,
+    public Pair<Float, Float> getDwbLayoutTranslations(int taskViewWidth,
             int taskViewHeight, StagedSplitBounds splitBounds, DeviceProfile deviceProfile,
             View[] thumbnailViews, int desiredTaskId, View banner) {
+        boolean isRtl = banner.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
         float translationX = 0;
         float translationY = 0;
         FrameLayout.LayoutParams bannerParams = (FrameLayout.LayoutParams) banner.getLayoutParams();
         banner.setPivotX(0);
         banner.setPivotY(0);
         banner.setRotation(getDegreesRotated());
+        translationX = taskViewWidth - banner.getHeight();
         FrameLayout.LayoutParams snapshotParams =
                 (FrameLayout.LayoutParams) thumbnailViews[0]
                         .getLayoutParams();
-        bannerParams.gravity = BOTTOM | END;
-        translationX = taskViewWidth - banner.getHeight();
+        bannerParams.gravity = BOTTOM | (isRtl ? END : START);
+
         if (splitBounds == null) {
             // Single, fullscreen case
             bannerParams.width = taskViewHeight - snapshotParams.topMargin;
@@ -130,19 +133,22 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
 
         // Set correct width
         if (desiredTaskId == splitBounds.leftTopTaskId) {
-            bannerParams.width = thumbnailViews[1].getMeasuredHeight();
-        } else {
             bannerParams.width = thumbnailViews[0].getMeasuredHeight();
+        } else {
+            bannerParams.width = thumbnailViews[1].getMeasuredHeight();
         }
 
         // Set translations
         if (desiredTaskId == splitBounds.rightBottomTaskId) {
-            translationY = -(taskViewHeight - snapshotParams.topMargin)
-                    * (1f - splitBounds.leftTaskPercent)
-                    + banner.getHeight();
+            translationY = banner.getHeight();
         }
         if (desiredTaskId == splitBounds.leftTopTaskId) {
-            translationY = banner.getHeight();
+            float bottomRightTaskPlusDividerPercent = splitBounds.appsStackedVertically
+                    ? (1f - splitBounds.topTaskPercent)
+                    : (1f - splitBounds.leftTaskPercent);
+            translationY = banner.getHeight()
+                    - ((taskViewHeight - snapshotParams.topMargin)
+                    * bottomRightTaskPlusDividerPercent);
         }
         return new Pair<>(translationX, translationY);
     }
@@ -157,18 +163,16 @@ public class SeascapePagedViewHandler extends LandscapePagedViewHandler {
         // Add "right" option which is actually the top
         return Collections.singletonList(new SplitPositionOption(
                 R.drawable.ic_split_right, R.string.split_screen_position_right,
-                STAGE_POSITION_TOP_OR_LEFT, STAGE_TYPE_MAIN));
+                STAGE_POSITION_BOTTOM_OR_RIGHT, STAGE_TYPE_MAIN));
     }
 
     @Override
-    public void setIconAndSnapshotParams(View mIconView, int taskIconMargin, int taskIconHeight,
-            FrameLayout.LayoutParams snapshotParams, boolean isRtl) {
-        FrameLayout.LayoutParams iconParams =
-                (FrameLayout.LayoutParams) mIconView.getLayoutParams();
+    public void setTaskIconParams(FrameLayout.LayoutParams iconParams,
+            int taskIconMargin, int taskIconHeight, int thumbnailTopMargin, boolean isRtl) {
         iconParams.gravity = (isRtl ? END : START) | CENTER_VERTICAL;
         iconParams.leftMargin = -taskIconHeight - taskIconMargin / 2;
         iconParams.rightMargin = 0;
-        iconParams.topMargin = snapshotParams.topMargin / 2;
+        iconParams.topMargin = thumbnailTopMargin / 2;
     }
 
     @Override

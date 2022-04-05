@@ -96,6 +96,16 @@ public final class FeatureFlags {
             getDebugFlag("ENABLE_FLOATING_SEARCH_BAR", false,
                     "Keep All Apps search bar at the bottom (but above keyboard if open)");
 
+    public static final BooleanFlag INJECT_WEB_TOP = new DeviceFlag("INJECT_WEB_TOP", false,
+            "Show web suggestions on top of the search results");
+
+    public static final BooleanFlag USE_FALLBACK_APP_SEARCH = new DeviceFlag(
+            "USE_FALLBACK_APP_SEARCH", false,
+            "Use fallback launcher app search results instead of AiAi app results");
+
+    public static final BooleanFlag ENABLE_QUICK_SEARCH = new DeviceFlag("ENABLE_QUICK_SEARCH",
+            true, "Use quick search behavior.");
+
     public static final BooleanFlag COLLECT_SEARCH_HISTORY = new DeviceFlag(
             "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
 
@@ -139,12 +149,12 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_BULK_WORKSPACE_ICON_LOADING = getDebugFlag(
             "ENABLE_BULK_WORKSPACE_ICON_LOADING",
-            false,
+            true,
             "Enable loading workspace icons in bulk.");
 
     public static final BooleanFlag ENABLE_BULK_ALL_APPS_ICON_LOADING = getDebugFlag(
             "ENABLE_BULK_ALL_APPS_ICON_LOADING",
-            false,
+            true,
             "Enable loading all apps icons in bulk.");
 
     // Keep as DeviceFlag for remote disable in emergency.
@@ -197,12 +207,6 @@ public final class FeatureFlags {
             "ENABLE_APP_PREDICTIONS_WHILE_VISIBLE", true, "Allows app "
             + "predictions to be updated while they are visible to the user.");
 
-    public static final BooleanFlag ENABLE_TASKBAR = getDebugFlag(
-            "ENABLE_TASKBAR", true, "Allows a system Taskbar to be shown on larger devices.");
-
-    public static final BooleanFlag ENABLE_TASKBAR_EDU = getDebugFlag("ENABLE_TASKBAR_EDU", true,
-            "Enables showing taskbar education the first time an app is opened.");
-
     public static final BooleanFlag ENABLE_TASKBAR_POPUP_MENU = getDebugFlag(
             "ENABLE_TASKBAR_POPUP_MENU", true, "Enables long pressing taskbar icons to show the"
                     + " popup menu.");
@@ -252,9 +256,17 @@ public final class FeatureFlags {
             "ENABLE_ALL_APPS_IN_TASKBAR", true,
             "Enables accessing All Apps from the system Taskbar.");
 
+    public static final BooleanFlag ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR = getDebugFlag(
+            "ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR", false,
+            "Enables One Search box in Taskbar All Apps.");
+
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE = getDebugFlag(
             "ENABLE_SPLIT_FROM_WORKSPACE", true,
             "Enable initiating split screen from workspace.");
+
+    public static final BooleanFlag ENABLE_NEW_MIGRATION_LOGIC = getDebugFlag(
+            "ENABLE_NEW_MIGRATION_LOGIC", true,
+            "Enable the new grid migration logic, keeping pages when src < dest");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

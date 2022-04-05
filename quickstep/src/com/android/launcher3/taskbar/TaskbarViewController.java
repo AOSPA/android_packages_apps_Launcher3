@@ -20,13 +20,14 @@ import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.quickstep.AnimatedFloat.VALUE;
 
+import android.annotation.NonNull;
 import android.graphics.Rect;
 import android.util.FloatProperty;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewTreeObserver;
-import android.view.ViewTreeObserver.OnPreDrawListener;
+
+import androidx.core.view.OneShotPreDrawListener;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
@@ -37,6 +38,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.AnimatedFloat;
@@ -142,18 +144,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      * drawing a frame and invoked only once
      * @param listener callback that will be invoked before drawing the next frame
      */
-    public void addOneTimePreDrawListener(Runnable listener) {
-        mTaskbarView.getViewTreeObserver().addOnPreDrawListener(new OnPreDrawListener() {
-            @Override
-            public boolean onPreDraw() {
-                final ViewTreeObserver viewTreeObserver = mTaskbarView.getViewTreeObserver();
-                if (viewTreeObserver.isAlive()) {
-                    listener.run();
-                    viewTreeObserver.removeOnPreDrawListener(this);
-                }
-                return true;
-            }
-        });
+    public void addOneTimePreDrawListener(@NonNull Runnable listener) {
+        OneShotPreDrawListener.add(mTaskbarView, listener);
     }
 
     public Rect getIconLayoutBounds() {
@@ -162,6 +154,10 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
     public View[] getIconViews() {
         return mTaskbarView.getIconViews();
+    }
+
+    public View getAllAppsButtonView() {
+        return mTaskbarView.getAllAppsButtonView();
     }
 
     public AnimatedFloat getTaskbarIconScaleForStash() {
@@ -211,7 +207,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         PendingAnimation setter = new PendingAnimation(100);
         Rect hotseatPadding = launcherDp.getHotseatLayoutPadding(mActivity);
         float scaleUp = ((float) launcherDp.iconSizePx) / mActivity.getDeviceProfile().iconSizePx;
-        int borderSpacing = launcherDp.cellLayoutBorderSpacePx.x;
+        int borderSpacing = launcherDp.hotseatBorderSpace;
         int hotseatCellSize = DeviceProfile.calculateCellWidth(
                 launcherDp.availableWidthPx - hotseatPadding.left - hotseatPadding.right,
                 borderSpacing,
@@ -235,7 +231,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
             if (FeatureFlags.ENABLE_ALL_APPS_IN_TASKBAR.get() && i == count - 1) {
                 // Note that there is no All Apps button in the hotseat, this position is only used
                 // as its convenient for animation purposes.
-                positionInHotseat = mActivity.getDeviceProfile().inv.numShownHotseatIcons;
+                positionInHotseat = Utilities.isRtl(child.getResources())
+                        ? -1
+                        : mActivity.getDeviceProfile().inv.numShownHotseatIcons;
 
                 setter.setViewAlpha(child, 0, LINEAR);
             } else if (child.getTag() instanceof ItemInfo) {
@@ -247,9 +245,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
             float hotseatIconCenter = hotseatPadding.left
                     + (hotseatCellSize + borderSpacing) * positionInHotseat
-                    + hotseatCellSize / 2;
+                    + hotseatCellSize / 2f;
 
-            float childCenter = (child.getLeft() + child.getRight()) / 2;
+            float childCenter = (child.getLeft() + child.getRight()) / 2f;
             setter.setFloat(child, ICON_TRANSLATE_X, hotseatIconCenter - childCenter, LINEAR);
 
             setter.setFloat(child, SCALE_PROPERTY, scaleUp, LINEAR);
@@ -268,8 +266,22 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarNavButtonTranslationY.updateValue(-deviceProfile.getTaskbarOffsetY());
     }
 
+    /**
+     * Maps the given operator to all the top-level children of TaskbarView.
+     */
     public void mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
         mTaskbarView.mapOverItems(op);
+    }
+
+    /**
+     * Returns the first icon to match the given parameter, in priority from:
+     * 1) Icons directly on Taskbar
+     * 2) FolderIcon of the Folder containing the given icon
+     * 3) All Apps button
+     */
+    public View getFirstIconMatch(ItemInfoMatcher matcher) {
+        ItemInfoMatcher folderMatcher = ItemInfoMatcher.forFolderMatch(matcher);
+        return mTaskbarView.getFirstMatch(matcher, folderMatcher);
     }
 
     /**
@@ -300,7 +312,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
 
         public View.OnClickListener getAllAppsButtonClickListener() {
-            return v -> mControllers.taskbarAllAppsViewController.show();
+            return v -> mControllers.taskbarAllAppsController.show();
         }
 
         public View.OnLongClickListener getIconOnLongClickListener() {

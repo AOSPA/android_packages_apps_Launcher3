@@ -38,9 +38,9 @@ import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
-import com.android.launcher3.allapps.AllAppsGridAdapter.AdapterItem;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AlphabeticalAppsList;
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.allapps.SearchUiManager;
 import com.android.launcher3.search.SearchCallback;
 
@@ -82,7 +82,7 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         setHint(prefixTextWithIcon(getContext(), R.drawable.ic_allapps_search, getHint()));
 
         mContentOverlap =
-                getResources().getDimensionPixelSize(R.dimen.all_apps_search_bar_field_height) / 2;
+                getResources().getDimensionPixelSize(R.dimen.all_apps_search_bar_content_overlap);
     }
 
     @Override

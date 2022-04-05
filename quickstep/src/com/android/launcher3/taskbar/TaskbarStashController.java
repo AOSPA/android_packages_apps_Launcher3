@@ -29,10 +29,12 @@ import android.annotation.Nullable;
 import android.content.SharedPreferences;
 import android.view.ViewConfiguration;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.MultiValueAlpha.AlphaProperty;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.SystemUiProxy;
+import com.android.systemui.shared.system.WindowManagerWrapper;
 
 import java.io.PrintWriter;
 import java.util.StringJoiner;
@@ -51,23 +53,25 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     public static final int FLAG_STASHED_IN_APP_SETUP = 1 << 4; // setup wizard and AllSetActivity
     public static final int FLAG_STASHED_IN_APP_IME = 1 << 5; // IME is visible
     public static final int FLAG_IN_STASHED_LAUNCHER_STATE = 1 << 6;
+    public static final int FLAG_STASHED_IN_APP_ALL_APPS = 1 << 7; // All apps is visible.
 
     // If we're in an app and any of these flags are enabled, taskbar should be stashed.
     private static final int FLAGS_STASHED_IN_APP = FLAG_STASHED_IN_APP_MANUAL
             | FLAG_STASHED_IN_APP_PINNED | FLAG_STASHED_IN_APP_EMPTY | FLAG_STASHED_IN_APP_SETUP
-            | FLAG_STASHED_IN_APP_IME;
+            | FLAG_STASHED_IN_APP_IME | FLAG_STASHED_IN_APP_ALL_APPS;
 
     // If any of these flags are enabled, inset apps by our stashed height instead of our unstashed
     // height. This way the reported insets are consistent even during transitions out of the app.
-    // Currently any flag that causes us to stash in an app is included, except for IME since that
-    // covers the underlying app anyway and thus the app shouldn't change insets.
+    // Currently any flag that causes us to stash in an app is included, except for IME or All Apps
+    // since those cover the underlying app anyway and thus the app shouldn't change insets.
     private static final int FLAGS_REPORT_STASHED_INSETS_TO_APP = FLAGS_STASHED_IN_APP
-            & ~FLAG_STASHED_IN_APP_IME;
+            & ~FLAG_STASHED_IN_APP_IME & ~FLAG_STASHED_IN_APP_ALL_APPS;
 
     /**
      * How long to stash/unstash when manually invoked via long press.
      */
-    public static final long TASKBAR_STASH_DURATION = 300;
+    public static final long TASKBAR_STASH_DURATION =
+            WindowManagerWrapper.ANIMATION_DURATION_RESIZE;
 
     /**
      * How long to stash/unstash when keyboard is appearing/disappearing.
@@ -186,7 +190,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      * Returns whether the taskbar can visually stash into a handle based on the current device
      * state.
      */
-    private boolean supportsVisualStashing() {
+    public boolean supportsVisualStashing() {
         return !mActivity.isThreeButtonNav();
     }
 
@@ -246,17 +250,35 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      * Returns whether the taskbar is currently visible and in an app.
      */
     public boolean isInAppAndNotStashed() {
-        return !mIsStashed && (mState & FLAG_IN_APP) != 0;
+        return !mIsStashed && isInApp();
+    }
+
+    private boolean isInApp() {
+        return hasAnyFlag(FLAG_IN_APP);
     }
 
     /**
      * Returns the height that taskbar will inset when inside apps.
      */
     public int getContentHeightToReportToApps() {
-        if (hasAnyFlag(FLAGS_REPORT_STASHED_INSETS_TO_APP)) {
+        if (supportsVisualStashing() && hasAnyFlag(FLAGS_REPORT_STASHED_INSETS_TO_APP)) {
+            DeviceProfile dp = mActivity.getDeviceProfile();
+            if (hasAnyFlag(FLAG_STASHED_IN_APP_SETUP) && dp.isTaskbarPresent && !dp.isLandscape) {
+                // We always show the back button in SUW but in portrait the SUW layout may not
+                // be wide enough to support overlapping the nav bar with its content.  For now,
+                // just inset by the bar height.
+                return mUnstashedHeight;
+            }
             boolean isAnimating = mAnimator != null && mAnimator.isStarted();
-            return mControllers.stashedHandleViewController.isStashedHandleVisible() || isAnimating
-                    ? mStashedHeight : 0;
+            if (!mControllers.stashedHandleViewController.isStashedHandleVisible()
+                    && isInApp()
+                    && !isAnimating) {
+                // We are in a settled state where we're not showing the handle even though taskbar
+                // is stashed. This can happen for example when home button is disabled (see
+                // StashedHandleViewController#setIsHomeButtonDisabled()).
+                return 0;
+            }
+            return mStashedHeight;
         }
         return mUnstashedHeight;
     }
@@ -275,11 +297,24 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             // taskbar, we use an OnLongClickListener on TaskbarView instead.
             return false;
         }
+        if (!canCurrentlyManuallyUnstash()) {
+            return false;
+        }
         if (updateAndAnimateIsManuallyStashedInApp(false)) {
             mControllers.taskbarActivityContext.getDragLayer().performHapticFeedback(LONG_PRESS);
             return true;
         }
         return false;
+    }
+
+    /**
+     * Returns whether taskbar will unstash when long pressing it based on the current state. The
+     * only time this is true is if the user is in an app and the taskbar is only stashed because
+     * the user previously long pressed to manually stash (not due to other reasons like IME).
+     */
+    private boolean canCurrentlyManuallyUnstash() {
+        return (mState & (FLAG_IN_APP | FLAGS_STASHED_IN_APP))
+                == (FLAG_IN_APP | FLAG_STASHED_IN_APP_MANUAL);
     }
 
     /**
@@ -421,6 +456,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     public void startUnstashHint(boolean animateForward) {
         if (!isStashed()) {
             // Already unstashed, no need to hint in that direction.
+            return;
+        }
+        if (!canCurrentlyManuallyUnstash()) {
+            // If any other flags are causing us to be stashed, long press won't cause us to
+            // unstash, so don't hint that it will.
             return;
         }
         mTaskbarStashedHandleHintScale.animateToValue(
@@ -567,6 +607,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         str.add((flags & FLAG_STASHED_IN_APP_IME) != 0 ? "FLAG_STASHED_IN_APP_IME" : "");
         str.add((flags & FLAG_IN_STASHED_LAUNCHER_STATE) != 0
                 ? "FLAG_IN_STASHED_LAUNCHER_STATE" : "");
+        str.add((flags & FLAG_STASHED_IN_APP_ALL_APPS) != 0 ? "FLAG_STASHED_IN_APP_ALL_APPS" : "");
         return str.toString();
     }
 

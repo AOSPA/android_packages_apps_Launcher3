@@ -15,7 +15,6 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
 
@@ -29,10 +28,14 @@ import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.util.MultiValueUpdateListener;
+import com.android.quickstep.util.TaskCornerRadius;
+import com.android.systemui.shared.system.QuickStepContract;
+
+import java.util.function.Consumer;
 
 /**
  * Create an instance via
- * {@link #getFloatingTaskView(StatefulActivity, View, Bitmap, Drawable, RectF)} to
+ * {@link #getFloatingTaskView(StatefulActivity, View, Bitmap, Drawable, RectF, Consumer)} to
  * which will have the thumbnail from the provided existing TaskView overlaying the taskview itself.
  *
  * Can then animate the taskview using
@@ -48,9 +51,9 @@ public class FloatingTaskView extends FrameLayout {
     private RectF mStartingPosition;
     private final StatefulActivity mActivity;
     private final boolean mIsRtl;
-    private final Rect mOutline = new Rect();
+    private final FullscreenDrawParams mCurrentFullscreenParams;
     private PagedOrientationHandler mOrientationHandler;
-    private ImageView mImageView;
+    private FloatingTaskThumbnailView mThumbnailView;
 
     public FloatingTaskView(Context context) {
         this(context, null);
@@ -64,16 +67,17 @@ public class FloatingTaskView extends FrameLayout {
         super(context, attrs, defStyleAttr);
         mActivity = BaseActivity.fromContext(context);
         mIsRtl = Utilities.isRtl(getResources());
+        mCurrentFullscreenParams = new FullscreenDrawParams(context);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        mImageView = findViewById(R.id.thumbnail);
-        mImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        mImageView.setLayerType(LAYER_TYPE_HARDWARE, null);
+        mThumbnailView = findViewById(R.id.thumbnail);
+        mThumbnailView.setFullscreenParams(mCurrentFullscreenParams);
         mSplitPlaceholderView = findViewById(R.id.split_placeholder);
         mSplitPlaceholderView.setAlpha(0);
+        mSplitPlaceholderView.setFullscreenParams(mCurrentFullscreenParams);
     }
 
     private void init(StatefulActivity launcher, View originalView, @Nullable Bitmap thumbnail,
@@ -84,13 +88,11 @@ public class FloatingTaskView extends FrameLayout {
                 (InsettableFrameLayout.LayoutParams) getLayoutParams();
 
         mSplitPlaceholderView.setLayoutParams(new FrameLayout.LayoutParams(lp.width, lp.height));
-        positionOut.round(mOutline);
         setPivotX(0);
         setPivotY(0);
 
         // Copy bounds of exiting thumbnail into ImageView
-        mImageView.setImageBitmap(thumbnail);
-        mImageView.setVisibility(VISIBLE);
+        mThumbnailView.setThumbnail(thumbnail);
 
         RecentsView recentsView = launcher.getOverviewPanel();
         mOrientationHandler = recentsView.getPagedOrientationHandler();
@@ -102,6 +104,10 @@ public class FloatingTaskView extends FrameLayout {
     /**
      * Configures and returns a an instance of {@link FloatingTaskView} initially matching the
      * appearance of {@code originalView}.
+     *
+     * @param additionalOffsetter optional, to set additional offsets to the FloatingTaskView
+     *                               to account for translations. If {@code null} then the
+     *                               translation values from originalView will be used
      */
     public static FloatingTaskView getFloatingTaskView(StatefulActivity launcher,
             View originalView, @Nullable Bitmap thumbnail, Drawable icon, RectF positionOut) {
@@ -118,9 +124,8 @@ public class FloatingTaskView extends FrameLayout {
     public void updateInitialPositionForView(View originalView) {
         Rect viewBounds = new Rect(0, 0, originalView.getWidth(), originalView.getHeight());
         Utilities.getBoundsForViewInDragLayer(mActivity.getDragLayer(), originalView, viewBounds,
-                true /* ignoreTransform */, null /* recycle */,
+                false /* ignoreTransform */, null /* recycle */,
                 mStartingPosition);
-        mStartingPosition.offset(originalView.getTranslationX(), originalView.getTranslationY());
         final InsettableFrameLayout.LayoutParams lp = new InsettableFrameLayout.LayoutParams(
                 Math.round(mStartingPosition.width()),
                 Math.round(mStartingPosition.height()));
@@ -128,27 +133,24 @@ public class FloatingTaskView extends FrameLayout {
         setLayoutParams(lp);
     }
 
-    // TODO(194414938) set correct corner radii
-    public void update(RectF position, float progress, float windowRadius) {
+    public void update(RectF position, float progress) {
         MarginLayoutParams lp = (MarginLayoutParams) getLayoutParams();
 
         float dX = position.left - mStartingPosition.left;
         float dY = position.top - lp.topMargin;
+        float scaleX = position.width() / lp.width;
+        float scaleY = position.height() / lp.height;
+
+        mCurrentFullscreenParams.updateParams(position, progress, scaleX, scaleY);
 
         setTranslationX(dX);
         setTranslationY(dY);
-
-        float scaleX = position.width() / lp.width;
-        float scaleY = position.height() / lp.height;
         setScaleX(scaleX);
         setScaleY(scaleY);
+        mSplitPlaceholderView.invalidate();
+
         float childScaleX = 1f / scaleX;
         float childScaleY = 1f / scaleY;
-
-        invalidate();
-        // TODO(194414938) seems like this scale value could be fine tuned, some stretchiness
-        mImageView.setScaleX(1f / scaleX + scaleX * progress);
-        mImageView.setScaleY(1f / scaleY + scaleY * progress);
         mOrientationHandler.setPrimaryScale(mSplitPlaceholderView.getIconView(), childScaleX);
         mOrientationHandler.setSecondaryScale(mSplitPlaceholderView.getIconView(), childScaleY);
     }
@@ -176,39 +178,33 @@ public class FloatingTaskView extends FrameLayout {
     }
 
     public void addAnimation(PendingAnimation animation, RectF startingBounds, Rect endBounds,
-            View viewToCover, boolean fadeWithThumbnail) {
+            boolean fadeWithThumbnail, boolean isInitialSplit) {
+        mCurrentFullscreenParams.setIsInitialSplit(isInitialSplit);
         final BaseDragLayer dragLayer = mActivity.getDragLayer();
         int[] dragLayerBounds = new int[2];
         dragLayer.getLocationOnScreen(dragLayerBounds);
         SplitOverlayProperties prop = new SplitOverlayProperties(endBounds,
-                startingBounds, viewToCover, dragLayerBounds[0],
-                dragLayerBounds[1]);
+                startingBounds, dragLayerBounds[0], dragLayerBounds[1]);
 
         ValueAnimator transitionAnimator = ValueAnimator.ofFloat(0, 1);
         animation.add(transitionAnimator);
         long animDuration = animation.getDuration();
-        Rect crop = new Rect();
         RectF floatingTaskViewBounds = new RectF();
-        final float initialWindowRadius = supportsRoundedCornersOnWindows(getResources())
-                ? Math.max(crop.width(), crop.height()) / 2f
-                : 0f;
 
         if (fadeWithThumbnail) {
             animation.addFloat(mSplitPlaceholderView, SplitPlaceholderView.ALPHA_FLOAT,
                     0, 1, ACCEL);
-            animation.addFloat(mImageView, LauncherAnimUtils.VIEW_ALPHA,
+            animation.addFloat(mThumbnailView, LauncherAnimUtils.VIEW_ALPHA,
                     1, 0, DEACCEL_3);
         }
 
         MultiValueUpdateListener listener = new MultiValueUpdateListener() {
-            final FloatProp mWindowRadius = new FloatProp(initialWindowRadius,
-                    initialWindowRadius, 0, animDuration, LINEAR);
             final FloatProp mDx = new FloatProp(0, prop.dX, 0, animDuration, LINEAR);
             final FloatProp mDy = new FloatProp(0, prop.dY, 0, animDuration, LINEAR);
-            final FloatProp mTaskViewScaleX = new FloatProp(prop.initialTaskViewScaleX,
-                    prop.finalTaskViewScaleX, 0, animDuration, LINEAR);
-            final FloatProp mTaskViewScaleY = new FloatProp(prop.initialTaskViewScaleY,
-                    prop.finalTaskViewScaleY, 0, animDuration, LINEAR);
+            final FloatProp mTaskViewScaleX = new FloatProp(1f, prop.finalTaskViewScaleX, 0,
+                    animDuration, LINEAR);
+            final FloatProp mTaskViewScaleY = new FloatProp(1f, prop.finalTaskViewScaleY, 0,
+                    animDuration, LINEAR);
             @Override
             public void onUpdate(float percent, boolean initOnly) {
                 // Calculate the icon position.
@@ -217,7 +213,7 @@ public class FloatingTaskView extends FrameLayout {
                 Utilities.scaleRectFAboutCenter(floatingTaskViewBounds, mTaskViewScaleX.value,
                         mTaskViewScaleY.value);
 
-                update(floatingTaskViewBounds, percent, mWindowRadius.value * 1);
+                update(floatingTaskViewBounds, percent);
             }
         };
         transitionAnimator.addUpdateListener(listener);
@@ -225,29 +221,57 @@ public class FloatingTaskView extends FrameLayout {
 
     private static class SplitOverlayProperties {
 
-        private final float initialTaskViewScaleX;
-        private final float initialTaskViewScaleY;
         private final float finalTaskViewScaleX;
         private final float finalTaskViewScaleY;
         private final float dX;
         private final float dY;
 
-        SplitOverlayProperties(Rect endBounds, RectF startTaskViewBounds, View view,
+        SplitOverlayProperties(Rect endBounds, RectF startTaskViewBounds,
                 int dragLayerLeft, int dragLayerTop) {
             float maxScaleX = endBounds.width() / startTaskViewBounds.width();
             float maxScaleY = endBounds.height() / startTaskViewBounds.height();
 
-            initialTaskViewScaleX = view.getScaleX();
-            initialTaskViewScaleY = view.getScaleY();
             finalTaskViewScaleX = maxScaleX;
             finalTaskViewScaleY = maxScaleY;
 
-            // Animate the app icon to the center of the window bounds in screen coordinates.
+            // Animate to the center of the window bounds in screen coordinates.
             float centerX = endBounds.centerX() - dragLayerLeft;
             float centerY = endBounds.centerY() - dragLayerTop;
 
             dX = centerX - startTaskViewBounds.centerX();
             dY = centerY - startTaskViewBounds.centerY();
+        }
+    }
+
+    public static class FullscreenDrawParams {
+
+        private final float mCornerRadius;
+        private final float mWindowCornerRadius;
+
+        public boolean mIsInitialSplit = true;
+        public final RectF mFloatingTaskViewBounds = new RectF();
+        public float mCurrentDrawnCornerRadius;
+        public float mScaleX = 1;
+        public float mScaleY = 1;
+
+        public FullscreenDrawParams(Context context) {
+            mCornerRadius = TaskCornerRadius.get(context);
+            mWindowCornerRadius = QuickStepContract.getWindowCornerRadius(context);
+
+            mCurrentDrawnCornerRadius = mCornerRadius;
+        }
+
+        public void updateParams(RectF floatingTaskViewBounds, float progress, float scaleX,
+                float scaleY) {
+            mFloatingTaskViewBounds.set(floatingTaskViewBounds);
+            mScaleX = scaleX;
+            mScaleY = scaleY;
+            mCurrentDrawnCornerRadius = mIsInitialSplit ? 0 :
+                    Utilities.mapRange(progress, mCornerRadius, mWindowCornerRadius);
+        }
+
+        public void setIsInitialSplit(boolean isInitialSplit) {
+            mIsInitialSplit = isInitialSplit;
         }
     }
 }

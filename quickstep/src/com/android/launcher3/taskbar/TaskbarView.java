@@ -32,12 +32,14 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.AllAppsButton;
@@ -214,7 +216,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
 
         if (mAllAppsButton != null) {
-            addView(mAllAppsButton);
+            int index = Utilities.isRtl(getResources()) ? 0 : getChildCount();
+            addView(mAllAppsButton, index);
         }
     }
 
@@ -316,6 +319,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         return icons;
     }
 
+    /**
+     * Returns the all apps button in the taskbar.
+     */
+    public View getAllAppsButtonView() {
+        return mAllAppsButton;
+    }
+
     // FolderIconParent implemented methods.
 
     @Override
@@ -357,7 +367,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         return getVisibility() == VISIBLE;
     }
 
-    protected void mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
+    /**
+     * Maps {@code op} over all the child views.
+     */
+    public void mapOverItems(LauncherBindableItemsContainer.ItemOperator op) {
         // map over all the shortcuts on the taskbar
         for (int i = 0; i < getChildCount(); i++) {
             View item = getChildAt(i);
@@ -365,5 +378,26 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 return;
             }
         }
+    }
+
+    /**
+     * Finds the first icon to match one of the given matchers, from highest to lowest priority.
+     * @return The first match, or All Apps button if no match was found.
+     */
+    public View getFirstMatch(ItemInfoMatcher... matchers) {
+        for (ItemInfoMatcher matcher : matchers) {
+            for (int i = 0; i < getChildCount(); i++) {
+                View item = getChildAt(i);
+                if (!(item.getTag() instanceof ItemInfo)) {
+                    // Should only happen for All Apps button.
+                    continue;
+                }
+                ItemInfo info = (ItemInfo) item.getTag();
+                if (matcher.matchesInfo(info)) {
+                    return item;
+                }
+            }
+        }
+        return mAllAppsButton;
     }
 }

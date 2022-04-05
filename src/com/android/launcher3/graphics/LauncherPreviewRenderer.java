@@ -87,6 +87,7 @@ import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext;
+import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.BaseLauncherAppWidgetHostView;
@@ -111,7 +112,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  *   3) Place appropriate elements like icons and first-page qsb
  *   4) Measure and draw the view on a canvas
  */
-@TargetApi(Build.VERSION_CODES.O)
+@TargetApi(Build.VERSION_CODES.R)
 public class LauncherPreviewRenderer extends ContextWrapper
         implements ActivityContext, WorkspaceLayoutManager, LayoutInflater.Factory2 {
 
@@ -128,7 +129,8 @@ public class LauncherPreviewRenderer extends ContextWrapper
         public PreviewContext(Context base, InvariantDeviceProfile idp) {
             super(base, UserCache.INSTANCE, InstallSessionHelper.INSTANCE,
                     LauncherAppState.INSTANCE, InvariantDeviceProfile.INSTANCE,
-                    CustomWidgetManager.INSTANCE, PluginManagerWrapper.INSTANCE);
+                    CustomWidgetManager.INSTANCE, PluginManagerWrapper.INSTANCE,
+                    WindowManagerProxy.INSTANCE);
             mIdp = idp;
             mObjectMap.put(InvariantDeviceProfile.INSTANCE, idp);
             mObjectMap.put(LauncherAppState.INSTANCE,
@@ -186,19 +188,13 @@ public class LauncherPreviewRenderer extends ContextWrapper
         mIdp = idp;
         mDp = idp.getDeviceProfile(context).copy(context);
 
-        if (Utilities.ATLEAST_R) {
-            WindowInsets currentWindowInsets = context.getSystemService(WindowManager.class)
-                    .getCurrentWindowMetrics().getWindowInsets();
-            mInsets = new Rect(
-                    currentWindowInsets.getSystemWindowInsetLeft(),
-                    currentWindowInsets.getSystemWindowInsetTop(),
-                    currentWindowInsets.getSystemWindowInsetRight(),
-                    currentWindowInsets.getSystemWindowInsetBottom());
-        } else {
-            mInsets = new Rect();
-            mInsets.left = mInsets.right = (mDp.widthPx - mDp.availableWidthPx) / 2;
-            mInsets.top = mInsets.bottom = (mDp.heightPx - mDp.availableHeightPx) / 2;
-        }
+        WindowInsets currentWindowInsets = context.getSystemService(WindowManager.class)
+                .getCurrentWindowMetrics().getWindowInsets();
+        mInsets = new Rect(
+                currentWindowInsets.getSystemWindowInsetLeft(),
+                currentWindowInsets.getSystemWindowInsetTop(),
+                currentWindowInsets.getSystemWindowInsetRight(),
+                mDp.isTaskbarPresent ? 0 : currentWindowInsets.getSystemWindowInsetBottom());
         mDp.updateInsets(mInsets);
 
         BaseIconFactory iconFactory =

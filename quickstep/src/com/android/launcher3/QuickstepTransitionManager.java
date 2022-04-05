@@ -16,6 +16,7 @@
 
 package com.android.launcher3;
 
+import static android.provider.Settings.Secure.LAUNCHER_TASKBAR_EDUCATION_SHOWING;
 import static android.window.StartingWindowInfo.STARTING_WINDOW_TYPE_NONE;
 import static android.window.StartingWindowInfo.STARTING_WINDOW_TYPE_SPLASH_SCREEN;
 
@@ -43,7 +44,7 @@ import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVIT
 import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_TRANSITIONS;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.statehandlers.DepthController.DEPTH;
-import static com.android.launcher3.util.DisplayController.getSingleFrameMs;
+import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
 import static com.android.launcher3.views.FloatingIconView.SHAPE_PROGRESS_DURATION;
 import static com.android.launcher3.views.FloatingIconView.getFloatingIconView;
 import static com.android.quickstep.TaskViewUtils.findTaskViewToLaunch;
@@ -75,6 +76,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.Pair;
 import android.util.Size;
 import android.view.SurfaceControl;
@@ -577,8 +579,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 }
             }
 
-            // Pause page indicator animations as they lead to layer trashing.
-            mLauncher.getWorkspace().getPageIndicator().pauseAnimations();
+            // Pause expensive view updates as they can lead to layer thrashing and skipped frames.
+            mLauncher.pauseExpensiveViewUpdates();
 
             endListener = () -> {
                 viewsToAnimate.forEach(view -> {
@@ -588,7 +590,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 if (scrimEnabled) {
                     mLauncher.getScrimView().setBackgroundColor(Color.TRANSPARENT);
                 }
-                mLauncher.getWorkspace().getPageIndicator().skipAnimationsToEnd();
+                mLauncher.resumeExpensiveViewUpdates();
             };
         }
 
@@ -682,6 +684,18 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         appAnimator.setInterpolator(LINEAR);
         appAnimator.addListener(floatingView);
         appAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                LauncherTaskbarUIController taskbarController = mLauncher.getTaskbarUIController();
+                if (taskbarController != null && taskbarController.shouldShowEdu()) {
+                    // LAUNCHER_TASKBAR_EDUCATION_SHOWING is set to true here, when the education
+                    // flow is about to start, to avoid a race condition with other components
+                    // that would show something else to the user as soon as the app is opened.
+                    Settings.Secure.putInt(mLauncher.getContentResolver(),
+                            LAUNCHER_TASKBAR_EDUCATION_SHOWING, 1);
+                }
+            }
+
             @Override
             public void onAnimationEnd(Animator animation) {
                 if (v instanceof BubbleTextView) {
@@ -1172,6 +1186,19 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         return false;
     }
 
+    private boolean hasMultipleTargetsWithMode(RemoteAnimationTargetCompat[] targets, int mode) {
+        int numTargets = 0;
+        for (RemoteAnimationTargetCompat target : targets) {
+            if (target.mode == mode) {
+                numTargets++;
+            }
+            if (numTargets > 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * @return Runner that plays when user goes to Launcher
      * ie. pressing home, swiping up from nav bar.
@@ -1566,7 +1593,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 View launcherView = findLauncherView(appTargets);
                 boolean playFallBackAnimation = (launcherView == null
                         && launcherIsForceInvisibleOrOpening)
-                        || mLauncher.getWorkspace().isOverlayShown();
+                        || mLauncher.getWorkspace().isOverlayShown()
+                        || hasMultipleTargetsWithMode(appTargets, MODE_CLOSING);
 
                 boolean playWorkspaceReveal = true;
                 boolean skipAllAppsScale = false;
