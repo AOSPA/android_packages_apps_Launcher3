@@ -54,4 +54,8 @@
     <string name="category_icon">Icons</string>
     <string name="category_misc">Misc</string>
 
+    <!-- Navigation bar -->
+    <string name="pref_allow_phone_taskbar">Use taskbar</string>
+    <string name="pref_allow_phone_taskbar_desc">For opening and switching apps anywhere</string>
+
 </resources>
