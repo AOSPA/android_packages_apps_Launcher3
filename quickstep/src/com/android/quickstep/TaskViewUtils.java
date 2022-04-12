@@ -183,6 +183,10 @@ public final class TaskViewUtils {
         boolean isQuickSwitch = taskView.isEndQuickSwitchCuj();
         taskView.setEndQuickSwitchCuj(false);
 
+        if (recentsView == null) {
+            return;
+        }
+
         final RemoteAnimationTargets targets =
                 new RemoteAnimationTargets(appTargets, wallpaperTargets, nonAppTargets,
                         MODE_OPENING);
