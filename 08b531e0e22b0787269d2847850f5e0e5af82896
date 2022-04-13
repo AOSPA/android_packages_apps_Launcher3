@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c1ee4dc6_8ae9d007",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000463
+      },
+      "writtenOn": "2022-04-13T22:36:48Z",
+      "side": 1,
+      "message": "not required after: https://gerrit.aospa.co/q/topic:sv2-keyguard-animation",
+      "revId": "08b531e0e22b0787269d2847850f5e0e5af82896",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
