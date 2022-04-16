@@ -71,6 +71,8 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
+import com.android.launcher3.testing.TestLogging;
+import com.android.launcher3.testing.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.NavigationMode;
@@ -440,7 +442,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.stashedHandleViewController.setIsHomeButtonDisabled(
                 mControllers.navbarButtonsViewController.isHomeDisabled());
         mControllers.taskbarKeyguardController.updateStateForSysuiFlags(systemUiStateFlags);
-        mControllers.taskbarStashController.updateStateForSysuiFlags(systemUiStateFlags, fromInit);
+        mControllers.taskbarStashController.updateStateForSysuiFlags(
+                systemUiStateFlags, fromInit || !isUserSetupComplete());
         mControllers.taskbarScrimViewController.updateStateForSysuiFlags(systemUiStateFlags,
                 fromInit);
         mControllers.navButtonController.updateSysuiFlags(systemUiStateFlags);
@@ -646,12 +649,16 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         Toast.makeText(this, R.string.safemode_shortcut_error,
                                 Toast.LENGTH_SHORT).show();
                     } else  if (info.isPromise()) {
+                        TestLogging.recordEvent(
+                                TestProtocol.SEQUENCE_MAIN, "start: taskbarPromiseIcon");
                         intent = new PackageManagerHelper(this)
                                 .getMarketIntent(info.getTargetPackage())
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(intent);
 
                     } else if (info.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
+                        TestLogging.recordEvent(
+                                TestProtocol.SEQUENCE_MAIN, "start: taskbarDeepShortcut");
                         String id = info.getDeepShortcutId();
                         String packageName = intent.getPackage();
                         getSystemService(LauncherApps.class)
@@ -680,6 +687,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         Intent intent = new Intent(info.getIntent())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
+            TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "start: taskbarAppIcon");
             if (info.user.equals(Process.myUserHandle())) {
                 // TODO(b/216683257): Use startActivityForResult for search results that require it.
                 startActivity(intent);

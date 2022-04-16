@@ -16,7 +16,6 @@
 
 package com.android.quickstep.views;
 
-import static android.app.PendingIntent.FLAG_MUTABLE;
 import static android.view.Surface.ROTATION_0;
 import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
@@ -67,8 +66,6 @@ import android.animation.PropertyValuesHolder;
 import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
 import android.app.ActivityManager.RunningTaskInfo;
-import android.app.PendingIntent;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.LocusId;
 import android.content.res.Configuration;
@@ -428,6 +425,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private final int mScrollHapticMinGapMillis;
     private final RecentsModel mModel;
     private final int mSplitPlaceholderSize;
+    private final int mSplitPlaceholderInset;
     private final ClearAllButton mClearAllButton;
     private final Rect mClearAllButtonDeadZoneRect = new Rect();
     private final Rect mTaskViewDeadZoneRect = new Rect();
@@ -700,6 +698,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         setLayoutDirection(mIsRtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         mSplitPlaceholderSize = getResources().getDimensionPixelSize(
                 R.dimen.split_placeholder_size);
+        mSplitPlaceholderInset = getResources().getDimensionPixelSize(
+                R.dimen.split_placeholder_inset);
         mSquaredTouchSlop = squaredTouchSlop(context);
 
         mEmptyIcon = context.getDrawable(R.drawable.ic_empty_recents);
@@ -1081,10 +1081,15 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private int getSnapToLastTaskScrollDiff() {
         // Snap to a position where ClearAll is just invisible.
         int screenStart = mOrientationHandler.getPrimaryScroll(this);
-        int clearAllWidth = mOrientationHandler.getPrimarySize(mClearAllButton);
         int clearAllScroll = getScrollForPage(indexOfChild(mClearAllButton));
-        int targetScroll = clearAllScroll + (mIsRtl ? clearAllWidth : -clearAllWidth);
-        return screenStart - targetScroll;
+        int clearAllWidth = mOrientationHandler.getPrimarySize(mClearAllButton);
+        int lastTaskScroll = getLastTaskScroll(clearAllScroll, clearAllWidth);
+        return screenStart - lastTaskScroll;
+    }
+
+    private int getLastTaskScroll(int clearAllScroll, int clearAllWidth) {
+        int distance = clearAllWidth + getClearAllExtraPageSpacing();
+        return clearAllScroll + (mIsRtl ? distance : -distance);
     }
 
     private int getSnapToFocusedTaskScrollDiff(boolean isClearAllHidden) {
@@ -2011,22 +2016,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         return null;
     }
 
-    @Nullable
-    private TaskView getTaskViewByComponentName(ComponentName componentName) {
-        if (componentName == null) {
-            return null;
-        }
-
-        for (int i = 0; i < getTaskViewCount(); i++) {
-            TaskView taskView = requireTaskViewAt(i);
-            if (taskView.getItemInfo().getIntent().getComponent().getPackageName().equals(
-                    componentName.getPackageName())) {
-                return taskView;
-            }
-        }
-        return null;
-    }
-
     public int getRunningTaskIndex() {
         TaskView taskView = getRunningTaskView();
         return taskView == null ? -1 : indexOfChild(taskView);
@@ -2716,7 +2705,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      */
     private void createInitialSplitSelectAnimation(PendingAnimation anim) {
         mOrientationHandler.getInitialSplitPlaceholderBounds(mSplitPlaceholderSize,
-                mActivity.getDeviceProfile(),
+                mSplitPlaceholderInset, mActivity.getDeviceProfile(),
                 mSplitSelectStateController.getActiveSplitStagePosition(), mTempRect);
 
         RectF startingTaskRect = new RectF();
@@ -2728,7 +2717,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                     mSplitHiddenTaskView.getIconView().getDrawable(), startingTaskRect);
             mFirstFloatingTaskView.setAlpha(1);
             mFirstFloatingTaskView.addAnimation(anim, startingTaskRect,
-                    mTempRect, true /* fadeWithThumbnail */, true /* isInitialSplit */);
+                    mTempRect, true /* fadeWithThumbnail */, true /* isStagedTask */);
         } else {
             mSplitSelectSource.view.setVisibility(INVISIBLE);
             mFirstFloatingTaskView = FloatingTaskView.getFloatingTaskView(mActivity,
@@ -2736,7 +2725,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                     mSplitSelectSource.drawable, startingTaskRect);
             mFirstFloatingTaskView.setAlpha(1);
             mFirstFloatingTaskView.addAnimation(anim, startingTaskRect,
-                    mTempRect, true /* fadeWithThumbnail */, true /* isInitialSplit */);
+                    mTempRect, true /* fadeWithThumbnail */, true /* isStagedTask */);
         }
         anim.addEndListener(success -> {
             if (success) {
@@ -3891,9 +3880,10 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         float taskSplitScrollOffsetPrimary = 0f;
         float clearAllSplitScrollOffsetPrimar = 0f;
         if (isSplitPlaceholderFirstInGrid()) {
-            taskSplitScrollOffsetPrimary = mSplitPlaceholderSize;
+            taskSplitScrollOffsetPrimary = mIsRtl ? mSplitPlaceholderSize : -mSplitPlaceholderSize;
         } else if (isSplitPlaceholderLastInGrid()) {
-            clearAllSplitScrollOffsetPrimar = -mSplitPlaceholderSize;
+            clearAllSplitScrollOffsetPrimar =
+                    mIsRtl ? -mSplitPlaceholderSize : mSplitPlaceholderSize;
         }
 
         for (int i = 0; i < getTaskViewCount(); i++) {
@@ -3969,17 +3959,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     public void initiateSplitSelect(QuickstepSystemShortcut.SplitSelectSource splitSelectSource) {
-        // Remove the task if it exists in Overview
-        TaskView matchingTaskView = getTaskViewByComponentName(
-                splitSelectSource.intent.getComponent());
-        if (matchingTaskView != null) {
-            removeTaskInternal(matchingTaskView.getTaskViewId());
-        }
-
         mSplitSelectSource = splitSelectSource;
-        mSplitSelectStateController.setInitialTaskSelect(
-                PendingIntent.getActivity(
-                        mContext, 0, splitSelectSource.intent, FLAG_MUTABLE),
+        mSplitSelectStateController.setInitialTaskSelect(splitSelectSource.intent,
                 splitSelectSource.position.stagePosition);
     }
 
@@ -4024,17 +4005,17 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         mFirstFloatingTaskView.getBoundsOnScreen(firstTaskStartingBounds);
         mFirstFloatingTaskView.addAnimation(pendingAnimation,
                 new RectF(firstTaskStartingBounds), firstTaskEndingBounds,
-                false /* fadeWithThumbnail */, false /* isInitialSplit */);
+                false /* fadeWithThumbnail */, true /* isStagedTask */);
 
         mSecondFloatingTaskView = FloatingTaskView.getFloatingTaskView(mActivity,
                 thumbnailView, thumbnailView.getThumbnail(),
                 iconView.getDrawable(), secondTaskStartingBounds);
         mSecondFloatingTaskView.setAlpha(1);
         mSecondFloatingTaskView.addAnimation(pendingAnimation, secondTaskStartingBounds,
-                secondTaskEndingBounds, true /* fadeWithThumbnail */, false /* isInitialSplit */);
+                secondTaskEndingBounds, true /* fadeWithThumbnail */, false /* isStagedTask */);
         pendingAnimation.addEndListener(aBoolean ->
-                mSplitSelectStateController.setSecondTaskId(task.key.id,
-                aBoolean1 -> RecentsView.this.resetFromSplitSelectionState()));
+                mSplitSelectStateController.setSecondTask(
+                        task, aBoolean1 -> RecentsView.this.resetFromSplitSelectionState()));
         if (containerTaskView.containsMultipleTasks()) {
             // If we are launching from a child task, then only hide the thumbnail itself
             mSecondSplitHiddenView = thumbnailView;
@@ -4099,10 +4080,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
     protected void onRotateInSplitSelectionState() {
         mOrientationHandler.getInitialSplitPlaceholderBounds(mSplitPlaceholderSize,
-                mActivity.getDeviceProfile(),
+                mSplitPlaceholderInset, mActivity.getDeviceProfile(),
                 mSplitSelectStateController.getActiveSplitStagePosition(), mTempRect);
         mTempRectF.set(mTempRect);
-        // TODO(194414938) set correct corner radius
         mFirstFloatingTaskView.updateOrientationHandler(mOrientationHandler);
         mFirstFloatingTaskView.update(mTempRectF, /*progress=*/1f);
 
@@ -4303,7 +4283,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
         mPendingAnimation.addEndListener(isSuccess -> {
             if (isSuccess) {
-                if (tv.getTaskIds()[1] != -1) {
+                if (tv.getTaskIds()[1] != -1 && mRemoteTargetHandles != null) {
                     // TODO(b/194414938): make this part of the animations instead.
                     TaskViewUtils.createSplitAuxiliarySurfacesAnimator(
                             mRemoteTargetHandles[0].getTransformParams().getTargetSet().nonApps,
@@ -4542,6 +4522,19 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     @Override
+    protected int getChildGap(int fromIndex, int toIndex) {
+        int clearAllIndex = indexOfChild(mClearAllButton);
+        return fromIndex == clearAllIndex || toIndex == clearAllIndex
+                ? getClearAllExtraPageSpacing() : 0;
+    }
+
+    private int getClearAllExtraPageSpacing() {
+        return showAsGrid()
+                ? Math.max(mActivity.getDeviceProfile().overviewGridSideMargin - mPageSpacing, 0)
+                : 0;
+    }
+
+    @Override
     protected void updateMinAndMaxScrollX() {
         super.updateMinAndMaxScrollX();
         if (DEBUG) {
@@ -4623,9 +4616,10 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             TaskView taskView = requireTaskViewAt(i);
             float scrollDiff = taskView.getScrollAdjustment(showAsFullscreen, showAsGrid);
             int pageScroll = newPageScrolls[i] + (int) scrollDiff;
-            if ((mIsRtl && pageScroll < clearAllScroll + clearAllWidth)
-                    || (!mIsRtl && pageScroll > clearAllScroll - clearAllWidth)) {
-                pageScroll = clearAllScroll + (mIsRtl ? clearAllWidth : -clearAllWidth);
+            int lastTaskScroll = getLastTaskScroll(clearAllScroll, clearAllWidth);
+            if ((mIsRtl && pageScroll < lastTaskScroll)
+                    || (!mIsRtl && pageScroll > lastTaskScroll)) {
+                pageScroll = lastTaskScroll;
             }
             if (outPageScrolls[i] != pageScroll) {
                 pageScrollChanged = true;
@@ -5109,6 +5103,19 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             if (mRecentsView != null) {
                 mRecentsView.mPipCornerRadius = cornerRadius;
             }
+        }
+
+        @Override
+        public void onExpandPip() {
+            MAIN_EXECUTOR.execute(() -> {
+                if (mRecentsView == null
+                        || mRecentsView.mSizeStrategy.getTaskbarController() == null) {
+                    return;
+                }
+                // Hide the task bar when leaving PiP to prevent it from flickering once
+                // the app settles in full-screen mode.
+                mRecentsView.mSizeStrategy.getTaskbarController().onExpandPip();
+            });
         }
     }
 
