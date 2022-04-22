@@ -237,8 +237,8 @@ import java.util.stream.Stream;
 /**
  * Default launcher application.
  */
-public class Launcher extends StatefulActivity<LauncherState> implements LauncherExterns,
-        Callbacks, InvariantDeviceProfile.OnIDPChangeListener,
+public class Launcher extends StatefulActivity<LauncherState>
+        implements LauncherExterns, Callbacks, InvariantDeviceProfile.OnIDPChangeListener,
         PluginListener<LauncherOverlayPlugin>, LauncherOverlayCallbacks {
     public static final String TAG = "Launcher";
 
@@ -304,7 +304,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     private Configuration mOldConfig;
 
     @Thunk
-    Workspace mWorkspace;
+    Workspace<?> mWorkspace;
     @Thunk
     DragLayer mDragLayer;
     private DragController mDragController;
@@ -604,7 +604,13 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     public void onEnterAnimationComplete() {
         super.onEnterAnimationComplete();
         mRotationHelper.setCurrentTransitionRequest(REQUEST_NONE);
-        AbstractFloatingView.closeOpenViews(this, false, TYPE_ICON_SURFACE);
+        // Starting with Android S, onEnterAnimationComplete is sent immediately
+        // causing the surface to get removed before the animation completed (b/175345344).
+        // Instead we rely on next user touch event to remove the view and optionally a callback
+        // from system from Android T onwards.
+        if (!Utilities.ATLEAST_S) {
+            AbstractFloatingView.closeOpenViews(this, false, TYPE_ICON_SURFACE);
+        }
     }
 
     @Override
@@ -1183,6 +1189,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             mOverlayManager.onActivityResumed(this);
         }
 
+        AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
         TraceHelper.INSTANCE.endSection(traceToken);
     }
 
@@ -1520,7 +1527,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         return mAppsView;
     }
 
-    public Workspace getWorkspace() {
+    public Workspace<?> getWorkspace() {
         return mWorkspace;
     }
 
@@ -1686,9 +1693,6 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
             outState.remove(RUNTIME_STATE_WIDGET_PANEL);
         }
 
-        // We close any open folders and shortcut containers that are not safe for rebind,
-        // and we need to make sure this state is reflected.
-        AbstractFloatingView.closeOpenViews(this, false, TYPE_ALL & ~TYPE_REBIND_SAFE);
         finishAutoCancelActionMode();
 
         if (mPendingRequestArgs != null) {
@@ -2356,7 +2360,7 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
         // Get the list of added items and intersect them with the set of items here
         final Collection<Animator> bounceAnims = new ArrayList<>();
         boolean canAnimatePageChange = canAnimatePageChange();
-        Workspace workspace = mWorkspace;
+        Workspace<?> workspace = mWorkspace;
         int newItemsScreenId = -1;
         int end = items.size();
         View newView = null;
@@ -3230,11 +3234,12 @@ public class Launcher extends StatefulActivity<LauncherState> implements Launche
     /** Pauses view updates that should not be run during the app launch animation. */
     public void pauseExpensiveViewUpdates() {
         // Pause page indicator animations as they lead to layer trashing.
-        getWorkspace().getPageIndicator().pauseAnimations();
+        mWorkspace.getPageIndicator().pauseAnimations();
     }
 
     /** Resumes view updates at the end of the app launch animation. */
     public void resumeExpensiveViewUpdates() {
-        getWorkspace().getPageIndicator().skipAnimationsToEnd();
+        mWorkspace.getPageIndicator().skipAnimationsToEnd();
     }
+
 }
