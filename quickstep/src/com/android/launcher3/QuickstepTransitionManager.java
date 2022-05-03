@@ -244,8 +244,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         mDragLayerAlpha = mDragLayer.getAlphaProperty(ALPHA_INDEX_TRANSITIONS);
         mHandler = new Handler(Looper.getMainLooper());
         mDeviceProfile = mLauncher.getDeviceProfile();
-        mBackAnimationController = new LauncherBackAnimationController(
-                mDeviceProfile, mLauncher, this);
+        mBackAnimationController = new LauncherBackAnimationController(mLauncher, this);
 
         Resources res = mLauncher.getResources();
         mContentScale = res.getFloat(R.dimen.content_scale);
@@ -1162,7 +1161,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                     new LauncherAnimationRunner(mHandler, mWallpaperOpenTransitionRunner,
                             false /* startAtFrontOfQueue */), mLauncher.getIApplicationThread());
             mLauncherOpenTransition.addHomeOpenCheck(mLauncher.getComponentName());
-            SystemUiProxy.INSTANCE.getNoCreate().registerRemoteTransition(mLauncherOpenTransition);
+            SystemUiProxy.INSTANCE.get(mLauncher).registerRemoteTransition(mLauncherOpenTransition);
         }
         if (mBackAnimationController != null) {
             mBackAnimationController.registerBackCallbacks(mHandler);
@@ -1173,7 +1172,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         unregisterRemoteAnimations();
         unregisterRemoteTransitions();
         mStartingWindowListener.setTransitionManager(null);
-        SystemUiProxy.INSTANCE.getNoCreate().setStartingWindowListener(null);
+        SystemUiProxy.INSTANCE.get(mLauncher).setStartingWindowListener(null);
     }
 
     private void unregisterRemoteAnimations() {
@@ -1197,7 +1196,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         }
         if (hasControlRemoteAppTransitionPermission()) {
             if (mLauncherOpenTransition == null) return;
-            SystemUiProxy.INSTANCE.getNoCreate().unregisterRemoteTransition(
+            SystemUiProxy.INSTANCE.get(mLauncher).unregisterRemoteTransition(
                     mLauncherOpenTransition);
             mLauncherOpenTransition = null;
             mWallpaperOpenTransitionRunner = null;
@@ -1441,6 +1440,10 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 }
             };
             anim.addOnUpdateListener(runner);
+        } else {
+            // If no floating icon or widget is present, animate the to the default window
+            // target rect.
+            anim.addOnUpdateListener(new SpringAnimRunner(targets, targetRect, windowTargetBounds));
         }
 
         // Use a fixed velocity to start the animation.
