@@ -154,6 +154,7 @@ import com.android.quickstep.RecentsModel.TaskVisualsChangeListener;
 import com.android.quickstep.RemoteAnimationTargets;
 import com.android.quickstep.RemoteTargetGluer;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
+import com.android.quickstep.RotationTouchHelper;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskThumbnailCache;
@@ -382,7 +383,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private static final float ANIMATION_DISMISS_PROGRESS_MIDPOINT = 0.5f;
     private static final float END_DISMISS_TRANSLATION_INTERPOLATION_OFFSET = 0.75f;
 
-    private static final float SIGNIFICANT_MOVE_THRESHOLD_TABLET = 0.15f;
+    private static final float SIGNIFICANT_MOVE_SCREEN_WIDTH_PERCENTAGE = 0.15f;
 
     protected final RecentsOrientedState mOrientationState;
     protected final BaseActivityInterface<STATE_TYPE, ACTIVITY_TYPE> mSizeStrategy;
@@ -539,6 +540,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private final PinnedStackAnimationListener mIPipAnimationListener =
             new PinnedStackAnimationListener();
     private int mPipCornerRadius;
+    private int mPipShadowRadius;
 
     // Used to keep track of the last requested task list id, so that we do not request to load the
     // tasks again if we have already requested it and the task list has not changed
@@ -1193,9 +1195,14 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     @Override
-    protected float getSignificantMoveThreshold() {
-        return mActivity.getDeviceProfile().isTablet ? SIGNIFICANT_MOVE_THRESHOLD_TABLET
-                : super.getSignificantMoveThreshold();
+    protected boolean isSignificantMove(float absoluteDelta, int pageOrientedSize) {
+        DeviceProfile deviceProfile = mActivity.getDeviceProfile();
+        if (!deviceProfile.isTablet) {
+            return super.isSignificantMove(absoluteDelta, pageOrientedSize);
+        }
+
+        return absoluteDelta
+                > deviceProfile.availableWidthPx * SIGNIFICANT_MOVE_SCREEN_WIDTH_PERCENTAGE;
     }
 
     @Override
@@ -1287,10 +1294,11 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                     return;
                 }
                 TaskView taskView = getTaskViewAt(mNextPage);
-                // Only snap to fully visible focused task.
-                if (taskView == null
-                        || !taskView.isFocusedTask()
-                        || !isTaskViewFullyVisible(taskView)) {
+                // Snap to fully visible focused task and clear all button.
+                boolean shouldSnapToFocusedTask = taskView != null && taskView.isFocusedTask()
+                        && isTaskViewFullyVisible(taskView);
+                boolean shouldSnapToClearAll = mNextPage == indexOfChild(mClearAllButton);
+                if (!shouldSnapToFocusedTask && !shouldSnapToClearAll) {
                     return;
                 }
             }
@@ -2064,11 +2072,16 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     /**
      * Called when a gesture from an app is starting.
      */
-    public void onGestureAnimationStart(RunningTaskInfo[] runningTaskInfo) {
+    public void onGestureAnimationStart(RunningTaskInfo[] runningTaskInfo,
+            RotationTouchHelper rotationTouchHelper) {
         mGestureActive = true;
         // This needs to be called before the other states are set since it can create the task view
         if (mOrientationState.setGestureActive(true)) {
-            updateOrientationHandler();
+            setLayoutRotation(rotationTouchHelper.getCurrentActiveRotation(),
+                    rotationTouchHelper.getDisplayRotation());
+            // Force update to ensure the initial task size is computed even if the orientation has
+            // not changed.
+            updateSizeAndPadding();
         }
 
         showCurrentTask(runningTaskInfo);
@@ -4528,7 +4541,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 ? getClearAllExtraPageSpacing() : 0;
     }
 
-    private int getClearAllExtraPageSpacing() {
+    protected int getClearAllExtraPageSpacing() {
         return showAsGrid()
                 ? Math.max(mActivity.getDeviceProfile().overviewGridSideMargin - mPageSpacing, 0)
                 : 0;
@@ -5004,6 +5017,14 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         return mPipCornerRadius;
     }
 
+    /**
+     * @return Shadow radius in pixel value for PiP window, which is updated via
+     *         {@link #mIPipAnimationListener}
+     */
+    public int getPipShadowRadius() {
+        return mPipShadowRadius;
+    }
+
     @Override
     public boolean scrollLeft() {
         if (!showAsGrid()) {
@@ -5099,9 +5120,10 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
 
         @Override
-        public void onPipCornerRadiusChanged(int cornerRadius) {
+        public void onPipResourceDimensionsChanged(int cornerRadius, int shadowRadius) {
             if (mRecentsView != null) {
                 mRecentsView.mPipCornerRadius = cornerRadius;
+                mRecentsView.mPipShadowRadius = shadowRadius;
             }
         }
 
