@@ -120,6 +120,12 @@
         android:key="misc_category"
         android:title="@string/category_misc">
 
+        <SwitchPreference
+            android:key="pref_show_top_shadow"
+            android:title="@string/show_top_shadow"
+            android:defaultValue="true"
+            android:persistent="true" />
+
         <Preference
             android:key="pref_developer_options"
             android:persistent="false"

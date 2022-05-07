@@ -69,4 +69,7 @@
     <string name="smartspace_pref_title">At a Glance</string>
     <string name="smartspace_pref_summary">Show smartspace at the top of home screen</string>
 
+    <!-- Show top shadow -->
+    <string name="show_top_shadow">Show top shadow</string>
+
 </resources>
