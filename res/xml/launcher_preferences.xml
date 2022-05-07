@@ -39,6 +39,13 @@
         android:summaryOn="@string/settings_lock_layout_summary_on"
         android:summaryOff="@string/settings_lock_layout_summary_off" />
 
+    <SwitchPreference
+        android:key="pref_hide_top_shadow"
+        android:title="@string/hide_top_shadow_title"
+        android:summary="@string/hide_top_shadow_summary"
+        android:defaultValue="false"
+        android:persistent="true" />
+
     <androidx.preference.PreferenceCategory
         android:key="gesture_category"
         android:title="@string/category_gesture">
