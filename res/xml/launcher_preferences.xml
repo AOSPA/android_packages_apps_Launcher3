@@ -53,6 +53,12 @@
         android:defaultValue="true"
         android:persistent="true"/>
 
+    <SwitchPreference
+        android:key="pref_dock_search"
+        android:title="@string/dock_search_title"
+        android:summary="@string/dock_search_summary"
+        android:defaultValue="true" />
+
     <Preference
         android:persistent="false"
         android:title="@string/suggestion_pref_screen_title"
@@ -60,18 +66,6 @@
         android:summary="@string/suggestion_pref_screen_desc">
         <intent android:action="android.settings.ACTION_CONTENT_SUGGESTIONS_SETTINGS" />
     </Preference>
-
-    <androidx.preference.PreferenceCategory
-        android:key="recents_category"
-        android:title="@string/category_recents">
-
-        <SwitchPreference
-            android:key="pref_dock_search"
-            android:title="@string/dock_search_title"
-            android:summary="@string/dock_search_summary"
-            android:defaultValue="false" />
-
-    </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory
         android:key="icon_category"
