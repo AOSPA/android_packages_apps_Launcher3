@@ -253,8 +253,8 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
         // Since state mBaseState can be reached from multiple states, just assume that the
         // transition plays in reverse and use the same duration as previous state.
         mConfig.duration = state == mBaseState
-                ? fromState.getTransitionDuration(mActivity)
-                : state.getTransitionDuration(mActivity);
+                ? fromState.getTransitionDuration(mActivity, false /* isToState */)
+                : state.getTransitionDuration(mActivity, true /* isToState */);
         prepareForAtomicAnimation(fromState, state, mConfig);
         AnimatorSet animation = createAnimationToNewWorkspaceInternal(state).buildAnim();
         if (listener != null) {
@@ -335,7 +335,13 @@ public class StateManager<STATE_TYPE extends BaseState<STATE_TYPE>> {
             @Override
             public void onAnimationStart(Animator animation) {
                 // Change the internal state only when the transition actually starts
-                onStateTransitionStart(state);
+                onStateTransitionStart(mCancelled ? mCurrentStableState : state);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                super.onAnimationCancel(animation);
+                mState = mCurrentStableState;
             }
 
             @Override

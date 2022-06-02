@@ -43,6 +43,7 @@ import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.SystemUiProxy;
@@ -136,7 +137,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
             return null;
         }
         ItemInfo item = (ItemInfo) icon.getTag();
-        if (!PopupContainerWithArrow.canShow(icon, item)) {
+        if (!ShortcutUtil.supportsShortcuts(item)) {
             return null;
         }
 
@@ -159,7 +160,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
                 mPopupDataProvider.getNotificationKeysForItem(item),
                 // TODO (b/198438631): add support for INSTALL shortcut factory
                 getSystemShortcuts()
-                        .map(s -> s.getShortcut(context, item))
+                        .map(s -> s.getShortcut(context, item, icon))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList()));
         container.requestFocus();
@@ -242,7 +243,8 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
      */
     private SystemShortcut.Factory<BaseTaskbarContext> createSplitShortcutFactory(
             SplitPositionOption position) {
-        return (context, itemInfo) -> new TaskbarSplitShortcut(context, itemInfo, position);
+        return (context, itemInfo, originalView) -> new TaskbarSplitShortcut(context, itemInfo,
+                originalView, position);
     }
 
      /**
@@ -253,9 +255,9 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
     private static class TaskbarSplitShortcut extends SystemShortcut<BaseTaskbarContext> {
         private final SplitPositionOption mPosition;
 
-        TaskbarSplitShortcut(BaseTaskbarContext context, ItemInfo itemInfo,
+        TaskbarSplitShortcut(BaseTaskbarContext context, ItemInfo itemInfo, View originalView,
                 SplitPositionOption position) {
-            super(position.iconResId, position.textResId, context, itemInfo);
+            super(position.iconResId, position.textResId, context, itemInfo, originalView);
             mPosition = position;
         }
 

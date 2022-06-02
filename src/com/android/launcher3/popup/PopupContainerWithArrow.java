@@ -187,7 +187,10 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
 
     /**
      * Returns true if we can show the container.
+     *
+     * @deprecated Left here since some dependent projects are using this method
      */
+    @Deprecated
     public static boolean canShow(View icon, ItemInfo item) {
         return icon instanceof BubbleTextView && ShortcutUtil.supportsShortcuts(item);
     }
@@ -204,7 +207,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
             return null;
         }
         ItemInfo item = (ItemInfo) icon.getTag();
-        if (!canShow(icon, item)) {
+        if (!ShortcutUtil.supportsShortcuts(item)) {
             return null;
         }
 
@@ -218,7 +221,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
                 popupDataProvider.getShortcutCountForItem(item),
                 popupDataProvider.getNotificationKeysForItem(item),
                 launcher.getSupportedShortcuts()
-                        .map(s -> s.getShortcut(launcher, item))
+                        .map(s -> s.getShortcut(launcher, item, icon))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList()));
         launcher.refreshAndBindWidgetsForPackageUser(PackageUserKey.fromItemInfo(item));
@@ -538,7 +541,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
     public static void dismissInvalidPopup(BaseDraggingActivity activity) {
         PopupContainerWithArrow popup = getOpen(activity);
         if (popup != null && (!popup.mOriginalIcon.isAttachedToWindow()
-                || !canShow(popup.mOriginalIcon, (ItemInfo) popup.mOriginalIcon.getTag()))) {
+                || !ShortcutUtil.supportsShortcuts((ItemInfo) popup.mOriginalIcon.getTag()))) {
             popup.animateClose();
         }
     }
