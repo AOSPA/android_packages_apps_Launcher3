@@ -178,6 +178,7 @@ android_library {
         "SettingsLib",
         "libGoogleFeed",
         "co.aospa.framework",
+        "bcsmartspace-google"
     ],
     manifest: "AndroidManifest-common.xml",
     sdk_version: "current",
