@@ -16,14 +16,39 @@
 
 package co.aospa.launcher;
 
+import android.app.smartspace.SmartspaceTarget;
+
+import co.aospa.launcher.ParanoidLauncherModelDelegate.SmartspaceItem;
+
+import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.systemui.plugins.shared.LauncherOverlayManager;
 
+import com.google.android.systemui.smartspace.BcSmartspaceDataProvider;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
 public class ParanoidLauncher extends QuickstepLauncher {
+
+    public BcSmartspaceDataProvider mSmartspacePlugin = new BcSmartspaceDataProvider();
 
     @Override
     protected LauncherOverlayManager getDefaultOverlay() {
         return new OverlayCallbackImpl(this);
+    }
+
+    public BcSmartspaceDataProvider getSmartspacePlugin() {
+        return mSmartspacePlugin;
+    }
+
+    @Override
+    public void bindExtraContainerItems(BgDataModel.FixedContainerItems container) {
+        if (container.containerId == -110) {
+            List<SmartspaceTarget> targets = container.items.stream().map(item -> ((SmartspaceItem) item).getSmartspaceTarget()).collect(Collectors.toList());
+            mSmartspacePlugin.onTargetsAvailable(targets);
+        }
+        super.bindExtraContainerItems(container);
     }
 
 }
