@@ -67,4 +67,7 @@
     <string name="lock_layout_summary_off">Icons and widgets can be added, removed and moved on the homescreen</string>
     <string name="lock_layout_widgets_error">It\'s not possible to add widgets to the home screen</string>
 
+    <!-- Smartspace -->
+    <string name="smartspace_pref_title">At a Glance</string>
+    <string name="smartspace_pref_summary">Show smartspace at the top of home screen</string>
 </resources>
