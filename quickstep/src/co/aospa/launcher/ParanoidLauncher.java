@@ -17,9 +17,17 @@
 package co.aospa.launcher;
 
 import android.app.smartspace.SmartspaceTarget;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.Uri;
+import android.os.Bundle;
 
 import co.aospa.launcher.ParanoidLauncherModelDelegate.SmartspaceItem;
 
+import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.systemui.plugins.shared.LauncherOverlayManager;
@@ -32,6 +40,38 @@ import java.util.stream.Collectors;
 public class ParanoidLauncher extends QuickstepLauncher {
 
     public BcSmartspaceDataProvider mSmartspacePlugin = new BcSmartspaceDataProvider();
+    private boolean mGsaEnabled, mAsiEnabled;
+
+    private BroadcastReceiver mPackageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Uri uri = intent.getData();
+            String pkg = uri != null ? uri.getSchemeSpecificPart() : null;
+            if (pkg != null) {
+                if (pkg.equals(Utilities.GSA_PACKAGE) && mGsaEnabled != Utilities.isGSAEnabled(context)) {
+                    mGsaEnabled = Utilities.isGSAEnabled(context);
+                    Utilities.restart(context);
+                } else if (pkg.equals(Utilities.ASI_PACKAGE) && mAsiEnabled != Utilities.isASIEnabled(context)) {
+                    mAsiEnabled = Utilities.isASIEnabled(context);
+                    Utilities.restart(context);
+                }
+            }
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        mGsaEnabled = Utilities.isGSAEnabled(this);
+        mAsiEnabled = Utilities.isASIEnabled(this);
+
+        IntentFilter packageFilter = new IntentFilter();
+        packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+        packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        packageFilter.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        packageFilter.addDataScheme("package");
+        registerReceiver(mPackageReceiver, packageFilter);
+    }
 
     @Override
     protected LauncherOverlayManager getDefaultOverlay() {
