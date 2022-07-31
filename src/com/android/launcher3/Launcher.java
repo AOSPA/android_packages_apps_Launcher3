@@ -406,6 +406,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     private StringCache mStringCache;
     private BaseSearchConfig mBaseSearchConfig;
 
+    private boolean mSmartspaceEnabled;
+
     @Override
     @TargetApi(Build.VERSION_CODES.S)
     protected void onCreate(Bundle savedInstanceState) {
@@ -495,6 +497,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         mAppWidgetManager = new WidgetManagerHelper(this);
         mAppWidgetHolder = createAppWidgetHolder();
         mAppWidgetHolder.startListening();
+
+        mSmartspaceEnabled = Utilities.showSmartspace(this);
 
         setupViews();
         crossFadeWithPreviousAppearance();
@@ -2273,11 +2277,11 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
     public void bindScreens(IntArray orderedScreenIds) {
         int firstScreenPosition = 0;
-        if (FeatureFlags.QSB_ON_FIRST_SCREEN &&
+        if (mSmartspaceEnabled &&
                 orderedScreenIds.indexOf(Workspace.FIRST_SCREEN_ID) != firstScreenPosition) {
             orderedScreenIds.removeValue(Workspace.FIRST_SCREEN_ID);
             orderedScreenIds.add(firstScreenPosition, Workspace.FIRST_SCREEN_ID);
-        } else if (!FeatureFlags.QSB_ON_FIRST_SCREEN && orderedScreenIds.isEmpty()) {
+        } else if (!mSmartspaceEnabled && orderedScreenIds.isEmpty()) {
             // If there are no screens, we need to have an empty screen
             mWorkspace.addExtraEmptyScreens();
         }
@@ -2301,7 +2305,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         int count = orderedScreenIds.size();
         for (int i = 0; i < count; i++) {
             int screenId = orderedScreenIds.get(i);
-            if (FeatureFlags.QSB_ON_FIRST_SCREEN && screenId == Workspace.FIRST_SCREEN_ID) {
+            if (mSmartspaceEnabled && screenId == Workspace.FIRST_SCREEN_ID) {
                 // No need to bind the first screen, as its always bound.
                 continue;
             }

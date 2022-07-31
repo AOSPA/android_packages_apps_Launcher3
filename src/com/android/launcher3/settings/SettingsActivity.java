@@ -146,6 +146,7 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         switch (key) {
             case Utilities.KEY_DOCK_SEARCH:
+            case Utilities.KEY_SMARTSPACE:
                 LauncherAppState.getInstanceNoCreate().setNeedsRestart();
                 break;
             default:
