@@ -53,6 +53,7 @@
     <!-- Settings Categories -->
     <string name="category_icon">Icons</string>
     <string name="category_misc">Misc</string>
+    <string name="category_google">Google</string>
 
     <!-- Recents -->
     <string name="action_lens">Lens</string>
