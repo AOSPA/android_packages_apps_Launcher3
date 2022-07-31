@@ -46,6 +46,8 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
 
     var workspaceLoading = true
 
+    var mSmartspaceEnabled = false
+
     /**
      * Refreshes the shortcuts shown on the workspace.
      *
@@ -327,15 +329,12 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         )
         val firstScreenPosition = 0
         if (
-            (isFirstPagePinnedItemEnabled && !SHOULD_SHOW_FIRST_PAGE_WIDGET) &&
+            (mSmartspaceEnabled) &&
                 orderedScreenIds.indexOf(FIRST_SCREEN_ID) != firstScreenPosition
         ) {
             orderedScreenIds.removeValue(FIRST_SCREEN_ID)
             orderedScreenIds.add(firstScreenPosition, FIRST_SCREEN_ID)
-        } else if (
-            (!isFirstPagePinnedItemEnabled || SHOULD_SHOW_FIRST_PAGE_WIDGET) &&
-                orderedScreenIds.isEmpty
-        ) {
+        } else if (!mSmartspaceEnabled && orderedScreenIds.isEmpty) {
             // If there are no screens, we need to have an empty screen
             launcher.workspace.addExtraEmptyScreens()
         }
@@ -390,8 +389,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         }
         orderedScreenIds
             .filterNot { screenId ->
-                isFirstPagePinnedItemEnabled &&
-                    !SHOULD_SHOW_FIRST_PAGE_WIDGET &&
+                mSmartspaceEnabled &&
                     screenId == WorkspaceLayoutManager.FIRST_SCREEN_ID
             }
             .forEach { screenId ->
@@ -430,4 +428,8 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
     fun getIsFirstPagePinnedItemEnabled(): Boolean = isFirstPagePinnedItemEnabled
 
     override fun getItemInflater() = launcher.itemInflater
+
+    fun setSmartSpaceEnabled(enabled: Boolean) {
+          mSmartspaceEnabled = enabled
+    }
 }
