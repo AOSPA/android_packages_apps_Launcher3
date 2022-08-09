@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "62227545_c713730a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000579
+      },
+      "writtenOn": "2022-08-09T03:16:28Z",
+      "side": 1,
+      "message": "Is there a way we can make misc header disappear until dev options is enabled? I have an empty category in there otherwise",
+      "revId": "a5a7c992a88a73143f955811092bcd7e63313722",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
