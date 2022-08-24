@@ -140,6 +140,20 @@ public final class Workspace extends Home {
         }
     }
 
+    /**
+     * Waits for an app icon to be gone (e.g. after uninstall). Fails if it remains.
+     *
+     * @param errorMessage error message thrown then the icon doesn't disappear.
+     * @param appName      app that should be gone.
+     */
+    public void verifyWorkspaceAppIconIsGone(String errorMessage, String appName) {
+        final UiObject2 workspace = verifyActiveContainer();
+        assertTrue(errorMessage,
+                workspace.wait(
+                        Until.gone(AppIcon.getAppIconSelector(appName, mLauncher)),
+                        LauncherInstrumentation.WAIT_TIME_MS));
+    }
+
 
     /**
      * Returns an icon for the app; fails if the icon doesn't exist.
@@ -394,6 +408,7 @@ public final class Workspace extends Home {
                 launcher,
                 launchable,
                 destSupplier,
+                /* isDecelerating= */ false,
                 () -> launcher.expectEvent(TestProtocol.SEQUENCE_MAIN, LONG_CLICK_EVENT),
                 /* expectDropEvents= */ null);
     }
@@ -402,6 +417,17 @@ public final class Workspace extends Home {
             LauncherInstrumentation launcher,
             Launchable launchable,
             Supplier<Point> dest,
+            Runnable expectLongClickEvents,
+            @Nullable Runnable expectDropEvents) {
+        dragIconToWorkspace(launcher, launchable, dest, /* isDecelerating */ true,
+                expectLongClickEvents, expectDropEvents);
+    }
+
+    static void dragIconToWorkspace(
+            LauncherInstrumentation launcher,
+            Launchable launchable,
+            Supplier<Point> dest,
+            boolean isDecelerating,
             Runnable expectLongClickEvents,
             @Nullable Runnable expectDropEvents) {
         try (LauncherInstrumentation.Closable ignored = launcher.addContextLayer(
@@ -430,7 +456,7 @@ public final class Workspace extends Home {
 
             // targetDest.x is now between 0 and displayX so we found the target page,
             // we just have to put move the icon to the destination and drop it
-            launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, true,
+            launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, isDecelerating,
                     downTime, SystemClock.uptimeMillis(), false,
                     LauncherInstrumentation.GestureScope.INSIDE);
             dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
