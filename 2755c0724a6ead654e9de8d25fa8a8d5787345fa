@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ac62514a_09fdc052",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000579
+      },
+      "writtenOn": "2022-08-30T12:59:27Z",
+      "side": 1,
+      "message": "21245: Revert \"Enable new keyguard-to-launcher animation\" | https://gerrit.aospa.co/c/AOSPA/android_packages_apps_Launcher3/+/21245 talk to him and confirm this still isn\u0027t the case",
+      "revId": "2755c0724a6ead654e9de8d25fa8a8d5787345fa",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
