@@ -375,6 +375,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
+    @ScreenRecord
     public void testDragToFolder() {
         // TODO: add the use case to drag an icon to an existing folder. Currently it either fails
         // on tablets or phones due to difference in resolution.
@@ -517,6 +518,25 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
             assertThat(finalPositions).doesNotContainKey(DUMMY_APP_NAME);
         } finally {
             TestUtil.uninstallDummyApp();
+        }
+    }
+
+    @Test
+    @PortraitLandscape
+    public void testDragShortcutToWorkspaceCell() throws Exception {
+        Point[] targets = getCornersAndCenterPositions();
+
+        for (Point target : targets) {
+            final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
+            allApps.freeze();
+            try {
+                allApps.getAppIcon(APP_NAME)
+                        .openDeepShortcutMenu()
+                        .getMenuItem(0)
+                        .dragToWorkspace(target.x, target.y);
+            } finally {
+                allApps.unfreeze();
+            }
         }
     }
 

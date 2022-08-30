@@ -27,6 +27,7 @@ import static com.android.launcher3.ResourceUtils.getBoolByName;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
 
 import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
@@ -111,6 +112,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     private final WindowManager mWindowManager;
     private final @Nullable RoundedCorner mLeftCorner, mRightCorner;
+    private DeviceProfile mDeviceProfile;
     private WindowManager.LayoutParams mWindowLayoutParams;
     private boolean mIsFullscreen;
     // The size we should return to when we call setTaskbarWindowFullscreen(false)
@@ -135,7 +137,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             TaskbarNavButtonController buttonController, ScopedUnfoldTransitionProgressProvider
             unfoldTransitionProgressProvider) {
         super(windowContext);
-        mDeviceProfile = dp;
+        mDeviceProfile = dp.copy(this);
 
         final Resources resources = getResources();
 
@@ -200,11 +202,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarAutohideSuspendController(this),
                 new TaskbarPopupController(this),
                 new TaskbarForceVisibleImmersiveController(this),
-                new TaskbarAllAppsController(this),
+                new TaskbarAllAppsController(this, dp),
                 isDesktopMode
                         ? new DesktopTaskbarRecentAppsController(this)
                         : TaskbarRecentAppsController.DEFAULT,
-                new TaskbarInsetsController(this));
+                new TaskbarInsetsController(this),
+                new VoiceInteractionWindowController(this));
     }
 
     public void init(@NonNull TaskbarSharedState sharedState) {
@@ -219,8 +222,14 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     @Override
+    public DeviceProfile getDeviceProfile() {
+        return mDeviceProfile;
+    }
+
+    /** Updates {@link DeviceProfile} instances for any Taskbar windows. */
     public void updateDeviceProfile(DeviceProfile dp) {
-        mDeviceProfile = dp;
+        mControllers.taskbarAllAppsController.updateDeviceProfile(dp);
+        mDeviceProfile = dp.copy(this);
         updateIconSize(getResources());
 
         AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
@@ -235,7 +244,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mDeviceProfile.updateIconSize(1, resources);
         float iconScale = taskbarIconSize / mDeviceProfile.iconSizePx;
         mDeviceProfile.updateIconSize(iconScale, resources);
-        mDeviceProfile.updateAllAppsIconSize(1, resources); // Leave all apps unscaled.
     }
 
     @VisibleForTesting
@@ -245,12 +253,20 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         return super.getStatsLogManager();
     }
 
-    /** Creates LayoutParams for adding a view directly to WindowManager as a new window */
+    /** @see #createDefaultWindowLayoutParams(int) */
     public WindowManager.LayoutParams createDefaultWindowLayoutParams() {
+        return createDefaultWindowLayoutParams(TYPE_NAVIGATION_BAR_PANEL);
+    }
+
+    /**
+     * Creates LayoutParams for adding a view directly to WindowManager as a new window.
+     * @param type The window type to pass to the created WindowManager.LayoutParams.
+     */
+    public WindowManager.LayoutParams createDefaultWindowLayoutParams(int type) {
         WindowManager.LayoutParams windowLayoutParams = new WindowManager.LayoutParams(
                 MATCH_PARENT,
                 mLastRequestedNonFullscreenHeight,
-                TYPE_NAVIGATION_BAR_PANEL,
+                type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_SLIPPERY,
                 PixelFormat.TRANSLUCENT);
@@ -467,6 +483,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 fromInit);
         mControllers.navButtonController.updateSysuiFlags(systemUiStateFlags);
         mControllers.taskbarForceVisibleImmersiveController.updateSysuiFlags(systemUiStateFlags);
+        mControllers.voiceInteractionWindowController.setIsVoiceInteractionWindowVisible(
+                (systemUiStateFlags & SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING) != 0, fromInit);
     }
 
     /**
@@ -611,7 +629,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     /** Removes the given view from WindowManager. See {@link #addWindowView}. */
     public void removeWindowView(View view) {
-        mWindowManager.removeViewImmediate(view);
+        if (view.isAttachedToWindow()) {
+            mWindowManager.removeViewImmediate(view);
+        }
     }
 
     protected void onTaskbarIconClicked(View view) {

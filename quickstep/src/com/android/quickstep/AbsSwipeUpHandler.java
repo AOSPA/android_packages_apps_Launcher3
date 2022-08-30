@@ -575,7 +575,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     protected void notifyGestureAnimationStartToRecents() {
         Task[] runningTasks;
-        if (mIsSwipeForStagedSplit) {
+        if (mIsSwipeForSplit) {
             int[] splitTaskIds = TopTaskTracker.INSTANCE.get(mContext).getRunningSplitTaskIds();
             runningTasks = mGestureState.getRunningTask().getPlaceholderTasks(splitTaskIds);
         } else {
@@ -1284,15 +1284,18 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     ? runningTaskTarget.taskInfo.launchCookies
                     : new ArrayList<>();
             boolean isTranslucent = runningTaskTarget != null && runningTaskTarget.isTranslucent;
+            boolean hasValidLeash = runningTaskTarget != null
+                    && runningTaskTarget.leash != null
+                    && runningTaskTarget.leash.isValid();
             boolean appCanEnterPip = !mDeviceState.isPipActive()
-                    && runningTaskTarget != null
+                    && hasValidLeash
                     && runningTaskTarget.allowEnterPip
                     && runningTaskTarget.taskInfo.pictureInPictureParams != null
                     && runningTaskTarget.taskInfo.pictureInPictureParams.isAutoEnterEnabled();
             HomeAnimationFactory homeAnimFactory =
                     createHomeAnimationFactory(cookies, duration, isTranslucent, appCanEnterPip,
                             runningTaskTarget);
-            mIsSwipingPipToHome = !mIsSwipeForStagedSplit && appCanEnterPip;
+            mIsSwipingPipToHome = !mIsSwipeForSplit && appCanEnterPip;
             final RectFSpringAnim[] windowAnim;
             if (mIsSwipingPipToHome) {
                 mSwipePipToHomeAnimator = createWindowAnimationToPip(
@@ -1394,9 +1397,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         }
     }
 
-    /**
-     * TODO(b/195473090) handle multiple task simulators (if needed) for PIP
-     */
     private SwipePipToHomeAnimator createWindowAnimationToPip(HomeAnimationFactory homeAnimFactory,
             RemoteAnimationTargetCompat runningTaskTarget, float startProgress) {
         // Directly animate the app to PiP (picture-in-picture) mode
@@ -1793,7 +1793,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     mSwipePipToHomeAnimator.getFinishTransaction(),
                     mSwipePipToHomeAnimator.getContentOverlay());
             mIsSwipingPipToHome = false;
-        } else if (mIsSwipeForStagedSplit) {
+        } else if (mIsSwipeForSplit) {
             // Transaction to hide the task to avoid flicker for entering PiP from split-screen.
             PictureInPictureSurfaceTransaction tx =
                     new PictureInPictureSurfaceTransaction.Builder()

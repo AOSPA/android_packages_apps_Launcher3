@@ -53,7 +53,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
-import com.android.launcher3.util.SplitConfigurationOptions.StagedSplitBounds;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
 import com.android.launcher3.views.BaseDragLayer;
 
 import java.util.Collections;
@@ -101,6 +101,17 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
         float oldX = velocity.x;
         float oldY = velocity.y;
         velocity.set(-oldY, oldX);
+    }
+
+    @Override
+    public void fixBoundsForHomeAnimStartRect(RectF outStartRect, DeviceProfile deviceProfile) {
+        // We don't need to check the "top" value here because the startRect is in the orientation
+        // of the app, not of the fixed portrait launcher.
+        if (outStartRect.left > deviceProfile.heightPx) {
+            outStartRect.offsetTo(0, outStartRect.top);
+        } else if (outStartRect.left < -deviceProfile.heightPx) {
+            outStartRect.offsetTo(0, outStartRect.top);
+        }
     }
 
     @Override
@@ -301,7 +312,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public Pair<Float, Float> getDwbLayoutTranslations(int taskViewWidth,
-            int taskViewHeight, StagedSplitBounds splitBounds, DeviceProfile deviceProfile,
+            int taskViewHeight, SplitBounds splitBounds, DeviceProfile deviceProfile,
             View[] thumbnailViews, int desiredTaskId, View banner) {
         boolean isRtl = banner.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
         float translationX = 0;
@@ -414,7 +425,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     }
 
     @Override
-    public void updateStagedSplitIconParams(View out, float onScreenRectCenterX,
+    public void updateSplitIconParams(View out, float onScreenRectCenterX,
             float onScreenRectCenterY, float fullscreenScaleX, float fullscreenScaleY,
             int drawableWidth, int drawableHeight, DeviceProfile dp,
             @StagePosition int stagePosition) {
@@ -459,7 +470,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public void setSplitTaskSwipeRect(DeviceProfile dp, Rect outRect,
-            StagedSplitBounds splitInfo, int desiredStagePosition) {
+            SplitBounds splitInfo, int desiredStagePosition) {
         float topLeftTaskPercent = splitInfo.appsStackedVertically
                 ? splitInfo.topTaskPercent
                 : splitInfo.leftTaskPercent;
@@ -476,7 +487,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
 
     @Override
     public void measureGroupedTaskViewThumbnailBounds(View primarySnapshot, View secondarySnapshot,
-            int parentWidth, int parentHeight, StagedSplitBounds splitBoundsConfig,
+            int parentWidth, int parentHeight, SplitBounds splitBoundsConfig,
             DeviceProfile dp, boolean isRtl) {
         int spaceAboveSnapshot = dp.overviewTaskThumbnailTopMarginPx;
         int totalThumbnailHeight = parentHeight - spaceAboveSnapshot;
@@ -518,7 +529,7 @@ public class LandscapePagedViewHandler implements PagedOrientationHandler {
     public void setSplitIconParams(View primaryIconView, View secondaryIconView,
             int taskIconHeight, int primarySnapshotWidth, int primarySnapshotHeight,
             int groupedTaskViewHeight, int groupedTaskViewWidth, boolean isRtl,
-            DeviceProfile deviceProfile, StagedSplitBounds splitConfig) {
+            DeviceProfile deviceProfile, SplitBounds splitConfig) {
         FrameLayout.LayoutParams primaryIconParams =
                 (FrameLayout.LayoutParams) primaryIconView.getLayoutParams();
         FrameLayout.LayoutParams secondaryIconParams =

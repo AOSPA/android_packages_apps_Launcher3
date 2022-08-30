@@ -34,6 +34,7 @@ import static com.android.launcher3.Utilities.squaredTouchSlop;
 import static com.android.launcher3.anim.Interpolators.ACCEL;
 import static com.android.launcher3.anim.Interpolators.ACCEL_0_75;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
+import static com.android.launcher3.anim.Interpolators.DEACCEL_2;
 import static com.android.launcher3.anim.Interpolators.FAST_OUT_SLOW_IN;
 import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
@@ -141,7 +142,7 @@ import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.util.ResourceBasedOverride.Overrides;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
-import com.android.launcher3.util.SplitConfigurationOptions.StagedSplitBounds;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.TranslateEdgeEffect;
 import com.android.launcher3.util.ViewPool;
@@ -624,7 +625,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     @Nullable
     private View mSecondSplitHiddenView;
     @Nullable
-    private StagedSplitBounds mSplitBoundsConfig;
+    private SplitBounds mSplitBoundsConfig;
     private final Toast mSplitToast = Toast.makeText(getContext(),
             R.string.toast_split_select_app, Toast.LENGTH_SHORT);
     private final Toast mSplitUnsupportedToast = Toast.makeText(getContext(),
@@ -1447,11 +1448,11 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
             if (hasMultipleTasks) {
                 boolean firstTaskIsLeftTopTask =
-                        groupTask.mStagedSplitBounds.leftTopTaskId == groupTask.task1.key.id;
+                        groupTask.mSplitBounds.leftTopTaskId == groupTask.task1.key.id;
                 Task leftTopTask = firstTaskIsLeftTopTask ? groupTask.task1 : groupTask.task2;
                 Task rightBottomTask = firstTaskIsLeftTopTask ? groupTask.task2 : groupTask.task1;
                 ((GroupedTaskView) taskView).bind(leftTopTask, rightBottomTask, mOrientationState,
-                        groupTask.mStagedSplitBounds);
+                        groupTask.mSplitBounds);
             } else {
                 taskView.bind(groupTask.task1, mOrientationState);
             }
@@ -4097,6 +4098,10 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         mSecondSplitHiddenView.setVisibility(INVISIBLE);
         InteractionJankMonitorWrapper.begin(this,
                 InteractionJankMonitorWrapper.CUJ_SPLIT_SCREEN_ENTER, "Second tile selected");
+
+        // Fade out all other views underneath placeholders
+        ObjectAnimator tvFade = ObjectAnimator.ofFloat(this, RecentsView.CONTENT_ALPHA,1, 0);
+        pendingAnimation.add(tvFade, DEACCEL_2, SpringProperty.DEFAULT);
         pendingAnimation.buildAnim().start();
         return true;
     }
@@ -4110,11 +4115,11 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 mSplitInstructionsView = null;
             }
             if (mFirstFloatingTaskView != null) {
-                mActivity.getRootView().removeView(mFirstFloatingTaskView);
+                mActivity.getDragLayer().removeView(mFirstFloatingTaskView);
                 mFirstFloatingTaskView = null;
             }
             if (mSecondFloatingTaskView != null) {
-                mActivity.getRootView().removeView(mSecondFloatingTaskView);
+                mActivity.getDragLayer().removeView(mSecondFloatingTaskView);
                 mSecondFloatingTaskView = null;
                 mSecondSplitHiddenView.setVisibility(VISIBLE);
                 mSecondSplitHiddenView = null;
@@ -4487,7 +4492,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         RemoteTargetGluer gluer = new RemoteTargetGluer(getContext(), getSizeStrategy());
         mRemoteTargetHandles = gluer.assignTargetsForSplitScreen(
                 getContext(), recentsAnimationTargets);
-        mSplitBoundsConfig = gluer.getStagedSplitBounds();
+        mSplitBoundsConfig = gluer.getSplitBounds();
         // Add release check to the targets from the RemoteTargetGluer and not the targets
         // passed in because in the event we're in split screen, we use the passed in targets
         // to create new RemoteAnimationTargets in assignTargetsForSplitScreen(), and the
@@ -4537,12 +4542,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             @Nullable Runnable onFinishComplete) {
         // TODO(b/197232424#comment#10) Move this back into onRecentsAnimationComplete(). Maybe?
         cleanupRemoteTargets();
-        if (!toRecents && ENABLE_QUICKSTEP_LIVE_TILE.get()) {
-            // Reset the minimized state since we force-toggled the minimized state when entering
-            // overview, but never actually finished the recents animation.  This is a catch all for
-            // cases where we haven't already reset it.
-            SystemUiProxy.INSTANCE.get(getContext()).setSplitScreenMinimized(false);
-        }
 
         if (mRecentsAnimationController == null) {
             if (onFinishComplete != null) {

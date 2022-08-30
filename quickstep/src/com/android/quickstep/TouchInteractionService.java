@@ -129,7 +129,7 @@ public class TouchInteractionService extends Service
     private static final String TAG = "TouchInteractionService";
 
     private static final boolean BUBBLES_HOME_GESTURE_ENABLED =
-            SystemProperties.getBoolean("persist.wm.debug.bubbles_home_gesture", false);
+            SystemProperties.getBoolean("persist.wm.debug.bubbles_home_gesture", true);
 
     private static final String KEY_BACK_NOTIFICATION_COUNT = "backNotificationCount";
     private static final String NOTIFY_ACTION_BACK = "com.android.quickstep.action.BACK_GESTURE";
@@ -266,6 +266,16 @@ public class TouchInteractionService extends Service
         @Override
         public void onScreenTurnedOn() {
             MAIN_EXECUTOR.execute(ProxyScreenStatusProvider.INSTANCE::onScreenTurnedOn);
+        }
+
+        /**
+         * Preloads the Overview activity.
+         *
+         * This method should only be used when the All Set page of the SUW is reached to safely
+         * preload the Launcher for the SUW first reveal.
+         */
+        public void preloadOverviewForSUWAllSet() {
+            preloadOverview(false, true);
         }
 
         @Override
@@ -883,6 +893,10 @@ public class TouchInteractionService extends Service
     }
 
     private void preloadOverview(boolean fromInit) {
+        preloadOverview(fromInit, false);
+    }
+
+    private void preloadOverview(boolean fromInit, boolean forSUWAllSet) {
         if (!mDeviceState.isUserUnlocked()) {
             return;
         }
@@ -892,7 +906,8 @@ public class TouchInteractionService extends Service
             return;
         }
 
-        if (RestoreDbTask.isPending(this) || !mDeviceState.isUserSetupComplete()) {
+        if ((RestoreDbTask.isPending(this) && !forSUWAllSet)
+                || !mDeviceState.isUserSetupComplete()) {
             // Preloading while a restore is pending may cause launcher to start the restore
             // too early.
             return;
