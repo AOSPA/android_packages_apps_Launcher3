@@ -166,11 +166,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     if (mActivity != activity) {
                         return;
                     }
-                    if (mTaskAnimationManager != null) {
-                        mTaskAnimationManager.finishRunningRecentsAnimation(true);
-                    }
                     mRecentsView = null;
-                    mActivity.unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
                     mActivity = null;
                 }
             };
@@ -234,7 +230,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     STATE_LAUNCHER_BIND_TO_SERVICE;
 
     public static final long MAX_SWIPE_DURATION = 350;
-    public static final long HOME_DURATION = StaggeredWorkspaceAnim.DURATION_MS;
 
     public static final float MIN_PROGRESS_FOR_OVERVIEW = 0.7f;
     private static final float SWIPE_DURATION_MULTIPLIER =
@@ -866,6 +861,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_RECENTS);
 
         if (mRecentsView != null) {
+            final View rv = mRecentsView;
             mRecentsView.getViewTreeObserver().addOnDrawListener(new OnDrawListener() {
                 boolean mHandled = false;
 
@@ -881,8 +877,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     InteractionJankMonitorWrapper.begin(mRecentsView,
                             InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
 
-                    mRecentsView.post(() ->
-                            mRecentsView.getViewTreeObserver().removeOnDrawListener(this));
+                    rv.post(() -> rv.getViewTreeObserver().removeOnDrawListener(this));
                 }
             });
         }
@@ -1141,7 +1136,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             mInputConsumerProxy.enable();
         }
         if (endTarget == HOME) {
-            duration = HOME_DURATION;
+            duration = mActivity.getDeviceProfile().isTaskbarPresent
+                    ? StaggeredWorkspaceAnim.DURATION_TASKBAR_MS
+                    : StaggeredWorkspaceAnim.DURATION_MS;
             // Early detach the nav bar once the endTarget is determined as HOME
             if (mRecentsAnimationController != null) {
                 mRecentsAnimationController.detachNavigationBarFromApp(true);
@@ -1599,6 +1596,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     private void reset() {
         mStateCallback.setStateOnUiThread(STATE_HANDLER_INVALIDATED);
+        if (mActivity != null) {
+            mActivity.unregisterActivityLifecycleCallbacks(mLifecycleCallbacks);
+        }
     }
 
     /**
@@ -1676,7 +1676,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         boolean wasVisible = mWasLauncherAlreadyVisible || mGestureStarted;
         mActivityInterface.onTransitionCancelled(wasVisible, mGestureState.getEndTarget());
 
-        if (mRecentsAnimationTargets != null) {
+        if (mRecentsAnimationTargets != null && wasVisible) {
             setDividerShown(true /* shown */, true /* immediate */);
         }
 
@@ -1799,6 +1799,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                     new PictureInPictureSurfaceTransaction.Builder()
                             .setAlpha(0f)
                             .build();
+            tx.setShouldDisableCanAffectSystemUiFlags(false);
             int[] taskIds = TopTaskTracker.INSTANCE.get(mContext).getRunningSplitTaskIds();
             for (int taskId : taskIds) {
                 mRecentsAnimationController.setFinishTaskTransaction(taskId,
