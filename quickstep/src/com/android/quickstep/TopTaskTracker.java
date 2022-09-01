@@ -15,12 +15,13 @@
  */
 package com.android.quickstep;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.content.Intent.ACTION_CHOOSER;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
-import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.ACTIVITY_TYPE_ASSISTANT;
 
 import android.app.ActivityManager.RunningTaskInfo;
 import android.content.Context;
@@ -32,7 +33,7 @@ import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
 import com.android.launcher3.util.SplitConfigurationOptions.StageType;
-import com.android.launcher3.util.SplitConfigurationOptions.StagedSplitTaskPosition;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitStageInfo;
 import com.android.launcher3.util.TraceHelper;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.Task.TaskKey;
@@ -62,8 +63,10 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
     // Ordered list with first item being the most recent task.
     private final LinkedList<RunningTaskInfo> mOrderedTaskList = new LinkedList<>();
 
-    private final StagedSplitTaskPosition mMainStagePosition = new StagedSplitTaskPosition();
-    private final StagedSplitTaskPosition mSideStagePosition = new StagedSplitTaskPosition();
+
+    private final SplitStageInfo mMainStagePosition = new SplitStageInfo();
+    private final SplitStageInfo mSideStagePosition = new SplitStageInfo();
+    private int mPinnedTaskId = INVALID_TASK_ID;
 
     private TopTaskTracker(Context context) {
         mMainStagePosition.stageType = SplitConfigurationOptions.STAGE_TYPE_MAIN;
@@ -132,7 +135,17 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
         }
     }
 
-    private void resetTaskId(StagedSplitTaskPosition taskPosition) {
+    @Override
+    public void onActivityPinned(String packageName, int userId, int taskId, int stackId) {
+        mPinnedTaskId = taskId;
+    }
+
+    @Override
+    public void onActivityUnpinned() {
+        mPinnedTaskId = INVALID_TASK_ID;
+    }
+
+    private void resetTaskId(SplitStageInfo taskPosition) {
         taskPosition.taskId = -1;
     }
 
@@ -141,7 +154,8 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
      *         Will return empty array if device is not in staged split
      */
     public int[] getRunningSplitTaskIds() {
-        if (mMainStagePosition.taskId == -1 || mSideStagePosition.taskId == -1) {
+        if (mMainStagePosition.taskId == INVALID_TASK_ID
+                || mSideStagePosition.taskId == INVALID_TASK_ID) {
             return new int[]{};
         }
         int[] out = new int[2];
@@ -175,7 +189,11 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
                             false /* filterOnlyVisibleRecents */));
             Collections.addAll(mOrderedTaskList, tasks);
         }
-        return new CachedTaskInfo(new ArrayList<>(mOrderedTaskList));
+
+        // Strip the pinned task
+        ArrayList<RunningTaskInfo> tasks = new ArrayList<>(mOrderedTaskList);
+        tasks.removeIf(t -> t.taskId == mPinnedTaskId);
+        return new CachedTaskInfo(tasks);
     }
 
     /**
@@ -194,7 +212,7 @@ public class TopTaskTracker extends ISplitScreenListener.Stub implements TaskSta
         }
 
         public int getTaskId() {
-            return mTopTask == null ? -1 : mTopTask.taskId;
+            return mTopTask == null ? INVALID_TASK_ID : mTopTask.taskId;
         }
 
         /**

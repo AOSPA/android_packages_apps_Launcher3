@@ -19,7 +19,6 @@ package com.android.quickstep.views;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
-import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
 import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
@@ -67,7 +66,6 @@ import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
@@ -726,10 +724,6 @@ public class TaskView extends FrameLayout implements Reusable {
                 return;
             }
 
-            // Reset the minimized state since we force-toggled the minimized state when entering
-            // overview, but never actually finished the recents animation
-            SystemUiProxy.INSTANCE.get(getContext()).setSplitScreenMinimized(false);
-
             mIsClickableAsLiveTile = false;
             RemoteAnimationTargets targets;
             if (remoteTargetHandles.length == 1) {
@@ -1343,7 +1337,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 continue;
             }
             for (SystemShortcut s : TaskOverlayFactory.getEnabledShortcuts(this,
-                    mActivity.getDeviceProfile(), taskContainer)) {
+                    taskContainer)) {
                 info.addAction(s.createAccessibilityAction(context));
             }
         }
@@ -1381,7 +1375,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 continue;
             }
             for (SystemShortcut s : TaskOverlayFactory.getEnabledShortcuts(this,
-                    mActivity.getDeviceProfile(), taskContainer)) {
+                    taskContainer)) {
                 if (s.hasHandlerForAction(action)) {
                     s.onClick(this);
                     return true;
@@ -1537,7 +1531,6 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     public void initiateSplitSelect(SplitPositionOption splitPositionOption) {
-        AbstractFloatingView.closeOpenViews(mActivity, false, TYPE_TASK_MENU);
         getRecentsView().initiateSplitSelect(this, splitPositionOption.stagePosition);
     }
 
@@ -1591,10 +1584,9 @@ public class TaskView extends FrameLayout implements Reusable {
             }
             mCurrentDrawnInsets.set(currentInsetsLeft, insets.top * fullscreenProgress,
                     currentInsetsRight, insetsBottom * fullscreenProgress);
-            float fullscreenCornerRadius = dp.isMultiWindowMode ? 0 : mWindowCornerRadius;
 
             mCurrentDrawnCornerRadius =
-                    Utilities.mapRange(fullscreenProgress, mCornerRadius, fullscreenCornerRadius)
+                    Utilities.mapRange(fullscreenProgress, mCornerRadius, mWindowCornerRadius)
                             / parentScale / taskViewScale;
 
             // We scaled the thumbnail to fit the content (excluding insets) within task view width.

@@ -217,6 +217,7 @@ public class DeviceProfile {
     public int dropTargetHorizontalPaddingPx;
     public int dropTargetVerticalPaddingPx;
     public int dropTargetGapPx;
+    public int dropTargetButtonWorkspaceEdgeGapPx;
 
     // Insets
     private final Rect mInsets = new Rect();
@@ -348,6 +349,8 @@ public class DeviceProfile {
         dropTargetVerticalPaddingPx = res.getDimensionPixelSize(
                 R.dimen.drop_target_button_drawable_vertical_padding);
         dropTargetGapPx = res.getDimensionPixelSize(R.dimen.drop_target_button_gap);
+        dropTargetButtonWorkspaceEdgeGapPx = res.getDimensionPixelSize(
+                R.dimen.drop_target_button_workspace_edge_gap);
 
         workspaceSpringLoadedBottomSpace =
                 res.getDimensionPixelSize(R.dimen.dynamic_grid_min_spring_loaded_space);
@@ -411,10 +414,7 @@ public class DeviceProfile {
         overviewTaskIconDrawableSizeGridPx =
                 res.getDimensionPixelSize(R.dimen.task_thumbnail_icon_drawable_size_grid);
         overviewTaskThumbnailTopMarginPx = overviewTaskIconSizePx + overviewTaskMarginPx * 2;
-        // In vertical bar, use the smaller task margin for the top regardless of mode.
-        overviewActionsTopMarginPx = isVerticalBarLayout()
-                ? overviewTaskMarginPx
-                : res.getDimensionPixelSize(R.dimen.overview_actions_top_margin);
+        overviewActionsTopMarginPx = res.getDimensionPixelSize(R.dimen.overview_actions_top_margin);
         overviewPageSpacing = res.getDimensionPixelSize(R.dimen.overview_page_spacing);
         overviewActionsButtonSpacing = res.getDimensionPixelSize(
                 R.dimen.overview_actions_button_spacing);
@@ -789,7 +789,7 @@ public class DeviceProfile {
     /**
      * Updates the iconSize for allApps* variants.
      */
-    public void updateAllAppsIconSize(float scale, Resources res) {
+    private void updateAllAppsIconSize(float scale, Resources res) {
         allAppsBorderSpacePx = new Point(
                 pxFromDp(inv.allAppsBorderSpaces[mTypeIndex].x, mMetrics, scale),
                 pxFromDp(inv.allAppsBorderSpaces[mTypeIndex].y, mMetrics, scale));
@@ -799,13 +799,13 @@ public class DeviceProfile {
                 + allAppsBorderSpacePx.y;
         // but width is just the cell,
         // the border is added in #updateAllAppsContainerWidth
-        allAppsCellWidthPx = pxFromDp(inv.allAppsCellSize[mTypeIndex].x, mMetrics, scale);
         if (isScalableGrid) {
             allAppsIconSizePx =
-                    pxFromDp(inv.allAppsIconSize[mTypeIndex], mMetrics);
+                    pxFromDp(inv.allAppsIconSize[mTypeIndex], mMetrics, scale);
             allAppsIconTextSizePx =
-                    pxFromSp(inv.allAppsIconTextSize[mTypeIndex], mMetrics);
+                    pxFromSp(inv.allAppsIconTextSize[mTypeIndex], mMetrics, scale);
             allAppsIconDrawablePaddingPx = iconDrawablePaddingOriginalPx;
+            allAppsCellWidthPx = pxFromDp(inv.allAppsCellSize[mTypeIndex].x, mMetrics, scale);
         } else {
             float invIconSizeDp = inv.allAppsIconSize[mTypeIndex];
             float invIconTextSizeSp = inv.allAppsIconTextSize[mTypeIndex];
@@ -813,6 +813,7 @@ public class DeviceProfile {
             allAppsIconTextSizePx = (int) (pxFromSp(invIconTextSizeSp, mMetrics) * scale);
             allAppsIconDrawablePaddingPx =
                     res.getDimensionPixelSize(R.dimen.all_apps_icon_drawable_padding);
+            allAppsCellWidthPx = allAppsIconSizePx + (2 * allAppsIconDrawablePaddingPx);
         }
 
         updateAllAppsContainerWidth(res);

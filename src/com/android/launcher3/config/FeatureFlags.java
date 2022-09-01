@@ -209,9 +209,6 @@ public final class FeatureFlags {
             "ENABLE_SCRIM_FOR_APP_LAUNCH", false,
             "Enables scrim during app launch animation.");
 
-    public static final BooleanFlag ENABLE_SPLIT_SELECT = getDebugFlag(
-            "ENABLE_SPLIT_SELECT", true, "Uses new split screen selection overview UI");
-
     public static final BooleanFlag ENABLE_ENFORCED_ROUNDED_CORNERS = new DeviceFlag(
             "ENABLE_ENFORCED_ROUNDED_CORNERS", true, "Enforce rounded corners on all App Widgets");
 
@@ -265,8 +262,8 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ONE_SEARCH_MOTION = new DeviceFlag(
             "ENABLE_ONE_SEARCH_MOTION", true, "Enables animations in OneSearch.");
 
-    public static final BooleanFlag ENABLE_SHOW_KEYBOARD_IN_ALL_APPS = getDebugFlag(
-            "ENABLE_SHOW_KEYBOARD_IN_ALL_APPS", false,
+    public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = new DeviceFlag(
+            "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", true,
             "Enable option to show keyboard when going to all-apps");
 
     public static final BooleanFlag USE_LOCAL_ICON_OVERRIDES = getDebugFlag(
