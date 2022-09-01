@@ -268,7 +268,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 mLastRequestedNonFullscreenHeight,
                 type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_SLIPPERY,
+                        | WindowManager.LayoutParams.FLAG_SLIPPERY
+                        | WindowManager.LayoutParams.FLAG_SPLIT_TOUCH,
                 PixelFormat.TRANSLUCENT);
         windowLayoutParams.setTitle(WINDOW_TITLE);
         windowLayoutParams.packageName = getPackageName();
@@ -468,6 +469,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 fromInit);
         mControllers.taskbarViewController.setImeIsVisible(
                 mControllers.navbarButtonsViewController.isImeVisible());
+        mControllers.taskbarViewController.setIsImeSwitcherVisible(
+                mControllers.navbarButtonsViewController.isImeSwitcherVisible());
         int shadeExpandedFlags = SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED
                 | SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
         onNotificationShadeExpandChanged((systemUiStateFlags & shadeExpandedFlags) != 0, fromInit);

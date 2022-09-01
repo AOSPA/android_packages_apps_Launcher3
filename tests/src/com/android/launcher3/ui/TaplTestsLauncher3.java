@@ -25,6 +25,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import android.content.Intent;
 import android.graphics.Point;
@@ -53,6 +54,7 @@ import com.android.launcher3.widget.picker.WidgetsFullSheet;
 import com.android.launcher3.widget.picker.WidgetsRecyclerView;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -188,6 +190,17 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 mLauncher.getWorkspace().switchToAllApps());
         assertTrue("Launcher internal state is not All Apps",
                 isInState(() -> LauncherState.ALL_APPS));
+    }
+
+    @Test
+    @PortraitLandscape
+    public void testAllAppsDeadzoneForTablet() throws Exception {
+        assumeTrue(mLauncher.isTablet());
+
+        mLauncher.getWorkspace().switchToAllApps().dismissByTappingOutsideForTablet(
+                true /* tapRight */);
+        mLauncher.getWorkspace().switchToAllApps().dismissByTappingOutsideForTablet(
+                false /* tapRight */);
     }
 
     @Test
@@ -376,6 +389,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @Test
     @PortraitLandscape
     @ScreenRecord
+    @Ignore // b/233075289
     public void testDragToFolder() {
         // TODO: add the use case to drag an icon to an existing folder. Currently it either fails
         // on tablets or phones due to difference in resolution.
@@ -538,6 +552,18 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 allApps.unfreeze();
             }
         }
+    }
+
+    @Test
+    @PortraitLandscape
+    public void testAddDeleteShortcutOnHotseat() {
+        mLauncher.getWorkspace()
+                .deleteAppIcon(mLauncher.getWorkspace().getHotseatAppIcon(0))
+                .switchToAllApps()
+                .getAppIcon(APP_NAME)
+                .dragToHotseat(0);
+        mLauncher.getWorkspace().deleteAppIcon(
+                mLauncher.getWorkspace().getHotseatAppIcon(APP_NAME));
     }
 
     /**

@@ -115,6 +115,8 @@ public final class TestProtocol {
     public static final String REQUEST_WORKSPACE_CELL_LAYOUT_SIZE = "workspace-cell-layout-size";
     public static final String REQUEST_WORKSPACE_CELL_CENTER = "workspace-cell-center";
 
+    public static final String REQUEST_HOTSEAT_CELL_CENTER = "hotseat-cell-center";
+
     public static final String REQUEST_GET_FOCUSED_TASK_HEIGHT_FOR_TABLET =
             "get-focused-task-height-for-tablet";
     public static final String REQUEST_GET_GRID_TASK_SIZE_RECT_FOR_TABLET =
@@ -139,4 +141,9 @@ public final class TestProtocol {
     public static final String MISSING_PROMISE_ICON = "b/202985412";
     public static final String BAD_STATE = "b/223498680";
     public static final String TASKBAR_IN_APP_STATE = "b/227657604";
+
+    public static final String REQUEST_EMULATE_DISPLAY = "emulate-display";
+    public static final String REQUEST_STOP_EMULATE_DISPLAY = "stop-emulate-display";
+    public static final String REQUEST_IS_EMULATE_DISPLAY_RUNNING = "is-emulate-display-running";
+    public static final String REQUEST_EMULATE_PRINT_DEVICE = "emulate-print-device";
 }
