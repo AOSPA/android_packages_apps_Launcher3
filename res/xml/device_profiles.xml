@@ -37,6 +37,8 @@
             launcher:iconTextSize="17.0"
             launcher:allAppsIconSize="60.0"
             launcher:allAppsIconTextSize="14.0"
+            launcher:allAppsBorderSpace="16"
+            launcher:allAppsCellHeight="104"
             launcher:canBeDefault="true" />
 
         <display-option
@@ -47,6 +49,8 @@
             launcher:iconTextSize="17.0"
             launcher:allAppsIconSize="60"
             launcher:allAppsIconTextSize="14.0"
+            launcher:allAppsBorderSpace="16"
+            launcher:allAppsCellHeight="104"
             launcher:canBeDefault="true" />
 
     </grid-option>
@@ -204,7 +208,7 @@
         launcher:numHotseatIcons="5"
         launcher:dbFile="launcher_5_by_6.db"
         launcher:defaultLayoutId="@xml/default_workspace_5x6"
-        launcher:deviceCategory="phone|multi_display" >
+        launcher:deviceCategory="phone|multi_display|tablet" >
 
         <display-option
             launcher:name="Large Phone"
@@ -212,6 +216,8 @@
             launcher:minHeightDps="694"
             launcher:iconImageSize="56"
             launcher:iconTextSize="12.0"
+            launcher:allAppsBorderSpace="16"
+            launcher:allAppsCellHeight="104"
             launcher:canBeDefault="true" />
 
     </grid-option>
@@ -225,7 +231,7 @@
         launcher:numHotseatIcons="5"
         launcher:dbFile="launcher_5_by_7.db"
         launcher:defaultLayoutId="@xml/default_workspace_5x7"
-        launcher:deviceCategory="phone|multi_display" >
+        launcher:deviceCategory="phone|multi_display|tablet" >
 
         <display-option
             launcher:name="Large Phone"
@@ -233,6 +239,8 @@
             launcher:minHeightDps="694"
             launcher:iconImageSize="56"
             launcher:iconTextSize="12.0"
+            launcher:allAppsBorderSpace="16"
+            launcher:allAppsCellHeight="104"
             launcher:canBeDefault="true" />
 
     </grid-option>
@@ -251,7 +259,7 @@
         launcher:devicePaddingId="@xml/paddings_6x5"
         launcher:dbFile="launcher_6_by_5.db"
         launcher:defaultLayoutId="@xml/default_workspace_6x5"
-        launcher:deviceCategory="tablet" >
+        launcher:deviceCategory="phone|multi_display|tablet" >
 
         <display-option
             launcher:name="Tablet"
@@ -293,7 +301,7 @@
         launcher:numHotseatIcons="6"
         launcher:dbFile="launcher_6_by_6.db"
         launcher:defaultLayoutId="@xml/default_workspace_6x6"
-        launcher:deviceCategory="phone|multi_display" >
+        launcher:deviceCategory="phone|multi_display|tablet" >
 
         <display-option
             launcher:name="Large Phone"
@@ -301,6 +309,8 @@
             launcher:minHeightDps="694"
             launcher:iconImageSize="48"
             launcher:iconTextSize="12.0"
+            launcher:allAppsBorderSpace="16"
+            launcher:allAppsCellHeight="104"
             launcher:canBeDefault="true" />
 
     </grid-option>
