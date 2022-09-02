@@ -17,6 +17,7 @@ package com.android.launcher3.allapps;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.util.ArrayMap;
@@ -81,11 +82,10 @@ public class FloatingHeaderView extends LinearLayout implements
 
     protected final Map<AllAppsRow, PluginHeaderRow> mPluginRows = new ArrayMap<>();
 
-    private final int mHeaderTopPadding;
     // These two values are necessary to ensure that the header protection is drawn correctly.
     private final int mHeaderTopAdjustment;
     private final int mHeaderBottomAdjustment;
-    private final boolean mHeaderProtectionSupported;
+    private boolean mHeaderProtectionSupported;
 
     protected ViewGroup mTabLayout;
     private AllAppsRecyclerView mMainRV;
@@ -118,16 +118,19 @@ public class FloatingHeaderView extends LinearLayout implements
 
     public FloatingHeaderView(@NonNull Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        mHeaderTopPadding = context.getResources()
-                .getDimensionPixelSize(R.dimen.all_apps_header_top_padding);
         mHeaderTopAdjustment = context.getResources()
                 .getDimensionPixelSize(R.dimen.all_apps_header_top_adjustment);
         mHeaderBottomAdjustment = context.getResources()
                 .getDimensionPixelSize(R.dimen.all_apps_header_bottom_adjustment);
         mHeaderProtectionSupported = context.getResources().getBoolean(
-                R.bool.config_header_protection_supported)
-                // TODO(b/208599118) Support header protection for bottom sheet.
-                && !ActivityContext.lookupContext(context).getDeviceProfile().isTablet;
+                R.bool.config_header_protection_supported);
+    }
+
+    @Override
+    protected void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        mHeaderProtectionSupported = getContext().getResources().getBoolean(
+                R.bool.config_header_protection_supported);
     }
 
     @Override
@@ -326,7 +329,7 @@ public class FloatingHeaderView extends LinearLayout implements
         int uncappedTranslationY = mTranslationY;
         mTranslationY = Math.max(mTranslationY, -mMaxTranslation);
 
-        if (mCollapsed || uncappedTranslationY < mTranslationY - mHeaderTopPadding) {
+        if (mCollapsed || uncappedTranslationY < mTranslationY - getPaddingTop()) {
             // we hide it completely if already capped (for opening search anim)
             for (FloatingHeaderRow row : mAllRows) {
                 row.setVerticalScroll(0, true /* isScrolledOut */);
@@ -339,7 +342,10 @@ public class FloatingHeaderView extends LinearLayout implements
 
         mTabLayout.setTranslationY(mTranslationY);
 
-        int clipTop = mHeaderTopPadding - mHeaderTopAdjustment;
+        int clipTop = getPaddingTop() - mHeaderTopAdjustment;
+        if (mTabsHidden) {
+            clipTop += getPaddingBottom() - mHeaderBottomAdjustment;
+        }
         mRVClip.top = mTabsHidden ? clipTop : 0;
         mHeaderClip.top = clipTop;
         // clipping on a draw might cause additional redraw

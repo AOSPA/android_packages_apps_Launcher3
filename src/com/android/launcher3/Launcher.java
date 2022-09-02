@@ -740,7 +740,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 completeAddAppWidget(appWidgetId, info, null, null);
                 break;
             case REQUEST_RECONFIGURE_APPWIDGET:
-                mStatsLogManager.logger().withItemInfo(info).log(LAUNCHER_WIDGET_RECONFIGURED);
+                getStatsLogManager().logger().withItemInfo(info).log(LAUNCHER_WIDGET_RECONFIGURED);
                 completeRestoreAppWidget(appWidgetId, LauncherAppWidgetInfo.RESTORE_COMPLETED);
                 break;
             case REQUEST_BIND_PENDING_APPWIDGET: {
@@ -1079,10 +1079,6 @@ public class Launcher extends StatefulActivity<LauncherState>
             scheduleDeferredCheck();
         }
         addActivityFlags(ACTIVITY_STATE_TRANSITION_ACTIVE);
-
-        if (state.hasFlag(FLAG_CLOSE_POPUPS)) {
-            AbstractFloatingView.closeAllOpenViews(this, !state.hasFlag(FLAG_NON_INTERACTIVE));
-        }
 
         if (state == SPRING_LOADED) {
             // Prevent any Un/InstallShortcutReceivers from updating the db while we are
@@ -2776,7 +2772,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             View v = getFirstMatch(Collections.singletonList(activeRecyclerView),
                     preferredItem, packageAndUserAndApp);
 
-            if (activeRecyclerView.getCurrentScrollY() > 0) {
+            if (v != null && activeRecyclerView.getCurrentScrollY() > 0) {
                 RectF locationBounds = new RectF();
                 FloatingIconView.getLocationBoundsForView(this, v, false, locationBounds,
                         new Rect());
@@ -2804,6 +2800,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      * @param containers List of ViewGroups to scan, in order of preference.
      * @param operators List of operators, in order starting from best matching operator.
      */
+    @Nullable
     private static View getFirstMatch(Iterable<ViewGroup> containers,
             final Predicate<ItemInfo>... operators) {
         for (Predicate<ItemInfo> operator : operators) {
@@ -2821,6 +2818,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Returns the first view matching the operator in the given ViewGroups, or null if none.
      * Forward iteration matters.
      */
+    @Nullable
     private static View mapOverViewGroup(ViewGroup container, Predicate<ItemInfo> op) {
         final int itemCount = container.getChildCount();
         for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {

@@ -171,7 +171,7 @@ public final class LauncherInstrumentation {
     private static final String WIDGETS_RES_ID = "primary_widgets_list_view";
     private static final String CONTEXT_MENU_RES_ID = "popup_container";
     private static final String TASKBAR_RES_ID = "taskbar_view";
-    public static final int WAIT_TIME_MS = 60000;
+    public static final int WAIT_TIME_MS = 30000;
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
     private static final String ANDROID_PACKAGE = "android";
 
@@ -1830,5 +1830,27 @@ public final class LauncherInstrumentation {
     private static boolean supportsRoundedCornersOnWindows(Resources resources) {
         return ResourceUtils.getBoolByName(
                 "config_supportsRoundedCornersOnWindows", resources, false);
+    }
+
+    /**
+     * Taps outside container to dismiss.
+     * @param container container to be dismissed
+     * @param tapRight tap on the right of the container if true, or left otherwise
+     */
+    void touchOutsideContainer(UiObject2 container, boolean tapRight) {
+        try (LauncherInstrumentation.Closable c = addContextLayer(
+                "want to tap outside container on the " + (tapRight ? "right" : "left"))) {
+            Rect containerBounds = getVisibleBounds(container);
+            final long downTime = SystemClock.uptimeMillis();
+            final Point tapTarget = new Point(
+                    tapRight
+                            ? (containerBounds.right + getRealDisplaySize().x) / 2
+                            : containerBounds.left / 2,
+                    containerBounds.top + 1);
+            sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN, tapTarget,
+                    LauncherInstrumentation.GestureScope.INSIDE);
+            sendPointer(downTime, downTime, MotionEvent.ACTION_UP, tapTarget,
+                    LauncherInstrumentation.GestureScope.INSIDE);
+        }
     }
 }
