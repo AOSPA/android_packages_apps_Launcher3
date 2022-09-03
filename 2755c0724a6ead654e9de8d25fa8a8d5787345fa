@@ -16,6 +16,24 @@
       "message": "21245: Revert \"Enable new keyguard-to-launcher animation\" | https://gerrit.aospa.co/c/AOSPA/android_packages_apps_Launcher3/+/21245 talk to him and confirm this still isn\u0027t the case",
       "revId": "2755c0724a6ead654e9de8d25fa8a8d5787345fa",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2246226f_3d85d26d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000730
+      },
+      "writtenOn": "2022-09-03T17:36:41Z",
+      "side": 1,
+      "message": "yea, just had that but,\nabandon ig?",
+      "parentUuid": "ac62514a_09fdc052",
+      "revId": "2755c0724a6ead654e9de8d25fa8a8d5787345fa",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
