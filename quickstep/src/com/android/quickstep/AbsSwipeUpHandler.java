@@ -58,6 +58,7 @@ import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.WindowConfiguration;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Matrix;
@@ -140,7 +141,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         RecentsAnimationCallbacks.RecentsAnimationListener {
     private static final String TAG = "AbsSwipeUpHandler";
 
-    private static final String[] STATE_NAMES = DEBUG_STATES ? new String[17] : null;
+    private static final ArrayList<String> STATE_NAMES = new ArrayList<>();
 
     protected final BaseActivityInterface<S, T> mActivityInterface;
     protected final InputConsumerProxy mInputConsumerProxy;
@@ -171,59 +172,62 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 }
             };
 
-    private static int getFlagForIndex(int index, String name) {
+    private static int FLAG_COUNT = 0;
+    private static int getNextStateFlag(String name) {
         if (DEBUG_STATES) {
-            STATE_NAMES[index] = name;
+            STATE_NAMES.add(name);
         }
-        return 1 << index;
+        int index = 1 << FLAG_COUNT;
+        FLAG_COUNT++;
+        return index;
     }
 
     // Launcher UI related states
     protected static final int STATE_LAUNCHER_PRESENT =
-            getFlagForIndex(0, "STATE_LAUNCHER_PRESENT");
+            getNextStateFlag("STATE_LAUNCHER_PRESENT");
     protected static final int STATE_LAUNCHER_STARTED =
-            getFlagForIndex(1, "STATE_LAUNCHER_STARTED");
+            getNextStateFlag("STATE_LAUNCHER_STARTED");
     protected static final int STATE_LAUNCHER_DRAWN =
-            getFlagForIndex(2, "STATE_LAUNCHER_DRAWN");
+            getNextStateFlag("STATE_LAUNCHER_DRAWN");
     // Called when the Launcher has connected to the touch interaction service (and the taskbar
     // ui controller is initialized)
     protected static final int STATE_LAUNCHER_BIND_TO_SERVICE =
-            getFlagForIndex(3, "STATE_LAUNCHER_BIND_TO_SERVICE");
+            getNextStateFlag("STATE_LAUNCHER_BIND_TO_SERVICE");
 
     // Internal initialization states
     private static final int STATE_APP_CONTROLLER_RECEIVED =
-            getFlagForIndex(4, "STATE_APP_CONTROLLER_RECEIVED");
+            getNextStateFlag("STATE_APP_CONTROLLER_RECEIVED");
 
     // Interaction finish states
     private static final int STATE_SCALED_CONTROLLER_HOME =
-            getFlagForIndex(5, "STATE_SCALED_CONTROLLER_HOME");
+            getNextStateFlag("STATE_SCALED_CONTROLLER_HOME");
     private static final int STATE_SCALED_CONTROLLER_RECENTS =
-            getFlagForIndex(6, "STATE_SCALED_CONTROLLER_RECENTS");
+            getNextStateFlag("STATE_SCALED_CONTROLLER_RECENTS");
 
     protected static final int STATE_HANDLER_INVALIDATED =
-            getFlagForIndex(7, "STATE_HANDLER_INVALIDATED");
+            getNextStateFlag("STATE_HANDLER_INVALIDATED");
     private static final int STATE_GESTURE_STARTED =
-            getFlagForIndex(8, "STATE_GESTURE_STARTED");
+            getNextStateFlag("STATE_GESTURE_STARTED");
     private static final int STATE_GESTURE_CANCELLED =
-            getFlagForIndex(9, "STATE_GESTURE_CANCELLED");
+            getNextStateFlag("STATE_GESTURE_CANCELLED");
     private static final int STATE_GESTURE_COMPLETED =
-            getFlagForIndex(10, "STATE_GESTURE_COMPLETED");
+            getNextStateFlag("STATE_GESTURE_COMPLETED");
 
     private static final int STATE_CAPTURE_SCREENSHOT =
-            getFlagForIndex(11, "STATE_CAPTURE_SCREENSHOT");
+            getNextStateFlag("STATE_CAPTURE_SCREENSHOT");
     protected static final int STATE_SCREENSHOT_CAPTURED =
-            getFlagForIndex(12, "STATE_SCREENSHOT_CAPTURED");
+            getNextStateFlag("STATE_SCREENSHOT_CAPTURED");
     private static final int STATE_SCREENSHOT_VIEW_SHOWN =
-            getFlagForIndex(13, "STATE_SCREENSHOT_VIEW_SHOWN");
+            getNextStateFlag("STATE_SCREENSHOT_VIEW_SHOWN");
 
     private static final int STATE_RESUME_LAST_TASK =
-            getFlagForIndex(14, "STATE_RESUME_LAST_TASK");
+            getNextStateFlag("STATE_RESUME_LAST_TASK");
     private static final int STATE_START_NEW_TASK =
-            getFlagForIndex(15, "STATE_START_NEW_TASK");
+            getNextStateFlag("STATE_START_NEW_TASK");
     private static final int STATE_CURRENT_TASK_FINISHED =
-            getFlagForIndex(16, "STATE_CURRENT_TASK_FINISHED");
+            getNextStateFlag("STATE_CURRENT_TASK_FINISHED");
     private static final int STATE_FINISH_WITH_NO_END =
-            getFlagForIndex(17, "STATE_FINISH_WITH_NO_END");
+            getNextStateFlag("STATE_FINISH_WITH_NO_END");
 
     private static final int LAUNCHER_UI_STATES =
             STATE_LAUNCHER_PRESENT | STATE_LAUNCHER_DRAWN | STATE_LAUNCHER_STARTED |
@@ -297,9 +301,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         mActivityInterface = gestureState.getActivityInterface();
         mActivityInitListener = mActivityInterface.createActivityInitListener(this::onActivityInit);
         mInputConsumerProxy =
-                new InputConsumerProxy(context,
-                        () -> mRecentsView.getPagedViewOrientedState().getRecentsActivityRotation(),
-                        inputConsumer, () -> {
+                new InputConsumerProxy(context, /* rotationSupplier = */ () -> {
+                    if (mRecentsView == null) {
+                        return ROTATION_0;
+                    }
+                    return mRecentsView.getPagedViewOrientedState().getRecentsActivityRotation();
+                }, inputConsumer, /* callback = */ () -> {
                     endRunningWindowAnim(mGestureState.getEndTarget() == HOME /* cancel */);
                     endLauncherTransitionController();
                 }, new InputProxyHandlerFactory(mActivityInterface, mGestureState));
@@ -314,7 +321,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     private void initStateCallbacks() {
-        mStateCallback = new MultiStateCallback(STATE_NAMES);
+        mStateCallback = new MultiStateCallback(STATE_NAMES.toArray(new String[0]));
 
         mStateCallback.runOnceAtState(STATE_LAUNCHER_PRESENT | STATE_GESTURE_STARTED,
                 this::onLauncherPresentAndGestureStarted);
@@ -441,7 +448,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             });
 
         setupRecentsViewUi();
-        linkRecentsViewScroll();
+        mRecentsView.runOnPageScrollsInitialized(this::linkRecentsViewScroll);
         activity.runOnBindToTouchInteractionService(this::onLauncherBindToService);
 
         mActivity.registerActivityLifecycleCallbacks(mLifecycleCallbacks);
@@ -1418,6 +1425,16 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                         runningTaskTarget.taskInfo.pictureInPictureParams,
                         homeRotation,
                         mDp.hotseatBarSizePx);
+        final Rect appBounds = new Rect();
+        final WindowConfiguration winConfig = taskInfo.configuration.windowConfiguration;
+        // Adjust the appBounds for TaskBar by using the calculated window crop Rect
+        // from TaskViewSimulator and fallback to the bounds in TaskInfo when it's originated
+        // from windowing modes other than full-screen.
+        if (winConfig.getWindowingMode() == WindowConfiguration.WINDOWING_MODE_FULLSCREEN) {
+            mRemoteTargetHandles[0].getTaskViewSimulator().getCurrentCropRect().round(appBounds);
+        } else {
+            appBounds.set(winConfig.getBounds());
+        }
         final SwipePipToHomeAnimator.Builder builder = new SwipePipToHomeAnimator.Builder()
                 .setContext(mContext)
                 .setTaskId(runningTaskTarget.taskId)
@@ -1425,7 +1442,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 .setLeash(runningTaskTarget.leash)
                 .setSourceRectHint(
                         runningTaskTarget.taskInfo.pictureInPictureParams.getSourceRectHint())
-                .setAppBounds(taskInfo.configuration.windowConfiguration.getBounds())
+                .setAppBounds(appBounds)
                 .setHomeToWindowPositionMap(homeToWindowPositionMap)
                 .setStartBounds(startRect)
                 .setDestinationBounds(destinationBounds)
@@ -1612,7 +1629,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         // Cleanup when switching handlers
         mInputConsumerProxy.unregisterCallback();
         mActivityInitListener.unregister();
-        ActivityManagerWrapper.getInstance().unregisterTaskStackListener(mActivityRestartListener);
+        TaskStackChangeListeners.getInstance().unregisterTaskStackListener(
+                mActivityRestartListener);
         mTaskSnapshot = null;
     }
 
@@ -2031,8 +2049,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
         float scrollOffset = Math.abs(mRecentsView.getScrollOffset(mRecentsView.getCurrentPage()));
         int maxScrollOffset = mRecentsView.getPagedOrientationHandler().getPrimaryValue(
-                mRecentsView.getLastComputedTaskSize().width(),
-                mRecentsView.getLastComputedTaskSize().height());
+                mActivity.getDeviceProfile().overviewTaskRect.width(),
+                mActivity.getDeviceProfile().overviewTaskRect.height());
         maxScrollOffset += mRecentsView.getPageSpacing();
 
         float maxScaleProgress =

@@ -154,10 +154,6 @@ public class TestInformationHandler implements ResourceBasedOverride {
                         mDeviceProfile.isTwoPanels);
                 return response;
 
-            case TestProtocol.REQUEST_SET_FORCE_PAUSE_TIMEOUT:
-                TestProtocol.sForcePauseTimeout = Long.parseLong(arg);
-                return response;
-
             case TestProtocol.REQUEST_GET_HAD_NONTEST_EVENTS:
                 response.putBoolean(
                         TestProtocol.TEST_INFO_RESPONSE_FIELD, TestLogging.sHadEventsNotFromTest);
@@ -210,7 +206,7 @@ public class TestInformationHandler implements ResourceBasedOverride {
                             /* spanX= */ 1, /* spanY= */ 1);
                     // TODO(b/234322284): return the real center point.
                     return new Point(cellRect.left + (cellRect.right - cellRect.left) / 3,
-                            cellRect.centerY());
+                            cellRect.top + (cellRect.bottom - cellRect.top) / 3);
                 });
             }
 
