@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e5b148d6_2ed8ad6f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000579
+      },
+      "writtenOn": "2022-09-03T15:12:15Z",
+      "side": 1,
+      "message": "https://github.com/AOSPA/android_vendor_aospa/blob/da2da59f2bd78c7b7432474f3d5a962c70ceb063/overlay/ParanoidLauncherOverlay/res/values/config.xml#L19",
+      "revId": "b95e153956ec4ead40593217b9f698adc9b22481",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
