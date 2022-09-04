@@ -17,9 +17,12 @@ package com.android.launcher3.taskbar
 
 import android.graphics.Insets
 import android.graphics.Region
+import android.view.InsetsFrameProvider
 import android.view.InsetsState.ITYPE_BOTTOM_MANDATORY_GESTURES
 import android.view.InsetsState
 import android.view.WindowManager
+import android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD
+import android.view.WindowManager.LayoutParams.TYPE_VOICE_INTERACTION
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_ALL_APPS
 import com.android.launcher3.DeviceProfile
@@ -86,9 +89,21 @@ class TaskbarInsetsController(val context: TaskbarActivityContext): LoggableTask
             }
         }
 
-        var imeInsetsSize = Insets.of(0, 0, 0, taskbarHeightForIme)
+        val imeInsetsSize = Insets.of(0, 0, 0, taskbarHeightForIme)
+        // Use 0 insets for the VoiceInteractionWindow (assistant) when gesture nav is enabled.
+        val visInsetsSize = Insets.of(0, 0, 0, if (context.isGestureNav) 0 else tappableHeight)
+        val insetsSizeOverride = arrayOf(
+            InsetsFrameProvider.InsetsSizeOverride(
+                TYPE_INPUT_METHOD,
+                imeInsetsSize
+            ),
+            InsetsFrameProvider.InsetsSizeOverride(
+                TYPE_VOICE_INTERACTION,
+                visInsetsSize
+            )
+        )
         for (provider in windowLayoutParams.providedInsets) {
-            provider.imeInsetsSize = imeInsetsSize
+            provider.insetsSizeOverrides = insetsSizeOverride
         }
     }
 
@@ -141,9 +156,17 @@ class TaskbarInsetsController(val context: TaskbarActivityContext): LoggableTask
         pw.println(prefix + "TaskbarInsetsController:")
         pw.println("$prefix\twindowHeight=${windowLayoutParams.height}")
         for (provider in windowLayoutParams.providedInsets) {
-            pw.println("$prefix\tprovidedInsets: (type=" + InsetsState.typeToString(provider.type)
-                    + " insetsSize=" + provider.insetsSize
-                    + " imeInsetsSize=" + provider.imeInsetsSize + ")")
+            pw.print("$prefix\tprovidedInsets: (type=" + InsetsState.typeToString(provider.type)
+                    + " insetsSize=" + provider.insetsSize)
+            if (provider.insetsSizeOverrides != null) {
+                pw.print(" insetsSizeOverrides={")
+                for ((i, overrideSize) in provider.insetsSizeOverrides.withIndex()) {
+                    if (i > 0) pw.print(", ")
+                    pw.print(overrideSize)
+                }
+                pw.print("})")
+            }
+            pw.println()
         }
     }
 }

@@ -30,10 +30,12 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ICON_SURFACE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_SNACKBAR;
 import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
+import static com.android.launcher3.LauncherAnimUtils.HOTSEAT_SCALE_PROPERTY_FACTORY;
+import static com.android.launcher3.LauncherAnimUtils.SCALE_INDEX_WIDGET_TRANSITION;
 import static com.android.launcher3.LauncherAnimUtils.SPRING_LOADED_EXIT_DELAY;
+import static com.android.launcher3.LauncherAnimUtils.WORKSPACE_SCALE_PROPERTY_FACTORY;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherState.ALL_APPS;
-import static com.android.launcher3.LauncherState.FLAG_CLOSE_POPUPS;
 import static com.android.launcher3.LauncherState.FLAG_MULTI_PAGE;
 import static com.android.launcher3.LauncherState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -97,6 +99,7 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.text.method.TextKeyListener;
+import android.util.FloatProperty;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.KeyEvent;
@@ -195,6 +198,7 @@ import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.UiThreadHelper;
+import com.android.launcher3.util.ViewCapture;
 import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.FloatingIconView;
@@ -266,7 +270,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected static final int REQUEST_LAST = 100;
 
     // Type: int
-    private static final String RUNTIME_STATE = "launcher.state";
+    protected static final String RUNTIME_STATE = "launcher.state";
     // Type: PendingRequestArgs
     private static final String RUNTIME_STATE_PENDING_REQUEST_ARGS = "launcher.request_args";
     // Type: int
@@ -277,6 +281,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     private static final String RUNTIME_STATE_WIDGET_PANEL = "launcher.widget_panel";
     // Type int[]
     private static final String RUNTIME_STATE_CURRENT_SCREEN_IDS = "launcher.current_screen_ids";
+
+    // Type PendingSplitSelectInfo<Parcelable>
+    protected static final String PENDING_SPLIT_SELECT_INFO = "launcher.pending_split_select_info";
 
     public static final String ON_CREATE_EVT = "Launcher.onCreate";
     public static final String ON_START_EVT = "Launcher.onStart";
@@ -299,13 +306,17 @@ public class Launcher extends StatefulActivity<LauncherState>
     public static final int DISPLAY_WORKSPACE_TRACE_COOKIE = 0;
     public static final int DISPLAY_ALL_APPS_TRACE_COOKIE = 1;
 
+    private static final FloatProperty<Workspace<?>> WORKSPACE_WIDGET_SCALE =
+            WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WIDGET_TRANSITION);
+    private static final FloatProperty<Hotseat> HOTSEAT_WIDGET_SCALE =
+            HOTSEAT_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WIDGET_TRANSITION);
+
     private Configuration mOldConfig;
 
     @Thunk
     Workspace<?> mWorkspace;
     @Thunk
     DragLayer mDragLayer;
-    private DragController mDragController;
 
     private WidgetManagerHelper mAppWidgetManager;
     private LauncherAppWidgetHost mAppWidgetHost;
@@ -369,6 +380,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     private RotationHelper mRotationHelper;
 
     protected LauncherOverlayManager mOverlayManager;
+    protected DragController mDragController;
     // If true, overlay callbacks are deferred
     private boolean mDeferOverlayCallbacks;
     private final Runnable mDeferredOverlayCallbacks = this::checkIfOverlayStillDeferred;
@@ -386,6 +398,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     private LauncherState mPrevLauncherState;
 
     private StringCache mStringCache;
+    private ViewCapture mViewCapture;
 
     @Override
     @TargetApi(Build.VERSION_CODES.S)
@@ -465,7 +478,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         mIconCache = app.getIconCache();
         mAccessibilityDelegate = createAccessibilityDelegate();
 
-        mDragController = new LauncherDragController(this);
+        initDragController();
         mAllAppsController = new AllAppsTransitionController(this);
         mStateManager = new StateManager<>(this, NORMAL);
 
@@ -612,6 +625,13 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         mOldConfig.setTo(newConfig);
         super.onConfigurationChanged(newConfig);
+    }
+
+    /**
+     * Initializes the drag controller.
+     */
+    protected void initDragController() {
+        mDragController = new LauncherDragController(this);
     }
 
     @Override
@@ -1469,6 +1489,14 @@ public class Launcher extends StatefulActivity<LauncherState>
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
         mOverlayManager.onAttachedToWindow();
+        if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
+            View root = getDragLayer().getRootView();
+            if (mViewCapture != null) {
+                root.getViewTreeObserver().removeOnDrawListener(mViewCapture);
+            }
+            mViewCapture = new ViewCapture(root);
+            root.getViewTreeObserver().addOnDrawListener(mViewCapture);
+        }
     }
 
     @Override
@@ -2988,11 +3016,15 @@ public class Launcher extends StatefulActivity<LauncherState>
         writer.println(prefix + "\tmRotationHelper: " + mRotationHelper);
         writer.println(prefix + "\tmAppWidgetHost.isListening: " + mAppWidgetHost.isListening());
 
+        if (mViewCapture != null) {
+            writer.println(prefix + "\tmViewCapture: " + mViewCapture.dumpToString());
+        }
+
         // Extra logging for general debugging
         mDragLayer.dump(prefix, writer);
         mStateManager.dump(prefix, writer);
         mPopupDataProvider.dump(prefix, writer);
-        mDeviceProfile.dump(prefix, writer);
+        mDeviceProfile.dump(this, prefix, writer);
 
         try {
             FileLog.flushAll(writer);
@@ -3216,7 +3248,12 @@ public class Launcher extends StatefulActivity<LauncherState>
      * @param progress Transition progress from 0 to 1; where 0 => home and 1 => widgets.
      */
     public void onWidgetsTransition(float progress) {
-        // No-Op
+        if (mDeviceProfile.isTablet) {
+            float scale =
+                    Utilities.comp(Utilities.comp(mDeviceProfile.workspaceContentScale) * progress);
+            WORKSPACE_WIDGET_SCALE.set(getWorkspace(), scale);
+            HOTSEAT_WIDGET_SCALE.set(getHotseat(), scale);
+        }
     }
 
     private static class NonConfigInstance {

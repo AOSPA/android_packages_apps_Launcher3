@@ -84,7 +84,6 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -101,7 +100,6 @@ public final class LauncherInstrumentation {
     private static final String TAG = "Tapl";
     private static final int ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME = 15;
     private static final int GESTURE_STEP_MS = 16;
-    private static final long FORCE_PAUSE_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(2);
 
     static final Pattern EVENT_TOUCH_DOWN = getTouchEventPattern("ACTION_DOWN");
     static final Pattern EVENT_TOUCH_UP = getTouchEventPattern("ACTION_UP");
@@ -123,8 +121,8 @@ public final class LauncherInstrumentation {
     // Types for launcher containers that the user is interacting with. "Background" is a
     // pseudo-container corresponding to inactive launcher covered by another app.
     public enum ContainerType {
-        WORKSPACE, HOME_ALL_APPS, OVERVIEW, WIDGETS, FALLBACK_OVERVIEW, LAUNCHED_APP,
-        TASKBAR_ALL_APPS
+        WORKSPACE, HOME_ALL_APPS, OVERVIEW, SPLIT_SCREEN_SELECT, WIDGETS, FALLBACK_OVERVIEW,
+        LAUNCHED_APP, TASKBAR_ALL_APPS
     }
 
     public enum NavigationModel {ZERO_BUTTON, THREE_BUTTON}
@@ -362,10 +360,6 @@ public final class LauncherInstrumentation {
         return getRealDisplaySize().x / 2f;
     }
 
-    private void setForcePauseTimeout(long timeout) {
-        getTestInfo(TestProtocol.REQUEST_SET_FORCE_PAUSE_TIMEOUT, Long.toString(timeout));
-    }
-
     public void setEnableRotation(boolean on) {
         getTestInfo(TestProtocol.REQUEST_ENABLE_ROTATION, Boolean.toString(on));
     }
@@ -377,6 +371,17 @@ public final class LauncherInstrumentation {
 
     void setActiveContainer(VisibleContainer container) {
         sActiveContainer = new WeakReference<>(container);
+    }
+
+    /**
+     * Sets the accesibility interactive timeout to be effectively indefinite (UI using this
+     * accesibility timeout will not automatically dismiss if true).
+     */
+    void setIndefiniteAccessibilityInteractiveUiTimeout(boolean indefiniteTimeout) {
+        final String cmd = indefiniteTimeout
+                ? "settings put secure accessibility_interactive_ui_timeout_ms 10000"
+                : "settings delete secure accessibility_interactive_ui_timeout_ms";
+        logShellCommand(cmd);
     }
 
     public NavigationModel getNavigationModel() {
@@ -739,7 +744,8 @@ public final class LauncherInstrumentation {
 
                     return waitForLauncherObject(APPS_RES_ID);
                 }
-                case OVERVIEW: {
+                case OVERVIEW:
+                case SPLIT_SCREEN_SELECT: {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
@@ -886,7 +892,6 @@ public final class LauncherInstrumentation {
             final String action;
             if (getNavigationModel() == NavigationModel.ZERO_BUTTON) {
                 checkForAnomaly(false, true);
-                setForcePauseTimeout(FORCE_PAUSE_TIMEOUT_MS);
 
                 final Point displaySize = getRealDisplaySize();
                 // The swipe up to home gesture starts from inside the launcher when the user is
@@ -1087,6 +1092,14 @@ public final class LauncherInstrumentation {
     }
 
     @NonNull
+    UiObject2 waitForSystemUiObject(BySelector selector) {
+        final UiObject2 object = TestHelpers.wait(
+                Until.findObject(selector), WAIT_TIME_MS);
+        assertNotNull("Can't find a systemui object with selector: " + selector, object);
+        return object;
+    }
+
+    @NonNull
     UiObject2 waitForNavigationUiObject(String resId) {
         String resPackage = getNavigationButtonResPackage();
         final UiObject2 object = mDevice.wait(
@@ -1215,6 +1228,13 @@ public final class LauncherInstrumentation {
                 Until.findObject(By.res(ANDROID_PACKAGE, resId)), WAIT_TIME_MS);
         assertNotNull("Can't find a android object with id: " + resId, object);
         return object;
+    }
+
+    @NonNull
+    List<UiObject2> waitForObjectsBySelector(BySelector selector) {
+        final List<UiObject2> objects = mDevice.wait(Until.findObjects(selector), WAIT_TIME_MS);
+        assertNotNull("Can't find any view in Launcher, selector: " + selector, objects);
+        return objects;
     }
 
     private UiObject2 waitForObjectBySelector(BySelector selector) {

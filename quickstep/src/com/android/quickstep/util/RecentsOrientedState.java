@@ -25,7 +25,6 @@ import static android.view.Surface.ROTATION_90;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SettingsCache.ROTATION_SETTING_URI;
-import static com.android.quickstep.BaseActivityInterface.getTaskDimension;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
@@ -53,7 +52,6 @@ import com.android.launcher3.util.SettingsCache;
 import com.android.quickstep.BaseActivityInterface;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskAnimationManager;
-import com.android.quickstep.views.TaskView;
 
 import java.lang.annotation.Retention;
 import java.util.function.IntConsumer;
@@ -221,8 +219,7 @@ public class RecentsOrientedState implements
 
     private boolean updateHandler() {
         mRecentsActivityRotation = inferRecentsActivityRotation(mDisplayRotation);
-        if (mRecentsActivityRotation == mTouchRotation || (isRecentsActivityRotationAllowed()
-                && (mFlags & FLAG_SWIPE_UP_NOT_RUNNING) != 0)) {
+        if (mRecentsActivityRotation == mTouchRotation || isRecentsActivityRotationAllowed()) {
             mOrientationHandler = PagedOrientationHandler.PORTRAIT;
         } else if (mTouchRotation == ROTATION_90) {
             mOrientationHandler = PagedOrientationHandler.LANDSCAPE;
@@ -400,31 +397,10 @@ public class RecentsOrientedState implements
      * Returns the scale and pivot so that the provided taskRect can fit the provided full size
      */
     public float getFullScreenScaleAndPivot(Rect taskView, DeviceProfile dp, PointF outPivot) {
-        Rect insets = dp.getInsets();
-        float fullWidth = dp.widthPx;
-        float fullHeight = dp.heightPx;
-        if (TaskView.clipLeft(dp)) {
-            fullWidth -= insets.left;
-        }
-        if (TaskView.clipRight(dp)) {
-            fullWidth -= insets.right;
-        }
-        if (TaskView.clipTop(dp)) {
-            fullHeight -= insets.top;
-        }
-        if (TaskView.clipBottom(dp)) {
-            fullHeight -= insets.bottom;
-        }
-
-        getTaskDimension(dp, outPivot);
-        float scale = Math.min(outPivot.x / taskView.width(), outPivot.y / taskView.height());
-        // We also scale the preview as part of fullScreenParams, so account for that as well.
-        if (fullWidth > 0) {
-            scale = scale * dp.widthPx / fullWidth;
-        }
-
+        float scale = Math.min(dp.taskDimension.x / taskView.width(),
+                dp.taskDimension.y / taskView.height());
         if (scale == 1) {
-            outPivot.set(fullWidth / 2, fullHeight / 2);
+            outPivot.set(taskView.centerX(), taskView.centerY());
         } else {
             float factor = scale / (scale - 1);
             outPivot.set(taskView.left * factor, taskView.top * factor);
