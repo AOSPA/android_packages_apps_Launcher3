@@ -18,8 +18,6 @@ package com.android.launcher3;
 
 import static android.app.PendingIntent.FLAG_IMMUTABLE;
 import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
-import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
-import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_UI_MODE;
 import static android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO;
 import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
@@ -60,7 +58,6 @@ import static com.android.launcher3.popup.SystemShortcut.INSTALL;
 import static com.android.launcher3.popup.SystemShortcut.WIDGETS;
 import static com.android.launcher3.states.RotationHelper.REQUEST_LOCK;
 import static com.android.launcher3.states.RotationHelper.REQUEST_NONE;
-import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
 import static com.android.launcher3.util.ItemInfoMatcher.forFolderMatch;
 
 import android.animation.Animator;
@@ -177,7 +174,7 @@ import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.states.RotationHelper;
 import com.android.launcher3.testing.TestLogging;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.AllAppsSwipeController;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
@@ -310,8 +307,6 @@ public class Launcher extends StatefulActivity<LauncherState>
             WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WIDGET_TRANSITION);
     private static final FloatProperty<Hotseat> HOTSEAT_WIDGET_SCALE =
             HOTSEAT_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WIDGET_TRANSITION);
-
-    private Configuration mOldConfig;
 
     @Thunk
     Workspace<?> mWorkspace;
@@ -467,7 +462,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         super.onCreate(savedInstanceState);
 
         LauncherAppState app = LauncherAppState.getInstance(this);
-        mOldConfig = new Configuration(getResources().getConfiguration());
         mModel = app.getModel();
 
         mRotationHelper = new RotationHelper(this);
@@ -513,7 +507,6 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         if (!mModel.addCallbacksAndLoad(this)) {
             if (!internalStateHandled) {
-                Log.d(BAD_STATE, "Launcher onCreate not binding sync, prevent drawing");
                 // If we are not binding synchronously, pause drawing until initial bind complete,
                 // so that the system could continue to show the device loading prompt
                 mOnInitialBindListener = Boolean.FALSE::booleanValue;
@@ -616,17 +609,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         dispatchDeviceProfileChanged();
     }
 
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        int diff = newConfig.diff(mOldConfig);
-        if ((diff & (CONFIG_ORIENTATION | CONFIG_SCREEN_SIZE)) != 0) {
-            onIdpChanged(false);
-        }
-
-        mOldConfig.setTo(newConfig);
-        super.onConfigurationChanged(newConfig);
-    }
-
     /**
      * Initializes the drag controller.
      */
@@ -636,7 +618,15 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     @Override
     public void onIdpChanged(boolean modelPropertiesChanged) {
-        initDeviceProfile(mDeviceProfile.inv);
+        onHandleConfigurationChanged();
+    }
+
+    @Override
+    protected void onHandleConfigurationChanged() {
+        if (!initDeviceProfile(mDeviceProfile.inv)) {
+            return;
+        }
+
         dispatchDeviceProfileChanged();
         reapplyUi();
         mDragLayer.recreateControllers();
@@ -659,9 +649,17 @@ public class Launcher extends StatefulActivity<LauncherState>
         mDragLayer.onOneHandedModeStateChanged(activated);
     }
 
-    protected void initDeviceProfile(InvariantDeviceProfile idp) {
+    /**
+     * Returns {@code true} if a new DeviceProfile is initialized, and {@code false} otherwise.
+     */
+    protected boolean initDeviceProfile(InvariantDeviceProfile idp) {
         // Load configuration-specific DeviceProfile
-        mDeviceProfile = idp.getDeviceProfile(this);
+        DeviceProfile deviceProfile = idp.getDeviceProfile(this);
+        if (mDeviceProfile == deviceProfile) {
+            return false;
+        }
+
+        mDeviceProfile = deviceProfile;
         if (isInMultiWindowMode()) {
             mDeviceProfile = mDeviceProfile.getMultiWindowProfile(
                     this, getMultiWindowDisplaySize());
@@ -669,6 +667,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         onDeviceProfileInitiated();
         mModelWriter = mModel.getWriter(getDeviceProfile().isVerticalBarLayout(), true, this);
+        return true;
     }
 
     public RotationHelper getRotationHelper() {
@@ -1492,16 +1491,20 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
             View root = getDragLayer().getRootView();
             if (mViewCapture != null) {
-                root.getViewTreeObserver().removeOnDrawListener(mViewCapture);
+                mViewCapture.detach();
             }
-            mViewCapture = new ViewCapture(root);
-            root.getViewTreeObserver().addOnDrawListener(mViewCapture);
+            mViewCapture = new ViewCapture(getWindow());
+            mViewCapture.attach();
         }
     }
 
     @Override
     public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        if (mViewCapture != null) {
+            mViewCapture.detach();
+            mViewCapture = null;
+        }
         mOverlayManager.onDetachedFromWindow();
         closeContextMenu();
     }
@@ -2982,6 +2985,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     @Override
     public void dump(String prefix, FileDescriptor fd, PrintWriter writer, String[] args) {
+        SafeCloseable viewDump = mViewCapture == null ? null : mViewCapture.beginDump(writer, fd);
         super.dump(prefix, fd, writer, args);
 
         if (args.length > 0 && TextUtils.equals(args[0], "--all")) {
@@ -3016,15 +3020,15 @@ public class Launcher extends StatefulActivity<LauncherState>
         writer.println(prefix + "\tmRotationHelper: " + mRotationHelper);
         writer.println(prefix + "\tmAppWidgetHost.isListening: " + mAppWidgetHost.isListening());
 
-        if (mViewCapture != null) {
-            writer.println(prefix + "\tmViewCapture: " + mViewCapture.dumpToString());
-        }
-
         // Extra logging for general debugging
         mDragLayer.dump(prefix, writer);
         mStateManager.dump(prefix, writer);
         mPopupDataProvider.dump(prefix, writer);
         mDeviceProfile.dump(this, prefix, writer);
+
+        if (viewDump != null) {
+            viewDump.close();
+        }
 
         try {
             FileLog.flushAll(writer);

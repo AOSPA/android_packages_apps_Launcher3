@@ -23,8 +23,9 @@ import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
-import static com.android.launcher3.ResourceUtils.getBoolByName;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_OPEN;
+import static com.android.launcher3.taskbar.TaskbarManager.FLAG_HIDE_NAVBAR_WINDOW;
+import static com.android.launcher3.testing.shared.ResourceUtils.getBoolByName;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
@@ -76,7 +77,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
 import com.android.launcher3.testing.TestLogging;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.NavigationMode;
@@ -118,7 +119,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     // The size we should return to when we call setTaskbarWindowFullscreen(false)
     private int mLastRequestedNonFullscreenHeight;
 
-    private final NavigationMode mNavMode;
+    private NavigationMode mNavMode;
     private final boolean mImeDrawsImeNavBar;
     private final ViewCache mViewCache = new ViewCache();
 
@@ -130,6 +131,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     // The flag to know if the window is excluded from magnification region computation.
     private boolean mIsExcludeFromMagnificationRegion = false;
     private boolean mBindingItems = false;
+    private boolean mAddedWindow = false;
+
 
     private final TaskbarShortcutMenuAccessibilityDelegate mAccessibilityDelegate;
 
@@ -218,7 +221,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.init(sharedState);
         updateSysuiStateFlags(sharedState.sysuiStateFlags, true /* fromInit */);
 
-        mWindowManager.addView(mDragLayer, mWindowLayoutParams);
+        if (!mAddedWindow) {
+            mWindowManager.addView(mDragLayer, mWindowLayoutParams);
+            mAddedWindow = true;
+        } else {
+            mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
+        }
     }
 
     @Override
@@ -227,7 +235,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     /** Updates {@link DeviceProfile} instances for any Taskbar windows. */
-    public void updateDeviceProfile(DeviceProfile dp) {
+    public void updateDeviceProfile(DeviceProfile dp, NavigationMode navMode) {
+        mNavMode = navMode;
         mControllers.taskbarAllAppsController.updateDeviceProfile(dp);
         mDeviceProfile = dp.copy(this);
         updateIconSize(getResources());
@@ -461,7 +470,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mIsDestroyed = true;
         setUIController(TaskbarUIController.DEFAULT);
         mControllers.onDestroy();
-        mWindowManager.removeViewImmediate(mDragLayer);
+        if (!FLAG_HIDE_NAVBAR_WINDOW) {
+            mWindowManager.removeViewImmediate(mDragLayer);
+            mAddedWindow = false;
+        }
     }
 
     public void updateSysuiStateFlags(int systemUiStateFlags, boolean fromInit) {
@@ -596,6 +608,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * Returns the default height of the window, including the static corner radii above taskbar.
      */
     public int getDefaultTaskbarWindowHeight() {
+        if (FLAG_HIDE_NAVBAR_WINDOW && mDeviceProfile.isPhone) {
+            Resources resources = getResources();
+            return isThreeButtonNav() ?
+                    resources.getDimensionPixelSize(R.dimen.taskbar_size) :
+                    resources.getDimensionPixelSize(R.dimen.taskbar_stashed_size);
+        }
         return mDeviceProfile.taskbarSize + Math.max(getLeftCornerRadius(), getRightCornerRadius());
     }
 
@@ -627,7 +645,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     /** Adds the given view to WindowManager with the provided LayoutParams (creates new window). */
     public void addWindowView(View view, WindowManager.LayoutParams windowLayoutParams) {
-        mWindowManager.addView(view, windowLayoutParams);
+        if (!view.isAttachedToWindow()) {
+            mWindowManager.addView(view, windowLayoutParams);
+        }
     }
 
     /** Removes the given view from WindowManager. See {@link #addWindowView}. */

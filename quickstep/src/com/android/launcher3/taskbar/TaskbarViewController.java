@@ -20,6 +20,7 @@ import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
+import static com.android.launcher3.taskbar.TaskbarManager.isPhoneMode;
 import static com.android.quickstep.AnimatedFloat.VALUE;
 
 import android.annotation.NonNull;
@@ -35,6 +36,7 @@ import androidx.core.view.OneShotPreDrawListener;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AlphaUpdateListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
@@ -69,7 +71,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public static final int ALPHA_INDEX_NOTIFICATION_EXPANDED = 4;
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 5;
     public static final int ALPHA_INDEX_IME_BUTTON_NAV = 6;
-    private static final int NUM_ALPHA_CHANNELS = 7;
+    public static final int ALPHA_INDEX_SMALL_SCREEN = 7;
+    private static final int NUM_ALPHA_CHANNELS = 8;
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarView mTaskbarView;
@@ -108,7 +111,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public void init(TaskbarControllers controllers) {
         mControllers = controllers;
         mTaskbarView.init(new TaskbarViewCallbacks());
-        mTaskbarView.getLayoutParams().height = mActivity.getDeviceProfile().taskbarSize;
+        mTaskbarView.getLayoutParams().height = isPhoneMode(mActivity.getDeviceProfile())
+                ? mActivity.getResources().getDimensionPixelSize(R.dimen.taskbar_size)
+                : mActivity.getDeviceProfile().taskbarSize;
         mThemeIconsColor = ThemedIconDrawable.getColors(mTaskbarView.getContext())[0];
 
         mTaskbarIconScaleForStash.updateValue(1f);
@@ -291,10 +296,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 boolean isRtl = Utilities.isRtl(child.getResources());
                 float hotseatIconCenter = isRtl
                         ? launcherDp.widthPx - hotseatPadding.right + borderSpacing
-                        + launcherDp.qsbWidth / 2f
-                        : hotseatPadding.left - borderSpacing - launcherDp.qsbWidth / 2f;
+                        + launcherDp.hotseatQsbWidth / 2f
+                        : hotseatPadding.left - borderSpacing - launcherDp.hotseatQsbWidth / 2f;
                 float childCenter = (child.getLeft() + child.getRight()) / 2f;
-                float halfQsbIconWidthDiff = (launcherDp.qsbWidth - taskbarDp.iconSizePx) / 2f;
+                float halfQsbIconWidthDiff =
+                        (launcherDp.hotseatQsbWidth - taskbarDp.iconSizePx) / 2f;
                 setter.addFloat(child, ICON_TRANSLATE_X,
                         isRtl ? -halfQsbIconWidthDiff : halfQsbIconWidthDiff,
                         hotseatIconCenter - childCenter, LINEAR);
@@ -308,7 +314,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                                 : Interpolators.clampToProgress(LINEAR, 0.84f, 1f));
                 setter.addOnFrameListener(animator -> AlphaUpdateListener.updateVisibility(child));
 
-                float qsbInsetFraction = halfQsbIconWidthDiff / launcherDp.qsbWidth;
+                float qsbInsetFraction = halfQsbIconWidthDiff / launcherDp.hotseatQsbWidth;
                 if (child instanceof  HorizontalInsettableView) {
                     setter.addFloat((HorizontalInsettableView) child,
                             HorizontalInsettableView.HORIZONTAL_INSETS, qsbInsetFraction, 0,
@@ -374,6 +380,20 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(prefix + "TaskbarViewController:");
+
+        mTaskbarIconAlpha.dump(
+                prefix + "\t",
+                pw,
+                "mTaskbarIconAlpha",
+                "ALPHA_INDEX_HOME",
+                "ALPHA_INDEX_KEYGUARD",
+                "ALPHA_INDEX_STASH",
+                "ALPHA_INDEX_RECENTS_DISABLED",
+                "ALPHA_INDEX_NOTIFICATION_EXPANDED",
+                "ALPHA_INDEX_ASSISTANT_INVOKED",
+                "ALPHA_INDEX_IME_BUTTON_NAV",
+                "ALPHA_INDEX_SMALL_SCREEN");
+
         mModelCallbacks.dumpLogs(prefix + "\t", pw);
     }
 

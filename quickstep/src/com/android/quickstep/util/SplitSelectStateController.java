@@ -33,6 +33,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.UserHandle;
 import android.text.TextUtils;
 import android.view.RemoteAnimationAdapter;
 import android.view.SurfaceControl;
@@ -43,7 +44,7 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.testing.TestLogging;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
 import com.android.quickstep.SystemUiProxy;
@@ -77,6 +78,8 @@ public class SplitSelectStateController {
     private int mSecondTaskId = INVALID_TASK_ID;
     private String mSecondTaskPackageName;
     private boolean mRecentsAnimationRunning;
+    @Nullable
+    private UserHandle mUser;
     /** If not null, this is the TaskView we want to launch from */
     @Nullable
     private GroupedTaskView mLaunchingTaskView;
@@ -97,12 +100,15 @@ public class SplitSelectStateController {
         mInitialTaskId = taskId;
         mStagePosition = stagePosition;
         mInitialTaskIntent = null;
+        mUser = null;
     }
 
-    public void setInitialTaskSelect(Intent intent, @StagePosition int stagePosition) {
+    public void setInitialTaskSelect(Intent intent, @StagePosition int stagePosition,
+            @Nullable UserHandle user) {
         mInitialTaskIntent = intent;
         mStagePosition = stagePosition;
         mInitialTaskId = INVALID_TASK_ID;
+        mUser = user;
     }
 
     /**
@@ -120,9 +126,12 @@ public class SplitSelectStateController {
         } else {
             fillInIntent = null;
         }
-        final PendingIntent pendingIntent =
-                mInitialTaskIntent == null ? null : PendingIntent.getActivity(mContext, 0,
-                        mInitialTaskIntent, FLAG_MUTABLE);
+
+        final PendingIntent pendingIntent = mInitialTaskIntent == null ? null : (mUser != null
+                ? PendingIntent.getActivityAsUser(mContext, 0, mInitialTaskIntent,
+                FLAG_MUTABLE, null /* options */, mUser)
+                : PendingIntent.getActivity(mContext, 0, mInitialTaskIntent, FLAG_MUTABLE));
+
         launchTasks(mInitialTaskId, pendingIntent, fillInIntent, mSecondTaskId, mStagePosition,
                 callback, false /* freezeTaskList */, DEFAULT_SPLIT_RATIO);
     }
@@ -242,8 +251,9 @@ public class SplitSelectStateController {
         @Override
         public void startAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
                 @NonNull SurfaceControl.Transaction t, @NonNull Runnable finishCallback) {
-            TaskViewUtils.composeRecentsSplitLaunchAnimator(mInitialTaskId,
-                    mInitialTaskPendingIntent, mSecondTaskId, info, t, () -> {
+            TaskViewUtils.composeRecentsSplitLaunchAnimator(mLaunchingTaskView, mStateManager,
+                    mDepthController, mInitialTaskId, mInitialTaskPendingIntent, mSecondTaskId,
+                    info, t, () -> {
                     finishCallback.run();
                     if (mSuccessCallback != null) {
                         mSuccessCallback.accept(true);

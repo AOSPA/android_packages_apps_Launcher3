@@ -30,7 +30,7 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.testing.TestLogging;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.systemui.shared.system.ViewTreeObserverWrapper;
 import com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo;
@@ -86,8 +86,14 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
         }
     }
 
+    protected void onDestroy(boolean forceDestroy) {
+        if (forceDestroy) {
+            ViewTreeObserverWrapper.removeOnComputeInsetsListener(mTaskbarInsetsComputer);
+        }
+    }
+
     protected void onDestroy() {
-        ViewTreeObserverWrapper.removeOnComputeInsetsListener(mTaskbarInsetsComputer);
+        onDestroy(!TaskbarManager.FLAG_HIDE_NAVBAR_WINDOW);
     }
 
     @Override
@@ -101,7 +107,7 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
 
-        onDestroy();
+        onDestroy(true);
     }
 
     @Override

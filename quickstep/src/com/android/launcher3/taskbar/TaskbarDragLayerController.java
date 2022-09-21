@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar;
 import android.content.res.Resources;
 import android.graphics.Rect;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.util.TouchController;
 import com.android.quickstep.AnimatedFloat;
@@ -144,10 +145,9 @@ public class TaskbarDragLayerController implements TaskbarControllers.LoggableTa
     public void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(prefix + "TaskbarDragLayerController:");
 
-        pw.println(String.format("%s\tmBgOffset=%.2f", prefix, mBgOffset.value));
-        pw.println(String.format("%s\tmFolderMargin=%dpx", prefix, mFolderMargin));
-        pw.println(String.format(
-                "%s\tmLastSetBackgroundAlpha=%.2f", prefix, mLastSetBackgroundAlpha));
+        pw.println(prefix + "\tmBgOffset=" + mBgOffset.value);
+        pw.println(prefix + "\tmFolderMargin=" + mFolderMargin);
+        pw.println(prefix + "\tmLastSetBackgroundAlpha=" + mLastSetBackgroundAlpha);
     }
 
     /**
@@ -174,7 +174,15 @@ public class TaskbarDragLayerController implements TaskbarControllers.LoggableTa
          * Returns how tall the background should be drawn at the bottom of the screen.
          */
         public int getTaskbarBackgroundHeight() {
-            return mActivity.getDeviceProfile().taskbarSize;
+            DeviceProfile deviceProfile = mActivity.getDeviceProfile();
+            if (TaskbarManager.isPhoneMode(deviceProfile)) {
+                Resources resources = mActivity.getResources();
+                return mActivity.isThreeButtonNav() ?
+                        resources.getDimensionPixelSize(R.dimen.taskbar_size) :
+                        resources.getDimensionPixelSize(R.dimen.taskbar_stashed_size);
+            } else {
+                return deviceProfile.taskbarSize;
+            }
         }
 
         /**
