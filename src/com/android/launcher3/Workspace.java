@@ -30,7 +30,6 @@ import static com.android.launcher3.dragndrop.DragLayer.ALPHA_INDEX_OVERLAY;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPELEFT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPERIGHT;
-import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -45,6 +44,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Point;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
@@ -151,10 +151,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     private static final int ADJACENT_SCREEN_DROP_DURATION = 300;
 
     public static final int DEFAULT_PAGE = 0;
-
-    private static final int DEFAULT_SMARTSPACE_HEIGHT = 1;
-
-    private static final int EXPANDED_SMARTSPACE_HEIGHT = 2;
 
     private LayoutTransition mLayoutTransition;
     @Thunk final WallpaperManager mWallpaperManager;
@@ -370,7 +366,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             float scale = 1;
             if (isWidget) {
                 DeviceProfile profile = mLauncher.getDeviceProfile();
-                scale = Utilities.shrinkRect(r, profile.appWidgetScale.x, profile.appWidgetScale.y);
+                final PointF appWidgetScale = profile.getAppWidgetScale(null);
+                scale = Utilities.shrinkRect(r, appWidgetScale.x, appWidgetScale.y);
             }
             size[0] = r.width();
             size[1] = r.height();
@@ -561,10 +558,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                     .inflate(R.layout.search_container_workspace, firstPage, false);
         }
 
-        int cellVSpan = FeatureFlags.EXPANDED_SMARTSPACE.get()
-                ? EXPANDED_SMARTSPACE_HEIGHT : DEFAULT_SMARTSPACE_HEIGHT;
         int cellHSpan = mLauncher.getDeviceProfile().inv.numSearchContainerColumns;
-        CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, cellHSpan, cellVSpan);
+        CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, cellHSpan, 1);
         lp.canReorder = false;
         if (!firstPage.addViewToCellLayout(mQsb, 0, R.id.search_container_workspace, lp, true)) {
             Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
@@ -1248,7 +1243,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         // different effects based on device performance. On at least one relatively high-end
         // device I've tried, translating the launcher causes things to get quite laggy.
         mLauncher.getDragLayer().setTranslationX(transX);
-        Log.d(BAD_STATE, "Workspace onOverlayScrollChanged DragLayer ALPHA_INDEX_OVERLAY=" + alpha);
         mLauncher.getDragLayer().getAlphaProperty(ALPHA_INDEX_OVERLAY).setValue(alpha);
     }
 
@@ -2063,20 +2057,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
                     if (container != LauncherSettings.Favorites.CONTAINER_HOTSEAT &&
                             cell instanceof LauncherAppWidgetHostView) {
-                        final CellLayout cellLayout = dropTargetLayout;
+
                         // We post this call so that the widget has a chance to be placed
                         // in its final location
-
-                        final LauncherAppWidgetHostView hostView = (LauncherAppWidgetHostView) cell;
-                        AppWidgetProviderInfo pInfo = hostView.getAppWidgetInfo();
-                        if (pInfo != null && pInfo.resizeMode != AppWidgetProviderInfo.RESIZE_NONE
-                                && !options.isAccessibleDrag) {
-                            onCompleteRunnable = () -> {
-                                if (!isPageInTransition()) {
-                                    AppWidgetResizeFrame.showForWidget(hostView, cellLayout);
-                                }
-                            };
-                        }
+                        onCompleteRunnable = getWidgetResizeFrameRunnable(options,
+                                (LauncherAppWidgetHostView) cell, dropTargetLayout);
                     }
                     mLauncher.getModelWriter().modifyItemInDatabase(info, container, screenId,
                             lp.cellX, lp.cellY, item.spanX, item.spanY);
@@ -2097,8 +2082,16 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 }
             } else {
                 // When drag is cancelled, reattach content view back to its original parent.
-                if (mDragInfo.cell instanceof LauncherAppWidgetHostView) {
+                if (cell instanceof LauncherAppWidgetHostView) {
                     d.dragView.detachContentView(/* reattachToPreviousParent= */ true);
+
+                    final CellLayout cellLayout = getParentCellLayoutForView(cell);
+                    boolean pageIsVisible = isVisible(cellLayout);
+
+                    if (pageIsVisible) {
+                        onCompleteRunnable = getWidgetResizeFrameRunnable(options,
+                                (LauncherAppWidgetHostView) cell, cellLayout);
+                    }
                 }
             }
 
@@ -2124,7 +2117,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 final ItemInfo info = (ItemInfo) cell.getTag();
                 boolean isWidget = info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET
                         || info.itemType == LauncherSettings.Favorites.ITEM_TYPE_CUSTOM_APPWIDGET;
-                if (isWidget) {
+                if (isWidget && dropTargetLayout != null) {
+                    // animate widget to a valid place
                     int animationType = resizeOnDrop ? ANIMATE_INTO_POSITION_AND_RESIZE :
                             ANIMATE_INTO_POSITION_AND_DISAPPEAR;
                     animateWidgetDrop(info, parent, d.dragView, null, animationType, cell, false);
@@ -2148,6 +2142,21 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         if (d.stateAnnouncer != null && !droppedOnOriginalCell) {
             d.stateAnnouncer.completeAction(R.string.item_moved);
         }
+    }
+
+    @Nullable
+    private Runnable getWidgetResizeFrameRunnable(DragOptions options,
+            LauncherAppWidgetHostView hostView, CellLayout cellLayout) {
+        AppWidgetProviderInfo pInfo = hostView.getAppWidgetInfo();
+        if (pInfo != null && pInfo.resizeMode != AppWidgetProviderInfo.RESIZE_NONE
+                && !options.isAccessibleDrag) {
+            return () -> {
+                if (!isPageInTransition()) {
+                    AppWidgetResizeFrame.showForWidget(hostView, cellLayout);
+                }
+            };
+        }
+        return null;
     }
 
     public void onNoCellFound(
@@ -2426,7 +2435,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         } else if ((mDragMode == DRAG_MODE_NONE || mDragMode == DRAG_MODE_REORDER)
                 && !mReorderAlarm.alarmPending()
                 && (mLastReorderX != reorderX || mLastReorderY != reorderY)
-                && targetCellDistance < mDragTargetLayout.getReorderRadius(mTargetCell)) {
+                && targetCellDistance < mDragTargetLayout.getReorderRadius(mTargetCell, item.spanX,
+                item.spanY)) {
 
             int[] resultSpan = new int[2];
             mDragTargetLayout.performReorder((int) mDragViewVisualCenter[0],
@@ -2884,7 +2894,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 r.top -= widgetPadding.top;
                 r.bottom += widgetPadding.bottom;
             }
-            Utilities.shrinkRect(r, profile.appWidgetScale.x, profile.appWidgetScale.y);
+            PointF appWidgetScale = profile.getAppWidgetScale(null);
+            Utilities.shrinkRect(r, appWidgetScale.x, appWidgetScale.y);
         }
 
         mTempFXY[0] = r.left;

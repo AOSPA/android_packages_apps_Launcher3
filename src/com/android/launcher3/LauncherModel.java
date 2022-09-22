@@ -63,7 +63,7 @@ import com.android.launcher3.pm.InstallSessionTracker;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutRequest;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.PackageUserKey;
@@ -457,9 +457,6 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
 
     @Override
     public void onSessionFailure(String packageName, UserHandle user) {
-        if (!FeatureFlags.PROMISE_APPS_NEW_INSTALLS.get()) {
-            return;
-        }
         enqueueModelUpdateTask(new BaseModelUpdateTask() {
             @Override
             public void execute(LauncherAppState app, BgDataModel dataModel, AllAppsList apps) {

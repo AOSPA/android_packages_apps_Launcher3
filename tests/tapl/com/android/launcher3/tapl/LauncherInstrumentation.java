@@ -23,7 +23,7 @@ import static android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS;
 
 import static com.android.launcher3.tapl.Folder.FOLDER_CONTENT_RES_ID;
 import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
-import static com.android.launcher3.testing.TestProtocol.NORMAL_STATE_ORDINAL;
+import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 
 import android.app.ActivityManager;
 import android.app.Instrumentation;
@@ -65,9 +65,9 @@ import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
 
-import com.android.launcher3.ResourceUtils;
-import com.android.launcher3.testing.TestInformationRequest;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.ResourceUtils;
+import com.android.launcher3.testing.shared.TestInformationRequest;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.systemui.shared.system.ContextUtils;
 import com.android.systemui.shared.system.QuickStepContract;
 
@@ -169,6 +169,7 @@ public final class LauncherInstrumentation {
     private static final String WIDGETS_RES_ID = "primary_widgets_list_view";
     private static final String CONTEXT_MENU_RES_ID = "popup_container";
     private static final String TASKBAR_RES_ID = "taskbar_view";
+    private static final String SPLIT_PLACEHOLDER_RES_ID = "split_placeholder";
     public static final int WAIT_TIME_MS = 30000;
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
     private static final String ANDROID_PACKAGE = "android";
@@ -178,6 +179,7 @@ public final class LauncherInstrumentation {
     private final UiDevice mDevice;
     private final Instrumentation mInstrumentation;
     private int mExpectedRotation = Surface.ROTATION_0;
+    private boolean mExpectedRotationCheckEnabled = true;
     private final Uri mTestProviderUri;
     private final Deque<String> mDiagnosticContext = new LinkedList<>();
     private Function<Long, String> mSystemHealthSupplier;
@@ -667,6 +669,10 @@ public final class LauncherInstrumentation {
         mExpectedRotation = expectedRotation;
     }
 
+    public void setExpectedRotationCheckEnabled(boolean expectedRotationCheckEnabled) {
+        mExpectedRotationCheckEnabled = expectedRotationCheckEnabled;
+    }
+
     public String getNavigationModeMismatchError(boolean waitForCorrectState) {
         final int waitTime = waitForCorrectState ? WAIT_TIME_MS : 0;
         final NavigationModel navigationModel = getNavigationModel();
@@ -700,8 +706,10 @@ public final class LauncherInstrumentation {
     private UiObject2 verifyContainerType(ContainerType containerType) {
         waitForLauncherInitialized();
 
-        assertEquals("Unexpected display rotation",
-                mExpectedRotation, mDevice.getDisplayRotation());
+        if (mExpectedRotationCheckEnabled) {
+            assertEquals("Unexpected display rotation",
+                    mExpectedRotation, mDevice.getDisplayRotation());
+        }
 
         final String error = getNavigationModeMismatchError(true);
         assertTrue(error, error == null);
@@ -724,6 +732,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(OVERVIEW_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
                     waitUntilLauncherObjectGone(TASKBAR_RES_ID);
+                    waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
                     return waitForLauncherObject(WORKSPACE_RES_ID);
                 }
@@ -732,6 +741,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(OVERVIEW_RES_ID);
                     waitUntilLauncherObjectGone(TASKBAR_RES_ID);
+                    waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
                     return waitForLauncherObject(WIDGETS_RES_ID);
                 }
@@ -741,16 +751,26 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(OVERVIEW_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
                     waitUntilLauncherObjectGone(TASKBAR_RES_ID);
+                    waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
                     return waitForLauncherObject(APPS_RES_ID);
                 }
-                case OVERVIEW:
+                case OVERVIEW: {
+                    waitUntilLauncherObjectGone(APPS_RES_ID);
+                    waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
+                    waitUntilLauncherObjectGone(WIDGETS_RES_ID);
+                    waitUntilLauncherObjectGone(TASKBAR_RES_ID);
+                    waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
+
+                    return waitForLauncherObject(OVERVIEW_RES_ID);
+                }
                 case SPLIT_SCREEN_SELECT: {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
                     waitUntilLauncherObjectGone(TASKBAR_RES_ID);
 
+                    waitForLauncherObject(SPLIT_PLACEHOLDER_RES_ID);
                     return waitForLauncherObject(OVERVIEW_RES_ID);
                 }
                 case FALLBACK_OVERVIEW: {
@@ -758,6 +778,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
                     waitUntilLauncherObjectGone(TASKBAR_RES_ID);
+                    waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
                     return waitForFallbackLauncherObject(OVERVIEW_RES_ID);
                 }
@@ -766,6 +787,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(OVERVIEW_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
+                    waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
                     if (isTablet() && !isFallbackOverview()) {
                         waitForLauncherObject(TASKBAR_RES_ID);
@@ -1106,6 +1128,16 @@ public final class LauncherInstrumentation {
                 Until.findObject(By.res(resPackage, resId)), WAIT_TIME_MS);
         assertNotNull("Can't find a navigation UI object with id: " + resId, object);
         return object;
+    }
+
+    @Nullable
+    UiObject2 findObjectInContainer(UiObject2 container, String resName) {
+        try {
+            return container.findObject(getLauncherObjectSelector(resName));
+        } catch (StaleObjectException e) {
+            fail("The container disappeared from screen");
+            return null;
+        }
     }
 
     @Nullable

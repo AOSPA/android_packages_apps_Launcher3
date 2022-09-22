@@ -18,6 +18,8 @@ package com.android.launcher3.ui;
 
 import static androidx.test.InstrumentationRegistry.getInstrumentation;
 
+import android.platform.test.annotations.IwTest;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertEquals;
@@ -203,6 +205,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 false /* tapRight */);
     }
 
+    @IwTest(focusArea="launcher")
     @Test
     @ScreenRecord // b/202433017
     public void testWorkspace() throws Exception {
@@ -330,6 +333,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         }
     }
 
+    @IwTest(focusArea="launcher")
     @Test
     @PortraitLandscape
     public void testDragAppIcon() throws Throwable {
@@ -511,6 +515,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     }
 
     @Test
+    @ScreenRecord // b/242163245
     public void getIconsPosition_afterIconRemoved_notContained() throws IOException {
         Point[] gridPositions = getCornersAndCenterPositions();
         createShortcutIfNotExist(STORE_APP_NAME, gridPositions[0]);
@@ -583,5 +588,17 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     public static String getAppPackageName() {
         return getInstrumentation().getContext().getPackageName();
+    }
+
+    @Test
+    public void testGetAppIconName() {
+        HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
+        allApps.freeze();
+        try {
+            HomeAppIcon icon = allApps.getAppIcon(APP_NAME);
+            assertEquals("Wrong app icon name.", icon.getIconName(), APP_NAME);
+        } finally {
+            allApps.unfreeze();
+        }
     }
 }

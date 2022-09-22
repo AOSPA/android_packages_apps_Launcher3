@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.testing;
+package com.android.launcher3.testing.shared;
 
 /**
  * Protocol for custom accessibility events for communication with UI Automation tests.
@@ -136,8 +136,8 @@ public final class TestProtocol {
     public static final String NO_DROP_TARGET = "b/195031154";
     public static final String NULL_INT_SET = "b/200572078";
     public static final String MISSING_PROMISE_ICON = "b/202985412";
-    public static final String BAD_STATE = "b/223498680";
     public static final String TASKBAR_IN_APP_STATE = "b/227657604";
+    public static final String INCORRECT_INFO_UPDATED = "b/239465630";
 
     public static final String REQUEST_EMULATE_DISPLAY = "emulate-display";
     public static final String REQUEST_STOP_EMULATE_DISPLAY = "stop-emulate-display";

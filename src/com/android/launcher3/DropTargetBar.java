@@ -37,7 +37,7 @@ import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragController.DragListener;
 import com.android.launcher3.dragndrop.DragOptions;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.TestProtocol;
 
 /*
  * The top bar containing various drop targets: Delete/App Info/Uninstall.
@@ -175,7 +175,7 @@ public class DropTargetBar extends FrameLayout
             secondButton.setPadding(horizontalPadding, verticalPadding, horizontalPadding,
                     verticalPadding);
 
-            float scale = dp.getWorkspaceSpringLoadScale();
+            float scale = dp.getWorkspaceSpringLoadScale(mLauncher);
             int scaledPanelWidth = (int) (dp.getCellLayoutWidth() * scale);
 
             int availableWidth;
@@ -232,7 +232,7 @@ public class DropTargetBar extends FrameLayout
 
         DeviceProfile dp = mLauncher.getDeviceProfile();
         // Center vertical bar over scaled workspace, accounting for hotseat offset.
-        float scale = dp.getWorkspaceSpringLoadScale();
+        float scale = dp.getWorkspaceSpringLoadScale(mLauncher);
         Workspace<?> ws = mLauncher.getWorkspace();
         int barCenter;
         if (dp.isTwoPanels) {

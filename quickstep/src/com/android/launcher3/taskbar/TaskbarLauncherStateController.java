@@ -31,11 +31,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
-import com.android.launcher3.BaseQuickstepLauncher;
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.statemanager.StateManager;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.RecentsAnimationCallbacks;
@@ -47,6 +49,7 @@ import com.android.systemui.shared.recents.model.ThumbnailData;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.StringJoiner;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -75,7 +78,7 @@ import java.util.function.Supplier;
     private TaskbarControllers mControllers;
     private AnimatedFloat mTaskbarBackgroundAlpha;
     private MultiValueAlpha.AlphaProperty mIconAlphaForHome;
-    private BaseQuickstepLauncher mLauncher;
+    private QuickstepLauncher mLauncher;
 
     private Integer mPrevState;
     private int mState;
@@ -90,6 +93,15 @@ import java.util.function.Supplier;
 
     // We skip any view synchronizations during init/destroy.
     private boolean mCanSyncViews;
+
+    private final Consumer<Float> mIconAlphaForHomeConsumer = alpha -> {
+        mLauncher.getHotseat().setIconsAlpha(alpha > 0 ? 0 : 1);
+        mLauncher.getHotseat().setQsbAlpha(
+                mLauncher.getDeviceProfile().isQsbInline && alpha > 0 ? 0 : 1);
+    };
+
+    private final DeviceProfile.OnDeviceProfileChangeListener mOnDeviceProfileChangeListener =
+            dp -> mIconAlphaForHomeConsumer.accept(mIconAlphaForHome.getValue());
 
     private final StateManager.StateListener<LauncherState> mStateListener =
             new StateManager.StateListener<LauncherState>() {
@@ -120,7 +132,7 @@ import java.util.function.Supplier;
                 }
             };
 
-    public void init(TaskbarControllers controllers, BaseQuickstepLauncher launcher) {
+    public void init(TaskbarControllers controllers, QuickstepLauncher launcher) {
         mCanSyncViews = false;
 
         mControllers = controllers;
@@ -130,13 +142,7 @@ import java.util.function.Supplier;
                 .getTaskbarBackgroundAlpha();
         MultiValueAlpha taskbarIconAlpha = mControllers.taskbarViewController.getTaskbarIconAlpha();
         mIconAlphaForHome = taskbarIconAlpha.getProperty(ALPHA_INDEX_HOME);
-        mIconAlphaForHome.setConsumer(
-                alpha -> {
-                    mLauncher.getHotseat().setIconsAlpha(alpha > 0 ? 0 : 1);
-                    if (mLauncher.getDeviceProfile().isQsbInline) {
-                        mLauncher.getHotseat().setQsbAlpha(alpha > 0 ? 0 : 1);
-                    }
-                });
+        mIconAlphaForHome.setConsumer(mIconAlphaForHomeConsumer);
 
         mIconAlignmentForResumedState.finishAnimation();
         onIconAlignmentRatioChangedForAppAndHomeTransition();
@@ -149,6 +155,7 @@ import java.util.function.Supplier;
         applyState(0);
 
         mCanSyncViews = true;
+        mLauncher.addOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
     }
 
     public void onDestroy() {
@@ -163,6 +170,7 @@ import java.util.function.Supplier;
         mLauncher.getStateManager().removeStateListener(mStateListener);
 
         mCanSyncViews = true;
+        mLauncher.removeOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
     }
 
     public Animator createAnimToLauncher(@NonNull LauncherState toState,
@@ -367,11 +375,14 @@ import java.util.function.Supplier;
     private void playStateTransitionAnim(AnimatorSet animatorSet, long duration,
             boolean committed) {
         boolean isInStashedState = mLauncherState.isTaskbarStashed(mLauncher);
-        float toAlignment = mLauncherState.isTaskbarAlignedWithHotseat(mLauncher) ? 1 : 0;
+        boolean willStashVisually =
+                isInStashedState && mControllers.taskbarStashController.supportsVisualStashing();
+        float toAlignment =
+                mLauncherState.isTaskbarAlignedWithHotseat(mLauncher) && !willStashVisually ? 1 : 0;
 
-        TaskbarStashController controller = mControllers.taskbarStashController;
-        controller.updateStateForFlag(FLAG_IN_STASHED_LAUNCHER_STATE, isInStashedState);
-        Animator stashAnimator = controller.applyStateWithoutStart(duration);
+        TaskbarStashController stashController = mControllers.taskbarStashController;
+        stashController.updateStateForFlag(FLAG_IN_STASHED_LAUNCHER_STATE, isInStashedState);
+        Animator stashAnimator = stashController.applyStateWithoutStart(duration);
         if (stashAnimator != null) {
             stashAnimator.addListener(new AnimatorListenerAdapter() {
                 @Override
@@ -391,9 +402,13 @@ import java.util.function.Supplier;
             });
             animatorSet.play(stashAnimator);
         }
-
-        // If we're already animating to the value, just leave it be instead of restarting it.
+        if (mIconAlignmentForLauncherState.value == toAlignment) {
+            // Already at expected value, but make sure we run the callback at the end.
+            animatorSet.addListener(AnimatorListeners.forEndCallback(
+                    this::onIconAlignmentRatioChangedForStateTransition));
+        }
         if (!mIconAlignmentForLauncherState.isAnimatingToValue(toAlignment)) {
+            // If we're already animating to the value, just leave it be instead of restarting it.
             mIconAlignmentForLauncherState.finishAnimation();
             animatorSet.play(mIconAlignmentForLauncherState.animateToValue(toAlignment)
                     .setDuration(duration));

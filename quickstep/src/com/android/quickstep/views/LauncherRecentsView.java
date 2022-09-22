@@ -21,24 +21,22 @@ import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
-import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
 
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.os.Build;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.Surface;
 
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
-import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.popup.QuickstepSystemShortcut;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager.StateListener;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.PendingSplitSelectInfo;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.quickstep.LauncherActivityInterface;
@@ -48,7 +46,7 @@ import com.android.quickstep.util.SplitSelectStateController;
  * {@link RecentsView} used in Launcher activity
  */
 @TargetApi(Build.VERSION_CODES.O)
-public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, LauncherState>
+public class LauncherRecentsView extends RecentsView<QuickstepLauncher, LauncherState>
         implements StateListener<LauncherState> {
 
     public LauncherRecentsView(Context context) {
@@ -68,7 +66,6 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
     public void init(OverviewActionsView actionsView,
             SplitSelectStateController splitPlaceholderView) {
         super.init(actionsView, splitPlaceholderView);
-        Log.d(BAD_STATE, "LauncherRecentsView init setContentAlpha=0");
         setContentAlpha(0);
     }
 
@@ -119,7 +116,6 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
         if (toState == OVERVIEW_MODAL_TASK) {
             setOverviewSelectEnabled(true);
         }
-        Log.d(BAD_STATE, "LRV onStateTransitionStart setFreezeVisibility=true, toState=" + toState);
         setFreezeViewVisibility(true);
     }
 
@@ -131,8 +127,6 @@ public class LauncherRecentsView extends RecentsView<BaseQuickstepLauncher, Laun
         }
         boolean isOverlayEnabled = finalState == OVERVIEW || finalState == OVERVIEW_MODAL_TASK;
         setOverlayEnabled(isOverlayEnabled);
-        Log.d(BAD_STATE, "LRV onStateTransitionComplete setFreezeVisibility=false, finalState="
-                + finalState);
         setFreezeViewVisibility(false);
         if (finalState != OVERVIEW_MODAL_TASK) {
             setOverviewSelectEnabled(false);

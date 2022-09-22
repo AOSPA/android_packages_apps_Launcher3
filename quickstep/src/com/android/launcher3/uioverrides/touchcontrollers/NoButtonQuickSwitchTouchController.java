@@ -39,7 +39,6 @@ import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_S
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_ALL_ANIMATIONS;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_OVERVIEW;
 import static com.android.launcher3.states.StateAnimationConfig.SKIP_SCRIM;
-import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
 import static com.android.launcher3.touch.BothAxesSwipeDetector.DIRECTION_RIGHT;
 import static com.android.launcher3.touch.BothAxesSwipeDetector.DIRECTION_UP;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
@@ -56,11 +55,9 @@ import android.animation.Animator.AnimatorListener;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.graphics.PointF;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.animation.Interpolator;
 
-import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -69,6 +66,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.BaseSwipeDetector;
 import com.android.launcher3.touch.BothAxesSwipeDetector;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.TouchController;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.SystemUiProxy;
@@ -93,7 +91,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
     private static final Interpolator SCALE_DOWN_INTERPOLATOR = LINEAR;
     private static final long ATOMIC_DURATION_FROM_PAUSED_TO_OVERVIEW = 300;
 
-    private final BaseQuickstepLauncher mLauncher;
+    private final QuickstepLauncher mLauncher;
     private final BothAxesSwipeDetector mSwipeDetector;
     private final float mXRange;
     private final float mYRange;
@@ -115,13 +113,13 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
     private AnimatorPlaybackController mXOverviewAnim;
     private AnimatedFloat mYOverviewAnim;
 
-    public NoButtonQuickSwitchTouchController(BaseQuickstepLauncher launcher) {
+    public NoButtonQuickSwitchTouchController(QuickstepLauncher launcher) {
         mLauncher = launcher;
         mSwipeDetector = new BothAxesSwipeDetector(mLauncher, this);
         mRecentsView = mLauncher.getOverviewPanel();
         mXRange = mLauncher.getDeviceProfile().widthPx / 2f;
-        mYRange = LayoutUtils.getShelfTrackingDistance(mLauncher.getDeviceProfile(),
-                mRecentsView.getPagedOrientationHandler());
+        mYRange = LayoutUtils.getShelfTrackingDistance(
+            mLauncher, mLauncher.getDeviceProfile(), mRecentsView.getPagedOrientationHandler());
         mMaxYProgress = mLauncher.getDeviceProfile().heightPx / mYRange;
         mMotionPauseDetector = new MotionPauseDetector(mLauncher);
         mMotionPauseMinDisplacement = mLauncher.getResources().getDimension(
@@ -227,11 +225,11 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         // Set RecentView's initial properties.
         RECENTS_SCALE_PROPERTY.set(mRecentsView, fromState.getOverviewScaleAndOffset(mLauncher)[0]);
         ADJACENT_PAGE_HORIZONTAL_OFFSET.set(mRecentsView, 1f);
-        Log.d(BAD_STATE, "NBQSTC setupOverviewAnimators setContentAlpha=1");
         mRecentsView.setContentAlpha(1);
         mRecentsView.setFullscreenProgress(fromState.getOverviewFullscreenProgress());
         mLauncher.getActionsView().getVisibilityAlpha().setValue(
                 (fromState.getVisibleElements(mLauncher) & OVERVIEW_ACTIONS) != 0 ? 1f : 0f);
+        mRecentsView.setTaskIconScaledDown(true);
 
         float[] scaleAndOffset = toState.getOverviewScaleAndOffset(mLauncher);
         // As we drag right, animate the following properties:
@@ -246,24 +244,6 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
                 QUICK_SWITCH.getWorkspaceScrimColor(mLauncher), LINEAR);
         if (mRecentsView.getTaskViewCount() == 0) {
             xAnim.addFloat(mRecentsView, CONTENT_ALPHA, 0f, 1f, LINEAR);
-            Log.d(BAD_STATE, "NBQSTC setupOverviewAnimators from: 0 to: 1");
-            xAnim.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    Log.d(BAD_STATE, "NBQSTC setupOverviewAnimators onStart");
-                }
-
-                @Override
-                public void onAnimationCancel(Animator animation) {
-                    float alpha = mRecentsView == null ? -1 : CONTENT_ALPHA.get(mRecentsView);
-                    Log.d(BAD_STATE, "NBQSTC setupOverviewAnimators onCancel, alpha=" + alpha);
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    Log.d(BAD_STATE, "NBQSTC setupOverviewAnimators onEnd");
-                }
-            });
         }
         mXOverviewAnim = xAnim.createPlaybackController();
         mXOverviewAnim.dispatchOnStart();
@@ -321,6 +301,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         boolean verticalFling = mSwipeDetector.isFling(velocity.y);
         boolean noFling = !horizontalFling && !verticalFling;
         if (mMotionPauseDetector.isPaused() && noFling) {
+            // Going to Overview.
             cancelAnimations();
 
             StateAnimationConfig config = new StateAnimationConfig();
@@ -331,6 +312,8 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
                 @Override
                 public void onAnimationEnd(Animator animation) {
                     onAnimationToStateCompleted(OVERVIEW);
+                    // Animate the icon after onAnimationToStateCompleted() so it doesn't clobber.
+                    mRecentsView.animateUpTaskIconScale();
                 }
             });
             overviewAnim.start();
