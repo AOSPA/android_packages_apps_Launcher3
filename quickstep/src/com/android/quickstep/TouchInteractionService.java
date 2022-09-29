@@ -23,6 +23,8 @@ import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_DOWN;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_UP;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_RECENT_TASKS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_BACK_ANIMATION;
@@ -80,6 +82,7 @@ import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.TraceHelper;
+import com.android.launcher3.util.ViewCapture;
 import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
 import com.android.quickstep.inputconsumers.AssistantInputConsumer;
@@ -459,7 +462,8 @@ public class TouchInteractionService extends Service
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
         mOverviewCommandHelper = new OverviewCommandHelper(this,
                 mOverviewComponentObserver, mTaskAnimationManager);
-        mResetGestureInputConsumer = new ResetGestureInputConsumer(mTaskAnimationManager);
+        mResetGestureInputConsumer = new ResetGestureInputConsumer(
+                mTaskAnimationManager, mTaskbarManager::getCurrentActivityContext);
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
         mInputConsumer.registerInputConsumer();
         onSystemUiFlagsChanged(mDeviceState.getSystemUiStateFlags());
@@ -650,12 +654,17 @@ public class TouchInteractionService extends Service
             switch (event.getActionMasked()) {
                 case ACTION_DOWN:
                 case ACTION_UP:
-                    ActiveGestureLog.INSTANCE.addLog("onMotionEvent("
-                            + (int) event.getRawX() + ", " + (int) event.getRawY() + ")",
-                            event.getActionMasked());
+                    ActiveGestureLog.INSTANCE.addLog(
+                            /* event= */ "onMotionEvent(" + (int) event.getRawX() + ", "
+                                    + (int) event.getRawY() + "): "
+                                    + MotionEvent.actionToString(event.getActionMasked()),
+                            /* gestureEvent= */ event.getActionMasked() == ACTION_DOWN
+                                    ? MOTION_DOWN
+                                    : MOTION_UP);
                     break;
                 default:
-                    ActiveGestureLog.INSTANCE.addLog("onMotionEvent", event.getActionMasked());
+                    ActiveGestureLog.INSTANCE.addLog("onMotionEvent: "
+                            + MotionEvent.actionToString(event.getActionMasked()));
                     break;
             }
         }
@@ -702,15 +711,22 @@ public class TouchInteractionService extends Service
     public GestureState createGestureState(GestureState previousGestureState) {
         GestureState gestureState = new GestureState(mOverviewComponentObserver,
                 ActiveGestureLog.INSTANCE.incrementLogId());
+        TopTaskTracker.CachedTaskInfo taskInfo;
         if (mTaskAnimationManager.isRecentsAnimationRunning()) {
-            gestureState.updateRunningTask(previousGestureState.getRunningTask());
+            taskInfo = previousGestureState.getRunningTask();
+            gestureState.updateRunningTask(taskInfo);
             gestureState.updateLastStartedTaskId(previousGestureState.getLastStartedTaskId());
             gestureState.updatePreviouslyAppearedTaskIds(
                     previousGestureState.getPreviouslyAppearedTaskIds());
         } else {
-            gestureState.updateRunningTask(
-                    TopTaskTracker.INSTANCE.get(this).getCachedTopTask(false));
+            taskInfo = TopTaskTracker.INSTANCE.get(this).getCachedTopTask(false);
+            gestureState.updateRunningTask(taskInfo);
         }
+        // Log initial state for the gesture.
+        ActiveGestureLog.INSTANCE.addLog(new CompoundString("Current running task package name=")
+                .append(taskInfo == null ? "no running task" : taskInfo.getPackageName()));
+        ActiveGestureLog.INSTANCE.addLog(new CompoundString("Current SystemUi state flags=")
+                .append(mDeviceState.getSystemUiStateString()));
         return gestureState;
     }
 
@@ -1012,12 +1028,27 @@ public class TouchInteractionService extends Service
                             .append("activity == null, trying to use default input consumer"));
         }
 
-        if (activity.getRootView().hasWindowFocus()
-                || previousGestureState.isRunningAnimationToLauncher()
-                || (ASSISTANT_GIVES_LAUNCHER_FOCUS.get()
-                    && forceOverviewInputConsumer)
-                || (ENABLE_QUICKSTEP_LIVE_TILE.get()
-                && gestureState.getActivityInterface().isInLiveTileMode())) {
+        boolean hasWindowFocus = activity.getRootView().hasWindowFocus();
+        boolean isPreviousGestureAnimatingToLauncher =
+                previousGestureState.isRunningAnimationToLauncher();
+        boolean forcingOverviewInputConsumer =
+                ASSISTANT_GIVES_LAUNCHER_FOCUS.get() && forceOverviewInputConsumer;
+        boolean isInLiveTileMode = ENABLE_QUICKSTEP_LIVE_TILE.get()
+                && gestureState.getActivityInterface().isInLiveTileMode();
+        reasonString.append(SUBSTRING_PREFIX)
+                .append(hasWindowFocus
+                        ? "activity has window focus"
+                        : (isPreviousGestureAnimatingToLauncher
+                                ? "previous gesture is still animating to launcher"
+                                : (forcingOverviewInputConsumer
+                                        ? "assistant gives launcher focus and forcing focus"
+                                        : (isInLiveTileMode
+                                                ? "device is in live mode"
+                                                : "all overview focus conditions failed"))));
+        if (hasWindowFocus
+                || isPreviousGestureAnimatingToLauncher
+                || forcingOverviewInputConsumer
+                || isInLiveTileMode) {
             reasonString.append(SUBSTRING_PREFIX)
                     .append("overview should have focus, using OverviewInputConsumer");
             return new OverviewInputConsumer(gestureState, activity, mInputMonitorCompat,
@@ -1184,12 +1215,15 @@ public class TouchInteractionService extends Service
                 createdOverviewActivity.getDeviceProfile().dump(this, "", pw);
             }
             mTaskbarManager.dumpLogs("", pw);
+
+            ViewCapture.INSTANCE.get(this).dump(pw, fd);
         }
     }
 
     private void printAvailableCommands(PrintWriter pw) {
         pw.println("Available commands:");
         pw.println("  clear-touch-log: Clears the touch interaction log");
+        pw.println("  print-gesture-log: only prints the ActiveGestureLog dump");
     }
 
     private void onCommand(PrintWriter pw, LinkedList<String> args) {
@@ -1197,6 +1231,8 @@ public class TouchInteractionService extends Service
             case "clear-touch-log":
                 ActiveGestureLog.INSTANCE.clear();
                 break;
+            case "print-gesture-log":
+                ActiveGestureLog.INSTANCE.dump("", pw);
         }
     }
 

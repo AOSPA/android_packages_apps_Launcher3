@@ -65,8 +65,13 @@ public final class FeatureFlags {
      */
     public static final BooleanFlag ENABLE_INPUT_CONSUMER_REASON_LOGGING = getDebugFlag(
             "ENABLE_INPUT_CONSUMER_REASON_LOGGING",
-            false,
+            true,
             "Log the reason why an Input Consumer was selected for a gesture.");
+
+    public static final BooleanFlag ENABLE_GESTURE_ERROR_DETECTION = getDebugFlag(
+            "ENABLE_GESTURE_ERROR_DETECTION",
+            true,
+            "Analyze gesture events and log detected errors");
 
     // When enabled the promise icon is visible in all apps while installation an app.
     public static final BooleanFlag PROMISE_APPS_IN_ALL_APPS = getDebugFlag(
@@ -269,6 +274,10 @@ public final class FeatureFlags {
             "USE_SEARCH_REQUEST_TIMEOUT_OVERRIDES", false,
             "Use local overrides for search request timeout");
 
+    public static final BooleanFlag USE_APP_SEARCH_FOR_WEB = getDebugFlag(
+            "USE_APP_SEARCH_FOR_WEB", false,
+            "Use app search to request zero state web suggestions");
+
     public static final BooleanFlag CONTINUOUS_VIEW_TREE_CAPTURE = getDebugFlag(
             "CONTINUOUS_VIEW_TREE_CAPTURE", false, "Capture View tree every frame");
 
@@ -280,6 +289,13 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_SECONDARY_DEEP_SHORTCUTS = getDebugFlag(
             "ENABLE_SECONDARY_DEEP_SHORTCUTS", false,
             "Enable deep shortcut pinning within secondary display");
+
+    public static final BooleanFlag FOLDABLE_WORKSPACE_REORDER = getDebugFlag(
+            "FOLDABLE_WORKSPACE_REORDER", false,
+            "In foldables, when reordering the icons and widgets, is now going to use both sides");
+
+    public static final BooleanFlag SHOW_SEARCH_EDUCARD_QSB = new DeviceFlag(
+            "SHOW_SEARCH_EDUCARD_QSB", false, "Shows Search Educard for QSB entry in OneSearch.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

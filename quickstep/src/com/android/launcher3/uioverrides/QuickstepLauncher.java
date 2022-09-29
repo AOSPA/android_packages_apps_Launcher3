@@ -45,9 +45,9 @@ import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_O
 import static com.android.launcher3.testing.shared.TestProtocol.QUICK_SWITCH_STATE_ORDINAL;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
-import static com.android.launcher3.util.DisplayController.NavigationMode.TWO_BUTTONS;
 import static com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+import static com.android.launcher3.util.NavigationMode.TWO_BUTTONS;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 
 import android.animation.AnimatorSet;
@@ -64,6 +64,7 @@ import android.hardware.devicestate.DeviceStateManager;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.IBinder;
+import android.os.SystemProperties;
 import android.view.Display;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -113,16 +114,18 @@ import com.android.launcher3.uioverrides.touchcontrollers.TransposedQuickSwitchT
 import com.android.launcher3.uioverrides.touchcontrollers.TwoButtonNavbarTouchController;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.DisplayController;
-import com.android.launcher3.util.DisplayController.NavigationMode;
 import com.android.launcher3.util.IntSet;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.ObjectWrapper;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.PendingSplitSelectInfo;
 import com.android.launcher3.util.RunnableList;
+import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.UiThreadHelper;
 import com.android.launcher3.util.UiThreadHelper.AsyncCommand;
+import com.android.launcher3.util.ViewCapture;
 import com.android.launcher3.widget.LauncherAppWidgetHost;
 import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.RecentsModel;
@@ -159,6 +162,9 @@ import java.util.stream.Stream;
 
 public class QuickstepLauncher extends Launcher {
 
+    public static final boolean ENABLE_PIP_KEEP_CLEAR_ALGORITHM =
+            SystemProperties.getBoolean("persist.wm.debug.enable_pip_keep_clear_algorithm", false);
+
     public static final boolean GO_LOW_RAM_RECENTS_ENABLED = false;
     /**
      * Reusable command for applying the shelf height on the background thread.
@@ -190,6 +196,8 @@ public class QuickstepLauncher extends Launcher {
      * recover. In all other cases this will remain null.
      */
     private PendingSplitSelectInfo mPendingSplitSelectInfo = null;
+
+    private SafeCloseable mViewCapture;
 
     @Override
     protected void setupViews() {
@@ -349,16 +357,18 @@ public class QuickstepLauncher extends Launcher {
      */
     private void onStateOrResumeChanging(boolean inTransition) {
         LauncherState state = getStateManager().getState();
-        boolean started = ((getActivityFlags() & ACTIVITY_STATE_STARTED)) != 0;
-        if (started) {
-            DeviceProfile profile = getDeviceProfile();
-            boolean willUserBeActive =
-                    (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
-            boolean visible = (state == NORMAL || state == OVERVIEW)
-                    && (willUserBeActive || isUserActive())
-                    && !profile.isVerticalBarLayout();
-            UiThreadHelper.runAsyncCommand(this, SET_SHELF_HEIGHT, visible ? 1 : 0,
-                    profile.hotseatBarSizePx);
+        if (!ENABLE_PIP_KEEP_CLEAR_ALGORITHM) {
+            boolean started = ((getActivityFlags() & ACTIVITY_STATE_STARTED)) != 0;
+            if (started) {
+                DeviceProfile profile = getDeviceProfile();
+                boolean willUserBeActive =
+                        (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
+                boolean visible = (state == NORMAL || state == OVERVIEW)
+                        && (willUserBeActive || isUserActive())
+                        && !profile.isVerticalBarLayout();
+                UiThreadHelper.runAsyncCommand(this, SET_SHELF_HEIGHT, visible ? 1 : 0,
+                        profile.hotseatBarSizePx);
+            }
         }
         if (state == NORMAL && !inTransition) {
             ((RecentsView) getOverviewPanel()).setSwipeDownShouldLaunchApp(false);
@@ -404,6 +414,7 @@ public class QuickstepLauncher extends Launcher {
 
         super.onDestroy();
         mHotseatPredictionController.destroy();
+        mViewCapture.close();
     }
 
     @Override
@@ -503,6 +514,7 @@ public class QuickstepLauncher extends Launcher {
         }
         addMultiWindowModeChangedListener(mDepthController);
         initUnfoldTransitionProgressProvider();
+        mViewCapture = ViewCapture.INSTANCE.get(this).startCapture(getWindow());
     }
 
     @Override

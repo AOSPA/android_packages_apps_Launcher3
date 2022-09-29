@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_RESUMED;
+import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 import static com.android.systemui.shared.system.WindowManagerWrapper.ITYPE_EXTRA_NAVIGATION_BAR;
 
 import android.animation.Animator;
@@ -30,7 +31,6 @@ import android.view.WindowManagerGlobal;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherState;
@@ -124,24 +124,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     /**
-     * Enables manual taskbar stashing. This method should only be used for tests that need to
-     * stash/unstash the taskbar.
-     */
-    @VisibleForTesting
-    public void enableManualStashingForTests(boolean enableManualStashing) {
-        mControllers.taskbarStashController.enableManualStashingForTests(enableManualStashing);
-    }
-
-    /**
-     * Unstashes the Taskbar if it is stashed. This method should only be used to unstash the
-     * taskbar at the end of a test.
-     */
-    @VisibleForTesting
-    public void unstashTaskbarIfStashed() {
-        mControllers.taskbarStashController.onLongPressToUnstashTaskbar();
-    }
-
-    /**
      * Adds the Launcher resume animator to the given animator set.
      *
      * This should be used to run a Launcher resume animation whose progress matches a
@@ -186,6 +168,13 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 // Resuming implicitly means device unlocked
                 mKeyguardController.setScreenOn();
             }
+        }
+
+        if (ENABLE_SHELL_TRANSITIONS
+                && !mLauncher.getStateManager().getState().isTaskbarAlignedWithHotseat(mLauncher)) {
+            // Launcher is resumed, but in a state where taskbar is still independent, so
+            // ignore the state change.
+            return null;
         }
 
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_RESUMED, isResumed);

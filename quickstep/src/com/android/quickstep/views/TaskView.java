@@ -323,6 +323,19 @@ public class TaskView extends FrameLayout implements Reusable {
                 }
             };
 
+    public static final FloatProperty<TaskView> ICON_ALPHA =
+            new FloatProperty<TaskView>("iconAlpha") {
+                @Override
+                public void setValue(TaskView taskView, float v) {
+                    taskView.mIconView.setAlpha(v);
+                }
+
+                @Override
+                public Float get(TaskView taskView) {
+                    return taskView.mIconView.getAlpha();
+                }
+            };
+
     @Nullable
     protected Task mTask;
     protected TaskThumbnailView mSnapshotView;
@@ -330,7 +343,7 @@ public class TaskView extends FrameLayout implements Reusable {
     protected final DigitalWellBeingToast mDigitalWellBeingToast;
     private float mFullscreenProgress;
     private float mGridProgress;
-    protected float mOverviewProgress;
+    protected float mTaskThumbnailSplashAlpha;
     private float mNonGridScale = 1;
     private float mDismissScale = 1;
     protected final FullscreenDrawParams mCurrentFullscreenParams;
@@ -1056,18 +1069,15 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     /**
-     * Updates progress of task view for entering/exiting overview on swipe up/down.
-     *
-     * <p>Updates the alpha of any splash screen over the thumbnail if it exists.
+     * Updates alpha of task thumbnail splash on swipe up/down.
      */
-    public void setOverviewProgress(float overviewProgress) {
-        mOverviewProgress = overviewProgress;
+    public void setTaskThumbnailSplashAlpha(float taskThumbnailSplashAlpha) {
+        mTaskThumbnailSplashAlpha = taskThumbnailSplashAlpha;
         applyThumbnailSplashAlpha();
     }
 
     protected void applyThumbnailSplashAlpha() {
-        mSnapshotView.setSplashAlpha(
-                Utilities.mapToRange(mOverviewProgress, 0f, 1f, 1f, 0f, LINEAR));
+        mSnapshotView.setSplashAlpha(mTaskThumbnailSplashAlpha);
     }
 
     private void setSplitSelectTranslationX(float x) {
@@ -1489,6 +1499,10 @@ public class TaskView extends FrameLayout implements Reusable {
     private int getRootViewDisplayId() {
         Display  display = getRootView().getDisplay();
         return display != null ? display.getDisplayId() : DEFAULT_DISPLAY;
+    }
+
+    void setThumbnailVisibility(int visibility) {
+        mSnapshotView.setVisibility(visibility);
     }
 
     /**

@@ -231,6 +231,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @PortraitLandscape
     @ScreenRecord // b/238461765
     public void testSwitchToOverview() throws Exception {
+        startTestAppsWithCheck();
         assertNotNull("Workspace.switchToOverview() returned null",
                 mLauncher.goHome().switchToOverview());
         assertTrue("Launcher internal state didn't switch to Overview",
@@ -408,6 +409,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     }
 
     @Test
+    @ScreenRecord // b/242163205
     public void testDisableRotationCheckForPhone() throws Exception {
         assumeFalse(mLauncher.isTablet());
         try {

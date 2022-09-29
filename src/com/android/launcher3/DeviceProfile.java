@@ -52,6 +52,7 @@ import com.android.launcher3.util.WindowBounds;
 
 import java.io.PrintWriter;
 import java.util.List;
+import java.util.Locale;
 
 @SuppressLint("NewApi")
 public class DeviceProfile {
@@ -513,7 +514,7 @@ public class DeviceProfile {
     private int getIconToIconWidthForColumns(int columns) {
         return columns * getCellSize().x
                 + (columns - 1) * cellLayoutBorderSpacePx.x
-                - (getCellSize().x - iconSizePx);  // left and right cell space
+                - getCellHorizontalSpace();
     }
 
     private int getHorizontalMarginPx(InvariantDeviceProfile idp, Resources res) {
@@ -985,6 +986,13 @@ public class DeviceProfile {
     }
 
     /**
+     * Returns the left and right space on the cell, which is the cell width - icon size
+     */
+    public int getCellHorizontalSpace() {
+        return getCellSize().x - iconSizePx;
+    }
+
+    /**
      * Gets the number of panels within the workspace.
      */
     public int getPanelCount() {
@@ -1030,7 +1038,7 @@ public class DeviceProfile {
                         / getCellLayoutHeight();
         scale = Math.min(scale, 1f);
 
-        // Reduce scale if next pages would not be visible after scaling the workspace
+        // Reduce scale if next pages would not be visible after scaling the workspace.
         int workspaceWidth = availableWidthPx;
         float scaledWorkspaceWidth = workspaceWidth * scale;
         float maxAvailableWidth = workspaceWidth - (2 * workspaceSpringLoadedMinNextPageVisiblePx);
@@ -1347,6 +1355,10 @@ public class DeviceProfile {
         return "\t" + name + ": " + value + "px (" + dpiFromPx(value, mMetrics.densityDpi) + "dp)";
     }
 
+    private String dpPointFToString(String name, PointF value) {
+        return String.format(Locale.ENGLISH, "\t%s: PointF(%.1f, %.1f)dp", name, value.x, value.y);
+    }
+
     /** Dumps various DeviceProfile variables to the specified writer. */
     public void dump(Context context, String prefix, PrintWriter writer) {
         writer.println(prefix + "DeviceProfile:");
@@ -1382,7 +1394,7 @@ public class DeviceProfile {
         writer.println(prefix + "\tinv.numSearchContainerColumns: "
                 + inv.numSearchContainerColumns);
 
-        writer.println(prefix + "\tminCellSize: " + inv.minCellSize[mTypeIndex] + "dp");
+        writer.println(prefix + dpPointFToString("minCellSize", inv.minCellSize[mTypeIndex]));
 
         writer.println(prefix + pxToDpStr("cellWidthPx", cellWidthPx));
         writer.println(prefix + pxToDpStr("cellHeightPx", cellHeightPx));
@@ -1662,7 +1674,7 @@ public class DeviceProfile {
                 mTransposeLayoutWithOrientation = !mInfo.isTablet(mWindowBounds);
             }
             if (mIsGestureMode == null) {
-                mIsGestureMode = DisplayController.getNavigationMode(mContext).hasGestures;
+                mIsGestureMode = mInfo.navigationMode.hasGestures;
             }
             if (mDotRendererCache == null) {
                 mDotRendererCache = new SparseArray<>();
