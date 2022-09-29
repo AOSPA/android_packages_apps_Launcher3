@@ -17,7 +17,6 @@ package com.android.quickstep;
 
 import static com.android.launcher3.anim.Interpolators.ACCEL_1_5;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_SPLIT_SELECT;
 
 import android.animation.Animator;
 import android.content.Context;
@@ -50,7 +49,6 @@ import java.util.function.Consumer;
 public abstract class SwipeUpAnimationLogic implements
         RecentsAnimationCallbacks.RecentsAnimationListener{
 
-    protected static final Rect TEMP_RECT = new Rect();
     protected final RemoteTargetGluer mTargetGluer;
 
     protected DeviceProfile mDp;
@@ -72,16 +70,14 @@ public abstract class SwipeUpAnimationLogic implements
     // How much further we can drag past recents, as a factor of mTransitionDragLength.
     protected float mDragLengthFactor = 1;
 
-    protected boolean mIsSwipeForStagedSplit;
+    protected boolean mIsSwipeForSplit;
 
     public SwipeUpAnimationLogic(Context context, RecentsAnimationDeviceState deviceState,
             GestureState gestureState) {
         mContext = context;
         mDeviceState = deviceState;
         mGestureState = gestureState;
-
-        mIsSwipeForStagedSplit = ENABLE_SPLIT_SELECT.get() &&
-                TopTaskTracker.INSTANCE.get(context).getRunningSplitTaskIds().length > 1;
+        mIsSwipeForSplit = TopTaskTracker.INSTANCE.get(context).getRunningSplitTaskIds().length > 1;
 
         mTargetGluer = new RemoteTargetGluer(mContext, mGestureState.getActivityInterface());
         mRemoteTargetHandles = mTargetGluer.getRemoteTargetHandles();
@@ -95,7 +91,7 @@ public abstract class SwipeUpAnimationLogic implements
     protected void initTransitionEndpoints(DeviceProfile dp) {
         mDp = dp;
         mTransitionDragLength = mGestureState.getActivityInterface().getSwipeUpDestinationAndLength(
-                dp, mContext, TEMP_RECT, mRemoteTargetHandles[0].getTaskViewSimulator()
+                dp, mContext, mRemoteTargetHandles[0].getTaskViewSimulator()
                         .getOrientationState().getOrientationHandler());
         mDragLengthFactor = (float) dp.heightPx / mTransitionDragLength;
 
@@ -266,6 +262,13 @@ public abstract class SwipeUpAnimationLogic implements
         RectF cropRectF = new RectF(taskViewSimulator.getCurrentCropRect());
         // Move the startRect to Launcher space as floatingIconView runs in Launcher
         Matrix windowToHomePositionMap = new Matrix();
+
+        // If the start rect ends up overshooting too much to the left/right offscreen, bring it
+        // back to fullscreen. This can happen when the recentsScroll value isn't aligned with
+        // the pageScroll value for a given taskView, see b/228829958#comment12
+        mRemoteTargetHandles[0].getTaskViewSimulator().getOrientationState().getOrientationHandler()
+                .fixBoundsForHomeAnimStartRect(startRect, mDp);
+
         homeToWindowPositionMap.invert(windowToHomePositionMap);
         windowToHomePositionMap.mapRect(startRect);
 

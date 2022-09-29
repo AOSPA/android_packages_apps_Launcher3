@@ -22,10 +22,8 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -33,7 +31,6 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
-import com.android.launcher3.uioverrides.ApiWrapper;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.NavigationMode;
 import com.android.launcher3.util.MultiValueAlpha;
@@ -80,8 +77,9 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     private static final int INDEX_VISIBILITY_ALPHA = 1;
     private static final int INDEX_FULLSCREEN_ALPHA = 2;
     private static final int INDEX_HIDDEN_FLAGS_ALPHA = 3;
+    private static final int INDEX_SHARE_TARGET_ALPHA = 4;
 
-    private final MultiValueAlpha mMultiValueAlpha;
+    private MultiValueAlpha mMultiValueAlpha;
     private Button mSplitButton;
 
     @ActionsHiddenFlags
@@ -95,7 +93,6 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
 
     @Nullable
     protected DeviceProfile mDp;
-    private final Rect mTaskSize = new Rect();
 
     public OverviewActionsView(Context context) {
         this(context, null);
@@ -107,13 +104,14 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
 
     public OverviewActionsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr, 0);
-        mMultiValueAlpha = new MultiValueAlpha(this, 5);
-        mMultiValueAlpha.setUpdateVisibility(true);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
+        mMultiValueAlpha = new MultiValueAlpha(findViewById(R.id.action_buttons), 5);
+        mMultiValueAlpha.setUpdateVisibility(true);
+
         findViewById(R.id.action_screenshot).setOnClickListener(this);
 
         mSplitButton = findViewById(R.id.action_split);
@@ -195,6 +193,10 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         return mMultiValueAlpha.getProperty(INDEX_FULLSCREEN_ALPHA);
     }
 
+    public AlphaProperty getShareTargetAlpha() {
+        return mMultiValueAlpha.getProperty(INDEX_SHARE_TARGET_ALPHA);
+    }
+
     /**
      * Offsets OverviewActionsView horizontal position based on 3 button nav container in taskbar.
      */
@@ -202,10 +204,13 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         if (mDp == null) {
             return;
         }
-        boolean alignFor3ButtonTaskbar = mDp.isTaskbarPresent && !mDp.isGestureMode;
-        if (alignFor3ButtonTaskbar) {
+        boolean largeScreenLandscape = mDp.isTablet && !mDp.isTwoPanels && mDp.isLandscape;
+        // If in 3-button mode, shift action buttons to accommodate 3-button layout.
+        // (Special exception for landscape tablets, where there is enough room and we don't need to
+        // shift the action buttons.)
+        if (mDp.areNavButtonsInline && !largeScreenLandscape) {
             // Add extra horizontal spacing
-            int additionalPadding = ApiWrapper.getHotseatEndOffset(getContext());
+            int additionalPadding = mDp.hotseatBarEndOffset;
             if (isLayoutRtl()) {
                 setPadding(mInsets.left + additionalPadding, 0, mInsets.right, 0);
             } else {
@@ -233,32 +238,21 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
             return 0;
         }
 
-        if (mDp.isVerticalBarLayout()) {
-            return mDp.getInsets().bottom;
-        }
-
         if (!mDp.isGestureMode && mDp.isTaskbarPresent) {
             return mDp.getOverviewActionsClaimedSpaceBelow();
         }
 
         // Align to bottom of task Rect.
-        return mDp.heightPx - mTaskSize.bottom - mDp.overviewActionsTopMarginPx
+        return mDp.heightPx - mDp.overviewTaskRect.bottom - mDp.overviewActionsTopMarginPx
                 - mDp.overviewActionsHeight;
     }
 
     /**
-     * Updates device profile and task size for this view to draw with.
+     * Updates device profile for this view to draw with.
      */
-    public void updateDimension(DeviceProfile dp, Rect taskSize) {
+    public void updateDimension(DeviceProfile dp) {
         mDp = dp;
-        mTaskSize.set(taskSize);
         updateVerticalMargin(DisplayController.getNavigationMode(getContext()));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                dp.isVerticalBarLayout() ? 0 : dp.overviewActionsButtonSpacing,
-                ViewGroup.LayoutParams.MATCH_PARENT);
-        params.weight = dp.isVerticalBarLayout() ? 1 : 0;
-        findViewById(R.id.action_split_space).setLayoutParams(params);
 
         requestLayout();
 

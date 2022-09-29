@@ -51,6 +51,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.view.Choreographer;
 import android.view.InputEvent;
@@ -127,6 +128,9 @@ public class TouchInteractionService extends Service
 
     private static final String TAG = "TouchInteractionService";
 
+    private static final boolean BUBBLES_HOME_GESTURE_ENABLED =
+            SystemProperties.getBoolean("persist.wm.debug.bubbles_home_gesture", true);
+
     private static final String KEY_BACK_NOTIFICATION_COUNT = "backNotificationCount";
     private static final String NOTIFY_ACTION_BACK = "com.android.quickstep.action.BACK_GESTURE";
     private static final String HAS_ENABLED_QUICKSTEP_ONCE = "launcher.has_enabled_quickstep_once";
@@ -146,6 +150,8 @@ public class TouchInteractionService extends Service
      * Local IOverviewProxy implementation with some methods for local components
      */
     public class TISBinder extends IOverviewProxy.Stub {
+
+        @Nullable private Runnable mOnOverviewTargetChangeListener = null;
 
         @BinderThread
         public void onInitialize(Bundle bundle) {
@@ -264,6 +270,16 @@ public class TouchInteractionService extends Service
             MAIN_EXECUTOR.execute(ProxyScreenStatusProvider.INSTANCE::onScreenTurnedOn);
         }
 
+        /**
+         * Preloads the Overview activity.
+         *
+         * This method should only be used when the All Set page of the SUW is reached to safely
+         * preload the Launcher for the SUW first reveal.
+         */
+        public void preloadOverviewForSUWAllSet() {
+            preloadOverview(false, true);
+        }
+
         @Override
         public void onRotationProposal(int rotation, boolean isValid) {
             executeForTaskbarManager(() -> mTaskbarManager.onRotationProposal(rotation, isValid));
@@ -316,6 +332,18 @@ public class TouchInteractionService extends Service
          */
         public void setGestureBlockedTaskId(int taskId) {
             mDeviceState.setGestureBlockingTaskId(taskId);
+        }
+
+        /** Sets a listener to be run on Overview Target updates. */
+        public void setOverviewTargetChangeListener(@Nullable Runnable listener) {
+            mOnOverviewTargetChangeListener = listener;
+        }
+
+        protected void onOverviewTargetChange() {
+            if (mOnOverviewTargetChangeListener != null) {
+                mOnOverviewTargetChangeListener.run();
+                mOnOverviewTargetChangeListener = null;
+            }
         }
     }
 
@@ -477,6 +505,7 @@ public class TouchInteractionService extends Service
         if (newOverviewActivity != null) {
             mTaskbarManager.setActivity(newOverviewActivity);
         }
+        mTISBinder.onOverviewTargetChange();
     }
 
     @UiThread
@@ -698,12 +727,29 @@ public class TouchInteractionService extends Service
                 base = new TaskbarStashInputConsumer(this, base, mInputMonitorCompat, tac);
             }
 
-            // If Bubbles is expanded, use the overlay input consumer, which will close Bubbles
-            // instead of going all the way home when a swipe up is detected.
-            if (mDeviceState.isBubblesExpanded() || mDeviceState.isSystemUiDialogShowing()) {
+            if (mDeviceState.isBubblesExpanded()) {
+                if (BUBBLES_HOME_GESTURE_ENABLED) {
+                    // Bubbles can handle home gesture itself.
+                    base = getDefaultInputConsumer();
+                } else {
+                    // If Bubbles is expanded, use the overlay input consumer, which will close
+                    // Bubbles instead of going all the way home when a swipe up is detected.
+                    // Notification panel can be expanded on top of expanded bubbles. Bubbles remain
+                    // expanded in the back. Make sure swipe up is not passed to bubbles in this
+                    // case.
+                    if (!mDeviceState.isNotificationPanelExpanded()) {
+                        base = new SysUiOverlayInputConsumer(
+                                getBaseContext(), mDeviceState, mInputMonitorCompat);
+                    }
+                }
+            }
+
+            if (mDeviceState.isSystemUiDialogShowing()) {
                 base = new SysUiOverlayInputConsumer(
                         getBaseContext(), mDeviceState, mInputMonitorCompat);
             }
+
+
 
             if (mDeviceState.isScreenPinningActive()) {
                 // Note: we only allow accessibility to wrap this, and it replaces the previous
@@ -862,6 +908,10 @@ public class TouchInteractionService extends Service
     }
 
     private void preloadOverview(boolean fromInit) {
+        preloadOverview(fromInit, false);
+    }
+
+    private void preloadOverview(boolean fromInit, boolean forSUWAllSet) {
         if (!mDeviceState.isUserUnlocked()) {
             return;
         }
@@ -871,7 +921,8 @@ public class TouchInteractionService extends Service
             return;
         }
 
-        if (RestoreDbTask.isPending(this) || !mDeviceState.isUserSetupComplete()) {
+        if ((RestoreDbTask.isPending(this) && !forSUWAllSet)
+                || !mDeviceState.isUserSetupComplete()) {
             // Preloading while a restore is pending may cause launcher to start the restore
             // too early.
             return;
@@ -964,7 +1015,7 @@ public class TouchInteractionService extends Service
             pw.println("ProtoTrace:");
             pw.println("  file=" + ProtoTracer.INSTANCE.get(this).getTraceFile());
             if (createdOverviewActivity != null) {
-                createdOverviewActivity.getDeviceProfile().dump("", pw);
+                createdOverviewActivity.getDeviceProfile().dump(this, "", pw);
             }
             mTaskbarManager.dumpLogs("", pw);
         }

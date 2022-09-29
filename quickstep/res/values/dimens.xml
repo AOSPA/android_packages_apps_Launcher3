@@ -15,8 +15,6 @@
 -->
 
 <resources>
-    <dimen name="task_thumbnail_icon_size">48dp</dimen>
-    <dimen name="task_thumbnail_icon_drawable_size">48dp</dimen>
     <!-- For screens without rounded corners -->
     <dimen name="task_corner_radius_small">2dp</dimen>
     <!-- For Launchers that want to override the default dialog corner radius -->
@@ -32,18 +30,21 @@
     <dimen name="overview_proactive_row_bottom_margin">16dp</dimen>
 
     <dimen name="overview_minimum_next_prev_size">50dp</dimen>
+
+    <!--  Task View  -->
+    <dimen name="task_thumbnail_icon_size">48dp</dimen>
+    <dimen name="task_thumbnail_icon_drawable_size">44dp</dimen>
     <dimen name="overview_task_margin">16dp</dimen>
-    <dimen name="overview_task_margin_grid">0dp</dimen>
+    <dimen name="overview_page_spacing">16dp</dimen>
+    <dimen name="task_icon_cache_default_icon_size">72dp</dimen>
+
     <item name="overview_max_scale" format="float" type="dimen">0.7</item>
     <item name="overview_modal_max_scale" format="float" type="dimen">1.1</item>
 
     <!-- Overrideable in overlay that provides the Overview Actions. -->
-    <dimen name="overview_actions_height">48dp</dimen>
-    <dimen name="overview_actions_button_spacing">32dp</dimen>
     <dimen name="overview_actions_top_margin">24dp</dimen>
-    <dimen name="overview_actions_horizontal_margin">16dp</dimen>
-
-    <dimen name="overview_page_spacing">16dp</dimen>
+    <dimen name="overview_actions_height">48dp</dimen>
+    <dimen name="overview_actions_button_spacing">36dp</dimen>
 
     <!-- These speeds are in dp/s -->
     <dimen name="max_task_dismiss_drag_velocity">2.25dp</dimen>
@@ -66,7 +67,6 @@
     <dimen name="quickstep_fling_threshold_speed">0.5dp</dimen>
 
     <!-- Launcher app transition -->
-    <item name="content_scale" format="float" type="dimen">0.97</item>
     <dimen name="closing_window_trans_y">115dp</dimen>
 
     <dimen name="quick_switch_scaling_scroll_threshold">100dp</dimen>
@@ -239,7 +239,7 @@
     <dimen name="navigation_key_padding">0dp</dimen>
 
     <!-- Floating rotation button -->
-    <dimen name="floating_rotation_button_diameter">40dp</dimen>
+    <dimen name="floating_rotation_button_diameter">52dp</dimen>
     <dimen name="floating_rotation_button_min_margin">20dp</dimen>
     <dimen name="floating_rotation_button_taskbar_left_margin">20dp</dimen>
     <dimen name="floating_rotation_button_taskbar_bottom_margin">10dp</dimen>

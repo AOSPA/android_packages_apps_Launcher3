@@ -21,11 +21,6 @@ import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
-import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
-import static com.android.launcher3.anim.Interpolators.INSTANT;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
-import static com.android.launcher3.states.StateAnimationConfig.ANIM_SCRIM_FADE;
 
 import android.view.MotionEvent;
 
@@ -36,6 +31,7 @@ import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.AbstractStateChangeTouchController;
+import com.android.launcher3.touch.AllAppsSwipeController;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
 import com.android.launcher3.uioverrides.states.OverviewState;
 import com.android.quickstep.SystemUiProxy;
@@ -49,26 +45,6 @@ import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 public class PortraitStatesTouchController extends AbstractStateChangeTouchController {
 
     private static final String TAG = "PortraitStatesTouchCtrl";
-
-    /**
-     * The progress at which all apps content will be fully visible.
-     */
-    public static final float ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD = 0.8f;
-
-    /**
-     * Minimum clamping progress for fading in all apps content
-     */
-    public static final float ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD = 0.5f;
-
-    /**
-     * Minimum clamping progress for fading in all apps scrim
-     */
-    public static final float ALL_APPS_SCRIM_VISIBLE_THRESHOLD = .1f;
-
-    /**
-     * Maximum clamping progress for opaque all apps scrim
-     */
-    public static final float ALL_APPS_SCRIM_OPAQUE_THRESHOLD = .5f;
 
     private final PortraitOverviewStateTouchHelper mOverviewPortraitStateTouchHelper;
 
@@ -125,44 +101,15 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
         return fromState;
     }
 
-    private StateAnimationConfig getNormalToAllAppsAnimation() {
-        StateAnimationConfig builder = new StateAnimationConfig();
-        boolean isTablet = mLauncher.getDeviceProfile().isTablet;
-        builder.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
-                ? INSTANT
-                : Interpolators.clampToProgress(LINEAR,
-                        ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD,
-                        ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD));
-        builder.setInterpolator(ANIM_SCRIM_FADE, Interpolators.clampToProgress(LINEAR,
-                ALL_APPS_SCRIM_VISIBLE_THRESHOLD,
-                ALL_APPS_SCRIM_OPAQUE_THRESHOLD));
-        return builder;
-    }
-
-    private StateAnimationConfig getAllAppsToNormalAnimation() {
-        StateAnimationConfig builder = new StateAnimationConfig();
-        boolean isTablet = mLauncher.getDeviceProfile().isTablet;
-        builder.setInterpolator(ANIM_ALL_APPS_FADE, isTablet
-                ? FINAL_FRAME
-                : Interpolators.clampToProgress(LINEAR,
-                        1 - ALL_APPS_CONTENT_FADE_MAX_CLAMPING_THRESHOLD,
-                        1 - ALL_APPS_CONTENT_FADE_MIN_CLAMPING_THRESHOLD));
-        builder.setInterpolator(ANIM_SCRIM_FADE, Interpolators.clampToProgress(LINEAR,
-                1 - ALL_APPS_SCRIM_OPAQUE_THRESHOLD,
-                1 - ALL_APPS_SCRIM_VISIBLE_THRESHOLD));
-        return builder;
-    }
-
     @Override
     protected StateAnimationConfig getConfigForStates(
             LauncherState fromState, LauncherState toState) {
-        final StateAnimationConfig config;
+        final StateAnimationConfig config = new StateAnimationConfig();
+        config.userControlled = true;
         if (fromState == NORMAL && toState == ALL_APPS) {
-            config = getNormalToAllAppsAnimation();
+            AllAppsSwipeController.applyNormalToAllAppsAnimConfig(mLauncher, config);
         } else if (fromState == ALL_APPS && toState == NORMAL) {
-            config = getAllAppsToNormalAnimation();
-        } else {
-            config = new StateAnimationConfig();
+            AllAppsSwipeController.applyAllAppsToNormalConfig(mLauncher, config);
         }
         return config;
     }
@@ -197,8 +144,8 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
                     .createPlaybackController();
             mLauncher.getStateManager().setCurrentUserControlledAnimation(mCurrentAnimation);
             RecentsView recentsView = mLauncher.getOverviewPanel();
-            totalShift = LayoutUtils.getShelfTrackingDistance(mLauncher,
-                    mLauncher.getDeviceProfile(), recentsView.getPagedOrientationHandler());
+            totalShift = LayoutUtils.getShelfTrackingDistance(mLauncher.getDeviceProfile(),
+                    recentsView.getPagedOrientationHandler());
         } else {
             mCurrentAnimation = mLauncher.getStateManager()
                     .createAnimationToNewWorkspace(mToState, config);

@@ -16,10 +16,16 @@
 package com.android.launcher3.taskbar
 
 import android.graphics.Insets
+import android.graphics.Region
+import android.view.InsetsFrameProvider
+import android.view.InsetsState.ITYPE_BOTTOM_MANDATORY_GESTURES
+import android.view.InsetsState
 import android.view.WindowManager
+import android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD
+import android.view.WindowManager.LayoutParams.TYPE_VOICE_INTERACTION
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_ALL_APPS
-import com.android.launcher3.R
+import com.android.launcher3.DeviceProfile
 import com.android.launcher3.anim.AlphaUpdateListener
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
 import com.android.quickstep.KtR
@@ -36,6 +42,10 @@ class TaskbarInsetsController(val context: TaskbarActivityContext): LoggableTask
     /** The bottom insets taskbar provides to the IME when IME is visible. */
     val taskbarHeightForIme: Int = context.resources.getDimensionPixelSize(
         KtR.dimen.taskbar_ime_size)
+    private val contentRegion: Region = Region()
+    private val deviceProfileChangeListener = { _: DeviceProfile ->
+        onTaskbarWindowHeightOrInsetsChanged()
+    }
 
     // Initialized in init.
     private lateinit var controllers: TaskbarControllers
@@ -50,41 +60,51 @@ class TaskbarInsetsController(val context: TaskbarActivityContext): LoggableTask
             windowLayoutParams,
             intArrayOf(
                 ITYPE_EXTRA_NAVIGATION_BAR,
-                ITYPE_BOTTOM_TAPPABLE_ELEMENT
+                ITYPE_BOTTOM_TAPPABLE_ELEMENT,
+                ITYPE_BOTTOM_MANDATORY_GESTURES
             )
         )
-
-        windowLayoutParams.providedInternalInsets = arrayOfNulls<Insets>(ITYPE_SIZE)
-        windowLayoutParams.providedInternalImeInsets = arrayOfNulls<Insets>(ITYPE_SIZE)
 
         onTaskbarWindowHeightOrInsetsChanged()
 
         windowLayoutParams.insetsRoundedCornerFrame = true
+        context.addOnDeviceProfileChangeListener(deviceProfileChangeListener)
     }
 
-    fun onDestroy() {}
+    fun onDestroy() {
+        context.removeOnDeviceProfileChangeListener(deviceProfileChangeListener)
+    }
 
     fun onTaskbarWindowHeightOrInsetsChanged() {
-        var reducingSize = getReducingInsetsForTaskbarInsetsHeight(
-            controllers.taskbarStashController.contentHeightToReportToApps)
-        windowLayoutParams.providedInternalInsets[ITYPE_EXTRA_NAVIGATION_BAR] = reducingSize
-        reducingSize = getReducingInsetsForTaskbarInsetsHeight(
-            controllers.taskbarStashController.tappableHeightToReportToApps)
-        windowLayoutParams.providedInternalInsets[ITYPE_BOTTOM_TAPPABLE_ELEMENT] = reducingSize
+        var contentHeight = controllers.taskbarStashController.contentHeightToReportToApps
+        contentRegion.set(0, windowLayoutParams.height - contentHeight,
+            context.deviceProfile.widthPx, windowLayoutParams.height)
+        var tappableHeight = controllers.taskbarStashController.tappableHeightToReportToApps
+        for (provider in windowLayoutParams.providedInsets) {
+            if (provider.type == ITYPE_EXTRA_NAVIGATION_BAR) {
+                provider.insetsSize = Insets.of(0, 0, 0, contentHeight)
+            } else if (provider.type == ITYPE_BOTTOM_TAPPABLE_ELEMENT
+                      || provider.type == ITYPE_BOTTOM_MANDATORY_GESTURES) {
+                provider.insetsSize = Insets.of(0, 0, 0, tappableHeight)
+            }
+        }
 
-        reducingSize = getReducingInsetsForTaskbarInsetsHeight(taskbarHeightForIme)
-        windowLayoutParams.providedInternalImeInsets[ITYPE_EXTRA_NAVIGATION_BAR] = reducingSize
-        windowLayoutParams.providedInternalImeInsets[ITYPE_BOTTOM_TAPPABLE_ELEMENT] = reducingSize
-    }
-
-    /**
-     * WindowLayoutParams.providedInternal*Insets expects Insets that subtract from the window frame
-     * height (i.e. WindowLayoutParams#height). So for Taskbar to report bottom insets to apps, it
-     * actually provides insets from the top of its window frame.
-     * @param height The number of pixels from the bottom of the screen that Taskbar insets.
-     */
-    private fun getReducingInsetsForTaskbarInsetsHeight(height: Int): Insets {
-        return Insets.of(0, windowLayoutParams.height - height, 0, 0)
+        val imeInsetsSize = Insets.of(0, 0, 0, taskbarHeightForIme)
+        // Use 0 insets for the VoiceInteractionWindow (assistant) when gesture nav is enabled.
+        val visInsetsSize = Insets.of(0, 0, 0, if (context.isGestureNav) 0 else tappableHeight)
+        val insetsSizeOverride = arrayOf(
+            InsetsFrameProvider.InsetsSizeOverride(
+                TYPE_INPUT_METHOD,
+                imeInsetsSize
+            ),
+            InsetsFrameProvider.InsetsSizeOverride(
+                TYPE_VOICE_INTERACTION,
+                visInsetsSize
+            )
+        )
+        for (provider in windowLayoutParams.providedInsets) {
+            provider.insetsSizeOverrides = insetsSizeOverride
+        }
     }
 
     /**
@@ -121,7 +141,8 @@ class TaskbarInsetsController(val context: TaskbarActivityContext): LoggableTask
                 if (context.isTaskbarWindowFullscreen) {
                     InsetsInfo.TOUCHABLE_INSETS_FRAME
                 } else {
-                    InsetsInfo.TOUCHABLE_INSETS_CONTENT
+                    insetsInfo.touchableRegion.set(contentRegion)
+                    InsetsInfo.TOUCHABLE_INSETS_REGION
                 }
             )
             insetsIsTouchableRegion = false
@@ -134,13 +155,18 @@ class TaskbarInsetsController(val context: TaskbarActivityContext): LoggableTask
     override fun dumpLogs(prefix: String, pw: PrintWriter) {
         pw.println(prefix + "TaskbarInsetsController:")
         pw.println("$prefix\twindowHeight=${windowLayoutParams.height}")
-        pw.println("$prefix\tprovidedInternalInsets[ITYPE_EXTRA_NAVIGATION_BAR]=" +
-                "${windowLayoutParams.providedInternalInsets[ITYPE_EXTRA_NAVIGATION_BAR]}")
-        pw.println("$prefix\tprovidedInternalInsets[ITYPE_BOTTOM_TAPPABLE_ELEMENT]=" +
-                "${windowLayoutParams.providedInternalInsets[ITYPE_BOTTOM_TAPPABLE_ELEMENT]}")
-        pw.println("$prefix\tprovidedInternalImeInsets[ITYPE_EXTRA_NAVIGATION_BAR]=" +
-                "${windowLayoutParams.providedInternalImeInsets[ITYPE_EXTRA_NAVIGATION_BAR]}")
-        pw.println("$prefix\tprovidedInternalImeInsets[ITYPE_BOTTOM_TAPPABLE_ELEMENT]=" +
-                "${windowLayoutParams.providedInternalImeInsets[ITYPE_BOTTOM_TAPPABLE_ELEMENT]}")
+        for (provider in windowLayoutParams.providedInsets) {
+            pw.print("$prefix\tprovidedInsets: (type=" + InsetsState.typeToString(provider.type)
+                    + " insetsSize=" + provider.insetsSize)
+            if (provider.insetsSizeOverrides != null) {
+                pw.print(" insetsSizeOverrides={")
+                for ((i, overrideSize) in provider.insetsSizeOverrides.withIndex()) {
+                    if (i > 0) pw.print(", ")
+                    pw.print(overrideSize)
+                }
+                pw.print("})")
+            }
+            pw.println()
+        }
     }
 }

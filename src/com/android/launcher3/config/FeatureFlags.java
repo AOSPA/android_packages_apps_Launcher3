@@ -96,6 +96,9 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_QUICK_SEARCH = new DeviceFlag("ENABLE_QUICK_SEARCH",
             true, "Use quick search behavior.");
 
+    public static final BooleanFlag ENABLE_HIDE_HEADER = new DeviceFlag("ENABLE_HIDE_HEADER",
+            true, "Hide header on keyboard before typing in all apps");
+
     public static final BooleanFlag COLLECT_SEARCH_HISTORY = new DeviceFlag(
             "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
 
@@ -209,9 +212,6 @@ public final class FeatureFlags {
             "ENABLE_SCRIM_FOR_APP_LAUNCH", false,
             "Enables scrim during app launch animation.");
 
-    public static final BooleanFlag ENABLE_SPLIT_SELECT = getDebugFlag(
-            "ENABLE_SPLIT_SELECT", true, "Uses new split screen selection overview UI");
-
     public static final BooleanFlag ENABLE_ENFORCED_ROUNDED_CORNERS = new DeviceFlag(
             "ENABLE_ENFORCED_ROUNDED_CORNERS", true, "Enforce rounded corners on all App Widgets");
 
@@ -246,6 +246,10 @@ public final class FeatureFlags {
             "ENABLE_ALL_APPS_IN_TASKBAR", true,
             "Enables accessing All Apps from the system Taskbar.");
 
+    public static final BooleanFlag ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT = getDebugFlag(
+            "ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT", false,
+            "Enables displaying the all apps button in the hotseat.");
+
     public static final BooleanFlag ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR = getDebugFlag(
             "ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR", false,
             "Enables One Search box in Taskbar All Apps.");
@@ -261,6 +265,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ONE_SEARCH_MOTION = new DeviceFlag(
             "ENABLE_ONE_SEARCH_MOTION", true, "Enables animations in OneSearch.");
 
+    public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = new DeviceFlag(
+            "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", true,
+            "Enable option to show keyboard when going to all-apps");
+
     public static final BooleanFlag USE_LOCAL_ICON_OVERRIDES = getDebugFlag(
             "USE_LOCAL_ICON_OVERRIDES", true,
             "Use inbuilt monochrome icons if app doesn't provide one");
@@ -268,6 +276,17 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_DISMISS_PREDICTION_UNDO = getDebugFlag(
             "ENABLE_DISMISS_PREDICTION_UNDO", false,
             "Show an 'Undo' snackbar when users dismiss a predicted hotseat item");
+
+    public static final BooleanFlag ENABLE_CACHED_WIDGET = getDebugFlag(
+            "ENABLE_CACHED_WIDGET", true,
+            "Show previously cached widgets as opposed to deferred widget where available");
+
+    public static final BooleanFlag USE_SEARCH_REQUEST_TIMEOUT_OVERRIDES = getDebugFlag(
+            "USE_SEARCH_REQUEST_TIMEOUT_OVERRIDES", false,
+            "Use local overrides for search request timeout");
+
+    public static final BooleanFlag CONTINUOUS_VIEW_TREE_CAPTURE = getDebugFlag(
+            "CONTINUOUS_VIEW_TREE_CAPTURE", false, "Capture View tree every frame");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

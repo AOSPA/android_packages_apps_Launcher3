@@ -30,7 +30,6 @@ import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsPagedView;
-import com.android.launcher3.allapps.WorkAdapterProvider;
 import com.android.launcher3.allapps.WorkEduCard;
 import com.android.launcher3.allapps.WorkPausedCard;
 import com.android.launcher3.allapps.WorkProfileManager;
@@ -140,8 +139,8 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
         executeOnLauncher(l -> {
             ActivityAllAppsContainerView<?> allApps = l.getAppsView();
             assertEquals("Work tab is not focused", allApps.getCurrentPage(), WORK_PAGE);
-            View workPausedCard = allApps.getActiveRecyclerView().findViewHolderForAdapterPosition(
-                    0).itemView;
+            View workPausedCard = allApps.getActiveRecyclerView()
+                    .findViewHolderForAdapterPosition(0).itemView;
             workPausedCard.findViewById(R.id.enable_work_apps).performClick();
         });
         waitForLauncherCondition("Work profile toggle ON failed", launcher -> {
@@ -155,7 +154,7 @@ public class WorkProfileTest extends AbstractLauncherUiTest {
     public void testEdu() {
         waitForWorkTabSetup();
         executeOnLauncher(l -> {
-            l.getSharedPrefs().edit().putInt(WorkAdapterProvider.KEY_WORK_EDU_STEP, 0).commit();
+            l.getSharedPrefs().edit().putInt(WorkProfileManager.KEY_WORK_EDU_STEP, 0).commit();
             ((AllAppsPagedView) l.getAppsView().getContentView()).setCurrentPage(WORK_PAGE);
             l.getAppsView().getWorkManager().reset();
         });

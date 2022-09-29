@@ -65,12 +65,9 @@ public class OverviewState extends LauncherState {
 
     @Override
     public ScaleAndTranslation getWorkspaceScaleAndTranslation(Launcher launcher) {
-        RecentsView recentsView = launcher.getOverviewPanel();
-        float workspacePageHeight = launcher.getDeviceProfile().getCellLayoutHeight();
-        recentsView.getTaskSize(sTempRect);
-        float scale = (float) sTempRect.height() / workspacePageHeight;
         float parallaxFactor = 0.5f;
-        return new ScaleAndTranslation(scale, 0, -getDefaultSwipeHeight(launcher) * parallaxFactor);
+        return new ScaleAndTranslation(launcher.getDeviceProfile().overviewTaskWorkspaceScale, 0,
+                -getDefaultSwipeHeight(launcher) * parallaxFactor);
     }
 
     @Override
@@ -131,9 +128,14 @@ public class OverviewState extends LauncherState {
 
     @Override
     public void onBackPressed(Launcher launcher) {
-        TaskView taskView = launcher.<RecentsView>getOverviewPanel().getRunningTaskView();
+        RecentsView recentsView = launcher.getOverviewPanel();
+        TaskView taskView = recentsView.getRunningTaskView();
         if (taskView != null) {
-            taskView.launchTaskAnimated();
+            if (recentsView.isTaskViewFullyVisible(taskView)) {
+                taskView.launchTasks();
+            } else {
+                recentsView.snapToPage(recentsView.indexOfChild(taskView));
+            }
         } else {
             super.onBackPressed(launcher);
         }

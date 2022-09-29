@@ -104,8 +104,6 @@ public class RecentsAnimationController {
         }
         if (mSplitScreenMinimized != splitScreenMinimized) {
             mSplitScreenMinimized = splitScreenMinimized;
-            UI_HELPER_EXECUTOR.execute(() -> SystemUiProxy.INSTANCE.get(context)
-                    .setSplitScreenMinimized(splitScreenMinimized));
         }
     }
 
@@ -222,7 +220,6 @@ public class RecentsAnimationController {
      */
     public void enableInputConsumer() {
         UI_HELPER_EXECUTOR.submit(() -> {
-            mController.hideCurrentInputMethod();
             mController.setInputConsumerEnabled(true);
         });
     }

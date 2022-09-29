@@ -18,8 +18,8 @@ package com.android.quickstep.views;
 
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
+import static android.window.SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR;
 
-import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
 import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
@@ -67,7 +67,6 @@ import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
@@ -89,7 +88,6 @@ import com.android.launcher3.util.ViewPool.Reusable;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.RemoteAnimationTargets;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
-import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskIconCache;
 import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskThumbnailCache;
@@ -138,41 +136,6 @@ public class TaskView extends FrameLayout implements Reusable {
 
     /** The maximum amount that a task view can be scrimmed, dimmed or tinted. */
     public static final float MAX_PAGE_SCRIM_ALPHA = 0.4f;
-
-    /**
-     * Should the TaskView display clip off the left inset in RecentsView.
-     */
-    public static boolean clipLeft(DeviceProfile deviceProfile) {
-        return false;
-    }
-
-    /**
-     * Should the TaskView display clip off the top inset in RecentsView.
-     */
-    public static boolean clipTop(DeviceProfile deviceProfile) {
-        return false;
-    }
-
-    /**
-     * Should the TaskView display clip off the right inset in RecentsView.
-     */
-    public static boolean clipRight(DeviceProfile deviceProfile) {
-        return false;
-    }
-
-    /**
-     * Should the TaskView display clip off the bottom inset in RecentsView.
-     */
-    public static boolean clipBottom(DeviceProfile deviceProfile) {
-        return deviceProfile.isTablet;
-    }
-
-    /**
-     * Should the TaskView scale down to fit whole thumbnail in fullscreen.
-     */
-    public static boolean useFullThumbnail(DeviceProfile deviceProfile) {
-        return deviceProfile.isTablet && !deviceProfile.isTaskbarPresentInApps;
-    }
 
     private static final float EDGE_SCALE_DOWN_FACTOR_CAROUSEL = 0.03f;
     private static final float EDGE_SCALE_DOWN_FACTOR_GRID = 0.00f;
@@ -371,6 +334,7 @@ public class TaskView extends FrameLayout implements Reusable {
     protected final DigitalWellBeingToast mDigitalWellBeingToast;
     private float mFullscreenProgress;
     private float mGridProgress;
+    protected float mOverviewProgress;
     private float mNonGridScale = 1;
     private float mDismissScale = 1;
     protected final FullscreenDrawParams mCurrentFullscreenParams;
@@ -429,7 +393,6 @@ public class TaskView extends FrameLayout implements Reusable {
     private final PointF mLastTouchDownPosition = new PointF();
 
     private boolean mIsClickableAsLiveTile = true;
-
 
     public TaskView(Context context) {
         this(context, null);
@@ -618,73 +581,7 @@ public class TaskView extends FrameLayout implements Reusable {
         if (confirmSecondSplitSelectApp()) {
             return;
         }
-        RecentsView recentsView = getRecentsView();
-        RemoteTargetHandle[] remoteTargetHandles = recentsView.mRemoteTargetHandles;
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isRunningTask() && remoteTargetHandles != null) {
-            if (!mIsClickableAsLiveTile) {
-                return;
-            }
-
-            // Reset the minimized state since we force-toggled the minimized state when entering
-            // overview, but never actually finished the recents animation
-            SystemUiProxy.INSTANCE.get(getContext()).setSplitScreenMinimized(false);
-
-            mIsClickableAsLiveTile = false;
-            RemoteAnimationTargets targets;
-            if (remoteTargetHandles.length == 1) {
-                targets = remoteTargetHandles[0].getTransformParams().getTargetSet();
-            } else {
-                TransformParams topLeftParams = remoteTargetHandles[0].getTransformParams();
-                TransformParams rightBottomParams = remoteTargetHandles[1].getTransformParams();
-                RemoteAnimationTargetCompat[] apps = Stream.concat(
-                        Arrays.stream(topLeftParams.getTargetSet().apps),
-                        Arrays.stream(rightBottomParams.getTargetSet().apps))
-                        .toArray(RemoteAnimationTargetCompat[]::new);
-                RemoteAnimationTargetCompat[] wallpapers = Stream.concat(
-                        Arrays.stream(topLeftParams.getTargetSet().wallpapers),
-                        Arrays.stream(rightBottomParams.getTargetSet().wallpapers))
-                        .toArray(RemoteAnimationTargetCompat[]::new);
-                targets = new RemoteAnimationTargets(apps, wallpapers,
-                        topLeftParams.getTargetSet().nonApps,
-                        topLeftParams.getTargetSet().targetMode);
-            }
-            if (targets == null) {
-                // If the recents animation is cancelled somehow between the parent if block and
-                // here, try to launch the task as a non live tile task.
-                launchTaskAnimated();
-                mIsClickableAsLiveTile = true;
-                return;
-            }
-
-            AnimatorSet anim = new AnimatorSet();
-            TaskViewUtils.composeRecentsLaunchAnimator(
-                    anim, this, targets.apps,
-                    targets.wallpapers, targets.nonApps, true /* launcherClosing */,
-                    mActivity.getStateManager(), recentsView,
-                    recentsView.getDepthController());
-            anim.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    recentsView.runActionOnRemoteHandles(
-                            (Consumer<RemoteTargetHandle>) remoteTargetHandle ->
-                                    remoteTargetHandle
-                                            .getTaskViewSimulator()
-                                            .setDrawsBelowRecents(false));
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animator) {
-                    if (mTask != null && mTask.key.displayId != getRootViewDisplayId()) {
-                        launchTaskAnimated();
-                    }
-                    mIsClickableAsLiveTile = true;
-                }
-            });
-            anim.start();
-            recentsView.onTaskLaunchedInLiveTileMode();
-        } else {
-            launchTaskAnimated();
-        }
+        launchTasks();
         mActivity.getStatsLogManager().logger().withItemInfo(getItemInfo())
                 .log(LAUNCHER_TASK_LAUNCH_TAP);
     }
@@ -764,6 +661,9 @@ public class TaskView extends FrameLayout implements Reusable {
             if (freezeTaskList) {
                 ActivityOptionsCompat.setFreezeRecentTasksList(opts);
             }
+            // TODO(b/202826469): Replace setSplashScreenStyle with setDisableStartingWindow.
+            opts.setSplashScreenStyle(mSnapshotView.shouldShowSplashView()
+                    ? SPLASH_SCREEN_STYLE_SOLID_COLOR : opts.getSplashScreenStyle());
             Task.TaskKey key = mTask.key;
             UI_HELPER_EXECUTOR.execute(() -> {
                 if (!ActivityManagerWrapper.getInstance().startActivityFromRecents(key, opts)) {
@@ -778,6 +678,75 @@ public class TaskView extends FrameLayout implements Reusable {
             });
         } else {
             callback.accept(false);
+        }
+    }
+
+    /**
+     * Launch of the current task (both live and inactive tasks) with an animation.
+     */
+    public void launchTasks() {
+        RecentsView recentsView = getRecentsView();
+        RemoteTargetHandle[] remoteTargetHandles = recentsView.mRemoteTargetHandles;
+        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isRunningTask() && remoteTargetHandles != null) {
+            if (!mIsClickableAsLiveTile) {
+                return;
+            }
+
+            mIsClickableAsLiveTile = false;
+            RemoteAnimationTargets targets;
+            if (remoteTargetHandles.length == 1) {
+                targets = remoteTargetHandles[0].getTransformParams().getTargetSet();
+            } else {
+                TransformParams topLeftParams = remoteTargetHandles[0].getTransformParams();
+                TransformParams rightBottomParams = remoteTargetHandles[1].getTransformParams();
+                RemoteAnimationTargetCompat[] apps = Stream.concat(
+                        Arrays.stream(topLeftParams.getTargetSet().apps),
+                        Arrays.stream(rightBottomParams.getTargetSet().apps))
+                        .toArray(RemoteAnimationTargetCompat[]::new);
+                RemoteAnimationTargetCompat[] wallpapers = Stream.concat(
+                        Arrays.stream(topLeftParams.getTargetSet().wallpapers),
+                        Arrays.stream(rightBottomParams.getTargetSet().wallpapers))
+                        .toArray(RemoteAnimationTargetCompat[]::new);
+                targets = new RemoteAnimationTargets(apps, wallpapers,
+                        topLeftParams.getTargetSet().nonApps,
+                        topLeftParams.getTargetSet().targetMode);
+            }
+            if (targets == null) {
+                // If the recents animation is cancelled somehow between the parent if block and
+                // here, try to launch the task as a non live tile task.
+                launchTaskAnimated();
+                mIsClickableAsLiveTile = true;
+                return;
+            }
+
+            AnimatorSet anim = new AnimatorSet();
+            TaskViewUtils.composeRecentsLaunchAnimator(
+                    anim, this, targets.apps,
+                    targets.wallpapers, targets.nonApps, true /* launcherClosing */,
+                    mActivity.getStateManager(), recentsView,
+                    recentsView.getDepthController());
+            anim.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    recentsView.runActionOnRemoteHandles(
+                            (Consumer<RemoteTargetHandle>) remoteTargetHandle ->
+                                    remoteTargetHandle
+                                            .getTaskViewSimulator()
+                                            .setDrawsBelowRecents(false));
+                }
+
+                @Override
+                public void onAnimationEnd(Animator animator) {
+                    if (mTask != null && mTask.key.displayId != getRootViewDisplayId()) {
+                        launchTaskAnimated();
+                    }
+                    mIsClickableAsLiveTile = true;
+                }
+            });
+            anim.start();
+            recentsView.onTaskLaunchedInLiveTileMode();
+        } else {
+            launchTaskAnimated();
         }
     }
 
@@ -1095,6 +1064,21 @@ public class TaskView extends FrameLayout implements Reusable {
         return scale;
     }
 
+    /**
+     * Updates progress of task view for entering/exiting overview on swipe up/down.
+     *
+     * <p>Updates the alpha of any splash screen over the thumbnail if it exists.
+     */
+    public void setOverviewProgress(float overviewProgress) {
+        mOverviewProgress = overviewProgress;
+        applyThumbnailSplashAlpha();
+    }
+
+    protected void applyThumbnailSplashAlpha() {
+        mSnapshotView.setSplashAlpha(
+                Utilities.mapToRange(mOverviewProgress, 0f, 1f, 1f, 0f, LINEAR));
+    }
+
     private void setSplitSelectTranslationX(float x) {
         mSplitSelectTranslationX = x;
         applyTranslationX();
@@ -1336,7 +1320,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 continue;
             }
             for (SystemShortcut s : TaskOverlayFactory.getEnabledShortcuts(this,
-                    mActivity.getDeviceProfile(), taskContainer)) {
+                    taskContainer)) {
                 info.addAction(s.createAccessibilityAction(context));
             }
         }
@@ -1374,7 +1358,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 continue;
             }
             for (SystemShortcut s : TaskOverlayFactory.getEnabledShortcuts(this,
-                    mActivity.getDeviceProfile(), taskContainer)) {
+                    taskContainer)) {
                 if (s.hasHandlerForAction(action)) {
                     s.onClick(this);
                     return true;
@@ -1447,9 +1431,8 @@ public class TaskView extends FrameLayout implements Reusable {
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         if (deviceProfile.isTablet) {
             final int thumbnailPadding = deviceProfile.overviewTaskThumbnailTopMarginPx;
-            final Rect lastComputedTaskSize = getRecentsView().getLastComputedTaskSize();
-            final int taskWidth = lastComputedTaskSize.width();
-            final int taskHeight = lastComputedTaskSize.height();
+            final int taskWidth = deviceProfile.overviewTaskRect.width();
+            final int taskHeight = deviceProfile.overviewTaskRect.height();
 
             int boxWidth;
             int boxHeight;
@@ -1460,10 +1443,9 @@ public class TaskView extends FrameLayout implements Reusable {
                 boxWidth = taskWidth;
                 boxHeight = taskHeight;
             } else {
-                // Otherwise task is in grid, and should use lastComputedGridTaskSize.
-                Rect lastComputedGridTaskSize = getRecentsView().getLastComputedGridTaskSize();
-                boxWidth = lastComputedGridTaskSize.width();
-                boxHeight = lastComputedGridTaskSize.height();
+                // Otherwise task is in grid.
+                boxWidth = deviceProfile.overviewGridTaskDimension.x;
+                boxHeight = deviceProfile.overviewGridTaskDimension.y;
             }
 
             // Bound width/height to the box size.
@@ -1530,7 +1512,6 @@ public class TaskView extends FrameLayout implements Reusable {
     }
 
     public void initiateSplitSelect(SplitPositionOption splitPositionOption) {
-        AbstractFloatingView.closeOpenViews(mActivity, false, TYPE_TASK_MENU);
         getRecentsView().initiateSplitSelect(this, splitPositionOption.stagePosition);
     }
 
@@ -1577,17 +1558,14 @@ public class TaskView extends FrameLayout implements Reusable {
             RectF insets = pph.getInsetsToDrawInFullscreen(dp);
 
             float currentInsetsLeft = insets.left * fullscreenProgress;
+            float currentInsetsTop = insets.top * fullscreenProgress;
             float currentInsetsRight = insets.right * fullscreenProgress;
-            float insetsBottom = insets.bottom;
-            if (dp.isTaskbarPresentInApps) {
-                insetsBottom = Math.max(0, insetsBottom - dp.taskbarSize);
-            }
-            mCurrentDrawnInsets.set(currentInsetsLeft, insets.top * fullscreenProgress,
-                    currentInsetsRight, insetsBottom * fullscreenProgress);
-            float fullscreenCornerRadius = dp.isMultiWindowMode ? 0 : mWindowCornerRadius;
+            float currentInsetsBottom = insets.bottom * fullscreenProgress;
+            mCurrentDrawnInsets.set(
+                    currentInsetsLeft, currentInsetsTop, currentInsetsRight, currentInsetsBottom);
 
             mCurrentDrawnCornerRadius =
-                    Utilities.mapRange(fullscreenProgress, mCornerRadius, fullscreenCornerRadius)
+                    Utilities.mapRange(fullscreenProgress, mCornerRadius, mWindowCornerRadius)
                             / parentScale / taskViewScale;
 
             // We scaled the thumbnail to fit the content (excluding insets) within task view width.

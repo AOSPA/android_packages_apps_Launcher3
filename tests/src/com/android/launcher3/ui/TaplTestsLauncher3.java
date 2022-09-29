@@ -25,6 +25,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import android.content.Intent;
 import android.graphics.Point;
@@ -53,6 +54,7 @@ import com.android.launcher3.widget.picker.WidgetsFullSheet;
 import com.android.launcher3.widget.picker.WidgetsRecyclerView;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -66,6 +68,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     private static final String DUMMY_APP_NAME = "Aardwolf";
     private static final String MAPS_APP_NAME = "Maps";
     private static final String STORE_APP_NAME = "Play Store";
+    private static final String GMAIL_APP_NAME = "Gmail";
 
     @Before
     public void setUp() throws Exception {
@@ -190,6 +193,17 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     }
 
     @Test
+    @PortraitLandscape
+    public void testAllAppsDeadzoneForTablet() throws Exception {
+        assumeTrue(mLauncher.isTablet());
+
+        mLauncher.getWorkspace().switchToAllApps().dismissByTappingOutsideForTablet(
+                true /* tapRight */);
+        mLauncher.getWorkspace().switchToAllApps().dismissByTappingOutsideForTablet(
+                false /* tapRight */);
+    }
+
+    @Test
     @ScreenRecord // b/202433017
     public void testWorkspace() throws Exception {
         final Workspace workspace = mLauncher.getWorkspace();
@@ -197,8 +211,8 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         // Test that ensureWorkspaceIsScrollable adds a page by dragging an icon there.
         executeOnLauncher(launcher -> assertFalse("Initial workspace state is scrollable",
                 isWorkspaceScrollable(launcher)));
-        assertNull("Chrome app was found on empty workspace",
-                workspace.tryGetWorkspaceAppIcon("Chrome"));
+        workspace.verifyWorkspaceAppIconIsGone(
+                "Chrome app was found on empty workspace", "Chrome");
 
         workspace.ensureWorkspaceIsScrollable();
 
@@ -374,28 +388,33 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
-    public void testDragToFolder() throws Exception {
-        final HomeAppIcon playStoreIcon = createShortcutIfNotExist("Play Store", 0, 1);
-        final HomeAppIcon gmailIcon = createShortcutIfNotExist("Gmail", 1, 1);
+    @ScreenRecord
+    @Ignore // b/233075289
+    public void testDragToFolder() {
+        // TODO: add the use case to drag an icon to an existing folder. Currently it either fails
+        // on tablets or phones due to difference in resolution.
+        final HomeAppIcon playStoreIcon = createShortcutIfNotExist(STORE_APP_NAME, 0, 1);
+        final HomeAppIcon gmailIcon = createShortcutInCenterIfNotExist(GMAIL_APP_NAME);
 
         FolderIcon folderIcon = gmailIcon.dragToIcon(playStoreIcon);
-
         Folder folder = folderIcon.open();
-        folder.getAppIcon("Play Store");
-        folder.getAppIcon("Gmail");
+        folder.getAppIcon(STORE_APP_NAME);
+        folder.getAppIcon(GMAIL_APP_NAME);
         Workspace workspace = folder.close();
 
-        assertNull("Gmail should be moved to a folder.",
-                workspace.tryGetWorkspaceAppIcon("Gmail"));
-        assertNull("Play Store should be moved to a folder.",
-                workspace.tryGetWorkspaceAppIcon("Play Store"));
+        workspace.verifyWorkspaceAppIconIsGone(STORE_APP_NAME + " should be moved to a folder.",
+                STORE_APP_NAME);
+        workspace.verifyWorkspaceAppIconIsGone(GMAIL_APP_NAME + " should be moved to a folder.",
+                GMAIL_APP_NAME);
 
-        final HomeAppIcon youTubeIcon = createShortcutInCenterIfNotExist("YouTube");
-
-        folderIcon = youTubeIcon.dragToIcon(folderIcon);
+        final HomeAppIcon mapIcon = createShortcutInCenterIfNotExist(MAPS_APP_NAME);
+        folderIcon = mapIcon.dragToIcon(folderIcon);
         folder = folderIcon.open();
-        folder.getAppIcon("YouTube");
-        folder.close();
+        folder.getAppIcon(MAPS_APP_NAME);
+        workspace = folder.close();
+
+        workspace.verifyWorkspaceAppIconIsGone(MAPS_APP_NAME + " should be moved to a folder.",
+                MAPS_APP_NAME);
     }
 
     @Test
@@ -419,8 +438,9 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         for (String appName : new String[]{"Gmail", "Play Store", APP_NAME}) {
             final HomeAppIcon homeAppIcon = createShortcutInCenterIfNotExist(appName);
             Workspace workspace = mLauncher.getWorkspace().deleteAppIcon(homeAppIcon);
-            assertNull(appName + " app was found after being deleted from workspace",
-                    workspace.tryGetWorkspaceAppIcon(appName));
+            workspace.verifyWorkspaceAppIconIsGone(
+                    appName + " app was found after being deleted from workspace",
+                    appName);
         }
     }
 
@@ -504,10 +524,8 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                     .containsAtLeast(DUMMY_APP_NAME, MAPS_APP_NAME, STORE_APP_NAME);
 
             mLauncher.getWorkspace().getWorkspaceAppIcon(DUMMY_APP_NAME).uninstall();
-
-            assertNull(
-                    DUMMY_APP_NAME + " app was found after being uninstalled",
-                    mLauncher.getWorkspace().tryGetWorkspaceAppIcon(DUMMY_APP_NAME));
+            mLauncher.getWorkspace().verifyWorkspaceAppIconIsGone(
+                    DUMMY_APP_NAME + " was expected to disappear after uninstall.", DUMMY_APP_NAME);
 
             Map<String, Point> finalPositions =
                     mLauncher.getWorkspace().getWorkspaceIconsPositions();
@@ -515,6 +533,37 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         } finally {
             TestUtil.uninstallDummyApp();
         }
+    }
+
+    @Test
+    @PortraitLandscape
+    public void testDragShortcutToWorkspaceCell() throws Exception {
+        Point[] targets = getCornersAndCenterPositions();
+
+        for (Point target : targets) {
+            final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
+            allApps.freeze();
+            try {
+                allApps.getAppIcon(APP_NAME)
+                        .openDeepShortcutMenu()
+                        .getMenuItem(0)
+                        .dragToWorkspace(target.x, target.y);
+            } finally {
+                allApps.unfreeze();
+            }
+        }
+    }
+
+    @Test
+    @PortraitLandscape
+    public void testAddDeleteShortcutOnHotseat() {
+        mLauncher.getWorkspace()
+                .deleteAppIcon(mLauncher.getWorkspace().getHotseatAppIcon(0))
+                .switchToAllApps()
+                .getAppIcon(APP_NAME)
+                .dragToHotseat(0);
+        mLauncher.getWorkspace().deleteAppIcon(
+                mLauncher.getWorkspace().getHotseatAppIcon(APP_NAME));
     }
 
     /**

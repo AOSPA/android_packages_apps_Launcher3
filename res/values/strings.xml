@@ -277,6 +277,9 @@
     <!-- Summary for Notification dots setting. Tapping this will link enable/disable notification dots feature on the home screen. [CHAR LIMIT=50] -->
     <string name="notification_dots_service_title">Show notification dots</string>
 
+    <!-- Title for Developer Options setting. [CHAR LIMIT=50] -->
+    <string name="developer_options_title">Developer Options</string>
+
     <!-- Label for the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=60] -->
     <string name="auto_add_shortcuts_label">Add app icons to home screen</string>
     <!-- Text description of the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=NONE] -->
@@ -341,7 +344,7 @@
     <string name="action_move">Move item</string>
 
     <!-- Accessibility description to move item to empty cell. -->
-    <string name="move_to_empty_cell">Move to row <xliff:g id="number" example="1">%1$s</xliff:g> column <xliff:g id="number" example="1">%2$s</xliff:g></string>
+    <string name="move_to_empty_cell_description">Move to row <xliff:g id="number" example="1">%1$s</xliff:g> column <xliff:g id="number" example="1">%2$s</xliff:g> in <xliff:g id="string" example="Home screen 2 of 4">%3$s</xliff:g></string>
 
     <!-- Accessibility description to move item inside a folder. -->
     <string name="move_to_position">Move to position <xliff:g id="number" example="1">%1$s</xliff:g></string>
@@ -435,6 +438,10 @@
     <!-- A hint shown in launcher settings develop options filter box -->
     <string name="developer_options_filter_hint">Filter</string>
 
+    <!-- Title for preference screen show in Home Settings related to smart search preferences. [CHAR LIMIT=50]-->
+    <string name="search_pref_screen_title">Search your phone</string>
+    <!-- Title for preference screen show in Home Settings related to smart search preferences. [CHAR LIMIT=50]-->
+    <string name="search_pref_screen_title_tablet">Search your tablet</string>
     <!-- Failed action error message: e.g. Failed: Pause -->
     <string name="remote_action_failed">Failed: <xliff:g id="what" example="Pause">%1$s</xliff:g></string>
 </resources>

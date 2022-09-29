@@ -84,15 +84,12 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * The main tapl object. The only object that can be explicitly constructed by the using code. It
@@ -103,7 +100,6 @@ public final class LauncherInstrumentation {
     private static final String TAG = "Tapl";
     private static final int ZERO_BUTTON_STEPS_FROM_BACKGROUND_TO_HOME = 15;
     private static final int GESTURE_STEP_MS = 16;
-    private static final long FORCE_PAUSE_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(2);
 
     static final Pattern EVENT_TOUCH_DOWN = getTouchEventPattern("ACTION_DOWN");
     static final Pattern EVENT_TOUCH_UP = getTouchEventPattern("ACTION_UP");
@@ -125,8 +121,8 @@ public final class LauncherInstrumentation {
     // Types for launcher containers that the user is interacting with. "Background" is a
     // pseudo-container corresponding to inactive launcher covered by another app.
     public enum ContainerType {
-        WORKSPACE, HOME_ALL_APPS, OVERVIEW, WIDGETS, FALLBACK_OVERVIEW, LAUNCHED_APP,
-        TASKBAR_ALL_APPS
+        WORKSPACE, HOME_ALL_APPS, OVERVIEW, SPLIT_SCREEN_SELECT, WIDGETS, FALLBACK_OVERVIEW,
+        LAUNCHED_APP, TASKBAR_ALL_APPS
     }
 
     public enum NavigationModel {ZERO_BUTTON, THREE_BUTTON}
@@ -173,7 +169,7 @@ public final class LauncherInstrumentation {
     private static final String WIDGETS_RES_ID = "primary_widgets_list_view";
     private static final String CONTEXT_MENU_RES_ID = "popup_container";
     private static final String TASKBAR_RES_ID = "taskbar_view";
-    public static final int WAIT_TIME_MS = 60000;
+    public static final int WAIT_TIME_MS = 30000;
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
     private static final String ANDROID_PACKAGE = "android";
 
@@ -364,10 +360,6 @@ public final class LauncherInstrumentation {
         return getRealDisplaySize().x / 2f;
     }
 
-    private void setForcePauseTimeout(long timeout) {
-        getTestInfo(TestProtocol.REQUEST_SET_FORCE_PAUSE_TIMEOUT, Long.toString(timeout));
-    }
-
     public void setEnableRotation(boolean on) {
         getTestInfo(TestProtocol.REQUEST_ENABLE_ROTATION, Boolean.toString(on));
     }
@@ -379,6 +371,17 @@ public final class LauncherInstrumentation {
 
     void setActiveContainer(VisibleContainer container) {
         sActiveContainer = new WeakReference<>(container);
+    }
+
+    /**
+     * Sets the accesibility interactive timeout to be effectively indefinite (UI using this
+     * accesibility timeout will not automatically dismiss if true).
+     */
+    void setIndefiniteAccessibilityInteractiveUiTimeout(boolean indefiniteTimeout) {
+        final String cmd = indefiniteTimeout
+                ? "settings put secure accessibility_interactive_ui_timeout_ms 10000"
+                : "settings delete secure accessibility_interactive_ui_timeout_ms";
+        logShellCommand(cmd);
     }
 
     public NavigationModel getNavigationModel() {
@@ -501,29 +504,16 @@ public final class LauncherInstrumentation {
         }
     }
 
-    void checkPackagesVisible(String[] expectedVisiblePackages) {
-        Set<String> actualVisiblePackages =
-                getVisiblePackagesStream().collect(Collectors.toSet());
-
-        for (String expectedVisible : expectedVisiblePackages) {
-            assertTrue("Expected package not visible: " + expectedVisible,
-                    actualVisiblePackages.contains(expectedVisible));
-        }
-    }
-
     private String getVisiblePackages() {
-        final String apps = getVisiblePackagesStream().collect(Collectors.joining(", "));
-        return !apps.isEmpty()
-                ? "active app: " + apps
-                : "the test doesn't see views from any app, including Launcher";
-    }
-
-    private Stream<String> getVisiblePackagesStream() {
-        return mDevice.findObjects(getAnyObjectSelector())
+        final String apps = mDevice.findObjects(getAnyObjectSelector())
                 .stream()
                 .map(LauncherInstrumentation::getApplicationPackageSafe)
                 .distinct()
-                .filter(pkg -> pkg != null && !SYSTEMUI_PACKAGE.equals(pkg));
+                .filter(pkg -> pkg != null && !SYSTEMUI_PACKAGE.equals(pkg))
+                .collect(Collectors.joining(", "));
+        return !apps.isEmpty()
+                ? "active app: " + apps
+                : "the test doesn't see views from any app, including Launcher";
     }
 
     private static String getApplicationPackageSafe(UiObject2 object) {
@@ -754,7 +744,8 @@ public final class LauncherInstrumentation {
 
                     return waitForLauncherObject(APPS_RES_ID);
                 }
-                case OVERVIEW: {
+                case OVERVIEW:
+                case SPLIT_SCREEN_SELECT: {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
@@ -901,7 +892,6 @@ public final class LauncherInstrumentation {
             final String action;
             if (getNavigationModel() == NavigationModel.ZERO_BUTTON) {
                 checkForAnomaly(false, true);
-                setForcePauseTimeout(FORCE_PAUSE_TIMEOUT_MS);
 
                 final Point displaySize = getRealDisplaySize();
                 // The swipe up to home gesture starts from inside the launcher when the user is
@@ -1102,6 +1092,14 @@ public final class LauncherInstrumentation {
     }
 
     @NonNull
+    UiObject2 waitForSystemUiObject(BySelector selector) {
+        final UiObject2 object = TestHelpers.wait(
+                Until.findObject(selector), WAIT_TIME_MS);
+        assertNotNull("Can't find a systemui object with selector: " + selector, object);
+        return object;
+    }
+
+    @NonNull
     UiObject2 waitForNavigationUiObject(String resId) {
         String resPackage = getNavigationButtonResPackage();
         final UiObject2 object = mDevice.wait(
@@ -1230,6 +1228,13 @@ public final class LauncherInstrumentation {
                 Until.findObject(By.res(ANDROID_PACKAGE, resId)), WAIT_TIME_MS);
         assertNotNull("Can't find a android object with id: " + resId, object);
         return object;
+    }
+
+    @NonNull
+    List<UiObject2> waitForObjectsBySelector(BySelector selector) {
+        final List<UiObject2> objects = mDevice.wait(Until.findObjects(selector), WAIT_TIME_MS);
+        assertNotNull("Can't find any view in Launcher, selector: " + selector, objects);
+        return objects;
     }
 
     private UiObject2 waitForObjectBySelector(BySelector selector) {
@@ -1567,11 +1572,11 @@ public final class LauncherInstrumentation {
 
             // vx0: initial speed at the x-dimension, set as twice the avg speed
             // dx: the constant deceleration at the x-dimension
-            double vx0 = 2 * (to.x - from.x) / duration;
+            double vx0 = 2.0 * (to.x - from.x) / duration;
             double dx = vx0 / duration;
             // vy0: initial speed at the y-dimension, set as twice the avg speed
             // dy: the constant deceleration at the y-dimension
-            double vy0 = 2 * (to.y - from.y) / duration;
+            double vy0 = 2.0 * (to.y - from.y) / duration;
             double dy = vy0 / duration;
 
             for (long i = 0; i < steps; ++i) {
@@ -1845,5 +1850,27 @@ public final class LauncherInstrumentation {
     private static boolean supportsRoundedCornersOnWindows(Resources resources) {
         return ResourceUtils.getBoolByName(
                 "config_supportsRoundedCornersOnWindows", resources, false);
+    }
+
+    /**
+     * Taps outside container to dismiss.
+     * @param container container to be dismissed
+     * @param tapRight tap on the right of the container if true, or left otherwise
+     */
+    void touchOutsideContainer(UiObject2 container, boolean tapRight) {
+        try (LauncherInstrumentation.Closable c = addContextLayer(
+                "want to tap outside container on the " + (tapRight ? "right" : "left"))) {
+            Rect containerBounds = getVisibleBounds(container);
+            final long downTime = SystemClock.uptimeMillis();
+            final Point tapTarget = new Point(
+                    tapRight
+                            ? (containerBounds.right + getRealDisplaySize().x) / 2
+                            : containerBounds.left / 2,
+                    containerBounds.top + 1);
+            sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN, tapTarget,
+                    LauncherInstrumentation.GestureScope.INSIDE);
+            sendPointer(downTime, downTime, MotionEvent.ACTION_UP, tapTarget,
+                    LauncherInstrumentation.GestureScope.INSIDE);
+        }
     }
 }

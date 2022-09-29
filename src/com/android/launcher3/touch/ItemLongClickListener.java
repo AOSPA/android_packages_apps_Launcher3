@@ -37,6 +37,8 @@ import com.android.launcher3.logging.StatsLogManager.StatsLogger;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.views.BubbleTextHolder;
+import com.android.launcher3.widget.LauncherAppWidgetHostView;
 
 /**
  * Class to handle long-clicks on workspace items and start drag as a result.
@@ -50,7 +52,11 @@ public class ItemLongClickListener {
             ItemLongClickListener::onAllAppsItemLongClick;
 
     private static boolean onWorkspaceItemLongClick(View v) {
-        TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onWorkspaceItemLongClick");
+        if (v instanceof LauncherAppWidgetHostView) {
+            TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "Widgets.onLongClick");
+        } else {
+            TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onWorkspaceItemLongClick");
+        }
         Launcher launcher = Launcher.getLauncher(v.getContext());
         if (!canStartDrag(launcher)) return false;
         if (!launcher.isInState(NORMAL) && !launcher.isInState(OVERVIEW)) return false;
@@ -79,9 +85,12 @@ public class ItemLongClickListener {
         launcher.getWorkspace().startDrag(longClickCellInfo, dragOptions);
     }
 
-    private static boolean onAllAppsItemLongClick(View v) {
+    private static boolean onAllAppsItemLongClick(View view) {
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onAllAppsItemLongClick");
-        v.cancelLongPress();
+        view.cancelLongPress();
+        View v = (view instanceof BubbleTextHolder)
+                ? ((BubbleTextHolder) view).getBubbleText()
+                : view;
         Launcher launcher = Launcher.getLauncher(v.getContext());
         if (!canStartDrag(launcher)) return false;
         // When we have exited all apps or are in transition, disregard long clicks

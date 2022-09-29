@@ -468,7 +468,6 @@ public final class TaskViewUtils {
             animatorSet.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    super.onAnimationEnd(animation);
                     finishCallback.run();
                 }
             });
@@ -514,9 +513,6 @@ public final class TaskViewUtils {
             for (SurfaceControl leash: openingTargets) {
                 t.setAlpha(leash, progress);
             }
-            for (SurfaceControl leash: closingTargets) {
-                t.setAlpha(leash, 1 - progress);
-            }
             t.apply();
         });
         animator.addListener(new AnimatorListenerAdapter() {
@@ -533,7 +529,6 @@ public final class TaskViewUtils {
                 for (SurfaceControl leash: closingTargets) {
                     t.hide(leash);
                 }
-                super.onAnimationEnd(animation);
                 finishCallback.run();
             }
         });
@@ -602,8 +597,13 @@ public final class TaskViewUtils {
             launcherAnim.setInterpolator(Interpolators.TOUCH_RESPONSE_INTERPOLATOR);
             launcherAnim.setDuration(RECENTS_LAUNCH_DURATION);
 
-            // Make sure recents gets fixed up by resetting task alphas and scales, etc.
             windowAnimEndListener = new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    recentsView.onTaskLaunchedInLiveTileMode();
+                }
+
+                // Make sure recents gets fixed up by resetting task alphas and scales, etc.
                 @Override
                 public void onAnimationEnd(Animator animation) {
                     recentsView.finishRecentsAnimation(false /* toRecents */, () -> {
@@ -680,7 +680,6 @@ public final class TaskViewUtils {
         dockFadeAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
-                super.onAnimationStart(animation);
                 if (shown) {
                     for (SurfaceControl leash : auxiliarySurfaces) {
                         t.setAlpha(leash, 0);
@@ -692,7 +691,6 @@ public final class TaskViewUtils {
 
             @Override
             public void onAnimationEnd(Animator animation) {
-                super.onAnimationEnd(animation);
                 if (!shown) {
                     for (SurfaceControl leash : auxiliarySurfaces) {
                         t.hide(leash);

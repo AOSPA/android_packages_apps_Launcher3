@@ -30,10 +30,12 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ICON_SURFACE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_SNACKBAR;
 import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
+import static com.android.launcher3.LauncherAnimUtils.HOTSEAT_SCALE_PROPERTY_FACTORY;
+import static com.android.launcher3.LauncherAnimUtils.SCALE_INDEX_WIDGET_TRANSITION;
 import static com.android.launcher3.LauncherAnimUtils.SPRING_LOADED_EXIT_DELAY;
+import static com.android.launcher3.LauncherAnimUtils.WORKSPACE_SCALE_PROPERTY_FACTORY;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherState.ALL_APPS;
-import static com.android.launcher3.LauncherState.FLAG_CLOSE_POPUPS;
 import static com.android.launcher3.LauncherState.FLAG_MULTI_PAGE;
 import static com.android.launcher3.LauncherState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -97,6 +99,7 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.text.method.TextKeyListener;
+import android.util.FloatProperty;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.KeyEvent;
@@ -124,6 +127,7 @@ import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.accessibility.BaseAccessibilityDelegate.LauncherAction;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
+import com.android.launcher3.allapps.AllAppsRecyclerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.AllAppsTransitionController;
 import com.android.launcher3.allapps.BaseAllAppsContainerView;
@@ -194,8 +198,10 @@ import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.UiThreadHelper;
+import com.android.launcher3.util.ViewCapture;
 import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.views.FloatingIconView;
 import com.android.launcher3.views.FloatingSurfaceView;
 import com.android.launcher3.views.OptionsPopupView;
 import com.android.launcher3.views.ScrimView;
@@ -264,7 +270,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected static final int REQUEST_LAST = 100;
 
     // Type: int
-    private static final String RUNTIME_STATE = "launcher.state";
+    protected static final String RUNTIME_STATE = "launcher.state";
     // Type: PendingRequestArgs
     private static final String RUNTIME_STATE_PENDING_REQUEST_ARGS = "launcher.request_args";
     // Type: int
@@ -275,6 +281,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     private static final String RUNTIME_STATE_WIDGET_PANEL = "launcher.widget_panel";
     // Type int[]
     private static final String RUNTIME_STATE_CURRENT_SCREEN_IDS = "launcher.current_screen_ids";
+
+    // Type PendingSplitSelectInfo<Parcelable>
+    protected static final String PENDING_SPLIT_SELECT_INFO = "launcher.pending_split_select_info";
 
     public static final String ON_CREATE_EVT = "Launcher.onCreate";
     public static final String ON_START_EVT = "Launcher.onStart";
@@ -297,13 +306,17 @@ public class Launcher extends StatefulActivity<LauncherState>
     public static final int DISPLAY_WORKSPACE_TRACE_COOKIE = 0;
     public static final int DISPLAY_ALL_APPS_TRACE_COOKIE = 1;
 
+    private static final FloatProperty<Workspace<?>> WORKSPACE_WIDGET_SCALE =
+            WORKSPACE_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WIDGET_TRANSITION);
+    private static final FloatProperty<Hotseat> HOTSEAT_WIDGET_SCALE =
+            HOTSEAT_SCALE_PROPERTY_FACTORY.get(SCALE_INDEX_WIDGET_TRANSITION);
+
     private Configuration mOldConfig;
 
     @Thunk
     Workspace<?> mWorkspace;
     @Thunk
     DragLayer mDragLayer;
-    private DragController mDragController;
 
     private WidgetManagerHelper mAppWidgetManager;
     private LauncherAppWidgetHost mAppWidgetHost;
@@ -367,6 +380,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     private RotationHelper mRotationHelper;
 
     protected LauncherOverlayManager mOverlayManager;
+    protected DragController mDragController;
     // If true, overlay callbacks are deferred
     private boolean mDeferOverlayCallbacks;
     private final Runnable mDeferredOverlayCallbacks = this::checkIfOverlayStillDeferred;
@@ -384,6 +398,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     private LauncherState mPrevLauncherState;
 
     private StringCache mStringCache;
+    private ViewCapture mViewCapture;
 
     @Override
     @TargetApi(Build.VERSION_CODES.S)
@@ -463,7 +478,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         mIconCache = app.getIconCache();
         mAccessibilityDelegate = createAccessibilityDelegate();
 
-        mDragController = new LauncherDragController(this);
+        initDragController();
         mAllAppsController = new AllAppsTransitionController(this);
         mStateManager = new StateManager<>(this, NORMAL);
 
@@ -536,6 +551,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (Utilities.ATLEAST_R) {
             getWindow().setSoftInputMode(LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         }
+        setTitle(R.string.home_screen);
     }
 
     protected LauncherOverlayManager getDefaultOverlay() {
@@ -609,6 +625,13 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         mOldConfig.setTo(newConfig);
         super.onConfigurationChanged(newConfig);
+    }
+
+    /**
+     * Initializes the drag controller.
+     */
+    protected void initDragController() {
+        mDragController = new LauncherDragController(this);
     }
 
     @Override
@@ -737,7 +760,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 completeAddAppWidget(appWidgetId, info, null, null);
                 break;
             case REQUEST_RECONFIGURE_APPWIDGET:
-                mStatsLogManager.logger().withItemInfo(info).log(LAUNCHER_WIDGET_RECONFIGURED);
+                getStatsLogManager().logger().withItemInfo(info).log(LAUNCHER_WIDGET_RECONFIGURED);
                 completeRestoreAppWidget(appWidgetId, LauncherAppWidgetInfo.RESTORE_COMPLETED);
                 break;
             case REQUEST_BIND_PENDING_APPWIDGET: {
@@ -1077,10 +1100,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
         addActivityFlags(ACTIVITY_STATE_TRANSITION_ACTIVE);
 
-        if (state.hasFlag(FLAG_CLOSE_POPUPS)) {
-            AbstractFloatingView.closeAllOpenViews(this, !state.hasFlag(FLAG_NON_INTERACTIVE));
-        }
-
         if (state == SPRING_LOADED) {
             // Prevent any Un/InstallShortcutReceivers from updating the db while we are
             // not on homescreen
@@ -1169,6 +1188,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
 
         AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
+        DragView.removeAllViews(this);
         TraceHelper.INSTANCE.endSection(traceToken);
     }
 
@@ -1469,6 +1489,14 @@ public class Launcher extends StatefulActivity<LauncherState>
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
         mOverlayManager.onAttachedToWindow();
+        if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
+            View root = getDragLayer().getRootView();
+            if (mViewCapture != null) {
+                root.getViewTreeObserver().removeOnDrawListener(mViewCapture);
+            }
+            mViewCapture = new ViewCapture(root);
+            root.getViewTreeObserver().addOnDrawListener(mViewCapture);
+        }
     }
 
     @Override
@@ -1955,6 +1983,19 @@ public class Launcher extends StatefulActivity<LauncherState>
      * @param deleteFromDb whether or not to delete this item from the db.
      */
     public boolean removeItem(View v, final ItemInfo itemInfo, boolean deleteFromDb) {
+        return removeItem(v, itemInfo, deleteFromDb, null);
+    }
+
+    /**
+     * Unbinds the view for the specified item, and removes the item and all its children.
+     *
+     * @param v the view being removed.
+     * @param itemInfo the {@link ItemInfo} for this view.
+     * @param deleteFromDb whether or not to delete this item from the db.
+     * @param reason the resaon for removal.
+     */
+    public boolean removeItem(View v, final ItemInfo itemInfo, boolean deleteFromDb,
+            @Nullable final String reason) {
         if (itemInfo instanceof WorkspaceItemInfo) {
             // Remove the shortcut from the folder before removing it from launcher
             View folderIcon = mWorkspace.getHomescreenIconByItemId(itemInfo.container);
@@ -1964,7 +2005,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 mWorkspace.removeWorkspaceItem(v);
             }
             if (deleteFromDb) {
-                getModelWriter().deleteItemFromDatabase(itemInfo);
+                getModelWriter().deleteItemFromDatabase(itemInfo, reason);
             }
         } else if (itemInfo instanceof FolderInfo) {
             final FolderInfo folderInfo = (FolderInfo) itemInfo;
@@ -1979,7 +2020,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             final LauncherAppWidgetInfo widgetInfo = (LauncherAppWidgetInfo) itemInfo;
             mWorkspace.removeWorkspaceItem(v);
             if (deleteFromDb) {
-                getModelWriter().deleteWidgetInfo(widgetInfo, getAppWidgetHost());
+                getModelWriter().deleteWidgetInfo(widgetInfo, getAppWidgetHost(), reason);
             }
         } else {
             return false;
@@ -2031,11 +2072,14 @@ public class Launcher extends StatefulActivity<LauncherState>
         // Note: There should be at most one log per method call. This is enforced implicitly
         // by using if-else statements.
         AbstractFloatingView topView = AbstractFloatingView.getTopOpenView(this);
-        if (topView != null && topView.onBackPressed()) {
-            // Handled by the floating view.
-        } else {
-            mStateManager.getState().onBackPressed(this);
+        if (topView == null || !topView.onBackPressed()) {
+            // Not handled by the floating view.
+            onStateBack();
         }
+    }
+
+    protected void onStateBack() {
+        mStateManager.getState().onBackPressed(this);
     }
 
     protected void onScreenOff() {
@@ -2398,8 +2442,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                     if (FeatureFlags.IS_STUDIO_BUILD) {
                         throw (new RuntimeException(desc));
                     } else {
-                        Log.d(TAG, desc);
-                        getModelWriter().deleteItemFromDatabase(item);
+                        getModelWriter().deleteItemFromDatabase(item, desc);
                         if (TestProtocol.sDebugTracing) {
                             Log.d(TestProtocol.MISSING_PROMISE_ICON,
                                     TAG + "bindItems failed for item=" + item);
@@ -2479,7 +2522,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (item.hasOptionFlag(LauncherAppWidgetInfo.OPTION_SEARCH_WIDGET)) {
             item.providerName = QsbContainerView.getSearchComponentName(this);
             if (item.providerName == null) {
-                getModelWriter().deleteItemFromDatabase(item);
+                getModelWriter().deleteItemFromDatabase(item,
+                        "search widget removed because search component cannot be found");
                 return null;
             }
         }
@@ -2530,10 +2574,10 @@ public class Launcher extends StatefulActivity<LauncherState>
             if (!item.hasRestoreFlag(LauncherAppWidgetInfo.FLAG_PROVIDER_NOT_READY)
                     && (item.restoreStatus != LauncherAppWidgetInfo.RESTORE_COMPLETED)) {
                 if (appWidgetInfo == null) {
-                    FileLog.d(TAG, "Removing restored widget: id=" + item.appWidgetId
+                    getModelWriter().deleteItemFromDatabase(item,
+                            "Removing restored widget: id=" + item.appWidgetId
                             + " belongs to component " + item.providerName + " user " + item.user
                             + ", as the provider is null and " + removalReason);
-                    getModelWriter().deleteItemFromDatabase(item);
                     return null;
                 }
 
@@ -2603,7 +2647,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 // Verify that we own the widget
                 if (appWidgetInfo == null) {
                     FileLog.e(TAG, "Removing invalid widget: id=" + item.appWidgetId);
-                    getModelWriter().deleteWidgetInfo(item, getAppWidgetHost());
+                    getModelWriter().deleteWidgetInfo(item, getAppWidgetHost(), removalReason);
                     return null;
                 }
 
@@ -2739,8 +2783,8 @@ public class Launcher extends StatefulActivity<LauncherState>
      * @param supportsAllAppsState If true and we are in All Apps state, looks for view in All Apps.
      *                             Else we only looks on the workspace.
      */
-    public View getFirstMatchForAppClose(int preferredItemId, String packageName, UserHandle user,
-            boolean supportsAllAppsState) {
+    public @Nullable View getFirstMatchForAppClose(int preferredItemId, String packageName,
+            UserHandle user, boolean supportsAllAppsState) {
         final Predicate<ItemInfo> preferredItem = info ->
                 info != null && info.id == preferredItemId;
         final Predicate<ItemInfo> packageAndUserAndApp = info ->
@@ -2752,8 +2796,21 @@ public class Launcher extends StatefulActivity<LauncherState>
                         packageName);
 
         if (supportsAllAppsState && isInState(LauncherState.ALL_APPS)) {
-            return getFirstMatch(Collections.singletonList(mAppsView.getActiveRecyclerView()),
+            AllAppsRecyclerView activeRecyclerView = mAppsView.getActiveRecyclerView();
+            View v = getFirstMatch(Collections.singletonList(activeRecyclerView),
                     preferredItem, packageAndUserAndApp);
+
+            if (v != null && activeRecyclerView.getCurrentScrollY() > 0) {
+                RectF locationBounds = new RectF();
+                FloatingIconView.getLocationBoundsForView(this, v, false, locationBounds,
+                        new Rect());
+                if (locationBounds.top < mAppsView.getHeaderBottom()) {
+                    // Icon is covered by scrim, return null to play fallback animation.
+                    return null;
+                }
+            }
+
+            return v;
         } else {
             List<ViewGroup> containers = new ArrayList<>(mWorkspace.getPanelCount() + 1);
             containers.add(mWorkspace.getHotseat().getShortcutsAndWidgets());
@@ -2771,6 +2828,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      * @param containers List of ViewGroups to scan, in order of preference.
      * @param operators List of operators, in order starting from best matching operator.
      */
+    @Nullable
     private static View getFirstMatch(Iterable<ViewGroup> containers,
             final Predicate<ItemInfo>... operators) {
         for (Predicate<ItemInfo> operator : operators) {
@@ -2788,6 +2846,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Returns the first view matching the operator in the given ViewGroups, or null if none.
      * Forward iteration matters.
      */
+    @Nullable
     private static View mapOverViewGroup(ViewGroup container, Predicate<ItemInfo> op) {
         final int itemCount = container.getChildCount();
         for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
@@ -2957,11 +3016,15 @@ public class Launcher extends StatefulActivity<LauncherState>
         writer.println(prefix + "\tmRotationHelper: " + mRotationHelper);
         writer.println(prefix + "\tmAppWidgetHost.isListening: " + mAppWidgetHost.isListening());
 
+        if (mViewCapture != null) {
+            writer.println(prefix + "\tmViewCapture: " + mViewCapture.dumpToString());
+        }
+
         // Extra logging for general debugging
         mDragLayer.dump(prefix, writer);
         mStateManager.dump(prefix, writer);
         mPopupDataProvider.dump(prefix, writer);
-        mDeviceProfile.dump(prefix, writer);
+        mDeviceProfile.dump(this, prefix, writer);
 
         try {
             FileLog.flushAll(writer);
@@ -3185,7 +3248,12 @@ public class Launcher extends StatefulActivity<LauncherState>
      * @param progress Transition progress from 0 to 1; where 0 => home and 1 => widgets.
      */
     public void onWidgetsTransition(float progress) {
-        // No-Op
+        if (mDeviceProfile.isTablet) {
+            float scale =
+                    Utilities.comp(Utilities.comp(mDeviceProfile.workspaceContentScale) * progress);
+            WORKSPACE_WIDGET_SCALE.set(getWorkspace(), scale);
+            HOTSEAT_WIDGET_SCALE.set(getHotseat(), scale);
+        }
     }
 
     private static class NonConfigInstance {
@@ -3211,11 +3279,24 @@ public class Launcher extends StatefulActivity<LauncherState>
     public void pauseExpensiveViewUpdates() {
         // Pause page indicator animations as they lead to layer trashing.
         getWorkspace().getPageIndicator().pauseAnimations();
+
+        getWorkspace().mapOverItems((info, view) -> {
+            if (view instanceof LauncherAppWidgetHostView) {
+                ((LauncherAppWidgetHostView) view).beginDeferringUpdates();
+            }
+            return false; // Return false to continue iterating through all the items.
+        });
     }
 
     /** Resumes view updates at the end of the app launch animation. */
     public void resumeExpensiveViewUpdates() {
         getWorkspace().getPageIndicator().skipAnimationsToEnd();
-    }
 
+        getWorkspace().mapOverItems((info, view) -> {
+            if (view instanceof LauncherAppWidgetHostView) {
+                ((LauncherAppWidgetHostView) view).endDeferringUpdates();
+            }
+            return false; // Return false to continue iterating through all the items.
+        });
+    }
 }

@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
+import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.taskbar.LauncherTaskbarUIController.SYSUI_SURFACE_PROGRESS_INDEX;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_A11Y;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_BACK;
@@ -34,6 +35,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_N
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_OVERVIEW_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
 import static com.android.systemui.shared.system.ViewTreeObserverWrapper.InsetsInfo.TOUCHABLE_INSETS_REGION;
 
 import android.animation.ArgbEvaluator;
@@ -51,6 +53,7 @@ import android.graphics.Region.Op;
 import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.PaintDrawable;
 import android.inputmethodservice.InputMethodService;
+import android.os.Handler;
 import android.util.Property;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -103,8 +106,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     private static final int FLAG_DISABLE_BACK = 1 << 9;
     private static final int FLAG_NOTIFICATION_SHADE_EXPANDED = 1 << 10;
     private static final int FLAG_SCREEN_PINNING_ACTIVE = 1 << 11;
-
-    private static final int MASK_IME_SWITCHER_VISIBLE = FLAG_SWITCHER_SUPPORTED | FLAG_IME_VISIBLE;
+    private static final int FLAG_VOICE_INTERACTION_WINDOW_SHOWING = 1 << 12;
 
     private static final String NAV_BUTTONS_SEPARATE_WINDOW_TITLE = "Taskbar Nav Buttons";
 
@@ -158,6 +160,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     private BaseDragLayer<TaskbarActivityContext> mSeparateWindowParent; // Initialized in init.
     private final ViewTreeObserverWrapper.OnComputeInsetsListener mSeparateWindowInsetsComputer =
             this::onComputeInsetsForSeparateWindow;
+    private final RecentsHitboxExtender mHitboxExtender = new RecentsHitboxExtender();
 
     public NavbarButtonsViewController(TaskbarActivityContext context, FrameLayout navButtonsView) {
         mContext = context;
@@ -186,7 +189,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                     isThreeButtonNav ? mStartContextualContainer : mEndContextualContainer,
                     mControllers.navButtonController, R.id.ime_switcher);
             mPropertyHolders.add(new StatePropertyHolder(imeSwitcherButton,
-                    flags -> ((flags & MASK_IME_SWITCHER_VISIBLE) == MASK_IME_SWITCHER_VISIBLE)
+                    flags -> ((flags & FLAG_SWITCHER_SUPPORTED) != 0)
                             && ((flags & FLAG_ROTATION_BUTTON_VISIBLE) == 0)));
         }
 
@@ -204,9 +207,12 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         boolean isInKidsMode = mContext.isNavBarKidsModeActive();
         boolean alwaysShowButtons = isThreeButtonNav || isInSetup;
 
-        // Make sure to remove nav bar buttons translation when notification shade is expanded or
-        // IME is showing (add separate translation for IME).
-        int flagsToRemoveTranslation = FLAG_NOTIFICATION_SHADE_EXPANDED | FLAG_IME_VISIBLE;
+        // Make sure to remove nav bar buttons translation when any of the following occur:
+        // - Notification shade is expanded
+        // - IME is showing (add separate translation for IME)
+        // - VoiceInteractionWindow (assistant) is showing
+        int flagsToRemoveTranslation = FLAG_NOTIFICATION_SHADE_EXPANDED | FLAG_IME_VISIBLE
+                | FLAG_VOICE_INTERACTION_WINDOW_SHOWING;
         mPropertyHolders.add(new StatePropertyHolder(mNavButtonInAppDisplayProgressForSysui,
                 flags -> (flags & flagsToRemoveTranslation) != 0, AnimatedFloat.VALUE,
                 1, 0));
@@ -303,6 +309,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 navButtonsLayoutParams.setMarginEnd(navButtonsLayoutParams.getMarginStart());
                 navButtonsLayoutParams.gravity = Gravity.CENTER;
                 mNavButtonContainer.requestLayout();
+
+                mHomeButton.setOnLongClickListener(null);
             }
 
             // Animate taskbar background when either..
@@ -394,8 +402,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                         || (flags & FLAG_KEYGUARD_VISIBLE) != 0,
                 VIEW_TRANSLATE_X, navButtonSize * (isRtl ? -2 : 2), 0));
 
-
-        // home and recents buttons
+        // home button
         mHomeButton = addButton(R.drawable.ic_sysbar_home, BUTTON_HOME, navContainer,
                 navButtonController, R.id.home);
         mHomeButtonAlpha = new MultiValueAlpha(mHomeButton, NUM_ALPHA_CHANNELS);
@@ -405,8 +412,21 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                         ALPHA_INDEX_KEYGUARD_OR_DISABLE),
                 flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0 &&
                         (flags & FLAG_DISABLE_HOME) == 0));
+
+        // Recents button
         View recentsButton = addButton(R.drawable.ic_sysbar_recent, BUTTON_RECENTS,
                 navContainer, navButtonController, R.id.recent_apps);
+        mHitboxExtender.init(recentsButton, mNavButtonsView, mContext.getDeviceProfile(),
+                () -> {
+                    float[] recentsCoords = new float[2];
+                    getDescendantCoordRelativeToAncestor(recentsButton, mNavButtonsView,
+                            recentsCoords, false);
+                    return recentsCoords;
+                }, new Handler());
+        recentsButton.setOnClickListener(v -> {
+            navButtonController.onButtonClick(BUTTON_RECENTS, v);
+            mHitboxExtender.onRecentsButtonClicked();
+        });
         mPropertyHolders.add(new StatePropertyHolder(recentsButton,
                 flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0 && (flags & FLAG_DISABLE_RECENTS) == 0
                         && !mContext.isNavBarKidsModeActive()));
@@ -432,6 +452,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 | SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
         boolean isNotificationShadeExpanded = (sysUiStateFlags & shadeExpandedFlags) != 0;
         boolean isScreenPinningActive = (sysUiStateFlags & SYSUI_STATE_SCREEN_PINNING) != 0;
+        boolean isVoiceInteractionWindowShowing =
+                (sysUiStateFlags & SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING) != 0;
 
         // TODO(b/202218289) we're getting IME as not visible on lockscreen from system
         updateStateForFlag(FLAG_IME_VISIBLE, isImeVisible);
@@ -442,6 +464,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         updateStateForFlag(FLAG_DISABLE_BACK, isBackDisabled);
         updateStateForFlag(FLAG_NOTIFICATION_SHADE_EXPANDED, isNotificationShadeExpanded);
         updateStateForFlag(FLAG_SCREEN_PINNING_ACTIVE, isScreenPinningActive);
+        updateStateForFlag(FLAG_VOICE_INTERACTION_WINDOW_SHOWING, isVoiceInteractionWindowShowing);
 
         if (mA11yButton != null) {
             // Only used in 3 button
@@ -488,6 +511,13 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     /**
+     * Returns true if IME switcher is visible
+     */
+    public boolean isImeSwitcherVisible() {
+        return (mState & FLAG_SWITCHER_SUPPORTED) != 0;
+    }
+
+    /**
      * Returns true if the home button is disabled
      */
     public boolean isHomeDisabled() {
@@ -510,6 +540,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             View button = mAllButtons.get(i);
             if (button.getVisibility() == View.VISIBLE) {
                 parent.getDescendantRectRelativeToSelf(button, mTempRect);
+                if (mHitboxExtender.extendedHitboxEnabled()) {
+                    mTempRect.bottom += mContext.getDeviceProfile().getTaskbarOffsetY();
+                }
                 outRegion.op(mTempRect, Op.UNION);
             }
         }
@@ -612,9 +645,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         buttonView.setImageResource(drawableId);
         buttonView.setContentDescription(parent.getContext().getString(
                 navButtonController.getButtonContentDescription(buttonType)));
-        buttonView.setOnClickListener(view -> navButtonController.onButtonClick(buttonType));
+        buttonView.setOnClickListener(view -> navButtonController.onButtonClick(buttonType, view));
         buttonView.setOnLongClickListener(view ->
-                navButtonController.onButtonLongClick(buttonType));
+                navButtonController.onButtonLongClick(buttonType, view));
         return buttonView;
     }
 
@@ -736,7 +769,20 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         appendFlag(str, flags, FLAG_NOTIFICATION_SHADE_EXPANDED,
                 "FLAG_NOTIFICATION_SHADE_EXPANDED");
         appendFlag(str, flags, FLAG_SCREEN_PINNING_ACTIVE, "FLAG_SCREEN_PINNING_ACTIVE");
+        appendFlag(str, flags, FLAG_VOICE_INTERACTION_WINDOW_SHOWING,
+                "FLAG_VOICE_INTERACTION_WINDOW_SHOWING");
         return str.toString();
+    }
+
+    public TouchController getTouchController() {
+        return mHitboxExtender;
+    }
+
+    /**
+     * @param alignment 0 -> Taskbar, 1 -> Workspace
+     */
+    public void updateTaskbarAlignment(float alignment) {
+        mHitboxExtender.onAnimationProgressToOverview(alignment);
     }
 
     private class RotationButtonListener implements RotationButton.RotationButtonUpdatesCallback {

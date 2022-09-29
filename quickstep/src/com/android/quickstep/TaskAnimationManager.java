@@ -192,6 +192,13 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                                 RemoteAnimationTargetCompat.wrap(nonAppTargets) /* nonApps */);
                         return;
                     }
+                } else if (nonAppTargets != null && nonAppTargets.length > 0) {
+                    TaskViewUtils.createSplitAuxiliarySurfacesAnimator(
+                            RemoteAnimationTargetCompat.wrap(nonAppTargets) /* nonApps */,
+                            true /*shown*/, dividerAnimator -> {
+                                dividerAnimator.start();
+                                dividerAnimator.end();
+                            });
                 }
                 if (mController != null) {
                     if (mLastAppearedTaskTarget == null
