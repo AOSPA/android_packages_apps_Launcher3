@@ -16,9 +16,7 @@
 
 package com.android.quickstep.views;
 
-import android.app.Activity;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.util.AttributeSet;
@@ -51,7 +49,7 @@ import java.lang.annotation.RetentionPolicy;
  * View for showing action buttons in Overview
  */
 public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayout
-        implements OnClickListener, Insettable, SharedPreferences.OnSharedPreferenceChangeListener {
+        implements OnClickListener, Insettable {
 
     private final Rect mInsets = new Rect();
 
@@ -83,8 +81,6 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     private static final int INDEX_VISIBILITY_ALPHA = 1;
     private static final int INDEX_FULLSCREEN_ALPHA = 2;
     private static final int INDEX_HIDDEN_FLAGS_ALPHA = 3;
-
-    private static final String KEY_SHOW_LENS_BUTTON = "pref_show_lens_button";
 
     private final MultiValueAlpha mMultiValueAlpha;
     private Button mSplitButton;
@@ -124,23 +120,11 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         mSplitButton = findViewById(R.id.action_split);
         mSplitButton.setOnClickListener(this);
 
-        SharedPreferences prefs = Utilities.getPrefs(getContext());
-        prefs.registerOnSharedPreferenceChangeListener(this);
-
-        if (Utilities.isGSAEnabled(getContext()) && prefs.getBoolean(KEY_SHOW_LENS_BUTTON, false)) {
+        if (Utilities.isGSAEnabled(getContext())) {
             View lens = findViewById(R.id.action_lens);
             lens.setOnClickListener(this);
             lens.setVisibility(VISIBLE);
             findViewById(R.id.lens_space).setVisibility(VISIBLE);
-            findViewById(R.id.action_screenshot).setVisibility(GONE);
-            findViewById(R.id.screenshot_space).setVisibility(GONE);
-        }
-    }
-
-    @Override
-    public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
-        if (key.equals(KEY_SHOW_LENS_BUTTON)) {
-            ((Activity) getContext()).recreate();
         }
     }
 
