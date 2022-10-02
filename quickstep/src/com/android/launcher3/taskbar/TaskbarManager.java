@@ -36,6 +36,7 @@ import android.view.Display;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
@@ -44,6 +45,7 @@ import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.unfold.NonDestroyableScopedUnfoldTransitionProgressProvider;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.RecentsActivity;
@@ -82,7 +84,7 @@ public class TaskbarManager {
     // It's destruction/creation will be managed by the activity.
     private final ScopedUnfoldTransitionProgressProvider mUnfoldProgressProvider =
             new NonDestroyableScopedUnfoldTransitionProgressProvider();
-    private DisplayController.NavigationMode mNavMode;
+    private NavigationMode mNavMode;
 
     private TaskbarActivityContext mTaskbarActivityContext;
     private StatefulActivity mActivity;
@@ -277,7 +279,8 @@ public class TaskbarManager {
      * we fully want to destroy an existing taskbar and create a new one.
      * In other case (folding/unfolding) we don't need to remove and add window.
      */
-    private void recreateTaskbar() {
+    @VisibleForTesting
+    public void recreateTaskbar() {
         DeviceProfile dp = mUserUnlocked ?
                 LauncherAppState.getIDP(mContext).getDeviceProfile(mContext) : null;
 

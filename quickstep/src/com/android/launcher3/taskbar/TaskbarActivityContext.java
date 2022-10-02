@@ -80,7 +80,7 @@ import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.DisplayController;
-import com.android.launcher3.util.DisplayController.NavigationMode;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.TraceHelper;
@@ -773,6 +773,24 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.taskbarStashController.startUnstashHint(animateForward);
     }
 
+    /**
+     * Enables manual taskbar stashing. This method should only be used for tests that need to
+     * stash/unstash the taskbar.
+     */
+    @VisibleForTesting
+    public void enableManualStashingForTests(boolean enableManualStashing) {
+        mControllers.taskbarStashController.enableManualStashingForTests(enableManualStashing);
+    }
+
+    /**
+     * Unstashes the Taskbar if it is stashed. This method should only be used to unstash the
+     * taskbar at the end of a test.
+     */
+    @VisibleForTesting
+    public void unstashTaskbarIfStashed() {
+        mControllers.taskbarStashController.onLongPressToUnstashTaskbar();
+    }
+
     protected boolean isUserSetupComplete() {
         return mIsUserSetupComplete;
     }
@@ -848,6 +866,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     public void showPopupMenuForIcon(BubbleTextView btv) {
         setTaskbarWindowFullscreen(true);
         btv.post(() -> mControllers.taskbarPopupController.showForIcon(btv));
+    }
+
+    public boolean isInApp() {
+        return mControllers.taskbarStashController.isInApp();
     }
 
     protected void dumpLogs(String prefix, PrintWriter pw) {
