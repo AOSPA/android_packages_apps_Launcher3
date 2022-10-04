@@ -42,6 +42,7 @@ import static com.android.launcher3.LauncherState.NO_SCALE;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
+import static com.android.launcher3.anim.Interpolators.EMPHASIZED;
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -113,6 +114,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
 import android.widget.ImageView;
 import android.widget.Toast;
+import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.CallSuper;
 import androidx.annotation.NonNull;
@@ -194,7 +196,6 @@ import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.TouchController;
 import com.android.launcher3.util.TraceHelper;
-import com.android.launcher3.util.UiThreadHelper;
 import com.android.launcher3.util.ViewOnDrawExecutor;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.FloatingIconView;
@@ -543,6 +544,8 @@ public class Launcher extends StatefulActivity<LauncherState>
             getWindow().setSoftInputMode(LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         }
         setTitle(R.string.home_screen);
+
+        registerOnBackInvokedCallback();
     }
 
     protected LauncherOverlayManager getDefaultOverlay() {
@@ -1123,6 +1126,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                         .log(getAllAppsEntryEvent().get());
             }
         }
+        updateDisallowBack();
     }
 
     /**
@@ -1653,16 +1657,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
     }
 
-    /**
-     * Hides the keyboard if visible
-     */
-    public void hideKeyboard() {
-        final View v = getWindow().peekDecorView();
-        if (v != null && v.getWindowToken() != null) {
-            UiThreadHelper.hideKeyboardAsync(this, v.getWindowToken());
-        }
-    }
-
     @Override
     public void onRestoreInstanceState(Bundle state) {
         super.onRestoreInstanceState(state);
@@ -2069,6 +2063,17 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     protected void onStateBack() {
         mStateManager.getState().onBackPressed(this);
+    }
+
+    private void registerOnBackInvokedCallback() {
+        if (Utilities.ATLEAST_T) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    () -> {
+                        onBackPressed();
+                        TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "onBackInvoked");
+                    });
+        }
     }
 
     protected void onScreenOff() {
@@ -2789,7 +2794,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             View v = getFirstMatch(Collections.singletonList(activeRecyclerView),
                     preferredItem, packageAndUserAndApp);
 
-            if (v != null && activeRecyclerView.getCurrentScrollY() > 0) {
+            if (v != null && activeRecyclerView.computeVerticalScrollOffset() > 0) {
                 RectF locationBounds = new RectF();
                 FloatingIconView.getLocationBoundsForView(this, v, false, locationBounds,
                         new Rect());
@@ -3133,7 +3138,18 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     public void useFadeOutAnimationForLauncherStart(CancellationSignal signal) { }
 
-    public void onDragLayerHierarchyChanged() { }
+    public void onDragLayerHierarchyChanged() {
+        updateDisallowBack();
+    }
+
+    private void updateDisallowBack() {
+        LauncherRootView rv = getRootView();
+        if (rv != null) {
+            boolean disableBack = getStateManager().getState() == NORMAL
+                    && AbstractFloatingView.getTopOpenView(this) == null;
+            rv.setDisallowBackGesture(disableBack);
+        }
+    }
 
     @Override
     public void returnToHomescreen() {
@@ -3233,12 +3249,10 @@ public class Launcher extends StatefulActivity<LauncherState>
      * @param progress Transition progress from 0 to 1; where 0 => home and 1 => widgets.
      */
     public void onWidgetsTransition(float progress) {
-        if (mDeviceProfile.isTablet) {
-            float scale =
-                    Utilities.comp(Utilities.comp(mDeviceProfile.workspaceContentScale) * progress);
-            WORKSPACE_WIDGET_SCALE.set(getWorkspace(), scale);
-            HOTSEAT_WIDGET_SCALE.set(getHotseat(), scale);
-        }
+        float scale = Utilities.mapToRange(progress, 0f, 1f, 1f,
+                mDeviceProfile.bottomSheetWorkspaceScale, EMPHASIZED);
+        WORKSPACE_WIDGET_SCALE.set(getWorkspace(), scale);
+        HOTSEAT_WIDGET_SCALE.set(getHotseat(), scale);
     }
 
     private static class NonConfigInstance {

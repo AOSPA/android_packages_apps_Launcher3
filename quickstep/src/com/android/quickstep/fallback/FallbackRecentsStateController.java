@@ -78,6 +78,11 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
         }
         // While animating into recents, update the visible task data as needed
         setter.addOnFrameCallback(() -> mRecentsView.loadVisibleTaskData(FLAG_UPDATE_ALL));
+        setter.addEndListener(success -> {
+            if (!success) {
+                mRecentsView.reset();
+            }
+        });
         mRecentsView.updateEmptyMessage();
 
         setProperties(toState, config, setter);
@@ -114,8 +119,11 @@ public class FallbackRecentsStateController implements StateHandler<RecentsState
 
         RecentsState currentState = mActivity.getStateManager().getState();
         if (isSplitSelectionState(state) && !isSplitSelectionState(currentState)) {
-            setter.add(mRecentsView.createSplitSelectInitAnimation(
-                    state.getTransitionDuration(mActivity, true /* isToState */)).buildAnim());
+            int duration = state.getTransitionDuration(mActivity, true /* isToState */);
+            // TODO (b/246851887): Pass in setter as a NO_ANIM PendingAnimation instead
+            PendingAnimation pa = new PendingAnimation(duration);
+            mRecentsView.createSplitSelectInitAnimation(pa, duration);
+            setter.add(pa.buildAnim());
         }
 
         Pair<FloatProperty, FloatProperty> taskViewsFloat =

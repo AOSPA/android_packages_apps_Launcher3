@@ -42,7 +42,7 @@ import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
-import com.android.launcher3.util.MultiAdditivePropertyFactory;
+import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.views.ScrimView;
 
@@ -141,9 +141,9 @@ public class AllAppsTransitionController
 
     private ScrimView mScrimView;
 
-    private final MultiAdditivePropertyFactory<View>
-            mAppsViewTranslationYPropertyFactory = new MultiAdditivePropertyFactory<>(
-            "appsViewTranslationY", View.TRANSLATION_Y);
+    private final MultiPropertyFactory<View>
+            mAppsViewTranslationYPropertyFactory = new MultiPropertyFactory<>(
+            "appsViewTranslationY", View.TRANSLATION_Y, Float::sum);
     private MultiValueAlpha mAppsViewAlpha;
 
     private boolean mIsTablet;
@@ -227,7 +227,12 @@ public class AllAppsTransitionController
     @Override
     public void setStateWithAnimation(LauncherState toState,
             StateAnimationConfig config, PendingAnimation builder) {
-        if (NORMAL.equals(toState) && mLauncher.isInState(ALL_APPS)) {
+        if (mLauncher.isInState(ALL_APPS) && !ALL_APPS.equals(toState)) {
+            // For atomic animations, we close the keyboard immediately.
+            if (!config.userControlled && !FeatureFlags.ENABLE_KEYBOARD_TRANSITION_SYNC.get()) {
+                mLauncher.getAppsView().getSearchUiManager().getEditText().hideKeyboard();
+            }
+
             builder.addEndListener(success -> {
                 // Reset pull back progress and alpha after switching states.
                 ALL_APPS_PULL_BACK_TRANSLATION.set(this, 0f);
@@ -238,7 +243,7 @@ public class AllAppsTransitionController
                 // the keyboard open and then changes their mind and swipes back up, we want the
                 // keyboard to remain open. However an onCancel signal is sent to the listeners
                 // (success = false), so we need to check for that.
-                if (success) {
+                if (config.userControlled && success) {
                     mLauncher.getAppsView().getSearchUiManager().getEditText().hideKeyboard();
                 }
             });

@@ -36,7 +36,7 @@ import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.Interpolators.TOUCH_RESPONSE_INTERPOLATOR;
 import static com.android.launcher3.anim.Interpolators.clampToProgress;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
-import static com.android.launcher3.statehandlers.DepthController.DEPTH;
+import static com.android.launcher3.statehandlers.DepthController.STATE_DEPTH;
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_CLOSING;
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_OPENING;
 
@@ -367,7 +367,7 @@ public final class TaskViewUtils {
         });
 
         if (depthController != null) {
-            out.setFloat(depthController, DEPTH, BACKGROUND_APP.getDepth(baseActivity),
+            out.setFloat(depthController, STATE_DEPTH, BACKGROUND_APP.getDepth(baseActivity),
                     TOUCH_RESPONSE_INTERPOLATOR);
         }
     }
@@ -668,7 +668,7 @@ public final class TaskViewUtils {
         for (int i = 0; i < nonApps.length; ++i) {
             final RemoteAnimationTargetCompat targ = nonApps[i];
             final SurfaceControl leash = targ.leash;
-            if (targ.windowType == TYPE_DOCK_DIVIDER && leash != null) {
+            if (targ.windowType == TYPE_DOCK_DIVIDER && leash != null && leash.isValid()) {
                 auxiliarySurfaces.add(leash);
                 hasSurfaceToAnimate = true;
             }
@@ -681,7 +681,9 @@ public final class TaskViewUtils {
         dockFadeAnimator.addUpdateListener(valueAnimator -> {
             float progress = valueAnimator.getAnimatedFraction();
             for (SurfaceControl leash : auxiliarySurfaces) {
-                t.setAlpha(leash, shown ? progress : 1 - progress);
+                if (leash != null && leash.isValid()) {
+                    t.setAlpha(leash, shown ? progress : 1 - progress);
+                }
             }
             t.apply();
         });
@@ -702,7 +704,9 @@ public final class TaskViewUtils {
             public void onAnimationEnd(Animator animation) {
                 if (!shown) {
                     for (SurfaceControl leash : auxiliarySurfaces) {
-                        t.hide(leash);
+                        if (leash != null && leash.isValid()) {
+                            t.hide(leash);
+                        }
                     }
                     t.apply();
                 }

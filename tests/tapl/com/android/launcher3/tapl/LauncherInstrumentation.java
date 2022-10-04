@@ -68,7 +68,6 @@ import androidx.test.uiautomator.Until;
 import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.testing.shared.TestInformationRequest;
 import com.android.launcher3.testing.shared.TestProtocol;
-import com.android.systemui.shared.system.ContextUtils;
 import com.android.systemui.shared.system.QuickStepContract;
 
 import org.junit.Assert;
@@ -111,8 +110,11 @@ public final class LauncherInstrumentation {
     static final Pattern EVENT_TOUCH_UP_TIS = getTouchEventPatternTIS("ACTION_UP");
     static final Pattern EVENT_TOUCH_CANCEL_TIS = getTouchEventPatternTIS("ACTION_CANCEL");
 
-    static final Pattern EVENT_KEY_BACK_DOWN = getKeyEventPattern("ACTION_DOWN", "KEYCODE_BACK");
-    static final Pattern EVENT_KEY_BACK_UP = getKeyEventPattern("ACTION_UP", "KEYCODE_BACK");
+    private static final Pattern EVENT_KEY_BACK_DOWN =
+            getKeyEventPattern("ACTION_DOWN", "KEYCODE_BACK");
+    private static final Pattern EVENT_KEY_BACK_UP =
+            getKeyEventPattern("ACTION_UP", "KEYCODE_BACK");
+    private static final Pattern EVENT_ON_BACK_INVOKED = Pattern.compile("onBackInvoked");
 
     private final String mLauncherPackage;
     private Boolean mIsLauncher3;
@@ -264,7 +266,7 @@ public final class LauncherInstrumentation {
                 SystemClock.sleep(5000);
             } else {
                 try {
-                    final int userId = ContextUtils.getUserId(getContext());
+                    final int userId = getContext().getUserId();
                     final String launcherPidCommand = "pidof " + pi.packageName;
                     final String initialPid = mDevice.executeShellCommand(launcherPidCommand)
                             .replaceAll("\\s", "");
@@ -898,7 +900,14 @@ public final class LauncherInstrumentation {
     }
 
     /**
-     * Presses nav bar home button.
+     * Goes to home by swiping up in zero-button mode or pressing Home button.
+     * Calling it after another TAPL call is safe because all TAPL methods wait for the animations
+     * to finish.
+     * When calling it after a non-TAPL method, make sure that all animations have already
+     * completed, otherwise it may detect the current state (for example "Application" or "Home")
+     * incorrectly.
+     * The method expects either app or Launcher to be active when it's called. Other states, such
+     * as visible notification shade are not supported.
      *
      * @return the Workspace object.
      */
@@ -991,8 +1000,12 @@ public final class LauncherInstrumentation {
                 }
             }
             if (launcherVisible) {
-                expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_KEY_BACK_DOWN);
-                expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_KEY_BACK_UP);
+                if (getContext().getApplicationInfo().isOnBackInvokedCallbackEnabled()) {
+                    expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_ON_BACK_INVOKED);
+                } else {
+                    expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_KEY_BACK_DOWN);
+                    expectEvent(TestProtocol.SEQUENCE_MAIN, EVENT_KEY_BACK_UP);
+                }
             }
         }
     }
@@ -1895,8 +1908,9 @@ public final class LauncherInstrumentation {
 
     /**
      * Taps outside container to dismiss.
+     *
      * @param container container to be dismissed
-     * @param tapRight tap on the right of the container if true, or left otherwise
+     * @param tapRight  tap on the right of the container if true, or left otherwise
      */
     void touchOutsideContainer(UiObject2 container, boolean tapRight) {
         try (LauncherInstrumentation.Closable c = addContextLayer(

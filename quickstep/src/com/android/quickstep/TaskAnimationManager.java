@@ -36,12 +36,9 @@ import androidx.annotation.UiThread;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
-import com.android.quickstep.util.ActiveGestureErrorDetector;
-import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
-import com.android.systemui.shared.system.ActivityOptionsCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.system.RemoteTransitionCompat;
 import com.android.systemui.shared.system.TaskStackChangeListener;
@@ -138,8 +135,6 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                     // handling this call entirely
                     return;
                 }
-                ActiveGestureLog.INSTANCE.addLog("TaskAnimationManager.startRecentsAnimation",
-                        ActiveGestureErrorDetector.GestureEvent.START_RECENTS_ANIMATION);
                 mController = controller;
                 mTargets = targets;
                 mLastAppearedTaskTarget = mTargets.findTask(mLastGestureState.getRunningTaskId());
@@ -233,7 +228,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
             RemoteTransitionCompat transition = new RemoteTransitionCompat(mCallbacks,
                     mController != null ? mController.getController() : null,
                     mCtx.getIApplicationThread());
-            final ActivityOptions options = ActivityOptionsCompat.makeRemoteTransition(transition);
+            final ActivityOptions options = ActivityOptions.makeRemoteTransition(
+                    transition.getTransition());
             // Allowing to pause Home if Home is top activity and Recents is not Home. So when user
             // start home when recents animation is playing, the home activity can be resumed again
             // to let the transition controller collect Home activity.
