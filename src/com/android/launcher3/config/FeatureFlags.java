@@ -274,10 +274,6 @@ public final class FeatureFlags {
             "USE_SEARCH_REQUEST_TIMEOUT_OVERRIDES", false,
             "Use local overrides for search request timeout");
 
-    public static final BooleanFlag USE_APP_SEARCH_FOR_WEB = getDebugFlag(
-            "USE_APP_SEARCH_FOR_WEB", false,
-            "Use app search to request zero state web suggestions");
-
     public static final BooleanFlag CONTINUOUS_VIEW_TREE_CAPTURE = getDebugFlag(
             "CONTINUOUS_VIEW_TREE_CAPTURE", false, "Capture View tree every frame");
 
@@ -296,6 +292,14 @@ public final class FeatureFlags {
 
     public static final BooleanFlag SHOW_SEARCH_EDUCARD_QSB = new DeviceFlag(
             "SHOW_SEARCH_EDUCARD_QSB", false, "Shows Search Educard for QSB entry in OneSearch.");
+
+    public static final BooleanFlag ENABLE_IME_LATENCY_LOGGER = getDebugFlag(
+            "ENABLE_IME_LATENCY_LOGGER", false,
+            "Enable option to log the keyboard latency for both atomic and controlled keyboard "
+                    + "animations on an EditText");
+
+    public static final BooleanFlag ENABLE_WIDGET_PICKER_DEPTH = new DeviceFlag(
+            "ENABLE_WIDGET_PICKER_DEPTH", false, "Enable changing depth in widget picker.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

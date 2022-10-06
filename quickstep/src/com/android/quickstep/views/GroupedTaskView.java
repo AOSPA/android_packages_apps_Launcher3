@@ -1,5 +1,6 @@
 package com.android.quickstep.views;
 
+import static com.android.launcher3.AbstractFloatingView.getAnyView;
 import static com.android.launcher3.util.SplitConfigurationOptions.DEFAULT_SPLIT_RATIO;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
@@ -13,6 +14,7 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -162,6 +164,21 @@ public class GroupedTaskView extends TaskView {
         }
     }
 
+    @Override
+    protected boolean showTaskMenuWithContainer(IconView iconView) {
+        boolean showedTaskMenu = super.showTaskMenuWithContainer(iconView);
+        if (iconView == mIconView2 && showedTaskMenu && !mActivity.getDeviceProfile().isTablet) {
+            // Adjust the position of the secondary task's menu view (only on phones)
+            TaskMenuView taskMenuView = getAnyView(mActivity, AbstractFloatingView.TYPE_TASK_MENU);
+            DeviceProfile deviceProfile = mActivity.getDeviceProfile();
+            getRecentsView().getPagedOrientationHandler()
+                    .setSecondaryTaskMenuPosition(mSplitBoundsConfig, this,
+                            deviceProfile, mTaskIdAttributeContainer[0].getThumbnailView(),
+                            taskMenuView);
+        }
+        return showedTaskMenu;
+    }
+
     @Nullable
     @Override
     public RunnableList launchTaskAnimated() {
@@ -213,11 +230,12 @@ public class GroupedTaskView extends TaskView {
     }
 
     @Override
-    protected int getChildTaskIndexAtPosition(PointF position) {
-        if (isCoordInView(mIconView2, position) || isCoordInView(mSnapshotView2, position)) {
+    protected int getLastSelectedChildTaskIndex() {
+        if (isCoordInView(mIconView2, mLastTouchDownPosition)
+                || isCoordInView(mSnapshotView2, mLastTouchDownPosition)) {
             return 1;
         }
-        return super.getChildTaskIndexAtPosition(position);
+        return super.getLastSelectedChildTaskIndex();
     }
 
     private boolean isCoordInView(View v, PointF position) {
@@ -319,9 +337,26 @@ public class GroupedTaskView extends TaskView {
         mSnapshotView2.setSplashAlpha(mTaskThumbnailSplashAlpha);
     }
 
+    /**
+     *     Sets visibility for thumbnails and associated elements (DWB banners).
+     *     IconView is unaffected.
+     *
+     *     When setting INVISIBLE, sets the visibility for the last selected child task.
+     *     When setting VISIBLE (as a reset), sets the visibility for both tasks.
+     */
     @Override
     void setThumbnailVisibility(int visibility) {
-        super.setThumbnailVisibility(visibility);
-        mSnapshotView2.setVisibility(visibility);
+        if (visibility == VISIBLE) {
+            mSnapshotView.setVisibility(visibility);
+            mDigitalWellBeingToast.setBannerVisibility(visibility);
+            mSnapshotView2.setVisibility(visibility);
+            mDigitalWellBeingToast2.setBannerVisibility(visibility);
+        } else if (getLastSelectedChildTaskIndex() == 0) {
+            mSnapshotView.setVisibility(visibility);
+            mDigitalWellBeingToast.setBannerVisibility(visibility);
+        } else {
+            mSnapshotView2.setVisibility(visibility);
+            mDigitalWellBeingToast2.setBannerVisibility(visibility);
+        }
     }
 }

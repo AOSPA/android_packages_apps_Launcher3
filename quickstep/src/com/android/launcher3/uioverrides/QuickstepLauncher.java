@@ -17,22 +17,21 @@ package com.android.launcher3.uioverrides;
 
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
 
-import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
-import static com.android.launcher3.AbstractFloatingView.TYPE_HIDE_BACK_BUTTON;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT;
 import static com.android.launcher3.LauncherState.ALL_APPS;
-import static com.android.launcher3.LauncherState.FLAG_HIDE_BACK_BUTTON;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.NO_OFFSET;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
+import static com.android.launcher3.anim.Interpolators.EMPHASIZED;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_SPLIT_FROM_WORKSPACE;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_WIDGET_PICKER_DEPTH;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.popup.QuickstepSystemShortcut.getSplitSelectShortcutByPosition;
@@ -47,7 +46,7 @@ import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
 import static com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.launcher3.util.NavigationMode.TWO_BUTTONS;
+import static com.android.quickstep.util.BaseDepthController.WIDGET_DEPTH;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 
 import android.animation.AnimatorSet;
@@ -72,7 +71,6 @@ import android.window.SplashScreen;
 
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings.Favorites;
@@ -80,6 +78,7 @@ import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepAccessibilityDelegate;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.anim.AnimatorPlaybackController;
@@ -96,7 +95,6 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.proxy.ProxyActivityStarter;
 import com.android.launcher3.proxy.StartActivityParams;
-import com.android.launcher3.statehandlers.BackButtonAlphaHandler;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
@@ -123,9 +121,6 @@ import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.util.TouchController;
-import com.android.launcher3.util.UiThreadHelper;
-import com.android.launcher3.util.UiThreadHelper.AsyncCommand;
-import com.android.launcher3.util.ViewCapture;
 import com.android.launcher3.widget.LauncherAppWidgetHost;
 import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.RecentsModel;
@@ -139,11 +134,11 @@ import com.android.quickstep.util.RemoteAnimationProvider;
 import com.android.quickstep.util.RemoteFadeOutAnimationListener;
 import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TISBindHelper;
+import com.android.quickstep.util.ViewCapture;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
-import com.android.systemui.shared.system.ActivityOptionsCompat;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 import com.android.systemui.unfold.UnfoldTransitionFactory;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
@@ -166,17 +161,6 @@ public class QuickstepLauncher extends Launcher {
             SystemProperties.getBoolean("persist.wm.debug.enable_pip_keep_clear_algorithm", false);
 
     public static final boolean GO_LOW_RAM_RECENTS_ENABLED = false;
-    /**
-     * Reusable command for applying the shelf height on the background thread.
-     */
-    public static final AsyncCommand SET_SHELF_HEIGHT = (context, arg1, arg2) ->
-            SystemUiProxy.INSTANCE.get(context).setShelfHeight(arg1 != 0, arg2);
-    /**
-     * Reusable command for applying the back button alpha on the background thread.
-     */
-    public static final AsyncCommand SET_BACK_BUTTON_ALPHA =
-            (context, arg1, arg2) -> SystemUiProxy.INSTANCE.get(context).setNavBarButtonAlpha(
-                    Float.intBitsToFloat(arg1), arg2 != 0);
 
     private FixedContainerItems mAllAppsPredictions;
     private HotseatPredictionController mHotseatPredictionController;
@@ -207,7 +191,7 @@ public class QuickstepLauncher extends Launcher {
         RecentsView overviewPanel = (RecentsView) getOverviewPanel();
         SplitSelectStateController controller =
                 new SplitSelectStateController(this, mHandler, getStateManager(),
-                        getDepthController());
+                        getDepthController(), getStatsLogManager());
         overviewPanel.init(mActionsView, controller);
         mActionsView.updateDimension(getDeviceProfile(), overviewPanel.getLastComputedTaskSize());
         mActionsView.updateVerticalMargin(DisplayController.getNavigationMode(this));
@@ -299,11 +283,6 @@ public class QuickstepLauncher extends Launcher {
 
     @Override
     protected void onActivityFlagsChanged(int changeBits) {
-        if ((changeBits
-                & (ACTIVITY_STATE_WINDOW_FOCUSED | ACTIVITY_STATE_TRANSITION_ACTIVE)) != 0) {
-            onLauncherStateOrFocusChanged();
-        }
-
         if ((changeBits & ACTIVITY_STATE_STARTED) != 0) {
             mDepthController.setActivityStarted(isStarted());
         }
@@ -366,8 +345,7 @@ public class QuickstepLauncher extends Launcher {
                 boolean visible = (state == NORMAL || state == OVERVIEW)
                         && (willUserBeActive || isUserActive())
                         && !profile.isVerticalBarLayout();
-                UiThreadHelper.runAsyncCommand(this, SET_SHELF_HEIGHT, visible ? 1 : 0,
-                        profile.hotseatBarSizePx);
+                SystemUiProxy.INSTANCE.get(this).setShelfHeight(visible, profile.hotseatBarSizePx);
             }
         }
         if (state == NORMAL && !inTransition) {
@@ -608,6 +586,13 @@ public class QuickstepLauncher extends Launcher {
     public void onWidgetsTransition(float progress) {
         super.onWidgetsTransition(progress);
         onTaskbarInAppDisplayProgressUpdate(progress, WIDGETS_PAGE_PROGRESS_INDEX);
+        // Change of wallpaper depth in widget picker is disabled for tests as it causes flakiness
+        // on very slow cuttlefish devices.
+        if (ENABLE_WIDGET_PICKER_DEPTH.get() && !Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+            WIDGET_DEPTH.set(getDepthController(),
+                    Utilities.mapToRange(progress, 0f, 1f, 0f, getDeviceProfile().bottomSheetDepth,
+                            EMPHASIZED));
+        }
     }
 
     private void onTaskbarInAppDisplayProgressUpdate(float progress, int flag) {
@@ -729,7 +714,6 @@ public class QuickstepLauncher extends Launcher {
         super.collectStateHandlers(out);
         out.add(getDepthController());
         out.add(new RecentsViewStateController(this));
-        out.add(new BackButtonAlphaHandler(this));
     }
 
     public DepthController getDepthController() {
@@ -788,39 +772,6 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
-    public void onDragLayerHierarchyChanged() {
-        onLauncherStateOrFocusChanged();
-    }
-
-    public boolean shouldBackButtonBeHidden(LauncherState toState) {
-        NavigationMode mode = DisplayController.getNavigationMode(this);
-        boolean shouldBackButtonBeHidden = mode.hasGestures
-                && toState.hasFlag(FLAG_HIDE_BACK_BUTTON)
-                && hasWindowFocus()
-                && (getActivityFlags() & ACTIVITY_STATE_TRANSITION_ACTIVE) == 0;
-        if (shouldBackButtonBeHidden) {
-            // Show the back button if there is a floating view visible.
-            shouldBackButtonBeHidden = AbstractFloatingView.getTopOpenViewWithType(this,
-                    TYPE_ALL & ~TYPE_HIDE_BACK_BUTTON) == null;
-        }
-        return shouldBackButtonBeHidden;
-    }
-
-    /**
-     * Sets the back button visibility based on the current state/window focus.
-     */
-    private void onLauncherStateOrFocusChanged() {
-        boolean shouldBackButtonBeHidden = shouldBackButtonBeHidden(getStateManager().getState());
-        if (DisplayController.getNavigationMode(this) == TWO_BUTTONS) {
-            UiThreadHelper.setBackButtonAlphaAsync(this, SET_BACK_BUTTON_ALPHA,
-                    shouldBackButtonBeHidden ? 0f : 1f, true /* animate */);
-        }
-        if (getDragLayer() != null) {
-            getRootView().setDisallowBackGesture(shouldBackButtonBeHidden);
-        }
-    }
-
-    @Override
     public void finishBindingItems(IntSet pagesBoundFirst) {
         super.finishBindingItems(pagesBoundFirst);
         // Instantiate and initialize WellbeingModel now that its loading won't interfere with
@@ -850,8 +801,8 @@ public class QuickstepLauncher extends Launcher {
                         ? mAppTransitionManager.getActivityLaunchOptions(v)
                         : super.getActivityLaunchOptions(v, item);
         if (mLastTouchUpTime > 0) {
-            ActivityOptionsCompat.setLauncherSourceInfo(
-                    activityOptions.options, mLastTouchUpTime);
+            activityOptions.options.setSourceInfo(ActivityOptions.SourceInfo.TYPE_LAUNCHER,
+                    mLastTouchUpTime);
         }
         activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
         activityOptions.options.setLaunchDisplayId(
@@ -949,8 +900,8 @@ public class QuickstepLauncher extends Launcher {
             outState.putIBinder(PENDING_SPLIT_SELECT_INFO, ObjectWrapper.wrap(
                     new PendingSplitSelectInfo(
                             splitSelectStateController.getInitialTaskId(),
-                            splitSelectStateController.getActiveSplitStagePosition()
-                    )
+                            splitSelectStateController.getActiveSplitStagePosition(),
+                            splitSelectStateController.getSplitEvent())
             ));
             outState.putInt(RUNTIME_STATE, OVERVIEW.ordinal);
         }
