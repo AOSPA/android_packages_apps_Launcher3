@@ -58,6 +58,8 @@ import com.android.systemui.shared.system.smartspace.ILauncherUnlockAnimationCon
 import com.android.systemui.shared.system.smartspace.ISysuiUnlockAnimationController;
 import com.android.systemui.shared.system.smartspace.SmartspaceState;
 import com.android.wm.shell.back.IBackAnimation;
+import com.android.wm.shell.desktopmode.IDesktopMode;
+import com.android.wm.shell.floating.IFloatingTasks;
 import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.pip.IPip;
 import com.android.wm.shell.pip.IPipAnimationListener;
@@ -88,11 +90,13 @@ public class SystemUiProxy implements ISystemUiProxy {
     private IPip mPip;
     private ISysuiUnlockAnimationController mSysuiUnlockAnimationController;
     private ISplitScreen mSplitScreen;
+    private IFloatingTasks mFloatingTasks;
     private IOneHanded mOneHanded;
     private IShellTransitions mShellTransitions;
     private IStartingWindow mStartingWindow;
     private IRecentTasks mRecentTasks;
     private IBackAnimation mBackAnimation;
+    private IDesktopMode mDesktopMode;
     private final DeathRecipient mSystemUiProxyDeathRecipient = () -> {
         MAIN_EXECUTOR.execute(() -> clearProxy());
     };
@@ -165,20 +169,22 @@ public class SystemUiProxy implements ISystemUiProxy {
     }
 
     public void setProxy(ISystemUiProxy proxy, IPip pip, ISplitScreen splitScreen,
-            IOneHanded oneHanded, IShellTransitions shellTransitions,
+            IFloatingTasks floatingTasks, IOneHanded oneHanded, IShellTransitions shellTransitions,
             IStartingWindow startingWindow, IRecentTasks recentTasks,
             ISysuiUnlockAnimationController sysuiUnlockAnimationController,
-            IBackAnimation backAnimation) {
+            IBackAnimation backAnimation, IDesktopMode desktopMode) {
         unlinkToDeath();
         mSystemUiProxy = proxy;
         mPip = pip;
         mSplitScreen = splitScreen;
+        mFloatingTasks = floatingTasks;
         mOneHanded = oneHanded;
         mShellTransitions = shellTransitions;
         mStartingWindow = startingWindow;
         mSysuiUnlockAnimationController = sysuiUnlockAnimationController;
         mRecentTasks = recentTasks;
         mBackAnimation = backAnimation;
+        mDesktopMode = desktopMode;
         linkToDeath();
         // re-attach the listeners once missing due to setProxy has not been initialized yet.
         if (mPipAnimationListener != null && mPip != null) {
@@ -206,7 +212,7 @@ public class SystemUiProxy implements ISystemUiProxy {
     }
 
     public void clearProxy() {
-        setProxy(null, null, null, null, null, null, null, null, null);
+        setProxy(null, null, null, null, null, null, null, null, null, null, null);
     }
 
     // TODO(141886704): Find a way to remove this
@@ -665,6 +671,20 @@ public class SystemUiProxy implements ISystemUiProxy {
     }
 
     //
+    // Floating tasks
+    //
+
+    public void showFloatingTask(Intent intent) {
+        if (mFloatingTasks != null) {
+            try {
+                mFloatingTasks.showTask(intent);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Launcher: Failed call showFloatingTask", e);
+            }
+        }
+    }
+
+    //
     // One handed
     //
 
@@ -936,5 +956,20 @@ public class SystemUiProxy implements ISystemUiProxy {
         }
 
         return false;
+    }
+
+    //
+    // Desktop Mode
+    //
+
+    /** Call shell to show all apps active on the desktop */
+    public void showDesktopApps() {
+        if (mDesktopMode != null) {
+            try {
+                mDesktopMode.showDesktopApps();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call showDesktopApps", e);
+            }
+        }
     }
 }

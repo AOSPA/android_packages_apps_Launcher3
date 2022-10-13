@@ -88,6 +88,7 @@ import com.android.launcher3.util.ViewPool.Reusable;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.RemoteAnimationTargets;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
+import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskIconCache;
 import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskThumbnailCache;
@@ -95,6 +96,7 @@ import com.android.quickstep.TaskUtils;
 import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.util.CancellableTask;
 import com.android.quickstep.util.RecentsOrientedState;
+import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TaskCornerRadius;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.views.TaskThumbnailView.PreviewPositionHelper;
@@ -561,6 +563,18 @@ public class TaskView extends FrameLayout implements Reusable {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
+        RecentsView recentsView = getRecentsView();
+        if (recentsView == null || mTask == null) {
+            return false;
+        }
+        SplitSelectStateController splitSelectStateController =
+                recentsView.getSplitSelectController();
+        if (splitSelectStateController.isSplitSelectActive() &&
+                splitSelectStateController.getInitialTaskId() == mTask.key.id) {
+            // Prevent taps on the this taskview if it's being animated into split select state
+            return false;
+        }
+
         if (ev.getAction() == MotionEvent.ACTION_DOWN) {
             mLastTouchDownPosition.set(ev.getX(), ev.getY());
         }
@@ -695,6 +709,11 @@ public class TaskView extends FrameLayout implements Reusable {
         RecentsView recentsView = getRecentsView();
         RemoteTargetHandle[] remoteTargetHandles = recentsView.mRemoteTargetHandles;
         RunnableList runnableList = new RunnableList();
+        if (mTask != null && mTask.desktopTile) {
+            // clicked on desktop
+            SystemUiProxy.INSTANCE.get(getContext()).showDesktopApps();
+            return runnableList;
+        }
         if (ENABLE_QUICKSTEP_LIVE_TILE.get() && isRunningTask() && remoteTargetHandles != null) {
             if (!mIsClickableAsLiveTile) {
                 return runnableList;
@@ -1242,7 +1261,7 @@ public class TaskView extends FrameLayout implements Reusable {
                 DISMISS_TRANSLATION_X, DISMISS_TRANSLATION_Y);
     }
 
-    public FloatProperty<TaskView> getSecondaryDissmissTranslationProperty() {
+    public FloatProperty<TaskView> getSecondaryDismissTranslationProperty() {
         return getPagedOrientationHandler().getSecondaryValue(
                 DISMISS_TRANSLATION_X, DISMISS_TRANSLATION_Y);
     }

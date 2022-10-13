@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.launcher3.views;
+
+package com.android.launcher3.taskbar;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -26,25 +27,25 @@ import com.android.launcher3.R;
 import com.android.launcher3.icons.FastBitmapDrawable;
 
 /**
- * Button in Taskbar that opens All Apps.
+ * Button in Taskbar that opens something in a floating task.
  */
-public class AllAppsButton extends BubbleTextView {
+public class LaunchFloatingTaskButton extends BubbleTextView {
 
-    public AllAppsButton(Context context) {
+    public LaunchFloatingTaskButton(Context context) {
         this(context, null);
     }
 
-    public AllAppsButton(Context context, AttributeSet attrs) {
+    public LaunchFloatingTaskButton(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public AllAppsButton(Context context, AttributeSet attrs, int defStyle) {
+    public LaunchFloatingTaskButton(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
 
         Context theme = new ContextThemeWrapper(context, R.style.AllAppsButtonTheme);
         Bitmap bitmap = LauncherAppState.getInstance(context).getIconCache().getIconFactory()
-                .createScaledBitmapWithShadow(theme.getDrawable(R.drawable.ic_all_apps_button));
+                .createScaledBitmapWithShadow(
+                        theme.getDrawable(R.drawable.ic_floating_task_button));
         setIcon(new FastBitmapDrawable(bitmap));
-        setContentDescription(context.getString(R.string.all_apps_button_label));
     }
 }
