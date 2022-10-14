@@ -23,7 +23,7 @@ import static androidx.recyclerview.widget.RecyclerView.NO_POSITION;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.AnimatorListeners.forSuccessCallback;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_7;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.launcher3.anim.Interpolators.INSTANT;
 import static com.android.launcher3.anim.Interpolators.clampToProgress;
 
 import android.animation.ObjectAnimator;
@@ -35,15 +35,16 @@ import android.view.animation.Interpolator;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.R;
 
 /** Coordinates the transition between Search and A-Z in All Apps. */
 public class SearchTransitionController {
 
     // Interpolator when the user taps the QSB while already in All Apps.
-    private static final Interpolator DEFAULT_INTERPOLATOR_WITHIN_ALL_APPS = DEACCEL_1_7;
+    private static final Interpolator INTERPOLATOR_WITHIN_ALL_APPS = DEACCEL_1_7;
     // Interpolator when the user taps the QSB from home screen, so transition to all apps is
     // happening simultaneously.
-    private static final Interpolator DEFAULT_INTERPOLATOR_TRANSITIONING_TO_ALL_APPS = LINEAR;
+    private static final Interpolator INTERPOLATOR_TRANSITIONING_TO_ALL_APPS = INSTANT;
 
     /**
      * These values represent points on the [0, 1] animation progress spectrum. They are used to
@@ -103,9 +104,11 @@ public class SearchTransitionController {
         boolean inAllApps = Launcher.getLauncher(
                 mAllAppsContainerView.getContext()).getStateManager().isInStableState(
                 LauncherState.ALL_APPS);
+        if (!inAllApps) {
+            duration = 0;  // Don't want to animate when coming from QSB.
+        }
         mSearchToAzAnimator.setDuration(duration).setInterpolator(
-                inAllApps ? DEFAULT_INTERPOLATOR_WITHIN_ALL_APPS
-                        : DEFAULT_INTERPOLATOR_TRANSITIONING_TO_ALL_APPS);
+                inAllApps ? INTERPOLATOR_WITHIN_ALL_APPS : INTERPOLATOR_TRANSITIONING_TO_ALL_APPS);
         mSearchToAzAnimator.addListener(forEndCallback(() -> mSearchToAzAnimator = null));
         if (!goingToSearch) {
             mSearchToAzAnimator.addListener(forSuccessCallback(() -> {
@@ -144,8 +147,11 @@ public class SearchTransitionController {
             headerView.setAlpha(clampToProgress(searchToAzProgress, 0.8f, 1f));
 
             // Account for the additional padding added for the tabs.
-            appsTranslationY -=
-                    headerView.getPaddingTop() - headerView.getTabsAdditionalPaddingBottom();
+            appsTranslationY +=
+                    headerView.getTabsAdditionalPaddingBottom()
+                            + mAllAppsContainerView.getResources().getDimensionPixelOffset(
+                                    R.dimen.all_apps_tabs_margin_top)
+                            - headerView.getPaddingTop();
         }
 
         View appsContainer = mAllAppsContainerView.getAppsRecyclerViewContainer();
