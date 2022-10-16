@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "aa1adc10_a324e8a6",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000469
+      },
+      "writtenOn": "2022-10-16T07:19:05Z",
+      "side": 1,
+      "message": "Broke unlock animation (icons and stuff)",
+      "revId": "eb4ae995daf6ad2dd07b9751152c29783f19d1e5",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
