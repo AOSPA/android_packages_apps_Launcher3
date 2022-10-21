@@ -43,6 +43,7 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.CellLayout.ContainerType;
 import com.android.launcher3.DevicePaddings.DevicePadding;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.launcher3.model.data.ItemInfo;
@@ -1271,12 +1272,17 @@ public class DeviceProfile {
      * Returns the number of pixels required below OverviewActions excluding insets.
      */
     public int getOverviewActionsClaimedSpaceBelow() {
-        if (isTaskbarPresent && !isGestureMode) {
+        if (isTaskbarPresent && !isGestureMode
+                // If taskbar is in overview, overview action has dedicated space above nav buttons
+                && !FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()) {
             // Align vertically to where nav buttons are.
             return ((taskbarSize - overviewActionsHeight) / 2) + getTaskbarOffsetY();
         }
 
-        return isTaskbarPresent ? stashedTaskbarSize : mInsets.bottom;
+        if (isTaskbarPresent) {
+            return FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get() ? taskbarSize : stashedTaskbarSize;
+        }
+        return mInsets.bottom;
     }
 
     /** Gets the space that the overview actions will take, including bottom margin. */

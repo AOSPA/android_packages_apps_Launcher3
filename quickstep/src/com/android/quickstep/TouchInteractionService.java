@@ -20,25 +20,24 @@ import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
 
 import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER_FOCUS;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_DOWN;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_UP;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_RECENT_TASKS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_BACK_ANIMATION;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_DESKTOP_MODE;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_FLOATING_TASKS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_ONE_HANDED;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_PIP;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SPLIT_SCREEN;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_STARTING_WINDOW;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_BACK_ANIMATION;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_DESKTOP_MODE;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_FLOATING_TASKS;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_ONE_HANDED;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_PIP;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_RECENT_TASKS;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_SPLIT_SCREEN;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_STARTING_WINDOW;
 
 import android.annotation.TargetApi;
 import android.app.PendingIntent;
@@ -183,7 +182,7 @@ public class TouchInteractionService extends Service
                     ISysuiUnlockAnimationController.Stub.asInterface(
                             bundle.getBinder(KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER));
             IRecentTasks recentTasks = IRecentTasks.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_RECENT_TASKS));
+                    bundle.getBinder(KEY_EXTRA_SHELL_RECENT_TASKS));
             IBackAnimation backAnimation = IBackAnimation.Stub.asInterface(
                     bundle.getBinder(KEY_EXTRA_SHELL_BACK_ANIMATION));
             IDesktopMode desktopMode = IDesktopMode.Stub.asInterface(
@@ -955,8 +954,7 @@ public class TouchInteractionService extends Service
         boolean launcherResumedThroughShellTransition =
                 gestureState.getActivityInterface().isResumed()
                         && !previousGestureState.isRecentsAnimationRunning();
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get()
-                && gestureState.getActivityInterface().isInLiveTileMode()) {
+        if (gestureState.getActivityInterface().isInLiveTileMode()) {
             return createOverviewInputConsumer(
                     previousGestureState,
                     gestureState,
@@ -1044,8 +1042,7 @@ public class TouchInteractionService extends Service
                 previousGestureState.isRunningAnimationToLauncher();
         boolean forcingOverviewInputConsumer =
                 ASSISTANT_GIVES_LAUNCHER_FOCUS.get() && forceOverviewInputConsumer;
-        boolean isInLiveTileMode = ENABLE_QUICKSTEP_LIVE_TILE.get()
-                && gestureState.getActivityInterface().isInLiveTileMode();
+        boolean isInLiveTileMode = gestureState.getActivityInterface().isInLiveTileMode();
         reasonString.append(SUBSTRING_PREFIX)
                 .append(hasWindowFocus
                         ? "activity has window focus"

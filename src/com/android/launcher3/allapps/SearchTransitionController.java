@@ -20,6 +20,7 @@ import static android.view.View.VISIBLE;
 
 import static androidx.recyclerview.widget.RecyclerView.NO_POSITION;
 
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.AnimatorListeners.forSuccessCallback;
 import static com.android.launcher3.anim.Interpolators.DEACCEL_1_7;
@@ -29,6 +30,7 @@ import static com.android.launcher3.anim.Interpolators.clampToProgress;
 import android.animation.ObjectAnimator;
 import android.graphics.drawable.Drawable;
 import android.util.FloatProperty;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.Interpolator;
 
@@ -36,9 +38,13 @@ import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
+import com.android.launcher3.model.data.ItemInfo;
 
 /** Coordinates the transition between Search and A-Z in All Apps. */
 public class SearchTransitionController {
+
+    private static final String LOG_TAG = "SearchTransitionCtrl";
 
     // Interpolator when the user taps the QSB while already in All Apps.
     private static final Interpolator INTERPOLATOR_WITHIN_ALL_APPS = DEACCEL_1_7;
@@ -120,6 +126,7 @@ public class SearchTransitionController {
         mSearchToAzAnimator.addListener(forSuccessCallback(onEndRunnable));
 
         mAllAppsContainerView.getFloatingHeaderView().setFloatingRowsCollapsed(true);
+        mAllAppsContainerView.getFloatingHeaderView().setVisibility(VISIBLE);
         mAllAppsContainerView.getAppsRecyclerViewContainer().setVisibility(VISIBLE);
         getSearchRecyclerView().setVisibility(VISIBLE);
         getSearchRecyclerView().setChildAttachedConsumer(this::onSearchChildAttached);
@@ -171,6 +178,7 @@ public class SearchTransitionController {
         int appRowHeight = 0;
         Integer top = null;
         SearchRecyclerView searchRecyclerView = getSearchRecyclerView();
+
         for (int i = 0; i < searchRecyclerView.getChildCount(); i++) {
             View searchResultView = searchRecyclerView.getChildAt(i);
             if (searchResultView == null) {
@@ -181,7 +189,9 @@ public class SearchTransitionController {
                 top = searchResultView.getTop();
             }
 
-            if (searchResultView instanceof BubbleTextView) {
+            if (searchResultView instanceof BubbleTextView
+                    && searchResultView.getTag() instanceof ItemInfo
+                    && ((ItemInfo) searchResultView.getTag()).itemType == ITEM_TYPE_APPLICATION) {
                 // The first app icon will set appRowHeight, which will also contribute to
                 // totalHeight. Additional app icons should remove the appRowHeight to remain in
                 // the same row as the first app.
@@ -191,6 +201,8 @@ public class SearchTransitionController {
                     totalHeight += appRowHeight;
                 }
                 // Don't scale/fade app row.
+                searchResultView.setScaleY(1);
+                searchResultView.setAlpha(1);
                 continue;
             }
 
@@ -226,13 +238,41 @@ public class SearchTransitionController {
             float scaleY = 1 - mSearchToAzProgress;
             int scaledHeight = (int) (searchResultView.getHeight() * scaleY);
             searchResultView.setScaleY(scaleY);
-            searchResultView.setY(top + totalHeight);
 
-            numSearchResultsAnimated++;
-            totalHeight += scaledHeight;
+            // For rows with multiple elements, only count the height once and translate elements to
+            // the same y position.
+            int y = top + totalHeight;
+            int spanIndex = getSpanIndex(searchRecyclerView, adapterPosition);
+            if (spanIndex > 0) {
+                // Continuation of an existing row; move this item into the row.
+                y -= scaledHeight;
+            } else {
+                // Start of a new row contributes to total height and animation stagger.
+                numSearchResultsAnimated++;
+                totalHeight += scaledHeight;
+            }
+            searchResultView.setY(y);
         }
 
         return totalHeight - appRowHeight;
+    }
+
+    /** @return the column that the view at this position is found (0 assumed if indeterminate). */
+    private int getSpanIndex(SearchRecyclerView searchRecyclerView, int adapterPosition) {
+        if (adapterPosition == NO_POSITION) {
+            Log.w(LOG_TAG, "Can't determine span index - child not found in adapter");
+            return 0;
+        }
+        if (!(searchRecyclerView.getAdapter() instanceof AllAppsGridAdapter<?>)) {
+            Log.e(LOG_TAG, "Search RV doesn't have an AllAppsGridAdapter?");
+            // This case shouldn't happen, but for debug devices we will continue to create a more
+            // visible crash.
+            if (!Utilities.IS_DEBUG_DEVICE) {
+                return 0;
+            }
+        }
+        AllAppsGridAdapter<?> adapter = (AllAppsGridAdapter<?>) searchRecyclerView.getAdapter();
+        return adapter.getSpanIndex(adapterPosition);
     }
 
     /** Called just before a child is attached to the SearchRecyclerView. */

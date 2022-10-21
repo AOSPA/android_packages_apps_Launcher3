@@ -15,7 +15,6 @@
  */
 package com.android.quickstep;
 
-import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
@@ -35,7 +34,6 @@ import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncest
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.Interpolators.TOUCH_RESPONSE_INTERPOLATOR;
 import static com.android.launcher3.anim.Interpolators.clampToProgress;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.statehandlers.DepthController.STATE_DEPTH;
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_CLOSING;
 import static com.android.systemui.shared.system.RemoteAnimationTargetCompat.MODE_OPENING;
@@ -304,9 +302,15 @@ public final class TaskViewUtils {
             // to follow the TaskViewSimulator. So the final matrix applied on the thumbnailView is:
             //    Mt K(0)` K(t) Mt`
             TaskThumbnailView[] thumbnails = v.getThumbnails();
-            Matrix[] mt = new Matrix[simulatorCopies.length];
-            Matrix[] mti = new Matrix[simulatorCopies.length];
-            for (int i = 0; i < thumbnails.length; i++) {
+
+            // In case simulator copies and thumbnail size do no match, ensure we get the lesser.
+            // This ensures we do not create arrays with empty elements or attempt to references
+            // indexes out of array bounds.
+            final int matrixSize = Math.min(simulatorCopies.length, thumbnails.length);
+
+            Matrix[] mt = new Matrix[matrixSize];
+            Matrix[] mti = new Matrix[matrixSize];
+            for (int i = 0; i < matrixSize; i++) {
                 TaskThumbnailView ttv = thumbnails[i];
                 RectF localBounds = new RectF(0, 0,  ttv.getWidth(), ttv.getHeight());
                 float[] tvBoundsMapped = new float[]{0, 0,  ttv.getWidth(), ttv.getHeight()};
@@ -323,14 +327,14 @@ public final class TaskViewUtils {
                 mti[i] = localMti;
             }
 
-            Matrix[] k0i = new Matrix[simulatorCopies.length];
-            for (int i = 0; i < simulatorCopies.length; i++) {
+            Matrix[] k0i = new Matrix[matrixSize];
+            for (int i = 0; i < matrixSize; i++) {
                 k0i[i] = new Matrix();
                 simulatorCopies[i].getTaskViewSimulator().getCurrentMatrix().invert(k0i[i]);
             }
             Matrix animationMatrix = new Matrix();
             out.addOnFrameCallback(() -> {
-                for (int i = 0; i < simulatorCopies.length; i++) {
+                for (int i = 0; i < matrixSize; i++) {
                     animationMatrix.set(mt[i]);
                     animationMatrix.postConcat(k0i[i]);
                     animationMatrix.postConcat(simulatorCopies[i]
@@ -426,8 +430,10 @@ public final class TaskViewUtils {
         TransitionInfo.Change splitRoot2 = null;
         for (int i = 0; i < transitionInfo.getChanges().size(); ++i) {
             final TransitionInfo.Change change = transitionInfo.getChanges().get(i);
-            final int taskId = change.getTaskInfo() != null ? change.getTaskInfo().taskId : -1;
+            if (change.getTaskInfo() == null) continue;
+            final int taskId = change.getTaskInfo().taskId;
             final int mode = change.getMode();
+
             // Find the target tasks' root tasks since those are the split stages that need to
             // be animated (the tasks themselves are children and thus inherit animation).
             if (taskId == initialTaskId || taskId == secondTaskId) {
@@ -440,7 +446,7 @@ public final class TaskViewUtils {
                             + "root of " + taskId + " is already visible or has broken hierarchy.");
                 }
             }
-            if (taskId == initialTaskId && initialTaskId != INVALID_TASK_ID) {
+            if (taskId == initialTaskId) {
                 splitRoot1 = transitionInfo.getChange(change.getParent());
             }
             if (taskId == secondTaskId) {
@@ -637,7 +643,7 @@ public final class TaskViewUtils {
             };
         }
         pa.add(launcherAnim);
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get() && recentsView.getRunningTaskIndex() != -1) {
+        if (recentsView.getRunningTaskIndex() != -1) {
             pa.addOnFrameCallback(recentsView::redrawLiveTile);
         }
         anim.play(pa.buildAnim());

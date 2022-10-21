@@ -532,9 +532,11 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (isSearching()) {
             getSearchRecyclerView().setVisibility(VISIBLE);
             getAppsRecyclerViewContainer().setVisibility(GONE);
+            mHeader.setVisibility(GONE);
         } else {
             getSearchRecyclerView().setVisibility(GONE);
             getAppsRecyclerViewContainer().setVisibility(VISIBLE);
+            mHeader.setVisibility(VISIBLE);
         }
         if (mHeader.isSetUp()) {
             mHeader.setActiveRV(getCurrentPage());
@@ -795,6 +797,17 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
      */
     public View getVisibleContainerView() {
         return mActivityContext.getDeviceProfile().isTablet ? mBottomSheetBackground : this;
+    }
+
+    /**
+     * Sets whether the view or its children should react to the window inset.
+     * Used for when exiting all apps -> workspace and determines if window inset
+     * should be applied.. ex) the work mode switch.
+     */
+    public void setApplyWindowInset(boolean shouldApplyWindowInset) {
+        if (mWorkManager.getWorkModeSwitch() != null) {
+            mWorkManager.getWorkModeSwitch().setApplyWindowInset(shouldApplyWindowInset);
+        }
     }
 
     /** Holds a {@link BaseAllAppsAdapter} and related fields. */

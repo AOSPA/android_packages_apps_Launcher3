@@ -50,6 +50,7 @@ import android.widget.LinearLayout;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
@@ -524,7 +525,9 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
         out.setRotation(getDegreesRotated());
         int distanceToEdge;
         if ((DisplayController.getNavigationMode(out.getContext()) == THREE_BUTTONS)
-                && (dp.isTwoPanels || dp.isTablet)) {
+                && (dp.isTwoPanels || dp.isTablet)
+                // If taskbar is in overview, overview action has dedicated space above nav buttons
+                && !FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()) {
             // If 3-button nav is active, align the splitInstructionsView with it.
             distanceToEdge = dp.getTaskbarOffsetY()
                     + ((dp.taskbarSize - splitInstructionsHeight) / 2);
@@ -561,8 +564,12 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
         int insetCorrectionX = (dp.getInsets().right - dp.getInsets().left) / 2;
         // Adjust for any insets on the bottom edge
         int insetCorrectionY = dp.getInsets().bottom;
+        // Adjust for taskbar in overview
+        int taskbarCorrectionY =
+                dp.isTaskbarPresent && FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()
+                        ? dp.taskbarSize : 0;
         out.setTranslationX(insetCorrectionX + threeButtonNavShift);
-        out.setTranslationY(-distanceToEdge + insetCorrectionY);
+        out.setTranslationY(-distanceToEdge + insetCorrectionY - taskbarCorrectionY);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) out.getLayoutParams();
         lp.gravity = CENTER_HORIZONTAL | BOTTOM;
         out.setLayoutParams(lp);
@@ -630,9 +637,9 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
             DeviceProfile dp, boolean isRtl) {
         int spaceAboveSnapshot = dp.overviewTaskThumbnailTopMarginPx;
         int totalThumbnailHeight = parentHeight - spaceAboveSnapshot;
-        int dividerBar = splitBoundsConfig.appsStackedVertically
-                ? (int) (splitBoundsConfig.dividerHeightPercent * parentHeight)
-                : (int) (splitBoundsConfig.dividerWidthPercent * parentWidth);
+        int dividerBar = Math.round(splitBoundsConfig.appsStackedVertically
+                ? splitBoundsConfig.dividerHeightPercent * totalThumbnailHeight
+                : splitBoundsConfig.dividerWidthPercent * totalThumbnailHeight);
         int primarySnapshotHeight;
         int primarySnapshotWidth;
         int secondarySnapshotHeight;
@@ -662,6 +669,16 @@ public class PortraitPagedViewHandler implements PagedOrientationHandler {
             secondarySnapshotHeight = totalThumbnailHeight - primarySnapshotHeight - dividerBar;
             int translationY = primarySnapshotHeight + spaceAboveSnapshot + dividerBar;
             secondarySnapshot.setTranslationY(translationY);
+
+            FrameLayout.LayoutParams primaryParams =
+                    (FrameLayout.LayoutParams) primarySnapshot.getLayoutParams();
+            FrameLayout.LayoutParams secondaryParams =
+                    (FrameLayout.LayoutParams) secondarySnapshot.getLayoutParams();
+            secondaryParams.topMargin = 0;
+            primaryParams.topMargin = spaceAboveSnapshot;
+
+            // Reset unused translations
+            primarySnapshot.setTranslationY(0);
             secondarySnapshot.setTranslationX(0);
             primarySnapshot.setTranslationX(0);
         }
