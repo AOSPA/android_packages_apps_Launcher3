@@ -37,7 +37,8 @@ public final class FeatureFlags {
 
     public static final String FLAGS_PREF_NAME = "featureFlags";
 
-    private FeatureFlags() { }
+    private FeatureFlags() {
+    }
 
     public static boolean showFlagTogglerUi(Context context) {
         return Utilities.IS_DEBUG_DEVICE && Utilities.isDevelopersOptionsEnabled(context);
@@ -61,7 +62,7 @@ public final class FeatureFlags {
      * To add a new flag that can be toggled through the flags UI:
      *
      * Declare a new ToggleableFlag below. Give it a unique key (e.g. "QSB_ON_FIRST_SCREEN"),
-     *    and set a default value for the flag. This will be the default value on Debug builds.
+     * and set a default value for the flag. This will be the default value on Debug builds.
      */
     public static final BooleanFlag ENABLE_INPUT_CONSUMER_REASON_LOGGING = getDebugFlag(
             "ENABLE_INPUT_CONSUMER_REASON_LOGGING",
@@ -84,15 +85,16 @@ public final class FeatureFlags {
     public static final BooleanFlag KEYGUARD_ANIMATION = getDebugFlag(
             "KEYGUARD_ANIMATION", false, "Enable animation for keyguard going away on wallpaper");
 
-    public static final BooleanFlag ENABLE_QUICKSTEP_LIVE_TILE = getDebugFlag(
-            "ENABLE_QUICKSTEP_LIVE_TILE", true, "Enable live tile in Quickstep overview");
-
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = new DeviceFlag(
             "ENABLE_DEVICE_SEARCH", true, "Allows on device search in all apps");
 
     public static final BooleanFlag ENABLE_FLOATING_SEARCH_BAR =
             getDebugFlag("ENABLE_FLOATING_SEARCH_BAR", false,
                     "Keep All Apps search bar at the bottom (but above keyboard if open)");
+
+    public static final BooleanFlag ENABLE_QUICK_LAUNCH_V2 = new DeviceFlag(
+            "ENABLE_QUICK_LAUNCH_V2", false, "Use quick launch v2 "
+            + "behavior. Quick search and quick launch v1 would be unavailable if this is enabled");
 
     public static final BooleanFlag ENABLE_HIDE_HEADER = new DeviceFlag("ENABLE_HIDE_HEADER",
             true, "Hide header on keyboard before typing in all apps");
@@ -157,14 +159,14 @@ public final class FeatureFlags {
     /**
      * Enables region sampling for text color: Needs system health assessment before turning on
      */
-    public static final BooleanFlag ENABLE_REGION_SAMPLING =  getDebugFlag(
+    public static final BooleanFlag ENABLE_REGION_SAMPLING = getDebugFlag(
             "ENABLE_REGION_SAMPLING", false,
             "Enable region sampling to determine color of text on screen.");
 
     public static final BooleanFlag ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS =
             getDebugFlag(
-            "ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS", false,
-            "Always use hardware optimization for folder animations.");
+                    "ALWAYS_USE_HARDWARE_OPTIMIZATION_FOR_FOLDER_ANIMATIONS", false,
+                    "Always use hardware optimization for folder animations.");
 
     public static final BooleanFlag SEPARATE_RECENTS_ACTIVITY = getDebugFlag(
             "SEPARATE_RECENTS_ACTIVITY", false,
@@ -238,6 +240,10 @@ public final class FeatureFlags {
             "ENABLE_ALL_APPS_ONE_SEARCH_IN_TASKBAR", false,
             "Enables One Search box in Taskbar All Apps.");
 
+    public static final BooleanFlag ENABLE_TASKBAR_IN_OVERVIEW = getDebugFlag(
+            "ENABLE_TASKBAR_IN_OVERVIEW", true,
+            "Enables accessing the system Taskbar in overview.");
+
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE = getDebugFlag(
             "ENABLE_SPLIT_FROM_WORKSPACE", true,
             "Enable initiating split screen from workspace.");
@@ -248,11 +254,6 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_ONE_SEARCH_MOTION = new DeviceFlag(
             "ENABLE_ONE_SEARCH_MOTION", true, "Enables animations in OneSearch.");
-
-    public static final BooleanFlag ENABLE_KEYBOARD_TRANSITION_SYNC = new DeviceFlag(
-            "ENABLE_KEYBOARD_TRANSITION_SYNC", IS_STUDIO_BUILD,
-            "Enable option to synchronize the keyboard open and close animations when transitioning"
-                    + " between home and all apps");
 
     public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = new DeviceFlag(
             "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", true,
@@ -300,6 +301,13 @@ public final class FeatureFlags {
 
     public static final BooleanFlag POPUP_MATERIAL_U = new DeviceFlag(
             "POPUP_MATERIAL_U", false, "Switch popup UX to use material U");
+
+    public static final BooleanFlag SHOW_HOME_GARDENING = new DeviceFlag(
+            "SHOW_HOME_GARDENING", false,
+            "Show the new home gardening mode");
+
+    public static final BooleanFlag ENABLE_TRANSIENT_TASKBAR = getDebugFlag(
+            "ENABLE_TRANSIENT_TASKBAR", false, "Enables transient taskbar.");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
