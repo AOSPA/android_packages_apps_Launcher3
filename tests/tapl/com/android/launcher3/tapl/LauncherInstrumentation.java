@@ -48,7 +48,6 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
-import android.view.Surface;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
@@ -138,6 +137,15 @@ public final class LauncherInstrumentation {
         OUTSIDE_WITH_KEYCODE,
     }
 
+    /**
+     * Represents a point in the code at which a callback can run.
+     */
+    public enum CALLBACK_RUN_POINT {
+        CALLBACK_HOLD_BEFORE_DROP
+    }
+
+    private Consumer<CALLBACK_RUN_POINT> mCallbackAtRunPoint = null;
+
     // Base class for launcher containers.
     abstract static class VisibleContainer {
         protected final LauncherInstrumentation mLauncher;
@@ -180,7 +188,7 @@ public final class LauncherInstrumentation {
 
     private final UiDevice mDevice;
     private final Instrumentation mInstrumentation;
-    private int mExpectedRotation = Surface.ROTATION_0;
+    private Integer mExpectedRotation = null;
     private boolean mExpectedRotationCheckEnabled = true;
     private final Uri mTestProviderUri;
     private final Deque<String> mDiagnosticContext = new LinkedList<>();
@@ -194,6 +202,7 @@ public final class LauncherInstrumentation {
 
     private boolean mCheckEventsForSuccessfulGestures = false;
     private Runnable mOnLauncherCrashed;
+
     private static Pattern getTouchEventPattern(String prefix, String action) {
         // The pattern includes checks that we don't get a multi-touch events or other surprises.
         return Pattern.compile(
@@ -298,8 +307,8 @@ public final class LauncherInstrumentation {
         final String testSuffix = ".test";
 
         return testPackage.endsWith(testSuffix) && testPackage.length() > testSuffix.length()
-            && testPackage.substring(0, testPackage.length() - testSuffix.length())
-            .equals(targetPackage);
+                && testPackage.substring(0, testPackage.length() - testSuffix.length())
+                .equals(targetPackage);
     }
 
     public void enableCheckEventsForSuccessfulGestures() {
@@ -686,15 +695,20 @@ public final class LauncherInstrumentation {
      * Whether to ignore verifying the task bar visibility during instrumenting.
      *
      * @param ignoreTaskbarVisibility {@code true} will ignore the instrumentation implicitly
-     *                                            verifying the task bar visibility with
-     *                                            {@link VisibleContainer#verifyActiveContainer}.
-     *                                            {@code false} otherwise.
+     *                                verifying the task bar visibility with
+     *                                {@link VisibleContainer#verifyActiveContainer}.
+     *                                {@code false} otherwise.
      */
     public void setIgnoreTaskbarVisibility(boolean ignoreTaskbarVisibility) {
         mIgnoreTaskbarVisibility = ignoreTaskbarVisibility;
     }
 
-    public void setExpectedRotation(int expectedRotation) {
+    /**
+     * Sets expected rotation.
+     * TAPL periodically checks that Launcher didn't suddenly change the rotation to unexpected one.
+     * Null parameter disables checks. The initial state is "no checks".
+     */
+    public void setExpectedRotation(Integer expectedRotation) {
         mExpectedRotation = expectedRotation;
     }
 
@@ -735,7 +749,7 @@ public final class LauncherInstrumentation {
     private UiObject2 verifyContainerType(ContainerType containerType) {
         waitForLauncherInitialized();
 
-        if (mExpectedRotationCheckEnabled) {
+        if (mExpectedRotationCheckEnabled && mExpectedRotation != null) {
             assertEquals("Unexpected display rotation",
                     mExpectedRotation, mDevice.getDisplayRotation());
         }
@@ -788,7 +802,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
-                    checkTaskbarVisibility();
+                    waitUntilLauncherObjectGone(TASKBAR_RES_ID);
                     waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
                     return waitForLauncherObject(OVERVIEW_RES_ID);
@@ -797,7 +811,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
-                    checkTaskbarVisibility();
+                    waitUntilLauncherObjectGone(TASKBAR_RES_ID);
 
                     waitForLauncherObject(SPLIT_PLACEHOLDER_RES_ID);
                     return waitForLauncherObject(OVERVIEW_RES_ID);
@@ -806,7 +820,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
-                    checkTaskbarVisibility();
+                    waitUntilLauncherObjectGone(TASKBAR_RES_ID);
                     waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
                     return waitForFallbackLauncherObject(OVERVIEW_RES_ID);
@@ -818,25 +832,20 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
                     waitUntilLauncherObjectGone(SPLIT_PLACEHOLDER_RES_ID);
 
-                    checkTaskbarVisibility();
+                    if (mIgnoreTaskbarVisibility) {
+                        return null;
+                    }
+                    if (isTablet() && !isFallbackOverview()) {
+                        waitForLauncherObject(TASKBAR_RES_ID);
+                    } else {
+                        waitUntilLauncherObjectGone(TASKBAR_RES_ID);
+                    }
                     return null;
                 }
                 default:
                     fail("Invalid state: " + containerType);
                     return null;
             }
-        }
-    }
-
-    private void checkTaskbarVisibility() {
-        if (mIgnoreTaskbarVisibility) {
-            return;
-        }
-
-        if (isTablet() && !isFallbackOverview()) {
-            waitForLauncherObject(TASKBAR_RES_ID);
-        } else {
-            waitUntilLauncherObjectGone(TASKBAR_RES_ID);
         }
     }
 
@@ -1961,6 +1970,22 @@ public final class LauncherInstrumentation {
                     LauncherInstrumentation.GestureScope.INSIDE);
             sendPointer(downTime, downTime, MotionEvent.ACTION_UP, tapTarget,
                     LauncherInstrumentation.GestureScope.INSIDE);
+        }
+    }
+
+    /**
+     * Sets the consumer to run callbacks at all run-points.
+     */
+    public void setRunPointCallback(Consumer<CALLBACK_RUN_POINT> callback) {
+        mCallbackAtRunPoint = callback;
+    }
+
+    /**
+     * Runs the callback at the specified point if it exists.
+     */
+    void runCallbackIfActive(CALLBACK_RUN_POINT runPoint) {
+        if (mCallbackAtRunPoint != null) {
+            mCallbackAtRunPoint.accept(runPoint);
         }
     }
 }

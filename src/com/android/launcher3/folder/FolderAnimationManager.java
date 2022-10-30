@@ -43,6 +43,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.PropertyResetListener;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.BaseDragLayer;
 
@@ -215,6 +216,7 @@ public class FolderAnimationManager {
         final int footerStartDelay;
         if (isLargeFolder()) {
             if (mIsOpening) {
+                mFolder.mFooter.setAlpha(0);
                 footerAlphaDuration = LARGE_FOLDER_FOOTER_DURATION;
                 footerStartDelay = mDuration - footerAlphaDuration;
             } else {
@@ -341,7 +343,7 @@ public class FolderAnimationManager {
         ShortcutAndWidgetContainer cwc = mContent.getPageAt(0).getShortcutsAndWidgets();
         for (int i = 0; i < numItemsInPreview; ++i) {
             final BubbleTextView btv = itemsInPreview.get(i);
-            CellLayout.LayoutParams btvLp = (CellLayout.LayoutParams) btv.getLayoutParams();
+            CellLayoutLayoutParams btvLp = (CellLayoutLayoutParams) btv.getLayoutParams();
 
             // Calculate the final values in the LayoutParams.
             btvLp.isLockedToGrid = true;
