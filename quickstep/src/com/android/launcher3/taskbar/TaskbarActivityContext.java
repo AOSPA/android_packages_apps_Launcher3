@@ -76,6 +76,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
+import com.android.launcher3.taskbar.overlay.TaskbarOverlayController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
@@ -89,6 +90,7 @@ import com.android.launcher3.views.ActivityContext;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.rotation.RotationButtonController;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.unfold.updates.RotationChangeProvider;
 import com.android.systemui.unfold.util.ScopedUnfoldTransitionProgressProvider;
 
 import java.io.PrintWriter;
@@ -153,6 +155,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 Settings.Secure.getUriFor(Settings.Secure.USER_SETUP_COMPLETE), 0);
         mIsNavBarForceVisible = settingsCache.getValue(
                 Settings.Secure.getUriFor(Settings.Secure.NAV_BAR_KIDS_MODE), 0);
+
+        // TODO(b/244231596) For shared Taskbar window, update this value in init() instead so
+        //  to get correct value when recreating the taskbar
         mIsNavBarKidsMode = settingsCache.getValue(
                 Settings.Secure.getUriFor(Settings.Secure.NAV_BAR_KIDS_MODE), 0);
 
@@ -198,7 +203,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarViewController(this, taskbarView),
                 new TaskbarScrimViewController(this, taskbarScrimView),
                 new TaskbarUnfoldAnimationController(this, unfoldTransitionProgressProvider,
-                        mWindowManager, WindowManagerGlobal.getWindowManagerService()),
+                    mWindowManager,
+                    new RotationChangeProvider(WindowManagerGlobal.getWindowManagerService(), this,
+                        getMainExecutor())),
                 new TaskbarKeyguardController(this),
                 new StashedHandleViewController(this, stashedHandleView),
                 new TaskbarStashController(this),
@@ -206,7 +213,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarAutohideSuspendController(this),
                 new TaskbarPopupController(this),
                 new TaskbarForceVisibleImmersiveController(this),
-                new TaskbarAllAppsController(this, dp),
+                new TaskbarOverlayController(this, dp),
+                new TaskbarAllAppsController(),
                 new TaskbarInsetsController(this),
                 new VoiceInteractionWindowController(this),
                 isDesktopMode
@@ -238,7 +246,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     /** Updates {@link DeviceProfile} instances for any Taskbar windows. */
     public void updateDeviceProfile(DeviceProfile dp, NavigationMode navMode) {
         mNavMode = navMode;
-        mControllers.taskbarAllAppsController.updateDeviceProfile(dp);
+        mControllers.taskbarOverlayController.updateDeviceProfile(dp);
         mDeviceProfile = dp.copy(this);
         updateIconSize(getResources());
 
@@ -273,9 +281,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * @param type The window type to pass to the created WindowManager.LayoutParams.
      */
     public WindowManager.LayoutParams createDefaultWindowLayoutParams(int type) {
+        DeviceProfile deviceProfile = getDeviceProfile();
+        // Taskbar is on the logical bottom of the screen
+        boolean isVerticalBarLayout = TaskbarManager.isPhoneMode(deviceProfile) &&
+                deviceProfile.isLandscape;
         WindowManager.LayoutParams windowLayoutParams = new WindowManager.LayoutParams(
-                MATCH_PARENT,
-                mLastRequestedNonFullscreenHeight,
+                isVerticalBarLayout ? mLastRequestedNonFullscreenHeight : MATCH_PARENT,
+                isVerticalBarLayout ? MATCH_PARENT : mLastRequestedNonFullscreenHeight,
                 type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_SLIPPERY
@@ -283,7 +295,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 PixelFormat.TRANSLUCENT);
         windowLayoutParams.setTitle(WINDOW_TITLE);
         windowLayoutParams.packageName = getPackageName();
-        windowLayoutParams.gravity = Gravity.BOTTOM;
+        windowLayoutParams.gravity = !isVerticalBarLayout ?
+                Gravity.BOTTOM :
+                Gravity.END; // TODO(b/230394142): seascape
+
         windowLayoutParams.setFitInsetsTypes(0);
         windowLayoutParams.receiveInsetsIgnoringZOrder = true;
         windowLayoutParams.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
@@ -800,7 +815,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         return mIsUserSetupComplete;
     }
 
-    protected boolean isNavBarKidsModeActive() {
+    public boolean isNavBarKidsModeActive() {
         return mIsNavBarKidsMode && isThreeButtonNav();
     }
 

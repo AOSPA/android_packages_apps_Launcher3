@@ -242,6 +242,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     protected boolean supportsManualStashing() {
         return supportsVisualStashing()
+                && isInApp()
                 && (!Utilities.IS_RUNNING_IN_TEST_HARNESS || mEnableManualStashingDuringTests);
     }
 
@@ -714,8 +715,16 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         applyState(skipAnim ? 0 : animDuration, skipAnim ? 0 : startDelay);
     }
 
+    /**
+     * We stash when IME or IME switcher is showing AND NOT
+     *  * in small screen AND
+     *  * 3 button nav AND
+     *  * landscape (or seascape)
+     */
     private boolean shouldStashForIme() {
-        return mIsImeShowing || mIsImeSwitcherShowing;
+        return (mIsImeShowing || mIsImeSwitcherShowing) &&
+                !(isPhoneMode() && mActivity.isThreeButtonNav()
+                        && mActivity.getDeviceProfile().isLandscape);
     }
 
     /**

@@ -20,14 +20,11 @@ import android.util.AttributeSet;
 import android.view.WindowInsets;
 
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
-import com.android.launcher3.allapps.AllAppsGridAdapter;
-import com.android.launcher3.allapps.AlphabeticalAppsList;
-import com.android.launcher3.allapps.BaseAdapterProvider;
-import com.android.launcher3.allapps.BaseAllAppsAdapter;
+import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 
 /** All apps container accessible from taskbar. */
 public class TaskbarAllAppsContainerView extends
-        ActivityAllAppsContainerView<TaskbarAllAppsContext> {
+        ActivityAllAppsContainerView<TaskbarOverlayContext> {
 
     public TaskbarAllAppsContainerView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
@@ -41,13 +38,5 @@ public class TaskbarAllAppsContainerView extends
     public WindowInsets onApplyWindowInsets(WindowInsets insets) {
         setInsets(insets.getInsets(WindowInsets.Type.systemBars()).toRect());
         return super.onApplyWindowInsets(insets);
-    }
-
-    @Override
-    protected BaseAllAppsAdapter<TaskbarAllAppsContext> createAdapter(
-            AlphabeticalAppsList<TaskbarAllAppsContext> appsList,
-            BaseAdapterProvider[] adapterProviders) {
-        return new AllAppsGridAdapter<>(mActivityContext, getLayoutInflater(), appsList,
-                adapterProviders);
     }
 }

@@ -53,12 +53,14 @@ import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -67,6 +69,7 @@ import com.android.launcher3.accessibility.AccessibleDragListenerAdapter;
 import com.android.launcher3.accessibility.WorkspaceAccessibilityHelper;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dot.FolderDotInfo;
 import com.android.launcher3.dragndrop.DragController;
@@ -106,7 +109,6 @@ import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.WallpaperOffsetInterpolator;
-import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.LauncherAppWidgetHost;
 import com.android.launcher3.widget.LauncherAppWidgetHost.ProviderChangedListener;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
@@ -325,6 +327,26 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         updateCellLayoutPadding();
         updateWorkspaceWidgetsSizes();
+        setPageIndicatorInset();
+    }
+
+    private void setPageIndicatorInset() {
+        DeviceProfile grid = mLauncher.getDeviceProfile();
+
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) mPageIndicator.getLayoutParams();
+
+        // Set insets for page indicator
+        Rect padding = grid.workspacePadding;
+        if (grid.isVerticalBarLayout()) {
+            lp.leftMargin = padding.left + grid.workspaceCellPaddingXPx;
+            lp.rightMargin = padding.right + grid.workspaceCellPaddingXPx;
+            lp.bottomMargin = padding.bottom;
+        } else {
+            lp.leftMargin = lp.rightMargin = 0;
+            lp.gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
+            lp.bottomMargin = grid.hotseatBarSizePx;
+        }
+        mPageIndicator.setLayoutParams(lp);
     }
 
     private void updateCellLayoutPadding() {
@@ -562,7 +584,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         }
 
         int cellHSpan = mLauncher.getDeviceProfile().inv.numSearchContainerColumns;
-        CellLayout.LayoutParams lp = new CellLayout.LayoutParams(0, 0, cellHSpan, 1);
+        CellLayoutLayoutParams lp = new CellLayoutLayoutParams(0, 0, cellHSpan, 1);
         lp.canReorder = false;
         if (!firstPage.addViewToCellLayout(mQsb, 0, R.id.search_container_workspace, lp, true)) {
             Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
@@ -1805,7 +1827,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     boolean willCreateUserFolder(ItemInfo info, View dropOverView, boolean considerTimeout) {
         if (dropOverView != null) {
-            CellLayout.LayoutParams lp = (CellLayout.LayoutParams) dropOverView.getLayoutParams();
+            CellLayoutLayoutParams lp = (CellLayoutLayoutParams) dropOverView.getLayoutParams();
             if (lp.useTmpCoords && (lp.tmpCellX != lp.cellX || lp.tmpCellY != lp.cellY)) {
                 return false;
             }
@@ -1840,7 +1862,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
     boolean willAddToExistingUserFolder(ItemInfo dragInfo, View dropOverView) {
         if (dropOverView != null) {
-            CellLayout.LayoutParams lp = (CellLayout.LayoutParams) dropOverView.getLayoutParams();
+            CellLayoutLayoutParams lp = (CellLayoutLayoutParams) dropOverView.getLayoutParams();
             if (lp.useTmpCoords && (lp.tmpCellX != lp.cellX || lp.tmpCellY != lp.cellY)) {
                 return false;
             }
@@ -2057,7 +2079,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                     }
 
                     // update the item's position after drop
-                    CellLayout.LayoutParams lp = (CellLayout.LayoutParams) cell.getLayoutParams();
+                    CellLayoutLayoutParams lp = (CellLayoutLayoutParams) cell.getLayoutParams();
                     lp.cellX = lp.tmpCellX = mTargetCell[0];
                     lp.cellY = lp.tmpCellY = mTargetCell[1];
                     lp.cellHSpan = item.spanX;
@@ -2083,7 +2105,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                     }
 
                     // If we can't find a drop location, we return the item to its original position
-                    CellLayout.LayoutParams lp = (CellLayout.LayoutParams) cell.getLayoutParams();
+                    CellLayoutLayoutParams lp = (CellLayoutLayoutParams) cell.getLayoutParams();
                     mTargetCell[0] = lp.cellX;
                     mTargetCell[1] = lp.cellY;
                     CellLayout layout = (CellLayout) cell.getParent().getParent();

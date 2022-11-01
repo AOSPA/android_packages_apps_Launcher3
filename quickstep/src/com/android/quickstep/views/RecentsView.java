@@ -180,6 +180,7 @@ import com.android.quickstep.util.RecentsOrientedState;
 import com.android.quickstep.util.SplitAnimationTimings;
 import com.android.quickstep.util.SplitScreenBounds;
 import com.android.quickstep.util.SplitSelectStateController;
+import com.android.quickstep.util.SurfaceTransaction;
 import com.android.quickstep.util.SurfaceTransactionApplier;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TaskVisualsChangeListener;
@@ -192,7 +193,6 @@ import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.PackageManagerWrapper;
 import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
-import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 import com.android.wm.shell.pip.IPipAnimationListener;
@@ -1077,14 +1077,15 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             appAnimator.setInterpolator(ACCEL_DEACCEL);
             appAnimator.addUpdateListener(valueAnimator -> {
                 float percent = valueAnimator.getAnimatedFraction();
-                SurfaceParams.Builder builder = new SurfaceParams.Builder(
-                        apps[apps.length - 1].leash);
+                SurfaceTransaction transaction = new SurfaceTransaction();
                 Matrix matrix = new Matrix();
                 matrix.postScale(percent, percent);
                 matrix.postTranslate(mActivity.getDeviceProfile().widthPx * (1 - percent) / 2,
                         mActivity.getDeviceProfile().heightPx * (1 - percent) / 2);
-                builder.withAlpha(percent).withMatrix(matrix);
-                surfaceApplier.scheduleApply(builder.build());
+                transaction.forSurface(apps[apps.length - 1].leash)
+                        .setAlpha(percent)
+                        .setMatrix(matrix);
+                surfaceApplier.scheduleApply(transaction);
             });
             anim.play(appAnimator);
             anim.addListener(new AnimatorListenerAdapter() {
@@ -1245,6 +1246,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         if (!mActivity.getDeviceProfile().isTablet) {
             mActionsView.updateDisabledFlags(OverviewActionsView.DISABLED_SCROLLING, true);
         }
+        InteractionJankMonitorWrapper.begin(/* view= */ this,
+                InteractionJankMonitorWrapper.CUJ_RECENTS_SCROLLING);
     }
 
     @Override
@@ -1258,6 +1261,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         if (getNextPage() > 0) {
             setSwipeDownShouldLaunchApp(true);
         }
+        InteractionJankMonitorWrapper.end(InteractionJankMonitorWrapper.CUJ_RECENTS_SCROLLING);
     }
 
     @Override
@@ -1511,21 +1515,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             addView(mClearAllButton);
         }
 
-        boolean settlingOnNewTask = mNextPage != INVALID_PAGE;
-        if (settlingOnNewTask) {
-            // Restore mCurrentPage but don't call setCurrentPage() as that clobbers the scroll.
-            mCurrentPage = previousCurrentPage;
-        } else {
-            // TODO(b/238461210): Remove logging once root cause of flake detected.
-            if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
-                Log.d("b/238461210", "RecentsView#applyLoadPlan() -> !settlingOnNewTask -> "
-                                + "previousCurrentPage: " + previousCurrentPage
-                                + ", getScrollForPage(previousCurrentPage): "
-                                + getScrollForPage(previousCurrentPage));
-            }
-            setCurrentPage(previousCurrentPage);
-        }
-
         // Keep same previous focused task
         TaskView newFocusedTaskView = getTaskViewByTaskId(focusedTaskId);
         // If the list changed, maybe the focused task doesn't exist anymore
@@ -1550,21 +1539,36 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
 
         int targetPage = -1;
-        if (!settlingOnNewTask) {
+        if (mNextPage != INVALID_PAGE) {
+            // Restore mCurrentPage but don't call setCurrentPage() as that clobbers the scroll.
+            mCurrentPage = previousCurrentPage;
+            if (currentTaskId != -1) {
+                currentTaskView = getTaskViewByTaskId(currentTaskId);
+                if (currentTaskView != null) {
+                    targetPage = indexOfChild(currentTaskView);
+                }
+            }
+        } else {
             // Set the current page to the running task, but not if settling on new task.
             if (runningTaskId != -1) {
                 targetPage = indexOfChild(newRunningTaskView);
             } else if (getTaskViewCount() > 0) {
                 targetPage = indexOfChild(requireTaskViewAt(0));
             }
-        } else if (currentTaskId != -1) {
-            currentTaskView = getTaskViewByTaskId(currentTaskId);
-            if (currentTaskView != null) {
-                targetPage = indexOfChild(currentTaskView);
-            }
         }
         if (targetPage != -1 && mCurrentPage != targetPage) {
-            setCurrentPage(targetPage);
+            int finalTargetPage = targetPage;
+            runOnPageScrollsInitialized(() -> {
+                // TODO(b/246283207): Remove logging once root cause of flake detected.
+                if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+                    Log.d("b/246283207", "RecentsView#applyLoadPlan() -> "
+                            + "previousCurrentPage: " + previousCurrentPage
+                            + ", targetPage: " + finalTargetPage
+                            + ", getScrollForPage(targetPage): "
+                            + getScrollForPage(finalTargetPage));
+                }
+                setCurrentPage(finalTargetPage);
+            });
         }
 
         if (mIgnoreResetTaskId != -1 &&
@@ -1760,7 +1764,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private void onOrientationChanged() {
         // If overview is in modal state when rotate, reset it to overview state without running
         // animation.
-        setModalStateEnabled(false);
+        setModalStateEnabled(/* isModalState= */ false, /* animate= */ false);
         if (isSplitSelectionActive()) {
             onRotateInSplitSelectionState();
         }
@@ -5198,11 +5202,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         setInsets(mInsets);
     }
 
-    /**
-     * Enables or disables modal state for RecentsView
-     * @param isModalState
-     */
-    public void setModalStateEnabled(boolean isModalState) { }
+    /** Enables or disables modal state for RecentsView */
+    public abstract void setModalStateEnabled(boolean isModalState, boolean animate);
 
     public TaskOverlayFactory getTaskOverlayFactory() {
         return mTaskOverlayFactory;
