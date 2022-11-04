@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3eca4b1e_a6cab875",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000541
+      },
+      "writtenOn": "2022-11-04T10:03:25Z",
+      "side": 1,
+      "message": "hitting this:\n\nE System  : java.lang.IllegalStateException: Signature|privileged permissions not in privapp-permissions allowlist: {com.android.launcher3 (/system_ext/priv-app/Launcher3QuickStep): android.permission.INTERACT_ACROSS_USERS}\n\nwhich causes a full system failure",
+      "revId": "f4428ccd740e601adab4c4e2de0b89cba294305e",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
