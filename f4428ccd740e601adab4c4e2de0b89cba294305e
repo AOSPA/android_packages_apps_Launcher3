@@ -16,6 +16,23 @@
       "message": "hitting this:\n\nE System  : java.lang.IllegalStateException: Signature|privileged permissions not in privapp-permissions allowlist: {com.android.launcher3 (/system_ext/priv-app/Launcher3QuickStep): android.permission.INTERACT_ACROSS_USERS}\n\nwhich causes a full system failure",
       "revId": "f4428ccd740e601adab4c4e2de0b89cba294305e",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "faa45b3a_d9ce7be9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000427
+      },
+      "writtenOn": "2022-11-05T20:05:23Z",
+      "side": 1,
+      "message": "we can probably get this for free using wellbeing_provider_pkg",
+      "revId": "f4428ccd740e601adab4c4e2de0b89cba294305e",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
