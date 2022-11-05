@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "34e72f26_1efcad45",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000427
+      },
+      "writtenOn": "2022-11-05T20:05:49Z",
+      "side": 1,
+      "message": "won\u0027t compile if we\u0027re building something other than quickstep",
+      "revId": "fb6a0aa3c8cacf50f3b6b62a6a35f8c71e93a9d2",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
