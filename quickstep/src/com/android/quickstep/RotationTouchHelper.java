@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Surface.ROTATION_0;
 
+import static com.android.launcher3.Utilities.isTrackpadMotionEvent;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_ALL;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
@@ -232,6 +233,9 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
      * @return whether the coordinates of the {@param event} is in the swipe up gesture region.
      */
     public boolean isInSwipeUpTouchRegion(MotionEvent event) {
+        if (isTrackpadMotionEvent(event)) {
+            return true;
+        }
         return mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(), event.getY());
     }
 
@@ -240,6 +244,9 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
      *         is in the swipe up gesture region.
      */
     public boolean isInSwipeUpTouchRegion(MotionEvent event, int pointerIndex) {
+        if (isTrackpadMotionEvent(event)) {
+            return true;
+        }
         return mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(pointerIndex),
                 event.getY(pointerIndex));
     }

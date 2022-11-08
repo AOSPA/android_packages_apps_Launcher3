@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
 import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_BACK_ANIMATION;
@@ -66,11 +67,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
+import com.android.app.viewcapture.ViewCapture;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarManager;
@@ -101,7 +104,6 @@ import com.android.quickstep.util.ActiveGestureLog.CompoundString;
 import com.android.quickstep.util.ProtoTracer;
 import com.android.quickstep.util.ProxyScreenStatusProvider;
 import com.android.quickstep.util.SplitScreenBounds;
-import com.android.quickstep.util.ViewCapture;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -542,6 +544,18 @@ public class TouchInteractionService extends Service
             SystemUiProxy.INSTANCE.get(this).setLastSystemUiStateFlags(systemUiStateFlags);
             mOverviewComponentObserver.onSystemUiStateChanged();
             mTaskbarManager.onSystemUiFlagsChanged(systemUiStateFlags);
+
+            boolean wasFreeformActive =
+                    (lastSysUIFlags & SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE) != 0;
+            boolean isFreeformActive =
+                    (systemUiStateFlags & SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE) != 0;
+            if (wasFreeformActive != isFreeformActive) {
+                DesktopVisibilityController controller = mOverviewComponentObserver
+                        .getActivityInterface().getDesktopVisibilityController();
+                if (controller != null) {
+                    controller.setFreeformTasksVisible(isFreeformActive);
+                }
+            }
 
             boolean wasExpanded = (lastSysUIFlags & SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED) != 0;
             boolean isExpanded =
@@ -1224,7 +1238,9 @@ public class TouchInteractionService extends Service
             }
             mTaskbarManager.dumpLogs("", pw);
 
-            ViewCapture.INSTANCE.get(this).dump(pw, fd);
+            if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
+                ViewCapture.getInstance().dump(pw, fd, this);
+            }
         }
     }
 

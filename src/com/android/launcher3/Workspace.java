@@ -109,7 +109,6 @@ import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.WallpaperOffsetInterpolator;
-import com.android.launcher3.widget.LauncherAppWidgetHost;
 import com.android.launcher3.widget.LauncherAppWidgetHost.ProviderChangedListener;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.NavigableAppWidgetHostView;
@@ -224,8 +223,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     // Variables relating to touch disambiguation (scrolling workspace vs. scrolling a widget)
     private float mXDown;
     private float mYDown;
-    private View mQsb;
-    private boolean mIsEventOverQsb;
+    private View mFirstPagePinnedItem;
+    private boolean mIsEventOverFirstPagePinnedItem;
 
     final static float START_DAMPING_TOUCH_SLOP_ANGLE = (float) Math.PI / 6;
     final static float MAX_SWIPE_ANGLE = (float) Math.PI / 3;
@@ -575,20 +574,22 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         // Add the first page
         CellLayout firstPage = insertNewWorkspaceScreen(Workspace.FIRST_SCREEN_ID, getChildCount());
-        // Always add a QSB on the first screen.
-        if (mQsb == null) {
-            // In transposed layout, we add the QSB in the Grid. As workspace does not touch the
-            // edges, we do not need a full width QSB.
-            mQsb = LayoutInflater.from(getContext())
+        // Always add a first page pinned widget on the first screen.
+        if (mFirstPagePinnedItem == null) {
+            // In transposed layout, we add the first page pinned widget in the Grid.
+            // As workspace does not touch the edges, we do not need a full
+            // width first page pinned widget.
+            mFirstPagePinnedItem = LayoutInflater.from(getContext())
                     .inflate(R.layout.search_container_workspace, firstPage, false);
         }
 
         int cellHSpan = mLauncher.getDeviceProfile().inv.numSearchContainerColumns;
         CellLayoutLayoutParams lp = new CellLayoutLayoutParams(0, 0, cellHSpan, 1);
         lp.canReorder = false;
-        if (!firstPage.addViewToCellLayout(mQsb, 0, R.id.search_container_workspace, lp, true)) {
+        if (!firstPage.addViewToCellLayout(
+                mFirstPagePinnedItem, 0, R.id.search_container_workspace, lp, true)) {
             Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
-            mQsb = null;
+            mFirstPagePinnedItem = null;
         }
     }
 
@@ -597,9 +598,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         // transition animations competing with us changing the scroll when we add pages
         disableLayoutTransitions();
 
-        // Recycle the QSB widget
-        if (mQsb != null) {
-            ((ViewGroup) mQsb.getParent()).removeView(mQsb);
+        // Recycle the first page pinned widget
+        if (mFirstPagePinnedItem != null) {
+            ((ViewGroup) mFirstPagePinnedItem.getParent()).removeView(mFirstPagePinnedItem);
         }
 
         // Remove the pages and clear the screen models
@@ -919,6 +920,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         return mScreenOrder;
     }
 
+    protected View getFirstPagePinnedItem() {
+        return mFirstPagePinnedItem;
+    }
+
     /**
      * Returns the screen ID of a page that is shown together with the given page screen ID when the
      * two panel UI is enabled.
@@ -1070,20 +1075,22 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         mXDown = ev.getX();
         mYDown = ev.getY();
-        if (mQsb != null) {
+        if (mFirstPagePinnedItem != null) {
             mTempFXY[0] = mXDown + getScrollX();
             mTempFXY[1] = mYDown + getScrollY();
-            Utilities.mapCoordInSelfToDescendant(mQsb, this, mTempFXY);
-            mIsEventOverQsb = mQsb.getLeft() <= mTempFXY[0] && mQsb.getRight() >= mTempFXY[0]
-                    && mQsb.getTop() <= mTempFXY[1] && mQsb.getBottom() >= mTempFXY[1];
+            Utilities.mapCoordInSelfToDescendant(mFirstPagePinnedItem, this, mTempFXY);
+            mIsEventOverFirstPagePinnedItem = mFirstPagePinnedItem.getLeft() <= mTempFXY[0]
+                    && mFirstPagePinnedItem.getRight() >= mTempFXY[0]
+                    && mFirstPagePinnedItem.getTop() <= mTempFXY[1]
+                    && mFirstPagePinnedItem.getBottom() >= mTempFXY[1];
         } else {
-            mIsEventOverQsb = false;
+            mIsEventOverFirstPagePinnedItem = false;
         }
     }
 
     @Override
     protected void determineScrollingStart(MotionEvent ev) {
-        if (!isFinishedSwitchingState() || mIsEventOverQsb) return;
+        if (!isFinishedSwitchingState() || mIsEventOverFirstPagePinnedItem) return;
 
         float deltaX = ev.getX() - mXDown;
         float absDeltaX = Math.abs(deltaX);
@@ -2534,10 +2541,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     private boolean isDragObjectOverSmartSpace(DragObject dragObject) {
-        if (mQsb == null) {
+        if (mFirstPagePinnedItem == null) {
             return false;
         }
-        getViewBoundsRelativeToWorkspace(mQsb, mTempRect);
+        getViewBoundsRelativeToWorkspace(mFirstPagePinnedItem, mTempRect);
         return mTempRect.contains(dragObject.x, dragObject.y);
     }
 
@@ -3383,7 +3390,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     public void widgetsRestored(final ArrayList<LauncherAppWidgetInfo> changedInfo) {
         if (!changedInfo.isEmpty()) {
             DeferredWidgetRefresh widgetRefresh = new DeferredWidgetRefresh(changedInfo,
-                    mLauncher.getAppWidgetHost());
+                    mLauncher.getAppWidgetHolder());
 
             LauncherAppWidgetInfo item = changedInfo.get(0);
             final AppWidgetProviderInfo widgetInfo;
@@ -3509,19 +3516,19 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
      */
     private class DeferredWidgetRefresh implements Runnable, ProviderChangedListener {
         private final ArrayList<LauncherAppWidgetInfo> mInfos;
-        private final LauncherAppWidgetHost mHost;
+        private final LauncherWidgetHolder mWidgetHolder;
         private final Handler mHandler;
 
         private boolean mRefreshPending;
 
         DeferredWidgetRefresh(ArrayList<LauncherAppWidgetInfo> infos,
-            LauncherAppWidgetHost host) {
+                LauncherWidgetHolder holder) {
             mInfos = infos;
-            mHost = host;
+            mWidgetHolder = holder;
             mHandler = mLauncher.mHandler;
             mRefreshPending = true;
 
-            mHost.addProviderChangeListener(this);
+            mWidgetHolder.addProviderChangeListener(this);
             // Force refresh after 10 seconds, if we don't get the provider changed event.
             // This could happen when the provider is no longer available in the app.
             Message msg = Message.obtain(mHandler, this);
@@ -3531,7 +3538,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         @Override
         public void run() {
-            mHost.removeProviderChangeListener(this);
+            mWidgetHolder.removeProviderChangeListener(this);
             mHandler.removeCallbacks(this);
 
             if (!mRefreshPending) {
