@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.ALL_APPS_CONTENT;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -42,6 +43,7 @@ import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.util.MultiPropertyFactory;
+import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.views.ScrimView;
 
@@ -74,6 +76,8 @@ public class AllAppsTransitionController
                 }
             };
 
+    private static final float ALL_APPS_PULL_BACK_TRANSLATION_DEFAULT = 0f;
+
     public static final FloatProperty<AllAppsTransitionController> ALL_APPS_PULL_BACK_TRANSLATION =
             new FloatProperty<AllAppsTransitionController>("allAppsPullBackTranslation") {
 
@@ -82,8 +86,7 @@ public class AllAppsTransitionController
                     if (controller.mIsTablet) {
                         return controller.mAppsView.getActiveRecyclerView().getTranslationY();
                     } else {
-                        return controller.getAppsViewPullbackTranslationY().get(
-                                controller.mAppsView);
+                        return controller.getAppsViewPullbackTranslationY().getValue();
                     }
                 }
 
@@ -91,12 +94,17 @@ public class AllAppsTransitionController
                 public void setValue(AllAppsTransitionController controller, float translation) {
                     if (controller.mIsTablet) {
                         controller.mAppsView.getActiveRecyclerView().setTranslationY(translation);
+                        controller.getAppsViewPullbackTranslationY().setValue(
+                                ALL_APPS_PULL_BACK_TRANSLATION_DEFAULT);
                     } else {
-                        controller.getAppsViewPullbackTranslationY().set(controller.mAppsView,
-                                translation);
+                        controller.getAppsViewPullbackTranslationY().setValue(translation);
+                        controller.mAppsView.getActiveRecyclerView().setTranslationY(
+                                ALL_APPS_PULL_BACK_TRANSLATION_DEFAULT);
                     }
                 }
             };
+
+    private static final float ALL_APPS_PULL_BACK_ALPHA_DEFAULT = 1f;
 
     public static final FloatProperty<AllAppsTransitionController> ALL_APPS_PULL_BACK_ALPHA =
             new FloatProperty<AllAppsTransitionController>("allAppsPullBackAlpha") {
@@ -114,8 +122,12 @@ public class AllAppsTransitionController
                 public void setValue(AllAppsTransitionController controller, float alpha) {
                     if (controller.mIsTablet) {
                         controller.mAppsView.getActiveRecyclerView().setAlpha(alpha);
+                        controller.getAppsViewPullbackAlpha().setValue(
+                                ALL_APPS_PULL_BACK_ALPHA_DEFAULT);
                     } else {
                         controller.getAppsViewPullbackAlpha().setValue(alpha);
+                        controller.mAppsView.getActiveRecyclerView().setAlpha(
+                                ALL_APPS_PULL_BACK_ALPHA_DEFAULT);
                     }
                 }
             };
@@ -140,10 +152,8 @@ public class AllAppsTransitionController
 
     private ScrimView mScrimView;
 
-    private final MultiPropertyFactory<View>
-            mAppsViewTranslationYPropertyFactory = new MultiPropertyFactory<>(
-            "appsViewTranslationY", View.TRANSLATION_Y, Float::sum);
     private MultiValueAlpha mAppsViewAlpha;
+    private MultiPropertyFactory<View> mAppsViewTranslationY;
 
     private boolean mIsTablet;
 
@@ -184,7 +194,7 @@ public class AllAppsTransitionController
      */
     public void setProgress(float progress) {
         mProgress = progress;
-        getAppsViewProgressTranslationY().set(mAppsView, mProgress * mShiftRange);
+        getAppsViewProgressTranslationY().setValue(mProgress * mShiftRange);
         mLauncher.onAllAppsTransition(1 - progress);
     }
 
@@ -192,20 +202,20 @@ public class AllAppsTransitionController
         return mProgress;
     }
 
-    private FloatProperty<View> getAppsViewProgressTranslationY() {
-        return mAppsViewTranslationYPropertyFactory.get(INDEX_APPS_VIEW_PROGRESS);
+    private MultiProperty getAppsViewProgressTranslationY() {
+        return mAppsViewTranslationY.get(INDEX_APPS_VIEW_PROGRESS);
     }
 
-    private FloatProperty<View> getAppsViewPullbackTranslationY() {
-        return mAppsViewTranslationYPropertyFactory.get(INDEX_APPS_VIEW_PULLBACK);
+    private MultiProperty getAppsViewPullbackTranslationY() {
+        return mAppsViewTranslationY.get(INDEX_APPS_VIEW_PULLBACK);
     }
 
-    private MultiValueAlpha.AlphaProperty getAppsViewProgressAlpha() {
-        return mAppsViewAlpha.getProperty(INDEX_APPS_VIEW_PROGRESS);
+    private MultiProperty getAppsViewProgressAlpha() {
+        return mAppsViewAlpha.get(INDEX_APPS_VIEW_PROGRESS);
     }
 
-    private MultiValueAlpha.AlphaProperty getAppsViewPullbackAlpha() {
-        return mAppsViewAlpha.getProperty(INDEX_APPS_VIEW_PULLBACK);
+    private MultiProperty getAppsViewPullbackAlpha() {
+        return mAppsViewAlpha.get(INDEX_APPS_VIEW_PULLBACK);
     }
 
     /**
@@ -228,14 +238,14 @@ public class AllAppsTransitionController
             StateAnimationConfig config, PendingAnimation builder) {
         if (mLauncher.isInState(ALL_APPS) && !ALL_APPS.equals(toState)) {
             // For atomic animations, we close the keyboard immediately.
-            if (!config.userControlled && !mLauncher.isKeyboardSyncEnabled()) {
+            if (!config.userControlled && !mLauncher.getSearchConfig().isKeyboardSyncEnabled()) {
                 mLauncher.getAppsView().getSearchUiManager().getEditText().hideKeyboard();
             }
 
             builder.addEndListener(success -> {
                 // Reset pull back progress and alpha after switching states.
-                ALL_APPS_PULL_BACK_TRANSLATION.set(this, 0f);
-                ALL_APPS_PULL_BACK_ALPHA.set(this, 1f);
+                ALL_APPS_PULL_BACK_TRANSLATION.set(this, ALL_APPS_PULL_BACK_TRANSLATION_DEFAULT);
+                ALL_APPS_PULL_BACK_ALPHA.set(this, ALL_APPS_PULL_BACK_ALPHA_DEFAULT);
 
                 // We only want to close the keyboard if the animation has completed successfully.
                 // The reason is that with keyboard sync, if the user swipes down from All Apps with
@@ -283,7 +293,7 @@ public class AllAppsTransitionController
         boolean hasAllAppsContent = (visibleElements & ALL_APPS_CONTENT) != 0;
 
         Interpolator allAppsFade = config.getInterpolator(ANIM_ALL_APPS_FADE, LINEAR);
-        setter.setFloat(getAppsViewProgressAlpha(), MultiValueAlpha.VALUE,
+        setter.setFloat(getAppsViewProgressAlpha(), MultiPropertyFactory.MULTI_PROPERTY_VALUE,
                 hasAllAppsContent ? 1 : 0, allAppsFade);
 
         boolean shouldProtectHeader =
@@ -302,8 +312,11 @@ public class AllAppsTransitionController
         mScrimView = scrimView;
         mAppsView = appsView;
         mAppsView.setScrimView(scrimView);
+
         mAppsViewAlpha = new MultiValueAlpha(mAppsView, APPS_VIEW_INDEX_COUNT);
         mAppsViewAlpha.setUpdateVisibility(true);
+        mAppsViewTranslationY = new MultiPropertyFactory<>(
+                mAppsView, VIEW_TRANSLATE_Y, APPS_VIEW_INDEX_COUNT, Float::sum);
     }
 
     /**

@@ -19,6 +19,7 @@ package com.android.quickstep.views;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
+import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
@@ -53,6 +54,7 @@ import android.util.FloatProperty;
 import android.util.Log;
 import android.view.Display;
 import android.view.MotionEvent;
+import android.view.RemoteAnimationTarget;
 import android.view.TouchDelegate;
 import android.view.View;
 import android.view.ViewGroup;
@@ -78,6 +80,7 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ComponentKey;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
@@ -101,7 +104,6 @@ import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.recents.utilities.PreviewPositionHelper;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.lang.annotation.Retention;
 import java.util.Arrays;
@@ -171,7 +173,7 @@ public class TaskView extends FrameLayout implements Reusable {
             new FloatProperty<TaskView>("focusTransition") {
                 @Override
                 public void setValue(TaskView taskView, float v) {
-                    taskView.setIconAndDimTransitionProgress(v, false /* invert */);
+                    taskView.setIconsAndBannersTransitionProgress(v, false /* invert */);
                 }
 
                 @Override
@@ -739,14 +741,14 @@ public class TaskView extends FrameLayout implements Reusable {
             } else {
                 TransformParams topLeftParams = remoteTargetHandles[0].getTransformParams();
                 TransformParams rightBottomParams = remoteTargetHandles[1].getTransformParams();
-                RemoteAnimationTargetCompat[] apps = Stream.concat(
+                RemoteAnimationTarget[] apps = Stream.concat(
                         Arrays.stream(topLeftParams.getTargetSet().apps),
                         Arrays.stream(rightBottomParams.getTargetSet().apps))
-                        .toArray(RemoteAnimationTargetCompat[]::new);
-                RemoteAnimationTargetCompat[] wallpapers = Stream.concat(
+                        .toArray(RemoteAnimationTarget[]::new);
+                RemoteAnimationTarget[] wallpapers = Stream.concat(
                         Arrays.stream(topLeftParams.getTargetSet().wallpapers),
                         Arrays.stream(rightBottomParams.getTargetSet().wallpapers))
-                        .toArray(RemoteAnimationTargetCompat[]::new);
+                        .toArray(RemoteAnimationTarget[]::new);
                 targets = new RemoteAnimationTargets(apps, wallpapers,
                         topLeftParams.getTargetSet().nonApps,
                         topLeftParams.getTargetSet().targetMode);
@@ -953,7 +955,11 @@ public class TaskView extends FrameLayout implements Reusable {
         return deviceProfile.isTablet && !isFocusedTask();
     }
 
-    protected void setIconAndDimTransitionProgress(float progress, boolean invert) {
+    /**
+     * Called to animate a smooth transition when going directly from an app into Overview (and
+     * vice versa). Icons fade in, and DWB banners slide in with a "shift up" animation.
+     */
+    protected void setIconsAndBannersTransitionProgress(float progress, boolean invert) {
         if (invert) {
             progress = 1 - progress;
         }
@@ -997,7 +1003,7 @@ public class TaskView extends FrameLayout implements Reusable {
         if (mIconAndDimAnimator != null) {
             mIconAndDimAnimator.cancel();
         }
-        setIconAndDimTransitionProgress(iconScale, invert);
+        setIconsAndBannersTransitionProgress(iconScale, invert);
     }
 
     protected void resetPersistentViewTransforms() {
@@ -1417,6 +1423,12 @@ public class TaskView extends FrameLayout implements Reusable {
         mIconView.setVisibility(progress < 1 ? VISIBLE : INVISIBLE);
         mSnapshotView.getTaskOverlay().setFullscreenProgress(progress);
 
+        // Animate icons and DWB banners in/out, except in QuickSwitch state, when tiles are
+        // oversized and banner would look disproportionately large.
+        if (mActivity.getStateManager().getState() != BACKGROUND_APP) {
+            setIconsAndBannersTransitionProgress(progress, true);
+        }
+
         updateSnapshotRadius();
     }
 
@@ -1574,9 +1586,12 @@ public class TaskView extends FrameLayout implements Reusable {
         /** The current scale we apply to the thumbnail to adjust for new left/right insets. */
         public float mScale = 1;
 
+        private boolean mIsTaskbarTransient;
+
         public FullscreenDrawParams(Context context) {
             mCornerRadius = TaskCornerRadius.get(context);
             mWindowCornerRadius = QuickStepContract.getWindowCornerRadius(context);
+            mIsTaskbarTransient = DisplayController.isTransientTaskbar(context);
 
             mCurrentDrawnCornerRadius = mCornerRadius;
         }
@@ -1586,7 +1601,7 @@ public class TaskView extends FrameLayout implements Reusable {
          */
         public void setProgress(float fullscreenProgress, float parentScale, float taskViewScale,
                 int previewWidth, DeviceProfile dp, PreviewPositionHelper pph) {
-            RectF insets = getInsetsToDrawInFullscreen(pph, dp);
+            RectF insets = getInsetsToDrawInFullscreen(pph, dp, mIsTaskbarTransient);
 
             float currentInsetsLeft = insets.left * fullscreenProgress;
             float currentInsetsTop = insets.top * fullscreenProgress;
@@ -1609,7 +1624,11 @@ public class TaskView extends FrameLayout implements Reusable {
         /**
          * Insets to used for clipping the thumbnail (in case it is drawing outside its own space)
          */
-        private static RectF getInsetsToDrawInFullscreen(PreviewPositionHelper pph, DeviceProfile dp) {
+        private static RectF getInsetsToDrawInFullscreen(PreviewPositionHelper pph,
+                DeviceProfile dp, boolean isTaskbarTransient) {
+            if (isTaskbarTransient) {
+                return pph.getClippedInsets();
+            }
             return dp.isTaskbarPresent && !dp.isTaskbarPresentInApps
                     ? pph.getClippedInsets() : EMPTY_RECT_F;
         }

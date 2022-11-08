@@ -17,6 +17,7 @@ package com.android.launcher3.taskbar;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Rect;
@@ -26,7 +27,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.annotation.LayoutRes;
@@ -45,9 +45,9 @@ import com.android.launcher3.icons.ThemedIconDrawable;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.views.AllAppsButton;
 import com.android.launcher3.views.DoubleShadowBubbleTextView;
 
 import java.util.function.Predicate;
@@ -62,7 +62,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     public int mThemeIconsBackground;
 
     private final int[] mTempOutLocation = new int[2];
-    private final Rect mIconLayoutBounds = new Rect();
+    private final Rect mIconLayoutBounds;
     private final int mIconTouchSize;
     private final int mItemMarginLeftRight;
     private final int mItemPadding;
@@ -81,12 +81,12 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     private @Nullable FolderIcon mLeaveBehindFolderIcon;
 
     // Only non-null when device supports having an All Apps button.
-    private @Nullable AllAppsButton mAllAppsButton;
+    private @Nullable View mAllAppsButton;
 
     private View mQsb;
 
     // Only non-null when device supports having a floating task.
-    private @Nullable BubbleTextView mFloatingTaskButton;
+    private @Nullable View mFloatingTaskButton;
     private @Nullable Intent mFloatingTaskIntent;
     private static final boolean FLOATING_TASKS_ENABLED =
             SystemProperties.getBoolean("persist.wm.debug.floating_tasks", false);
@@ -108,11 +108,14 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         mActivityContext = ActivityContext.lookupContext(context);
+        mIconLayoutBounds = mActivityContext.getTransientTaskbarBounds();
 
         Resources resources = getResources();
         mIconTouchSize = resources.getDimensionPixelSize(R.dimen.taskbar_icon_touch_size);
 
-        int actualMargin = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
+        int actualMargin = DisplayController.isTransientTaskbar(mActivityContext)
+                ? resources.getDimensionPixelSize(R.dimen.transient_taskbar_icon_spacing)
+                : resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
         int actualIconSize = mActivityContext.getDeviceProfile().iconSizePx;
 
         // We layout the icons to be of mIconTouchSize in width and height
@@ -125,10 +128,12 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mThemeIconsBackground = calculateThemeIconsBackground();
 
         if (FeatureFlags.ENABLE_ALL_APPS_IN_TASKBAR.get()) {
-            mAllAppsButton = new AllAppsButton(context);
-            mAllAppsButton.setLayoutParams(
-                    new ViewGroup.LayoutParams(mIconTouchSize, mIconTouchSize));
+            mAllAppsButton = LayoutInflater.from(context)
+                    .inflate(R.layout.taskbar_all_apps_button, this, false);
             mAllAppsButton.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
+            if (mActivityContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_PC)) {
+                mAllAppsButton.setVisibility(GONE);
+            }
         }
 
         // TODO: Disable touch events on QSB otherwise it can crash.
@@ -137,9 +142,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (FLOATING_TASKS_ENABLED) {
             mFloatingTaskIntent = FloatingTaskIntentResolver.getIntent(context);
             if (mFloatingTaskIntent != null) {
-                mFloatingTaskButton = new LaunchFloatingTaskButton(context);
-                mFloatingTaskButton.setLayoutParams(
-                        new ViewGroup.LayoutParams(mIconTouchSize, mIconTouchSize));
+                mFloatingTaskButton = LayoutInflater.from(context)
+                        .inflate(R.layout.taskbar_floating_task_button, this, false);
                 mFloatingTaskButton.setPadding(mItemPadding, mItemPadding, mItemPadding,
                         mItemPadding);
             } else {
