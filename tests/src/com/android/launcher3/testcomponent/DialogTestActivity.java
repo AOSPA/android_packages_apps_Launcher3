@@ -13,23 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.launcher3.allapps;
 
-/** Base config values for search. */
-public class BaseSearchConfig {
-    public BaseSearchConfig() {}
+package com.android.launcher3.testcomponent;
 
-    /**
-     * Returns whether to enable the synchronized keyboard transition between Home and All Apps.
-     */
-    public boolean isKeyboardSyncEnabled() {
-        return false;
-    }
 
-    /**
-     * Returns whether IME is enabled on swipe up.
-     */
-    public boolean isImeEnabledOnSwipeUp() {
-        return false;
-    }
-}
+/**
+ * Extension of BaseTestingActivity with a Dialog theme
+ */
+public class DialogTestActivity extends BaseTestingActivity {}

@@ -617,6 +617,11 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "Number of apps in A-Z list (personal and work profile)")
         LAUNCHER_ALLAPPS_COUNT(1225),
 
+        @UiEvent(doc = "User has invoked split to right half with a keyboard shortcut.")
+        LAUNCHER_KEYBOARD_SHORTCUT_SPLIT_RIGHT_BOTTOM(1232),
+
+        @UiEvent(doc = "User has invoked split to left half with a keyboard shortcut.")
+        LAUNCHER_KEYBOARD_SHORTCUT_SPLIT_LEFT_TOP(1233)
         ;
 
         // ADD MORE
@@ -781,7 +786,6 @@ public class StatsLogManager implements ResourceBasedOverride {
             public int getId() {
                 return mId;
             }
-
         }
 
         /**
@@ -810,6 +814,13 @@ public class StatsLogManager implements ResourceBasedOverride {
          * Sets query length of the event.
          */
         default StatsLatencyLogger withQueryLength(int queryLength) {
+            return this;
+        }
+
+        /**
+         * Sets sub event type.
+         */
+        default StatsLatencyLogger withSubEventType(int type) {
             return this;
         }
 

@@ -44,6 +44,7 @@ import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
 import static com.android.launcher3.anim.Interpolators.EMPHASIZED;
 import static com.android.launcher3.config.FeatureFlags.SHOW_DELIGHTFUL_PAGINATION;
+import static com.android.launcher3.config.FeatureFlags.SHOW_DOT_PAGINATION;
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
@@ -52,6 +53,8 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_EXIT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONRESUME;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONSTOP;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPELEFT;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SWIPERIGHT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGET_RECONFIGURED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_ACTIVITY_PAUSED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_DRAG_AND_DROP;
@@ -142,6 +145,7 @@ import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.dragndrop.DragOptions;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.dragndrop.LauncherDragController;
+import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderGridOrganizer;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.icons.BitmapRenderer;
@@ -181,7 +185,6 @@ import com.android.launcher3.states.RotationHelper;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.AllAppsSwipeController;
-import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.ActivityResultInfo;
 import com.android.launcher3.util.ActivityTracker;
@@ -220,7 +223,6 @@ import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.plugins.shared.LauncherExterns;
 import com.android.systemui.plugins.shared.LauncherOverlayManager;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlay;
-import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayCallbacks;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -240,7 +242,7 @@ import java.util.stream.Stream;
  */
 public class Launcher extends StatefulActivity<LauncherState>
         implements LauncherExterns, Callbacks, InvariantDeviceProfile.OnIDPChangeListener,
-        PluginListener<LauncherOverlayPlugin>, LauncherOverlayCallbacks {
+        PluginListener<LauncherOverlayPlugin> {
     public static final String TAG = "Launcher";
 
     public static final ActivityTracker<Launcher> ACTIVITY_TRACKER = new ActivityTracker<>();
@@ -694,15 +696,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     @Override
     public void setLauncherOverlay(LauncherOverlay overlay) {
-        if (overlay != null) {
-            overlay.setOverlayCallbacks(this);
-        }
         mWorkspace.setLauncherOverlay(overlay);
-    }
-
-    @Override
-    public void runOnOverlayHidden(Runnable runnable) {
-        getWorkspace().runOnOverlayHidden(runnable);
     }
 
     public boolean setLauncherCallbacks(LauncherCallbacks callbacks) {
@@ -1191,7 +1185,6 @@ public class Launcher extends StatefulActivity<LauncherState>
             mOverlayManager.onActivityResumed(this);
         }
 
-        AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
         DragView.removeAllViews(this);
         TraceHelper.INSTANCE.endSection(traceToken);
     }
@@ -1210,18 +1203,6 @@ public class Launcher extends StatefulActivity<LauncherState>
             mOverlayManager.onActivityPaused(this);
         }
         mAppWidgetHolder.setActivityResumed(false);
-    }
-
-    /**
-     * {@code LauncherOverlayCallbacks} scroll amount.
-     * Indicates transition progress to -1 screen.
-     * @param progress From 0 to 1.
-     */
-    @Override
-    public void onScrollChanged(float progress) {
-        if (mWorkspace != null) {
-            mWorkspace.onOverlayScrollChanged(progress);
-        }
     }
 
     /**
@@ -1300,7 +1281,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     @Override
     public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
-        if (SHOW_DELIGHTFUL_PAGINATION.get()
+        if ((SHOW_DOT_PAGINATION.get() || SHOW_DELIGHTFUL_PAGINATION.get())
                 && WorkspacePageIndicator.class.getName().equals(name)) {
             return LayoutInflater.from(context).inflate(R.layout.page_indicator_dots,
                     (ViewGroup) parent, false);
@@ -1331,7 +1312,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         BubbleTextView favorite = (BubbleTextView) LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.app_icon, parent, false);
         favorite.applyFromWorkspaceItem(info);
-        favorite.setOnClickListener(ItemClickHandler.INSTANCE);
+        favorite.setOnClickListener(getItemOnClickListener());
         favorite.setOnFocusChangeListener(mFocusHandler);
         return favorite;
     }
@@ -1704,6 +1685,10 @@ public class Launcher extends StatefulActivity<LauncherState>
             outState.remove(RUNTIME_STATE_WIDGET_PANEL);
         }
 
+        // We close any open folders and shortcut containers that are not safe for rebind,
+        // and we need to make sure this state is reflected.
+        AbstractFloatingView.closeAllOpenViewsExcept(
+                this, isStarted() && !isForceInvisible(), TYPE_REBIND_SAFE);
         finishAutoCancelActionMode();
 
         if (mPendingRequestArgs != null) {
@@ -2814,16 +2799,30 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
 
             return v;
-        } else {
-            List<ViewGroup> containers = new ArrayList<>(mWorkspace.getPanelCount() + 1);
-            containers.add(mWorkspace.getHotseat().getShortcutsAndWidgets());
-            mWorkspace.forEachVisiblePage(page
-                    -> containers.add(((CellLayout) page).getShortcutsAndWidgets()));
-
-            // Order: Preferred item by itself or in folder, then by matching package/user
-            return getFirstMatch(containers, preferredItem, forFolderMatch(preferredItem),
-                    packageAndUserAndApp, forFolderMatch(packageAndUserAndApp));
         }
+
+        // Look for the item inside the folder at the current page
+        Folder folder = Folder.getOpen(this);
+        if (folder != null) {
+            View v = getFirstMatch(Collections.singletonList(
+                    folder.getContent().getCurrentCellLayout().getShortcutsAndWidgets()),
+                    preferredItem,
+                    packageAndUserAndApp);
+            if (v == null) {
+                folder.close(isStarted() && !isForceInvisible());
+            } else {
+                return v;
+            }
+        }
+
+        List<ViewGroup> containers = new ArrayList<>(mWorkspace.getPanelCount() + 1);
+        containers.add(mWorkspace.getHotseat().getShortcutsAndWidgets());
+        mWorkspace.forEachVisiblePage(page
+                -> containers.add(((CellLayout) page).getShortcutsAndWidgets()));
+
+        // Order: Preferred item by itself or in folder, then by matching package/user
+        return getFirstMatch(containers, preferredItem, forFolderMatch(preferredItem),
+                packageAndUserAndApp, forFolderMatch(packageAndUserAndApp));
     }
 
     /**
@@ -2876,7 +2875,16 @@ public class Launcher extends StatefulActivity<LauncherState>
     /**
      * Informs us that the overlay (-1 screen, typically), has either become visible or invisible.
      */
-    public void onOverlayVisibilityChanged(boolean visible) {}
+    public void onOverlayVisibilityChanged(boolean visible) {
+        getStatsLogManager().logger()
+                .withSrcState(LAUNCHER_STATE_HOME)
+                .withDstState(LAUNCHER_STATE_HOME)
+                .withContainerInfo(LauncherAtom.ContainerInfo.newBuilder()
+                        .setWorkspace(WorkspaceContainer.newBuilder()
+                                .setPageIndex(visible ? 0 : -1))
+                        .build())
+                .log(visible ? LAUNCHER_SWIPELEFT : LAUNCHER_SWIPERIGHT);
+    }
 
     /**
      * Informs us that the page transition has ended, so that we can react to the newly selected
