@@ -38,7 +38,7 @@ public class ParanoidLauncherModelDelegate extends QuickstepModelDelegate
     public static final String TAG = "ParanoidLauncherModelDelegate";
 
     public final Context mContext;
-    public final Deque mSmartspaceTargets = new LinkedList();
+    public final Deque mSmartspaceTargets = new LinkedList<List>();
 
     public SmartspaceSession mSmartspaceSession;
 
@@ -64,8 +64,9 @@ public class ParanoidLauncherModelDelegate extends QuickstepModelDelegate
             return;
         }
         mSmartspaceTargets.descendingIterator().forEachRemaining((x) -> {
-            writer.println(prefix + "   Number of targets: " + mSmartspaceTargets.size());
-            Iterator it = mSmartspaceTargets.iterator();
+            List targets = (List) x;
+            writer.println(prefix + "   Number of targets: " + targets.size());
+            Iterator it = targets.iterator();
             while (it.hasNext()) {
                 writer.println(prefix + "      " + ((SmartspaceTarget) it.next()));
             }
