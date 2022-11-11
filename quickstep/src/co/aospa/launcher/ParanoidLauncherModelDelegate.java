@@ -65,7 +65,7 @@ public class ParanoidLauncherModelDelegate extends QuickstepModelDelegate
         }
         mSmartspaceTargets.descendingIterator().forEachRemaining((x) -> {
             writer.println(prefix + "   Number of targets: " + mSmartspaceTargets.size());
-            Iterator it = mSmartspaceTargets.iterator();
+            Iterator it = x.iterator();
             while (it.hasNext()) {
                 writer.println(prefix + "      " + ((SmartspaceTarget) it.next()));
             }
