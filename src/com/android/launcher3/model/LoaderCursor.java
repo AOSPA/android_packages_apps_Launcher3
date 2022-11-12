@@ -291,12 +291,16 @@ public class LoaderCursor extends CursorWrapper {
 
         // from the db
         if (TextUtils.isEmpty(info.title)) {
-            info.title = getTitle();
-        }
+            if (loadIcon) {
+                info.title = getTitle();
 
-        // fall back to the class name of the activity
-        if (info.title == null) {
-            info.title = componentName.getClassName();
+                // fall back to the class name of the activity
+                if (info.title == null) {
+                    info.title = componentName.getClassName();
+                }
+            } else {
+                info.title = "";
+            }
         }
 
         info.contentDescription = mPM.getUserBadgedLabel(info.title, info.user);
@@ -459,7 +463,7 @@ public class LoaderCursor extends CursorWrapper {
             if (item.screenId == Workspace.FIRST_SCREEN_ID) {
                 // Mark the first row as occupied (if the feature is enabled)
                 // in order to account for the QSB.
-                int spanY = FeatureFlags.EXPANDED_SMARTSPACE.get() ? 2 : 1;
+                int spanY = 1;
                 screen.markCells(0, 0, countX + 1, spanY, FeatureFlags.QSB_ON_FIRST_SCREEN);
             }
             occupied.put(item.screenId, screen);

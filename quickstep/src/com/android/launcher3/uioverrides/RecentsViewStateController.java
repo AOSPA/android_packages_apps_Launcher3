@@ -30,13 +30,14 @@ import static com.android.quickstep.views.TaskView.FLAG_UPDATE_ALL;
 import android.annotation.TargetApi;
 import android.os.Build;
 import android.util.FloatProperty;
+import android.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.PropertySetter;
@@ -55,7 +56,7 @@ import com.android.quickstep.views.RecentsView;
 public final class RecentsViewStateController extends
         BaseRecentsViewStateController<LauncherRecentsView> {
 
-    public RecentsViewStateController(BaseQuickstepLauncher launcher) {
+    public RecentsViewStateController(QuickstepLauncher launcher) {
         super(launcher);
     }
 
@@ -84,6 +85,13 @@ public final class RecentsViewStateController extends
             // While animating into recents, update the visible task data as needed
             builder.addOnFrameCallback(() -> mRecentsView.loadVisibleTaskData(FLAG_UPDATE_ALL));
             mRecentsView.updateEmptyMessage();
+            // TODO(b/238461210): Remove logging once root cause of flake detected.
+            if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+                Log.d("b/238461210", "RecentsView#setStateWithAnimationInternal getCurrentPage(): "
+                                + mRecentsView.getCurrentPage()
+                                + ", getScrollForPage(getCurrentPage())): "
+                                + mRecentsView.getScrollForPage(mRecentsView.getCurrentPage()));
+            }
         } else {
             builder.addListener(
                     AnimatorListeners.forSuccessCallback(mRecentsView::resetTaskVisuals));

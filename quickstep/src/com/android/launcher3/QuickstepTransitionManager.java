@@ -43,10 +43,10 @@ import static com.android.launcher3.config.FeatureFlags.KEYGUARD_ANIMATION;
 import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVITY;
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.statehandlers.DepthController.DEPTH;
-import static com.android.launcher3.testing.TestProtocol.BAD_STATE;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
 import static com.android.launcher3.views.FloatingIconView.SHAPE_PROGRESS_DURATION;
 import static com.android.launcher3.views.FloatingIconView.getFloatingIconView;
+import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 import static com.android.quickstep.TaskViewUtils.findTaskViewToLaunch;
 import static com.android.systemui.shared.system.QuickStepContract.getWindowCornerRadius;
 import static com.android.systemui.shared.system.QuickStepContract.supportsRoundedCornersOnWindows;
@@ -77,9 +77,9 @@ import android.os.Looper;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
-import android.util.Log;
 import android.util.Pair;
 import android.util.Size;
+import android.view.CrossWindowBlurListeners;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.view.ViewRootImpl;
@@ -95,12 +95,15 @@ import androidx.core.graphics.ColorUtils;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory;
 import com.android.launcher3.anim.AnimationSuccessListener;
+import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
+import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.touch.PagedOrientationHandler;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.DynamicResource;
 import com.android.launcher3.util.ObjectWrapper;
@@ -136,7 +139,6 @@ import com.android.systemui.shared.system.WindowManagerWrapper;
 import com.android.wm.shell.startingsurface.IStartingWindowListener;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -144,8 +146,6 @@ import java.util.List;
  * Manages the opening and closing app transitions from Launcher
  */
 public class QuickstepTransitionManager implements OnDeviceProfileChangeListener {
-
-    private static final String TAG = "QuickstepTransition";
 
     private static final boolean ENABLE_SHELL_STARTING_SURFACE =
             SystemProperties.getBoolean("persist.debug.shell_starting_surface", true);
@@ -195,7 +195,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
     // Cross-fade duration between App Widget and App
     private static final int WIDGET_CROSSFADE_DURATION_MILLIS = 125;
 
-    protected final BaseQuickstepLauncher mLauncher;
+    protected final QuickstepLauncher mLauncher;
     private final DragLayer mDragLayer;
 
     final Handler mHandler;
@@ -446,7 +446,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                         4 - rotationChange);
             }
         }
-        if (mDeviceProfile.isTaskbarPresentInApps) {
+        if (mDeviceProfile.isTaskbarPresentInApps && !target.willShowImeOnTarget) {
             // Animate to above the taskbar.
             bounds.bottom -= target.contentInsets.bottom;
         }
@@ -519,6 +519,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 appsView.setAlpha(startAlpha);
                 SCALE_PROPERTY.set(appsView, startScale);
                 appsView.setLayerType(View.LAYER_TYPE_NONE, null);
+                mLauncher.resumeExpensiveViewUpdates();
             };
         } else if (mLauncher.isInState(OVERVIEW)) {
             endListener = composeViewContentAnimator(launcherAnimator, alphas, scales);
@@ -622,28 +623,9 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         RecentsView overview = mLauncher.getOverviewPanel();
         ObjectAnimator alpha = ObjectAnimator.ofFloat(overview,
                 RecentsView.CONTENT_ALPHA, alphas);
-        Log.d(BAD_STATE, "QTM composeViewContentAnimator alphas=" + Arrays.toString(alphas));
-        alpha.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                Log.d(BAD_STATE, "QTM composeViewContentAnimator onStart");
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-                float alpha = overview == null ? -1 : RecentsView.CONTENT_ALPHA.get(overview);
-                Log.d(BAD_STATE, "QTM composeViewContentAnimator onCancel, alpha=" + alpha);
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                Log.d(BAD_STATE, "QTM composeViewContentAnimator onEnd");
-            }
-        });
         alpha.setDuration(CONTENT_ALPHA_DURATION);
         alpha.setInterpolator(LINEAR);
         anim.play(alpha);
-        Log.d(BAD_STATE, "QTM composeViewContentAnimator setFreezeVisibility=true");
         overview.setFreezeViewVisibility(true);
 
         ObjectAnimator scaleAnim = ObjectAnimator.ofFloat(overview, SCALE_PROPERTY, scales);
@@ -652,10 +634,10 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         anim.play(scaleAnim);
 
         return () -> {
-            Log.d(BAD_STATE, "QTM composeViewContentAnimator onEnd setFreezeVisibility=false");
             overview.setFreezeViewVisibility(false);
             SCALE_PROPERTY.set(overview, 1f);
             mLauncher.getStateManager().reapplyState();
+            mLauncher.resumeExpensiveViewUpdates();
         };
     }
 
@@ -1066,54 +1048,37 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
     private ObjectAnimator getBackgroundAnimator() {
         // When launching an app from overview that doesn't map to a task, we still want to just
         // blur the wallpaper instead of the launcher surface as well
-        boolean allowBlurringLauncher = mLauncher.getStateManager().getState() != OVERVIEW;
-        DepthController depthController = mLauncher.getDepthController();
+        boolean allowBlurringLauncher = mLauncher.getStateManager().getState() != OVERVIEW
+                && BlurUtils.supportsBlursOnWindows();
+
+        MyDepthController depthController = new MyDepthController(mLauncher);
         ObjectAnimator backgroundRadiusAnim = ObjectAnimator.ofFloat(depthController, DEPTH,
-                BACKGROUND_APP.getDepth(mLauncher))
+                        BACKGROUND_APP.getDepth(mLauncher))
                 .setDuration(APP_LAUNCH_DURATION);
+
         if (allowBlurringLauncher) {
-            final SurfaceControl dimLayer;
-            if (BlurUtils.supportsBlursOnWindows()) {
-                // Create a temporary effect layer, that lives on top of launcher, so we can apply
-                // the blur to it. The EffectLayer will be fullscreen, which will help with caching
-                // optimizations on the SurfaceFlinger side:
-                // - Results would be able to be cached as a texture
-                // - There won't be texture allocation overhead, because EffectLayers don't have
-                //   buffers
-                ViewRootImpl viewRootImpl = mLauncher.getDragLayer().getViewRootImpl();
-                SurfaceControl parent = viewRootImpl != null
-                        ? viewRootImpl.getSurfaceControl()
-                        : null;
-                dimLayer = new SurfaceControl.Builder()
-                        .setName("Blur layer")
-                        .setParent(parent)
-                        .setOpaque(false)
-                        .setHidden(false)
-                        .setEffectLayer()
-                        .build();
-            } else {
-                dimLayer = null;
-            }
+            // Create a temporary effect layer, that lives on top of launcher, so we can apply
+            // the blur to it. The EffectLayer will be fullscreen, which will help with caching
+            // optimizations on the SurfaceFlinger side:
+            // - Results would be able to be cached as a texture
+            // - There won't be texture allocation overhead, because EffectLayers don't have
+            //   buffers
+            ViewRootImpl viewRootImpl = mLauncher.getDragLayer().getViewRootImpl();
+            SurfaceControl parent = viewRootImpl != null
+                    ? viewRootImpl.getSurfaceControl()
+                    : null;
+            SurfaceControl dimLayer = new SurfaceControl.Builder()
+                    .setName("Blur layer")
+                    .setParent(parent)
+                    .setOpaque(false)
+                    .setHidden(false)
+                    .setEffectLayer()
+                    .build();
 
-            depthController.setSurface(dimLayer);
-            backgroundRadiusAnim.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    depthController.setIsInLaunchTransition(true);
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    depthController.setIsInLaunchTransition(false);
-                    depthController.setSurface(null);
-                    if (dimLayer != null) {
-                        new SurfaceControl.Transaction()
-                                .remove(dimLayer)
-                                .apply();
-                    }
-                }
-            });
+            backgroundRadiusAnim.addListener(AnimatorListeners.forEndCallback(() ->
+                    new SurfaceControl.Transaction().remove(dimLayer).apply()));
         }
+
         return backgroundRadiusAnim;
     }
 
@@ -1156,6 +1121,9 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
      * Registers remote animations used when closing apps to home screen.
      */
     public void registerRemoteTransitions() {
+        if (ENABLE_SHELL_TRANSITIONS) {
+            SystemUiProxy.INSTANCE.get(mLauncher).shareTransactionQueue();
+        }
         if (SEPARATE_RECENTS_ACTIVITY.get()) {
             return;
         }
@@ -1195,6 +1163,9 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
     }
 
     private void unregisterRemoteTransitions() {
+        if (ENABLE_SHELL_TRANSITIONS) {
+            SystemUiProxy.INSTANCE.get(mLauncher).unshareTransactionQueue();
+        }
         if (SEPARATE_RECENTS_ACTIVITY.get()) {
             return;
         }
@@ -1455,7 +1426,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         animation.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
-                anim.start(mLauncher, velocityPxPerS);
+                anim.start(mLauncher, mDeviceProfile, velocityPxPerS);
             }
         });
         return anim;
@@ -1956,6 +1927,19 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 return 0f;
             }
             return Utilities.mapToRange(progress, start, end, 1, 0, ACCEL_1_5);
+        }
+    }
+
+    private static class MyDepthController extends DepthController {
+        MyDepthController(Launcher l) {
+            super(l);
+            setCrossWindowBlursEnabled(
+                    CrossWindowBlurListeners.getInstance().isCrossWindowBlurEnabled());
+        }
+
+        @Override
+        public void setSurface(SurfaceControl surface) {
+            super.setSurface(surface);
         }
     }
 }

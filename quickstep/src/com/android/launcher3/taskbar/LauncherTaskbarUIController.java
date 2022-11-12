@@ -32,7 +32,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
@@ -42,6 +41,7 @@ import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.RecentsAnimationCallbacks;
@@ -65,7 +65,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     private final SparseArray<Float> mTaskbarInAppDisplayProgress = new SparseArray<>(4);
 
-    private final BaseQuickstepLauncher mLauncher;
+    private final QuickstepLauncher mLauncher;
 
     private final DeviceProfile.OnDeviceProfileChangeListener mOnDeviceProfileChangeListener =
             dp -> {
@@ -81,7 +81,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     private final TaskbarLauncherStateController
             mTaskbarLauncherStateController = new TaskbarLauncherStateController();
 
-    public LauncherTaskbarUIController(BaseQuickstepLauncher launcher) {
+    public LauncherTaskbarUIController(QuickstepLauncher launcher) {
         mLauncher = launcher;
     }
 
@@ -351,6 +351,13 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 getInAppDisplayProgress(SYSUI_SURFACE_PROGRESS_INDEX))
                 .max(Float::compareTo)
                 .get();
+    }
+
+    @Override
+    public void onExpandPip() {
+        super.onExpandPip();
+        mTaskbarLauncherStateController.updateStateForFlag(FLAG_RESUMED, false);
+        mTaskbarLauncherStateController.applyState();
     }
 
     @Override

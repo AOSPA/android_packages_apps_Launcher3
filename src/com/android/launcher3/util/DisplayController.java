@@ -19,7 +19,7 @@ import static android.content.Intent.ACTION_CONFIGURATION_CHANGED;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 
-import static com.android.launcher3.ResourceUtils.INVALID_RESOURCE_HANDLE;
+import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_2_BUTTON;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVIGATION_MODE_3_BUTTON;
@@ -46,7 +46,7 @@ import android.view.Display;
 import androidx.annotation.AnyThread;
 import androidx.annotation.UiThread;
 
-import com.android.launcher3.ResourceUtils;
+import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.util.window.CachedDisplayInfo;
@@ -278,11 +278,11 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         public final float fontScale;
         private final int densityDpi;
         public final NavigationMode navigationMode;
-
         private final PortraitSize mScreenSizeDp;
 
+        // WindowBounds
+        public final WindowBounds realBounds;
         public final Set<WindowBounds> supportedBounds = new ArraySet<>();
-
         private final ArrayMap<CachedDisplayInfo, WindowBounds[]> mPerDisplayBounds =
                 new ArrayMap<>();
 
@@ -310,7 +310,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             mPerDisplayBounds.putAll(perDisplayBoundsCache);
             WindowBounds[] cachedValue = mPerDisplayBounds.get(normalizedDisplayInfo);
 
-            WindowBounds realBounds = wmProxy.getRealBounds(displayInfoContext, displayInfo);
+            realBounds = wmProxy.getRealBounds(displayInfoContext, displayInfo);
             if (cachedValue == null) {
                 // Unexpected normalizedDisplayInfo is found, recreate the cache
                 Log.e(TAG, "Unexpected normalizedDisplayInfo found, invalidating cache");

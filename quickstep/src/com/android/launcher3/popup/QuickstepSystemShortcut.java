@@ -19,12 +19,13 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.UserHandle;
 import android.util.Log;
 import android.view.View;
 
-import com.android.launcher3.BaseQuickstepLauncher;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.quickstep.views.RecentsView;
 
@@ -32,18 +33,18 @@ public interface QuickstepSystemShortcut {
 
     String TAG = QuickstepSystemShortcut.class.getSimpleName();
 
-    static SystemShortcut.Factory<BaseQuickstepLauncher> getSplitSelectShortcutByPosition(
+    static SystemShortcut.Factory<QuickstepLauncher> getSplitSelectShortcutByPosition(
             SplitPositionOption position) {
         return (activity, itemInfo, originalView) ->
                 new QuickstepSystemShortcut.SplitSelectSystemShortcut(activity, itemInfo,
                         originalView, position);
     }
 
-    class SplitSelectSystemShortcut extends SystemShortcut<BaseQuickstepLauncher> {
+    class SplitSelectSystemShortcut extends SystemShortcut<QuickstepLauncher> {
 
         private final SplitPositionOption mPosition;
 
-        public SplitSelectSystemShortcut(BaseQuickstepLauncher launcher, ItemInfo itemInfo,
+        public SplitSelectSystemShortcut(QuickstepLauncher launcher, ItemInfo itemInfo,
                 View originalView, SplitPositionOption position) {
             super(position.iconResId, position.textResId, launcher, itemInfo, originalView);
 
@@ -71,7 +72,7 @@ public interface QuickstepSystemShortcut {
             RecentsView recentsView = mTarget.getOverviewPanel();
             recentsView.initiateSplitSelect(
                     new SplitSelectSource(mOriginalView, new BitmapDrawable(bitmap), intent,
-                            mPosition));
+                            mPosition, mItemInfo.user));
         }
     }
 
@@ -81,13 +82,15 @@ public interface QuickstepSystemShortcut {
         public final Drawable drawable;
         public final Intent intent;
         public final SplitPositionOption position;
+        public final UserHandle user;
 
         public SplitSelectSource(View view, Drawable drawable, Intent intent,
-                SplitPositionOption position) {
+                SplitPositionOption position, UserHandle user) {
             this.view = view;
             this.drawable = drawable;
             this.intent = intent;
             this.position = position;
+            this.user = user;
         }
     }
 }

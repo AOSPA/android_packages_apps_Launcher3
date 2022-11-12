@@ -43,7 +43,6 @@ import android.annotation.IdRes;
 import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Outline;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -57,7 +56,6 @@ import android.view.MotionEvent;
 import android.view.TouchDelegate;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewOutlineProvider;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.Interpolator;
 import android.widget.FrameLayout;
@@ -76,7 +74,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.testing.TestLogging;
-import com.android.launcher3.testing.TestProtocol;
+import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ComponentKey;
@@ -325,8 +323,6 @@ public class TaskView extends FrameLayout implements Reusable {
                 }
             };
 
-    private final TaskOutlineProvider mOutlineProvider;
-
     @Nullable
     protected Task mTask;
     protected TaskThumbnailView mSnapshotView;
@@ -409,10 +405,6 @@ public class TaskView extends FrameLayout implements Reusable {
 
         mCurrentFullscreenParams = new FullscreenDrawParams(context);
         mDigitalWellBeingToast = new DigitalWellBeingToast(mActivity, this);
-
-        mOutlineProvider = new TaskOutlineProvider(getContext(), mCurrentFullscreenParams,
-                mActivity.getDeviceProfile().overviewTaskThumbnailTopMarginPx);
-        setOutlineProvider(mOutlineProvider);
     }
 
     public void setTaskViewId(int id) {
@@ -874,10 +866,9 @@ public class TaskView extends FrameLayout implements Reusable {
 
         int thumbnailTopMargin = deviceProfile.overviewTaskThumbnailTopMarginPx;
         int taskIconHeight = deviceProfile.overviewTaskIconSizePx;
-        int taskMargin = isGridTask ? deviceProfile.overviewTaskMarginGridPx
-                : deviceProfile.overviewTaskMarginPx;
-        int taskIconMargin = thumbnailTopMargin - taskIconHeight - taskMargin;
-        orientationHandler.setTaskIconParams(iconParams, taskIconMargin, taskIconHeight,
+        int taskMargin = deviceProfile.overviewTaskMarginPx;
+
+        orientationHandler.setTaskIconParams(iconParams, taskMargin, taskIconHeight,
                 thumbnailTopMargin, isRtl);
         iconParams.width = iconParams.height = taskIconHeight;
         mIconView.setLayoutParams(iconParams);
@@ -1266,33 +1257,6 @@ public class TaskView extends FrameLayout implements Reusable {
         mEndQuickswitchCuj = endQuickswitchCuj;
     }
 
-    private static final class TaskOutlineProvider extends ViewOutlineProvider {
-
-        private int mMarginTop;
-        private FullscreenDrawParams mFullscreenParams;
-
-        TaskOutlineProvider(Context context, FullscreenDrawParams fullscreenParams, int topMargin) {
-            mMarginTop = topMargin;
-            mFullscreenParams = fullscreenParams;
-        }
-
-        public void updateParams(FullscreenDrawParams params, int topMargin) {
-            mFullscreenParams = params;
-            mMarginTop = topMargin;
-        }
-
-        @Override
-        public void getOutline(View view, Outline outline) {
-            RectF insets = mFullscreenParams.mCurrentDrawnInsets;
-            float scale = mFullscreenParams.mScale;
-            outline.setRoundRect(0,
-                    (int) (mMarginTop * scale),
-                    (int) ((insets.left + view.getWidth() + insets.right) * scale),
-                    (int) ((insets.top + view.getHeight() + insets.bottom) * scale),
-                    mFullscreenParams.mCurrentDrawnCornerRadius);
-        }
-    }
-
     private int getExpectedViewHeight(View view) {
         int expectedHeight;
         int h = view.getLayoutParams().height;
@@ -1398,11 +1362,6 @@ public class TaskView extends FrameLayout implements Reusable {
         mSnapshotView.getTaskOverlay().setFullscreenProgress(progress);
 
         updateSnapshotRadius();
-
-        mOutlineProvider.updateParams(
-                mCurrentFullscreenParams,
-                mActivity.getDeviceProfile().overviewTaskThumbnailTopMarginPx);
-        invalidateOutline();
     }
 
     protected void updateSnapshotRadius() {
@@ -1431,8 +1390,9 @@ public class TaskView extends FrameLayout implements Reusable {
         DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         if (deviceProfile.isTablet) {
             final int thumbnailPadding = deviceProfile.overviewTaskThumbnailTopMarginPx;
-            final int taskWidth = deviceProfile.overviewTaskRect.width();
-            final int taskHeight = deviceProfile.overviewTaskRect.height();
+            final Rect lastComputedTaskSize = getRecentsView().getLastComputedTaskSize();
+            final int taskWidth = lastComputedTaskSize.width();
+            final int taskHeight = lastComputedTaskSize.height();
 
             int boxWidth;
             int boxHeight;
@@ -1443,9 +1403,10 @@ public class TaskView extends FrameLayout implements Reusable {
                 boxWidth = taskWidth;
                 boxHeight = taskHeight;
             } else {
-                // Otherwise task is in grid.
-                boxWidth = deviceProfile.overviewGridTaskDimension.x;
-                boxHeight = deviceProfile.overviewGridTaskDimension.y;
+                // Otherwise task is in grid, and should use lastComputedGridTaskSize.
+                Rect lastComputedGridTaskSize = getRecentsView().getLastComputedGridTaskSize();
+                boxWidth = lastComputedGridTaskSize.width();
+                boxHeight = lastComputedGridTaskSize.height();
             }
 
             // Bound width/height to the box size.

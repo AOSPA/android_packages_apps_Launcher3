@@ -15,24 +15,38 @@
  */
 package com.android.launcher3.util;
 
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+
+import static java.util.stream.Collectors.toList;
+
 import android.content.res.Resources;
 import android.os.Handler;
-import android.os.Looper;
-import android.os.SystemClock;
+import android.os.Message;
 import android.os.Trace;
+import android.text.TextUtils;
 import android.util.Base64;
+import android.util.Base64OutputStream;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver.OnDrawListener;
+import android.view.Window;
 
 import androidx.annotation.UiThread;
+import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.view.ViewCaptureData.ExportedData;
 import com.android.launcher3.view.ViewCaptureData.FrameData;
 import com.android.launcher3.view.ViewCaptureData.ViewNode;
 
-import java.util.concurrent.FutureTask;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.concurrent.Future;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Utility class for capturing view data every frame
@@ -41,122 +55,221 @@ public class ViewCapture implements OnDrawListener {
 
     private static final String TAG = "ViewCapture";
 
+    // Number of frames to keep in memory
     private static final int MEMORY_SIZE = 2000;
+    // Initial size of the reference pool. This is at least be 5 * total number of views in
+    // Launcher. This allows the first free frames avoid object allocation during view capture.
+    private static final int INIT_POOL_SIZE = 300;
 
+    private final Window mWindow;
     private final View mRoot;
-    private final long[] mFrameTimes = new long[MEMORY_SIZE];
-    private final Node[] mNodes = new Node[MEMORY_SIZE];
+    private final Resources mResources;
 
-    private int mFrameIndex = -1;
+    private final Handler mHandler;
+    private final ViewRef mViewRef = new ViewRef();
+
+    private int mFrameIndexBg = -1;
+    private final long[] mFrameTimesBg = new long[MEMORY_SIZE];
+    private final ViewPropertyRef[] mNodesBg = new ViewPropertyRef[MEMORY_SIZE];
+
+    // Pool used for capturing view tree on the UI thread.
+    private ViewRef mPool = new ViewRef();
 
     /**
-     * @param root the root view for the capture data
+     * @param window the window for the capture data
      */
-    public ViewCapture(View root) {
-        mRoot = root;
+    public ViewCapture(Window window) {
+        mWindow = window;
+        mRoot = mWindow.getDecorView();
+        mResources = mRoot.getResources();
+        mHandler = new Handler(UI_HELPER_EXECUTOR.getLooper(), this::captureViewPropertiesBg);
+    }
+
+    /**
+     * Attaches the ViewCapture to the root
+     */
+    public void attach() {
+        mHandler.post(this::initPool);
+    }
+
+    /**
+     * Removes a previously attached ViewCapture from the root
+     */
+    public void detach() {
+        mHandler.post(() -> MAIN_EXECUTOR.execute(
+                () -> mRoot.getViewTreeObserver().removeOnDrawListener(this)));
     }
 
     @Override
     public void onDraw() {
         Trace.beginSection("view_capture");
-        long now = SystemClock.elapsedRealtimeNanos();
-
-        mFrameIndex++;
-        if (mFrameIndex >= MEMORY_SIZE) {
-            mFrameIndex = 0;
-        }
-        mFrameTimes[mFrameIndex] = now;
-        mNodes[mFrameIndex] = captureView(mRoot, mNodes[mFrameIndex]);
+        captureViewTree(mRoot, mViewRef);
+        Message m = Message.obtain(mHandler);
+        m.obj = mViewRef.next;
+        mHandler.sendMessage(m);
         Trace.endSection();
     }
 
     /**
-     * Creates a proto of all the data captured so far.
+     * Captures the View property on the background thread, and transfer all the ViewRef objects
+     * back to the pool
      */
-    public String dumpToString() {
-        Handler handler = mRoot.getHandler();
-        if (handler == null) {
-            handler = Executors.MAIN_EXECUTOR.getHandler();
+    @WorkerThread
+    private boolean captureViewPropertiesBg(Message msg) {
+        ViewRef start = (ViewRef) msg.obj;
+        long time = msg.getWhen();
+        if (start == null) {
+            return false;
         }
-        FutureTask<ExportedData> task = new FutureTask<>(this::dumpToProtoUI);
-        if (Looper.myLooper() == handler.getLooper()) {
-            task.run();
-        } else {
-            handler.post(task);
+        mFrameIndexBg++;
+        if (mFrameIndexBg >= MEMORY_SIZE) {
+            mFrameIndexBg = 0;
         }
-        try {
-            return Base64.encodeToString(task.get().toByteArray(),
-                    Base64.NO_CLOSE | Base64.NO_PADDING | Base64.NO_WRAP);
-        } catch (Exception e) {
-            Log.e(TAG, "Error capturing proto", e);
-            return "--error--";
+        mFrameTimesBg[mFrameIndexBg] = time;
+
+        ViewPropertyRef recycle = mNodesBg[mFrameIndexBg];
+
+        ViewPropertyRef result = null;
+        ViewPropertyRef resultEnd = null;
+
+        ViewRef current = start;
+        ViewRef last = start;
+        while (current != null) {
+            ViewPropertyRef propertyRef = recycle;
+            if (propertyRef == null) {
+                propertyRef = new ViewPropertyRef();
+            } else {
+                recycle = recycle.next;
+                propertyRef.next = null;
+            }
+
+            propertyRef.transfer(current);
+            last = current;
+            current = current.next;
+
+            if (result == null) {
+                result = propertyRef;
+                resultEnd = result;
+            } else {
+                resultEnd.next = propertyRef;
+                resultEnd = propertyRef;
+            }
         }
+        mNodesBg[mFrameIndexBg] = result;
+        ViewRef end = last;
+        MAIN_EXECUTOR.execute(() -> addToPool(start, end));
+        return true;
     }
 
     @UiThread
-    private ExportedData dumpToProtoUI() {
-        ExportedData.Builder dataBuilder = ExportedData.newBuilder();
-        Resources res = mRoot.getResources();
-
-        int size = (mNodes[MEMORY_SIZE - 1] == null) ? mFrameIndex + 1 : MEMORY_SIZE;
-        for (int i = size - 1; i >= 0; i--) {
-            int index = (MEMORY_SIZE + mFrameIndex - i) % MEMORY_SIZE;
-            dataBuilder.addFrameData(FrameData.newBuilder()
-                    .setNode(mNodes[index].toProto(res))
-                    .setTimestamp(mFrameTimes[index]));
-        }
-        return dataBuilder.build();
+    private void addToPool(ViewRef start, ViewRef end) {
+        end.next = mPool;
+        mPool = start;
     }
 
-    private Node captureView(View view, Node recycle) {
-        Node result = recycle == null ? new Node() : recycle;
+    @WorkerThread
+    private void initPool() {
+        ViewRef start = new ViewRef();
+        ViewRef current = start;
 
-        result.clazz = view.getClass();
-        result.hashCode = view.hashCode();
-        result.id = view.getId();
-        result.left = view.getLeft();
-        result.top = view.getTop();
-        result.right = view.getRight();
-        result.bottom = view.getBottom();
-        result.scrollX = view.getScrollX();
-        result.scrollY = view.getScrollY();
+        for (int i = 0; i < INIT_POOL_SIZE; i++) {
+            current.next = new ViewRef();
+            current = current.next;
+        }
 
-        result.translateX = view.getTranslationX();
-        result.translateY = view.getTranslationY();
-        result.scaleX = view.getScaleX();
-        result.scaleY = view.getScaleY();
-        result.alpha = view.getAlpha();
-
-        result.visibility = view.getVisibility();
-        result.willNotDraw = view.willNotDraw();
-
-        if (view instanceof ViewGroup) {
-            ViewGroup parent = (ViewGroup) view;
-            result.clipChildren = parent.getClipChildren();
-            int childCount = parent.getChildCount();
-            if (childCount == 0) {
-                result.children = null;
-            } else {
-                result.children = captureView(parent.getChildAt(0), result.children);
-                Node lastChild = result.children;
-                for (int i = 1; i < childCount; i++) {
-                    lastChild.sibling = captureView(parent.getChildAt(i), lastChild.sibling);
-                    lastChild = lastChild.sibling;
-                }
-                lastChild.sibling = null;
+        ViewRef end = current;
+        MAIN_EXECUTOR.execute(() ->  {
+            addToPool(start, end);
+            if (mRoot.isAttachedToWindow()) {
+                mRoot.getViewTreeObserver().addOnDrawListener(this);
             }
-        } else {
-            result.clipChildren = false;
-            result.children = null;
-        }
-        return result;
+        });
     }
 
-    private static class Node {
+    private String getName() {
+        String title = mWindow.getAttributes().getTitle().toString();
+        return TextUtils.isEmpty(title) ? mWindow.toString() : title;
+    }
 
+    /**
+     * Starts the dump process which is completed on closing the returned object.
+     */
+    public SafeCloseable beginDump(PrintWriter writer, FileDescriptor out) {
+        Future<ExportedData> task = UI_HELPER_EXECUTOR.submit(this::dumpToProto);
+
+        return () -> {
+            writer.println();
+            writer.println(" ContinuousViewCapture:");
+            writer.println(" window " + getName() + ":");
+            writer.println("  pkg:" + mRoot.getContext().getPackageName());
+            writer.print("  data:");
+            writer.flush();
+
+            try (OutputStream os = new FileOutputStream(out)) {
+                ExportedData data = task.get();
+                OutputStream encodedOS = new GZIPOutputStream(new Base64OutputStream(os,
+                        Base64.NO_CLOSE | Base64.NO_PADDING | Base64.NO_WRAP));
+                data.writeTo(encodedOS);
+                encodedOS.close();
+                os.flush();
+            } catch (Exception e) {
+                Log.e(TAG, "Error capturing proto", e);
+            }
+            writer.println();
+            writer.println("--end--");
+        };
+    }
+
+    @WorkerThread
+    private ExportedData dumpToProto() {
+        ExportedData.Builder dataBuilder = ExportedData.newBuilder();
+        Resources res = mResources;
+        ArrayList<Class> classList = new ArrayList<>();
+
+        int size = (mNodesBg[MEMORY_SIZE - 1] == null) ? mFrameIndexBg + 1 : MEMORY_SIZE;
+        for (int i = size - 1; i >= 0; i--) {
+            int index = (MEMORY_SIZE + mFrameIndexBg - i) % MEMORY_SIZE;
+            ViewNode.Builder nodeBuilder = ViewNode.newBuilder();
+            mNodesBg[index].toProto(res, classList, nodeBuilder);
+            dataBuilder.addFrameData(FrameData.newBuilder()
+                    .setNode(nodeBuilder)
+                    .setTimestamp(mFrameTimesBg[index]));
+        }
+        return dataBuilder
+                .addAllClassname(classList.stream().map(Class::getName).collect(toList()))
+                .build();
+    }
+
+    private ViewRef captureViewTree(View view, ViewRef start) {
+        ViewRef ref;
+        if (mPool != null) {
+            ref = mPool;
+            mPool = mPool.next;
+            ref.next = null;
+        } else {
+            ref = new ViewRef();
+        }
+        ref.view = view;
+        start.next = ref;
+        if (view instanceof ViewGroup) {
+            ViewRef result = ref;
+            ViewGroup parent = (ViewGroup) view;
+            int childCount = ref.childCount = parent.getChildCount();
+            for (int i = 0; i < childCount; i++) {
+                result = captureViewTree(parent.getChildAt(i), result);
+            }
+            return result;
+        } else {
+            ref.childCount = 0;
+            return ref;
+        }
+    }
+
+    private static class ViewPropertyRef {
         // We store reference in memory to avoid generating and storing too many strings
         public Class clazz;
         public int hashCode;
+        public int childCount = 0;
 
         public int id;
         public int left, top, right, bottom;
@@ -165,15 +278,48 @@ public class ViewCapture implements OnDrawListener {
         public float translateX, translateY;
         public float scaleX, scaleY;
         public float alpha;
+        public float elevation;
 
         public int visibility;
         public boolean willNotDraw;
         public boolean clipChildren;
 
-        public Node sibling;
-        public Node children;
+        public ViewPropertyRef next;
 
-        public ViewNode toProto(Resources res) {
+        public void transfer(ViewRef viewRef) {
+            childCount = viewRef.childCount;
+
+            View view = viewRef.view;
+            viewRef.view = null;
+
+            clazz = view.getClass();
+            hashCode = view.hashCode();
+            id = view.getId();
+            left = view.getLeft();
+            top = view.getTop();
+            right = view.getRight();
+            bottom = view.getBottom();
+            scrollX = view.getScrollX();
+            scrollY = view.getScrollY();
+
+            translateX = view.getTranslationX();
+            translateY = view.getTranslationY();
+            scaleX = view.getScaleX();
+            scaleY = view.getScaleY();
+            alpha = view.getAlpha();
+
+            visibility = view.getVisibility();
+            willNotDraw = view.willNotDraw();
+            elevation = view.getElevation();
+        }
+
+        /**
+         * Converts the data to the proto representation and returns the next property ref
+         * at the end of the iteration.
+         * @return
+         */
+        public ViewPropertyRef toProto(Resources res, ArrayList<Class> classList,
+                ViewNode.Builder outBuilder) {
             String resolvedId;
             if (id >= 0) {
                 try {
@@ -184,9 +330,14 @@ public class ViewCapture implements OnDrawListener {
             } else {
                 resolvedId = "NO_ID";
             }
-
-            ViewNode.Builder result = ViewNode.newBuilder()
-                    .setClassname(clazz.getName() + "@" + hashCode)
+            int classnameIndex = classList.indexOf(clazz);
+            if (classnameIndex < 0) {
+                classnameIndex = classList.size();
+                classList.add(clazz);
+            }
+            outBuilder
+                    .setClassnameIndex(classnameIndex)
+                    .setHashcode(hashCode)
                     .setId(resolvedId)
                     .setLeft(left)
                     .setTop(top)
@@ -199,14 +350,22 @@ public class ViewCapture implements OnDrawListener {
                     .setAlpha(alpha)
                     .setVisibility(visibility)
                     .setWillNotDraw(willNotDraw)
+                    .setElevation(elevation)
                     .setClipChildren(clipChildren);
-            Node child = children;
-            while (child != null) {
-                result.addChildren(child.toProto(res));
-                child = child.sibling;
-            }
-            return result.build();
-        }
 
+            ViewPropertyRef result = next;
+            for (int i = 0; (i < childCount) && (result != null); i++) {
+                ViewNode.Builder childBuilder = ViewNode.newBuilder();
+                result = result.toProto(res, classList, childBuilder);
+                outBuilder.addChildren(childBuilder);
+            }
+            return result;
+        }
+    }
+
+    private static class ViewRef {
+        public View view;
+        public int childCount = 0;
+        public ViewRef next;
     }
 }
