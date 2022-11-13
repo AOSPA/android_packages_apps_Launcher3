@@ -23,6 +23,7 @@ import android.view.ViewTreeObserver;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.util.DimensionUtils;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.TouchController;
 import com.android.quickstep.AnimatedFloat;
 
@@ -31,7 +32,8 @@ import java.io.PrintWriter;
 /**
  * Handles properties/data collection, then passes the results to TaskbarDragLayer to render.
  */
-public class TaskbarDragLayerController implements TaskbarControllers.LoggableTaskbarController {
+public class TaskbarDragLayerController implements TaskbarControllers.LoggableTaskbarController,
+        TaskbarControllers.BackgroundRendererController {
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarDragLayer mTaskbarDragLayer;
@@ -137,6 +139,11 @@ public class TaskbarDragLayerController implements TaskbarControllers.LoggableTa
         updateNavBarDarkIntensityMultiplier();
     }
 
+    @Override
+    public void setCornerRoundness(float cornerRoundness) {
+        mTaskbarDragLayer.setCornerRoundness(cornerRoundness);
+    }
+
     private void updateNavBarDarkIntensityMultiplier() {
         // Zero out the app-requested dark intensity when we're drawing our own background.
         float effectiveBgAlpha = mLastSetBackgroundAlpha * (1 - mBgOffset.value);
@@ -166,10 +173,24 @@ public class TaskbarDragLayerController implements TaskbarControllers.LoggableTa
         }
 
         /**
+         * Called whenever TaskbarDragLayer receives an ACTION_OUTSIDE event.
+         */
+        public void onActionOutsideEvent() {
+            if (!DisplayController.isTransientTaskbar(mActivity)) {
+                return;
+            }
+            if (mControllers.taskbarStashController.isStashed()) {
+                return;
+            }
+
+            mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+        }
+
+        /**
          * Called when a child is removed from TaskbarDragLayer.
          */
         public void onDragLayerViewRemoved() {
-            mActivity.maybeSetTaskbarWindowNotFullscreen();
+            mActivity.onDragEndOrViewRemoved();
         }
 
         /**

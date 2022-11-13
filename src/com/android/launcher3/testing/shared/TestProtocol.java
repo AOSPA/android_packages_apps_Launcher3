@@ -112,6 +112,9 @@ public final class TestProtocol {
             "get-activities-created-count";
     public static final String REQUEST_GET_ACTIVITIES = "get-activities";
     public static final String REQUEST_HAS_TIS = "has-touch-interaction-service";
+    public static final String REQUEST_TASKBAR_ALL_APPS_TOP_PADDING =
+            "taskbar-all-apps-top-padding";
+    public static final String REQUEST_ALL_APPS_TOP_PADDING = "all-apps-top-padding";
 
     public static final String REQUEST_WORKSPACE_CELL_LAYOUT_SIZE = "workspace-cell-layout-size";
     public static final String REQUEST_WORKSPACE_CELL_CENTER = "workspace-cell-center";
@@ -125,6 +128,7 @@ public final class TestProtocol {
     public static final String REQUEST_GET_OVERVIEW_PAGE_SPACING = "get-overview-page-spacing";
     public static final String REQUEST_ENABLE_ROTATION = "enable_rotation";
     public static final String REQUEST_ENABLE_SUGGESTION = "enable-suggestion";
+    public static final String REQUEST_MODEL_QUEUE_CLEARED = "model-queue-cleared";
 
     public static boolean sDebugTracing = false;
     public static final String REQUEST_ENABLE_DEBUG_TRACING = "enable-debug-tracing";

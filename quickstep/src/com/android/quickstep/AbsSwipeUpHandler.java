@@ -48,7 +48,7 @@ import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_CANCELE
 import static com.android.quickstep.GestureState.STATE_RECENTS_SCROLLING_FINISHED;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.FINISH_RECENTS_ANIMATION;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.EXPECTING_TASK_APPEARED;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.ON_SETTLED_ON_END_TARGET;
 import static com.android.quickstep.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
@@ -64,6 +64,7 @@ import android.app.ActivityManager;
 import android.app.WindowConfiguration;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -101,6 +102,7 @@ import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.tracing.InputConsumerProto;
 import com.android.launcher3.tracing.SwipeHandlerProto;
 import com.android.launcher3.util.ActivityLifecycleCallbacksAdapter;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.BaseActivityInterface.AnimationFactory;
@@ -311,6 +313,10 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     // Interpolate RecentsView scale from start of quick switch scroll until this scroll threshold
     private final float mQuickSwitchScaleScrollThreshold;
 
+    private final int mTaskbarAppWindowThreshold;
+    private final int mTaskbarCatchUpThreshold;
+    private boolean mTaskbarAlreadyOpen;
+
     public AbsSwipeUpHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState,
             long touchTimeMs, boolean continuingLastGesture,
@@ -331,11 +337,17 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         mTaskAnimationManager = taskAnimationManager;
         mTouchTimeMs = touchTimeMs;
         mContinuingLastGesture = continuingLastGesture;
-        mQuickSwitchScaleScrollThreshold = context.getResources().getDimension(
-                R.dimen.quick_switch_scaling_scroll_threshold);
 
-        mSplashMainWindowShiftLength = -context.getResources().getDimensionPixelSize(
-                R.dimen.starting_surface_exit_animation_window_shift_length);
+        Resources res = context.getResources();
+        mTaskbarAppWindowThreshold = res
+                .getDimensionPixelSize(R.dimen.taskbar_app_window_threshold);
+        mTaskbarCatchUpThreshold = res.getDimensionPixelSize(R.dimen.taskbar_catch_up_threshold);
+
+        mQuickSwitchScaleScrollThreshold = res
+                .getDimension(R.dimen.quick_switch_scaling_scroll_threshold);
+
+        mSplashMainWindowShiftLength = -res
+                .getDimensionPixelSize(R.dimen.starting_surface_exit_animation_window_shift_length);
 
         initAfterSubclassConstructor();
         initStateCallbacks();
@@ -824,7 +836,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             return;
         }
         mLauncherTransitionController.setProgress(
-                Math.max(mCurrentShift.value, getScaleProgressDueToScroll()), mDragLengthFactor);
+                Math.max(getTaskbarProgress(), getScaleProgressDueToScroll()), mDragLengthFactor);
     }
 
     /**
@@ -951,7 +963,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 new ActiveGestureLog.CompoundString("on gesture started (animate=false)"));
         mStateCallback.setStateOnUiThread(STATE_GESTURE_STARTED);
         mGestureStarted = true;
-        SystemUiProxy.INSTANCE.get(mContext).notifySwipeUpGestureStarted();
     }
 
     /**
@@ -1170,7 +1181,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     private boolean hasReachedOverviewThreshold() {
-        return mCurrentShift.value > MIN_PROGRESS_FOR_OVERVIEW;
+        return getTaskbarProgress() > MIN_PROGRESS_FOR_OVERVIEW;
     }
 
     @UiThread
@@ -1693,10 +1704,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     private void resumeLastTask() {
         if (mRecentsAnimationController != null) {
             mRecentsAnimationController.finish(false /* toRecents */, null);
-            ActiveGestureLog.INSTANCE.addLog(
-                    /* event= */ "finishRecentsAnimation",
-                    /* extras= */ false,
-                    /* gestureEvent= */ FINISH_RECENTS_ANIMATION);
         }
         doLogGesture(LAST_TASK, null);
         reset();
@@ -1905,10 +1912,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 mRecentsAnimationController.detachNavigationBarFromApp(true);
             }
         }
-        ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "finishRecentsAnimation",
-                /* extras= */ true,
-                /* gestureEvent= */ FINISH_RECENTS_ANIMATION);
     }
 
     private void finishCurrentTransitionToHome() {
@@ -1920,10 +1923,6 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             finishRecentsControllerToHome(
                     () -> mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED));
         }
-        ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "finishRecentsAnimation",
-                /* extras= */ true,
-                /* gestureEvent= */ FINISH_RECENTS_ANIMATION);
         doLogGesture(HOME, mRecentsView == null ? null : mRecentsView.getCurrentPageTaskView());
     }
 
@@ -2034,6 +2033,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 mGestureState.updateLastStartedTaskId(taskId);
                 boolean hasTaskPreviouslyAppeared = mGestureState.getPreviouslyAppearedTaskIds()
                         .contains(taskId);
+                if (!hasTaskPreviouslyAppeared) {
+                    ActiveGestureLog.INSTANCE.trackEvent(EXPECTING_TASK_APPEARED);
+                }
                 nextTask.launchTask(success -> {
                     resultCallback.accept(success);
                     if (success) {
@@ -2198,7 +2200,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             AnimatorControllerWithResistance playbackController =
                     remoteHandle.getPlaybackController();
             if (playbackController != null) {
-                playbackController.setProgress(Math.max(mCurrentShift.value,
+                playbackController.setProgress(Math.max(getTaskbarProgress(),
                         getScaleProgressDueToScroll()), mDragLengthFactor);
             }
 
@@ -2240,6 +2242,41 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         }
 
         return scaleProgress;
+    }
+
+    /**
+     * Updates the current status of taskbar during this swipe.
+     */
+    public void setTaskbarAlreadyOpen(boolean taskbarAlreadyOpen) {
+        mTaskbarAlreadyOpen = taskbarAlreadyOpen;
+    }
+
+    /**
+     * Overrides the current shift progress to keep the app window at the bottom of the screen
+     * while the transient taskbar is being swiped in.
+     *
+     * There is also a catch up period so that the window can start moving 1:1 with the swipe.
+     */
+    private float getTaskbarProgress() {
+        if (!DisplayController.isTransientTaskbar(mContext)) {
+            return mCurrentShift.value;
+        }
+
+        if (mTaskbarAlreadyOpen) {
+            return mCurrentShift.value;
+        }
+
+        if (mCurrentDisplacement < mTaskbarAppWindowThreshold) {
+            return 0;
+        }
+
+        // "Catch up" with `mCurrentShift.value`.
+        if (mCurrentDisplacement < mTaskbarCatchUpThreshold) {
+            return Utilities.mapToRange(mCurrentDisplacement, mTaskbarAppWindowThreshold,
+                    mTaskbarCatchUpThreshold, 0, mCurrentShift.value, ACCEL_DEACCEL);
+        }
+
+        return mCurrentShift.value;
     }
 
     private void setDividerShown(boolean shown, boolean immediate) {

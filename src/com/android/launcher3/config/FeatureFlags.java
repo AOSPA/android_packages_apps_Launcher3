@@ -96,6 +96,10 @@ public final class FeatureFlags {
             "ENABLE_QUICK_LAUNCH_V2", false, "Use quick launch v2 "
             + "behavior. Quick search and quick launch v1 would be unavailable if this is enabled");
 
+    public static final BooleanFlag GBOARD_UPDATE_ENTER_KEY = new DeviceFlag(
+            "GBOARD_UPDATE_ENTER_KEY", false, "Update gBoard enter key "
+            + "icon dynamically based on top search content for Quick Launch V2");
+
     public static final BooleanFlag ENABLE_HIDE_HEADER = new DeviceFlag("ENABLE_HIDE_HEADER",
             true, "Hide header on keyboard before typing in all apps");
 
@@ -206,10 +210,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ENFORCED_ROUNDED_CORNERS = new DeviceFlag(
             "ENABLE_ENFORCED_ROUNDED_CORNERS", true, "Enforce rounded corners on all App Widgets");
 
-    public static final BooleanFlag ENABLE_LOCAL_RECOMMENDED_WIDGETS_FILTER = new DeviceFlag(
-            "ENABLE_LOCAL_RECOMMENDED_WIDGETS_FILTER", true,
-            "Enables a local filter for recommended widgets.");
-
     public static final BooleanFlag NOTIFY_CRASHES = getDebugFlag("NOTIFY_CRASHES", false,
             "Sends a notification whenever launcher encounters an uncaught exception.");
 
@@ -252,6 +252,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE = getDebugFlag(
             "ENABLE_SPLIT_FROM_WORKSPACE", true,
             "Enable initiating split screen from workspace.");
+
+    public static final BooleanFlag ENABLE_SPLIT_FROM_FULLSCREEN_WITH_KEYBOARD_SHORTCUTS =
+            getDebugFlag("ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", false,
+                    "Enable splitting from fullscreen app with keyboard shortcuts");
 
     public static final BooleanFlag ENABLE_NEW_MIGRATION_LOGIC = getDebugFlag(
             "ENABLE_NEW_MIGRATION_LOGIC", true,
@@ -298,6 +302,10 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_WIDGET_PICKER_DEPTH = new DeviceFlag(
             "ENABLE_WIDGET_PICKER_DEPTH", true, "Enable changing depth in widget picker.");
+
+    public static final BooleanFlag SCROLL_TOP_TO_RESET = new DeviceFlag(
+            "SCROLL_TOP_TO_RESET", false, "Bring up IME and focus on "
+            + "input when scroll to top if 'Always show keyboard' is enabled or in prefix state");
 
     public static final BooleanFlag SHOW_DELIGHTFUL_PAGINATION = getDebugFlag(
             "SHOW_DELIGHTFUL_PAGINATION", false,
