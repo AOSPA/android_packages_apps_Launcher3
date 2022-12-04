@@ -78,6 +78,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.AutohideSuspendFlag;
+import com.android.launcher3.taskbar.TaskbarTranslationController.TransitionCallback;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayController;
 import com.android.launcher3.testing.TestLogging;
@@ -90,6 +91,7 @@ import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.ViewCache;
 import com.android.launcher3.views.ActivityContext;
+import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.rotation.RotationButtonController;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -132,6 +134,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     private final boolean mIsUserSetupComplete;
     private final boolean mIsNavBarForceVisible;
     private final boolean mIsNavBarKidsMode;
+
     private boolean mIsDestroyed = false;
     // The flag to know if the window is excluded from magnification region computation.
     private boolean mIsExcludeFromMagnificationRegion = false;
@@ -224,6 +227,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarAllAppsController(),
                 new TaskbarInsetsController(this),
                 new VoiceInteractionWindowController(this),
+                new TaskbarTranslationController(this),
                 isDesktopMode
                         ? new DesktopTaskbarRecentAppsController(this)
                         : TaskbarRecentAppsController.DEFAULT);
@@ -756,42 +760,63 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             if (info.isDisabled()) {
                 ItemClickHandler.handleDisabledItemClicked(info, this);
             } else {
-                Intent intent = new Intent(info.getIntent())
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    if (mIsSafeModeEnabled && !PackageManagerHelper.isSystemApp(this, intent)) {
-                        Toast.makeText(this, R.string.safemode_shortcut_error,
-                                Toast.LENGTH_SHORT).show();
-                    } else  if (info.isPromise()) {
-                        TestLogging.recordEvent(
-                                TestProtocol.SEQUENCE_MAIN, "start: taskbarPromiseIcon");
-                        intent = new PackageManagerHelper(this)
-                                .getMarketIntent(info.getTargetPackage())
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(intent);
+                TaskbarUIController taskbarUIController = mControllers.uiController;
+                RecentsView recents = taskbarUIController.getRecentsView();
+                if (recents != null
+                        && taskbarUIController.getRecentsView().isSplitSelectionActive()) {
+                    // If we are selecting a second app for split, launch the split tasks
+                    taskbarUIController.triggerSecondAppForSplit(info, info.intent, view);
+                } else {
+                    // Else launch the selected task
+                    Intent intent = new Intent(info.getIntent())
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    try {
+                        if (mIsSafeModeEnabled && !PackageManagerHelper.isSystemApp(this, intent)) {
+                            Toast.makeText(this, R.string.safemode_shortcut_error,
+                                    Toast.LENGTH_SHORT).show();
+                        } else if (info.isPromise()) {
+                            TestLogging.recordEvent(
+                                    TestProtocol.SEQUENCE_MAIN, "start: taskbarPromiseIcon");
+                            intent = new PackageManagerHelper(this)
+                                    .getMarketIntent(info.getTargetPackage())
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
 
-                    } else if (info.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
-                        TestLogging.recordEvent(
-                                TestProtocol.SEQUENCE_MAIN, "start: taskbarDeepShortcut");
-                        String id = info.getDeepShortcutId();
-                        String packageName = intent.getPackage();
-                        getSystemService(LauncherApps.class)
-                                .startShortcut(packageName, id, null, null, info.user);
-                    } else {
-                        startItemInfoActivity(info);
+                        } else if (info.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
+                            TestLogging.recordEvent(
+                                    TestProtocol.SEQUENCE_MAIN, "start: taskbarDeepShortcut");
+                            String id = info.getDeepShortcutId();
+                            String packageName = intent.getPackage();
+                            getSystemService(LauncherApps.class)
+                                    .startShortcut(packageName, id, null, null, info.user);
+                        } else {
+                            startItemInfoActivity(info);
+                        }
+
+                        mControllers.uiController.onTaskbarIconLaunched(info);
+                    } catch (NullPointerException
+                            | ActivityNotFoundException
+                            | SecurityException e) {
+                        Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT)
+                                .show();
+                        Log.e(TAG, "Unable to launch. tag=" + info + " intent=" + intent, e);
                     }
-
-                    mControllers.uiController.onTaskbarIconLaunched(info);
-                    mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
-                } catch (NullPointerException | ActivityNotFoundException | SecurityException e) {
-                    Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT)
-                            .show();
-                    Log.e(TAG, "Unable to launch. tag=" + info + " intent=" + intent, e);
                 }
+                mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
             }
         } else if (tag instanceof AppInfo) {
-            startItemInfoActivity((AppInfo) tag);
-            mControllers.uiController.onTaskbarIconLaunched((AppInfo) tag);
+            AppInfo info = (AppInfo) tag;
+            TaskbarUIController taskbarUIController = mControllers.uiController;
+            RecentsView recents = taskbarUIController.getRecentsView();
+            if (recents != null
+                    && taskbarUIController.getRecentsView().isSplitSelectionActive()) {
+                // If we are selecting a second app for split, launch the split tasks
+                taskbarUIController.triggerSecondAppForSplit(info, info.intent, view);
+            } else {
+                // Else launch the selected task
+                startItemInfoActivity((AppInfo) tag);
+                mControllers.uiController.onTaskbarIconLaunched((AppInfo) tag);
+            }
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
         } else {
             Log.e(TAG, "Unknown type clicked: " + tag);
@@ -832,6 +857,20 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      */
     public void onSwipeToUnstashTaskbar() {
         mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(false);
+    }
+
+    /**
+     * Called to start the taskbar translation spring to its settled translation (0).
+     */
+    public void startTranslationSpring() {
+        mControllers.taskbarTranslationController.startSpring();
+    }
+
+    /**
+     * Returns a callback to help monitor the swipe gesture.
+     */
+    public TransitionCallback getTranslationCallbacks() {
+        return mControllers.taskbarTranslationController.getTransitionCallback();
     }
 
     /**
