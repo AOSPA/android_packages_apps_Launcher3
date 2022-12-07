@@ -621,7 +621,7 @@ public class DeviceProfile {
         boolean canQsbInline = (isTwoPanels ? inv.inlineQsb[INDEX_TWO_PANEL_PORTRAIT]
                 || inv.inlineQsb[INDEX_TWO_PANEL_LANDSCAPE]
                 : inv.inlineQsb[INDEX_DEFAULT] || inv.inlineQsb[INDEX_LANDSCAPE])
-                && hotseatQsbHeight > 0;
+                && hotseatQsbHeight > 0 && Utilities.isGSAEnabled(context) && Utilities.isQSBEnabled(context);
         isQsbInline = isQsbInline(inv);
 
         areNavButtonsInline = isTaskbarPresent && !isGestureMode;
@@ -659,8 +659,10 @@ public class DeviceProfile {
             mResponsiveWorkspaceCellSpec = workspaceCellSpecs.getCalculatedSpec(
                     responsiveAspectRatio, heightPx);
         } else {
-            hotseatQsbSpace = pxFromDp(inv.hotseatQsbSpace[mTypeIndex], mMetrics);
-            hotseatBarBottomSpace = pxFromDp(inv.hotseatBarBottomSpace[mTypeIndex], mMetrics);
+            hotseatQsbSpace = Utilities.isGSAEnabled(context) && Utilities.isQSBEnabled(context)
+                    ? pxFromDp(inv.hotseatQsbSpace[mTypeIndex], mMetrics) : 0;
+            hotseatBarBottomSpace = Utilities.isGSAEnabled(context) && Utilities.isQSBEnabled(context)
+                    ? pxFromDp(inv.hotseatBarBottomSpace[mTypeIndex], mMetrics) : 0;
             mHotseatBarEdgePaddingPx =
                     isVerticalBarLayout() ? workspacePageIndicatorHeight : 0;
             mHotseatBarWorkspaceSpacePx =
@@ -669,7 +671,8 @@ public class DeviceProfile {
 
         if (!isVerticalBarLayout()) {
             // Have a little space between the inset and the QSB
-            if (mInsets.bottom + minQsbMargin > hotseatBarBottomSpace) {
+            if (Utilities.isGSAEnabled(context) && Utilities.isQSBEnabled(context) &&
+                (mInsets.bottom + minQsbMargin) > hotseatBarBottomSpace) {
                 int availableSpace = hotseatQsbSpace - (mInsets.bottom - hotseatBarBottomSpace);
 
                 // Only change the spaces if there is space
