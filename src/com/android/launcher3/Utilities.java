@@ -76,6 +76,7 @@ import android.widget.LinearLayout;
 
 import androidx.annotation.ChecksSdkIntAtLeast;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.LauncherModel;
@@ -90,6 +91,7 @@ import com.android.launcher3.model.data.SearchActionItemInfo;
 import com.android.launcher3.pm.ShortcutConfigActivityInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
+import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
@@ -540,9 +542,10 @@ public final class Utilities {
     }
 
     public static int pxFromSp(float size, DisplayMetrics metrics, float scale) {
-        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
-                size, metrics) * scale);
+        float value = scale * TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, size, metrics);
+        return ResourceUtils.roundPxValueFromFloat(value);
     }
+
 
     public static String createDbSelectionQuery(String columnName, IntArray values) {
         return String.format(Locale.ENGLISH, "%s IN (%s)", columnName, values.toConcatString());
@@ -599,15 +602,6 @@ public final class Utilities {
      */
     public static long boundToRange(long value, long lowerBound, long upperBound) {
         return Math.max(lowerBound, Math.min(value, upperBound));
-    }
-
-    /**
-     * Returns an intent for starting the default home activity
-     */
-    public static Intent createHomeIntent() {
-        return new Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_HOME)
-                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     }
 
     /**
@@ -1013,4 +1007,11 @@ public final class Utilities {
         return prefs.getBoolean(KEY_SMARTSPACE, true);
     }
 
+    public static boolean bothNull(@Nullable Object a, @Nullable Object b) {
+        return a == null && b == null;
+    }
+
+    public static boolean bothNonNull(@Nullable Object a, @Nullable Object b) {
+        return a != null && b != null;
+    }
 }

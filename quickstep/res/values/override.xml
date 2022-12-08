@@ -25,4 +25,6 @@
 
   <string name="model_delegate_class" translatable="false">co.aospa.launcher.ParanoidLauncherModelDelegate</string>
 
+  <string name="secondary_display_predictions_class" translatable="false">com.android.launcher3.secondarydisplay.SecondaryDisplayPredictionsImpl</string>
+
 </resources>
