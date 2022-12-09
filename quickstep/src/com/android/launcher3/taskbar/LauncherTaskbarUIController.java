@@ -26,7 +26,6 @@ import android.annotation.ColorInt;
 import android.os.RemoteException;
 import android.util.Log;
 import android.util.SparseArray;
-import android.view.MotionEvent;
 import android.view.TaskTransitionSpec;
 import android.view.WindowManagerGlobal;
 
@@ -48,6 +47,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.quickstep.AnimatedFloat;
 import com.android.quickstep.RecentsAnimationCallbacks;
+import com.android.quickstep.views.RecentsView;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -193,16 +193,15 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     public Animator createAnimToLauncher(@NonNull LauncherState toState,
             @NonNull RecentsAnimationCallbacks callbacks, long duration) {
-        return mTaskbarLauncherStateController.createAnimToLauncher(toState, callbacks, duration);
-    }
+        AnimatorSet set = new AnimatorSet();
+        Animator taskbarState = mTaskbarLauncherStateController
+                .createAnimToLauncher(toState, callbacks, duration);
+        long halfDuration = Math.round(duration * 0.5f);
+        Animator translation =
+                mControllers.taskbarTranslationController.createAnimToLauncher(halfDuration);
 
-    /**
-     * @param ev MotionEvent in screen coordinates.
-     * @return Whether any Taskbar item could handle the given MotionEvent if given the chance.
-     */
-    public boolean isEventOverAnyTaskbarItem(MotionEvent ev) {
-        return mControllers.taskbarViewController.isEventOverAnyItem(ev)
-                || mControllers.navbarButtonsViewController.isEventOverAnyItem(ev);
+        set.playTogether(taskbarState, translation);
+        return set;
     }
 
     public boolean isDraggingItem() {
@@ -392,5 +391,10 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         }
 
         mTaskbarLauncherStateController.dumpLogs(prefix + "\t", pw);
+    }
+
+    @Override
+    public RecentsView getRecentsView() {
+        return mLauncher.getOverviewPanel();
     }
 }
