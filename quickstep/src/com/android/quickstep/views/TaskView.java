@@ -20,7 +20,6 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.widget.Toast.LENGTH_SHORT;
 
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
-import static com.android.launcher3.Utilities.comp;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
 import static com.android.launcher3.anim.Interpolators.ACCEL_DEACCEL;
 import static com.android.launcher3.anim.Interpolators.FAST_OUT_SLOW_IN;
@@ -501,7 +500,7 @@ public class TaskView extends FrameLayout implements Reusable {
             return;
         }
         mModalness = modalness;
-        mIconView.setAlpha(comp(modalness));
+        mIconView.setAlpha(1 - modalness);
         mDigitalWellBeingToast.updateBannerOffset(modalness,
                 mCurrentFullscreenParams.mCurrentDrawnInsets.top
                         + mCurrentFullscreenParams.mCurrentDrawnInsets.bottom);
@@ -726,13 +725,14 @@ public class TaskView extends FrameLayout implements Reusable {
     /**
      * Launch of the current task (both live and inactive tasks) with an animation.
      */
+    @Nullable
     public RunnableList launchTasks() {
         RecentsView recentsView = getRecentsView();
         RemoteTargetHandle[] remoteTargetHandles = recentsView.mRemoteTargetHandles;
-        RunnableList runnableList = new RunnableList();
         if (isRunningTask() && remoteTargetHandles != null) {
             if (!mIsClickableAsLiveTile) {
-                return runnableList;
+                Log.e(TAG, "TaskView is not clickable as a live tile; returning to home.");
+                return null;
             }
 
             mIsClickableAsLiveTile = false;
@@ -757,11 +757,16 @@ public class TaskView extends FrameLayout implements Reusable {
             if (targets == null) {
                 // If the recents animation is cancelled somehow between the parent if block and
                 // here, try to launch the task as a non live tile task.
-                launchTaskAnimated();
+                RunnableList runnableList = launchTaskAnimated();
+                if (runnableList == null) {
+                    Log.e(TAG, "Recents animation cancelled and cannot launch task as non-live tile"
+                            + "; returning to home");
+                }
                 mIsClickableAsLiveTile = true;
                 return runnableList;
             }
 
+            RunnableList runnableList = new RunnableList();
             AnimatorSet anim = new AnimatorSet();
             TaskViewUtils.composeRecentsLaunchAnimator(
                     anim, this, targets.apps,
@@ -798,10 +803,10 @@ public class TaskView extends FrameLayout implements Reusable {
             });
             anim.start();
             recentsView.onTaskLaunchedInLiveTileMode();
+            return runnableList;
         } else {
             return launchTaskAnimated();
         }
-        return runnableList;
     }
 
     /**

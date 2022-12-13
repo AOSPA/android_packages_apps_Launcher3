@@ -41,6 +41,7 @@ import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.Interpolators.OVERSHOOT_0_75;
 import static com.android.launcher3.anim.Interpolators.clampToProgress;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_LAUNCH_FROM_STAGED_APP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_ACTIONS_SPLIT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASK_CLEAR_ALL;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASK_DISMISS_SWIPE_UP;
@@ -125,7 +126,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.core.graphics.ColorUtils;
 
-import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.BaseActivity.MultiWindowModeChangedListener;
 import com.android.launcher3.DeviceProfile;
@@ -498,6 +498,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private boolean mOverviewFullscreenEnabled;
     private boolean mOverviewSelectEnabled;
 
+    private boolean mShouldClampScrollOffset;
+    private int mClampedScrollOffsetBound;
+
     private float mAdjacentPageHorizontalOffset = 0;
     protected float mTaskViewsSecondaryTranslation = 0;
     protected float mTaskViewsPrimarySplitTranslation = 0;
@@ -752,6 +755,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         mSplitPlaceholderInset = getResources().getDimensionPixelSize(
                 R.dimen.split_placeholder_inset);
         mSquaredTouchSlop = squaredTouchSlop(context);
+        mClampedScrollOffsetBound = getResources().getDimensionPixelSize(
+                R.dimen.transient_taskbar_clamped_offset_bound);
 
         mEmptyIcon = context.getDrawable(R.drawable.ic_empty_recents);
         mEmptyIcon.setCallback(this);
@@ -2903,6 +2908,11 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                     false /* fadeWithThumbnail */, true /* isStagedTask */);
         }
 
+        // TODO (b/257513449): Launch animation not fully complete. OK to remove flag once it is.
+        if (ENABLE_LAUNCH_FROM_STAGED_APP.get()) {
+            mFirstFloatingTaskView.setOnClickListener(this::animateToFullscreen);
+        }
+
         // SplitInstructionsView: animate in
         safeRemoveDragLayerView(mSplitInstructionsView);
         mSplitInstructionsView = SplitInstructionsView.getSplitInstructionsView(mActivity);
@@ -2944,6 +2954,34 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                         InteractionJankMonitorWrapper.CUJ_SPLIT_SCREEN_ENTER);
             }
         });
+    }
+
+    private void animateToFullscreen(View view) {
+        FloatingTaskView stagedTaskView = (FloatingTaskView) view;
+
+        boolean isTablet = mActivity.getDeviceProfile().isTablet;
+        int duration = isTablet
+                ? SplitAnimationTimings.TABLET_CONFIRM_DURATION
+                : SplitAnimationTimings.PHONE_CONFIRM_DURATION;
+
+        PendingAnimation pendingAnimation = new PendingAnimation(duration);
+
+        Rect firstTaskStartingBounds = new Rect();
+        Rect firstTaskEndingBounds = new Rect();
+
+        stagedTaskView.getBoundsOnScreen(firstTaskStartingBounds);
+        mActivity.getDragLayer().getBoundsOnScreen(firstTaskEndingBounds);
+
+        stagedTaskView.addConfirmAnimation(
+                pendingAnimation,
+                new RectF(firstTaskStartingBounds),
+                firstTaskEndingBounds,
+                false /* fadeWithThumbnail */,
+                true /* isStagedTask */);
+
+        pendingAnimation.addEndListener(success -> launchStagedTask());
+
+        pendingAnimation.buildAnim().start();
     }
 
     /**
@@ -4232,7 +4270,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     public void initiateSplitSelect(QuickstepSystemShortcut.SplitSelectSource splitSelectSource) {
         mSplitSelectSource = splitSelectSource;
         mSplitSelectStateController.setInitialTaskSelect(splitSelectSource.intent,
-                splitSelectSource.position.stagePosition, splitSelectSource.mItemInfo,
+                splitSelectSource.position.stagePosition, splitSelectSource.itemInfo,
                 splitSelectSource.splitEvent);
     }
 
@@ -4294,11 +4332,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         Rect firstTaskEndingBounds = mTempRect;
 
         boolean isTablet = mActivity.getDeviceProfile().isTablet;
-        int duration = isTablet
-                ? SplitAnimationTimings.TABLET_CONFIRM_DURATION
-                : SplitAnimationTimings.PHONE_CONFIRM_DURATION;
-        PendingAnimation pendingAnimation = new PendingAnimation(duration);
         SplitAnimationTimings timings = AnimUtils.getDeviceSplitToConfirmTimings(isTablet);
+        PendingAnimation pendingAnimation = new PendingAnimation(timings.getDuration());
 
         int halfDividerSize = getResources()
                 .getDimensionPixelSize(R.dimen.multi_window_task_divider_size) / 2;
@@ -4648,6 +4683,16 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             mPendingAnimation = null;
         });
         return mPendingAnimation;
+    }
+
+    protected void launchStagedTask() {
+        if (mSplitHiddenTaskView != null) {
+            // Split staging was started from an existing running task (in Overview)
+            mSplitHiddenTaskView.launchTask(success -> resetFromSplitSelectionState());
+        } else {
+            // Split staging was started from a new intent (from app menu in Home/AllApps)
+            mActivity.startActivity(mSplitSelectSource.intent);
+        }
     }
 
     protected void onTaskLaunchAnimationEnd(boolean success) {
@@ -5015,9 +5060,35 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     /**
+     * Sets whether or not we should clamp the scroll offset.
+     * This is used to avoid x-axis movement when swiping up transient taskbar.
+     * Should only be set at the beginning and end of the gesture, otherwise a jump may occur.
+     * @param clampScrollOffset When true, we clamp the scroll to 0 before the clamp threshold is
+     *                          met.
+     */
+    public void setClampScrollOffset(boolean clampScrollOffset) {
+        mShouldClampScrollOffset = clampScrollOffset;
+    }
+
+    /**
      * Returns how many pixels the page is offset on the currently laid out dominant axis.
      */
     public int getScrollOffset(int pageIndex) {
+        int unboundedOffset = getUnclampedScrollOffset(pageIndex);
+        if (!mShouldClampScrollOffset) {
+            return unboundedOffset;
+        }
+        if (Math.abs(unboundedOffset) < mClampedScrollOffsetBound) {
+            return 0;
+        }
+        return unboundedOffset
+                - Math.round(Math.signum(unboundedOffset) * mClampedScrollOffsetBound);
+    }
+
+    /**
+     * Returns how many pixels the page is offset on the currently laid out dominant axis.
+     */
+    private int getUnclampedScrollOffset(int pageIndex) {
         if (pageIndex == -1) {
             return 0;
         }

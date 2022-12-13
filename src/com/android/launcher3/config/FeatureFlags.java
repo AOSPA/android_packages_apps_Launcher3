@@ -17,6 +17,7 @@
 package com.android.launcher3.config;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 
 import com.android.launcher3.BuildConfig;
 import com.android.launcher3.Utilities;
@@ -77,10 +78,6 @@ public final class FeatureFlags {
     // When enabled the promise icon is visible in all apps while installation an app.
     public static final BooleanFlag PROMISE_APPS_IN_ALL_APPS = getDebugFlag(
             "PROMISE_APPS_IN_ALL_APPS", false, "Add promise icon in all-apps");
-
-    // TODO: b/206508141: Long pressing on some icons on home screen cause launcher to crash.
-    public static final BooleanFlag ENABLE_LOCAL_COLOR_POPUPS = getDebugFlag(
-            "ENABLE_LOCAL_COLOR_POPUPS", false, "Enable local color extraction for popups.");
 
     public static final BooleanFlag KEYGUARD_ANIMATION = getDebugFlag(
             "KEYGUARD_ANIMATION", false, "Enable animation for keyguard going away on wallpaper");
@@ -257,12 +254,28 @@ public final class FeatureFlags {
             getDebugFlag("ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", false,
                     "Enable splitting from fullscreen app with keyboard shortcuts");
 
+    public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE = getDebugFlag(
+            "ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE", false,
+            "Enable initiating split screen from workspace to workspace.");
+
     public static final BooleanFlag ENABLE_NEW_MIGRATION_LOGIC = getDebugFlag(
             "ENABLE_NEW_MIGRATION_LOGIC", true,
             "Enable the new grid migration logic, keeping pages when src < dest");
 
+    public static final BooleanFlag ENABLE_WIDGET_HOST_IN_BACKGROUND = getDebugFlag(
+            "ENABLE_WIDGET_HOST_IN_BACKGROUND", false,
+            "Enable background widget updates listening for widget holder");
+
     public static final BooleanFlag ENABLE_ONE_SEARCH_MOTION = new DeviceFlag(
             "ENABLE_ONE_SEARCH_MOTION", true, "Enables animations in OneSearch.");
+
+    public static final BooleanFlag ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES = new DeviceFlag(
+            "ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES", false,
+            "Enable option to replace decorator-based search result backgrounds with drawables");
+
+    public static final BooleanFlag TWO_PREDICTED_ROWS_ALL_APPS_SEARCH = new DeviceFlag(
+            "TWO_PREDICTED_ROWS_ALL_APPS_SEARCH", false,
+            "Use 2 rows of app predictions in All Apps search zero-state");
 
     public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = new DeviceFlag(
             "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", true,
@@ -291,11 +304,6 @@ public final class FeatureFlags {
             "SECONDARY_DRAG_N_DROP_TO_PIN", false,
             "Enable dragging and dropping to pin apps within secondary display");
 
-    // TODO(b/241843710): Deep Shortcut Icons can be rendered, but do not persist.
-    public static final BooleanFlag ENABLE_SECONDARY_DEEP_SHORTCUTS = getDebugFlag(
-            "ENABLE_SECONDARY_DEEP_SHORTCUTS", false,
-            "Enable deep shortcut pinning within secondary display");
-
     public static final BooleanFlag FOLDABLE_WORKSPACE_REORDER = getDebugFlag(
             "FOLDABLE_WORKSPACE_REORDER", false,
             "In foldables, when reordering the icons and widgets, is now going to use both sides");
@@ -322,6 +330,10 @@ public final class FeatureFlags {
             "HOME_GARDENING_WORKSPACE_BUTTONS", false,
             "Change workspace edit buttons to reflect home gardening");
 
+    public static final BooleanFlag ENABLE_TASKBAR_REVISED_THRESHOLDS = getDebugFlag(
+            "ENABLE_TASKBAR_REVISED_THRESHOLDS", false,
+            "Uses revised thresholds for transient taskbar.");
+
     public static final BooleanFlag ENABLE_TRANSIENT_TASKBAR = getDebugFlag(
             "ENABLE_TRANSIENT_TASKBAR", false, "Enables transient taskbar.");
 
@@ -331,15 +343,39 @@ public final class FeatureFlags {
     public static final BooleanFlag SHOW_DOT_PAGINATION = getDebugFlag(
             "SHOW_DOT_PAGINATION", false, "Enable showing dot pagination in workspace");
 
+    public static final BooleanFlag LARGE_SCREEN_WIDGET_PICKER = getDebugFlag(
+            "LARGE_SCREEN_WIDGET_PICKER", false, "Enable new widget picker that takes "
+                    + "advantage of large screen format");
+
+    public static final BooleanFlag ENABLE_NEW_GESTURE_NAV_TUTORIAL = getDebugFlag(
+            "ENABLE_NEW_GESTURE_NAV_TUTORIAL", false,
+            "Enable the redesigned gesture navigation tutorial");
+
     public static final BooleanFlag ENABLE_TOAST_IMPRESSION_LOGGING = getDebugFlag(
             "ENABLE_TOAST_IMPRESSION_LOGGING", false, "Enable toast impression logging");
+
+    public static final BooleanFlag ENABLE_DEVICE_PROFILE_LOGGING = new DeviceFlag(
+            "ENABLE_DEVICE_PROFILE_LOGGING", false, "Allows DeviceProfile logging");
+
+    public static final BooleanFlag ENABLE_LAUNCH_FROM_STAGED_APP = getDebugFlag(
+            "ENABLE_LAUNCH_FROM_STAGED_APP", false,
+            "Enable the ability to tap a staged app during split select to launch it in full screen"
+    );
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
             for (DebugFlag flag : sDebugFlags) {
                 flag.initialize(context);
             }
-            sDebugFlags.sort((f1, f2) -> f1.key.compareToIgnoreCase(f2.key));
+
+            sDebugFlags.sort((f1, f2) -> {
+                // Sort first by any prefs that the user has changed, then alphabetically.
+                int changeComparison = Boolean.compare(f2.mHasBeenChangedAtLeastOnce,
+                        f1.mHasBeenChangedAtLeastOnce);
+                return changeComparison != 0
+                        ? changeComparison
+                        : f1.key.compareToIgnoreCase(f2.key);
+            });
         }
     }
 
@@ -395,6 +431,7 @@ public final class FeatureFlags {
     public static class DebugFlag extends BooleanFlag {
 
         public final String description;
+        protected boolean mHasBeenChangedAtLeastOnce;
         protected boolean mCurrentValue;
 
         public DebugFlag(String key, boolean defaultValue, String description) {
@@ -412,8 +449,10 @@ public final class FeatureFlags {
         }
 
         public void initialize(Context context) {
-            mCurrentValue = context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE)
-                    .getBoolean(key, defaultValue);
+            SharedPreferences prefs =
+                    context.getSharedPreferences(FLAGS_PREF_NAME, Context.MODE_PRIVATE);
+            mHasBeenChangedAtLeastOnce = prefs.contains(key);
+            mCurrentValue = prefs.getBoolean(key, defaultValue);
         }
 
         @Override
