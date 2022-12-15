@@ -17,6 +17,7 @@
 package com.android.launcher3;
 
 import static com.android.launcher3.Utilities.dpiFromPx;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_DEVICE_PROFILE_LOGGING;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TWO_PANEL_HOME;
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.util.DisplayController.CHANGE_DENSITY;
@@ -46,9 +47,9 @@ import android.view.Display;
 
 import androidx.annotation.DimenRes;
 import androidx.annotation.IntDef;
-import androidx.annotation.Nullable;
 import androidx.annotation.StyleRes;
 import androidx.annotation.VisibleForTesting;
+import androidx.annotation.XmlRes;
 import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.icons.DotRenderer;
@@ -171,7 +172,8 @@ public class InvariantDeviceProfile {
      * Do not query directly. see {@link DeviceProfile#isScalableGrid}.
      */
     protected boolean isScalable;
-    public int devicePaddingId;
+    @XmlRes
+    public int devicePaddingId = INVALID_RESOURCE_HANDLE;
 
     public String dbFile;
     public int defaultLayoutId;
@@ -182,9 +184,6 @@ public class InvariantDeviceProfile {
      * An immutable list of supported profiles.
      */
     public List<DeviceProfile> supportedProfiles = Collections.EMPTY_LIST;
-
-    @Nullable
-    public DevicePaddings devicePaddings;
 
     public Point defaultWallpaperSize;
     public Rect defaultWidgetPadding;
@@ -199,7 +198,8 @@ public class InvariantDeviceProfile {
         String gridName = getCurrentGridName(context);
         String newGridName = initGrid(context, gridName);
         if (!newGridName.equals(gridName)) {
-            Utilities.getPrefs(context).edit().putString(KEY_IDP_GRID_NAME, newGridName).apply();
+            LauncherPrefs.getPrefs(context).edit().putString(KEY_IDP_GRID_NAME, newGridName)
+                    .apply();
         }
         new DeviceGridState(this).writeToPrefs(context);
 
@@ -307,8 +307,7 @@ public class InvariantDeviceProfile {
     }
 
     public static String getCurrentGridName(Context context) {
-        return Utilities.isGridOptionsEnabled(context)
-                ? Utilities.getPrefs(context).getString(KEY_IDP_GRID_NAME, null) : null;
+        return LauncherPrefs.getPrefs(context).getString(KEY_IDP_GRID_NAME, null);
     }
 
     private String initGrid(Context context, String gridName) {
@@ -383,14 +382,6 @@ public class InvariantDeviceProfile {
         allAppsBorderSpaces = displayOption.allAppsBorderSpaces;
         allAppsIconSize = displayOption.allAppsIconSizes;
         allAppsIconTextSize = displayOption.allAppsIconTextSizes;
-        if (!Utilities.isGridOptionsEnabled(context)) {
-            allAppsIconSize = iconSize;
-            allAppsIconTextSize = iconTextSize;
-        }
-
-        if (devicePaddingId != 0) {
-            devicePaddings = new DevicePaddings(context, devicePaddingId);
-        }
 
         inlineQsb = closestProfile.inlineQsb;
 
@@ -440,7 +431,7 @@ public class InvariantDeviceProfile {
 
     public void setCurrentGrid(Context context, String gridName) {
         Context appContext = context.getApplicationContext();
-        Utilities.getPrefs(appContext).edit().putString(KEY_IDP_GRID_NAME, gridName).apply();
+        LauncherPrefs.getPrefs(appContext).edit().putString(KEY_IDP_GRID_NAME, gridName).apply();
         MAIN_EXECUTOR.execute(() -> onConfigChanged(appContext));
     }
 
@@ -648,7 +639,7 @@ public class InvariantDeviceProfile {
         float screenHeight = config.screenHeightDp * res.getDisplayMetrics().density;
         int rotation = WindowManagerProxy.INSTANCE.get(context).getRotation(context);
 
-        if (Utilities.IS_DEBUG_DEVICE) {
+        if (Utilities.IS_DEBUG_DEVICE && ENABLE_DEVICE_PROFILE_LOGGING.get()) {
             StringWriter stringWriter = new StringWriter();
             PrintWriter printWriter = new PrintWriter(stringWriter);
             DisplayController.INSTANCE.get(context).dump(printWriter);
@@ -829,7 +820,7 @@ public class InvariantDeviceProfile {
             isScalable = a.getBoolean(
                     R.styleable.GridDisplayOption_isScalable, false);
             devicePaddingId = a.getResourceId(
-                    R.styleable.GridDisplayOption_devicePaddingId, 0);
+                    R.styleable.GridDisplayOption_devicePaddingId, INVALID_RESOURCE_HANDLE);
 
             int deviceCategory = a.getInt(R.styleable.GridDisplayOption_deviceCategory,
                     DEVICE_CATEGORY_ALL);

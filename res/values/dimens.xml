@@ -333,7 +333,7 @@
 
     <!-- Snackbar -->
     <dimen name="snackbar_height">48dp</dimen>
-    <dimen name="snackbar_content_height">32dp</dimen>
+    <dimen name="snackbar_content_height">48dp</dimen>
     <dimen name="snackbar_padding">8dp</dimen>
     <dimen name="snackbar_min_margin_left_right">6dp</dimen>
     <dimen name="snackbar_max_margin_left_right">72dp</dimen>
@@ -368,6 +368,7 @@
     <dimen name="transient_taskbar_shadow_blur">0dp</dimen>
     <dimen name="transient_taskbar_key_shadow_distance">0dp</dimen>
     <dimen name="transient_taskbar_stashed_size">0dp</dimen>
+    <dimen name="transient_taskbar_clamped_offset_bound">0dp</dimen>
     <!-- Note that this applies to both sides of all icons, so visible space is double this. -->
     <dimen name="transient_taskbar_icon_spacing">0dp</dimen>
     <!-- Note that this applies to both sides of all icons, so visible space is double this. -->
@@ -387,6 +388,9 @@
     <dimen name="taskbar_app_window_threshold">0dp</dimen>
     <dimen name="taskbar_home_overview_threshold">0dp</dimen>
     <dimen name="taskbar_catch_up_threshold">0dp</dimen>
+    <dimen name="taskbar_nav_threshold_v2">0dp</dimen>
+    <dimen name="taskbar_app_window_threshold_v2">0dp</dimen>
+    <dimen name="taskbar_home_overview_threshold_v2">0dp</dimen>
 
     <!-- Size of the maximum radius for the enforced rounded rectangles. -->
     <dimen name="enforced_rounded_corner_max_radius">16dp</dimen>

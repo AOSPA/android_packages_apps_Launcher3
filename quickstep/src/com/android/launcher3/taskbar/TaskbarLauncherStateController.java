@@ -119,10 +119,13 @@ import java.util.StringJoiner;
                     mLauncherState = finalState;
                     updateStateForFlag(FLAG_TRANSITION_STATE_RUNNING, false);
                     applyState();
-                    mControllers.taskbarDragController.setDisallowGlobalDrag(
-                            (finalState instanceof OverviewState));
-                    mControllers.taskbarDragController.setDisallowLongClick(
-                            finalState == LauncherState.OVERVIEW_SPLIT_SELECT);
+                    boolean disallowGlobalDrag = finalState instanceof OverviewState;
+                    boolean disallowLongClick = finalState == LauncherState.OVERVIEW_SPLIT_SELECT;
+                    mControllers.taskbarDragController.setDisallowGlobalDrag(disallowGlobalDrag);
+                    mControllers.taskbarDragController.setDisallowLongClick(disallowLongClick);
+                    mControllers.taskbarAllAppsController.setDisallowGlobalDrag(disallowGlobalDrag);
+                    mControllers.taskbarAllAppsController.setDisallowLongClick(disallowLongClick);
+                    mControllers.taskbarPopupController.setHideSplitOptions(disallowGlobalDrag);
                 }
             };
 
@@ -183,6 +186,10 @@ import java.util.StringJoiner;
         animatorSet.play(stashController.applyStateWithoutStart(duration));
         animatorSet.play(applyState(duration, false));
 
+        if (mTaskBarRecentsAnimationListener != null) {
+            mTaskBarRecentsAnimationListener.endGestureStateOverride(
+                    !mLauncher.isInState(LauncherState.OVERVIEW));
+        }
         mTaskBarRecentsAnimationListener = new TaskBarRecentsAnimationListener(callbacks);
         callbacks.addListener(mTaskBarRecentsAnimationListener);
         ((RecentsView) mLauncher.getOverviewPanel()).setTaskLaunchListener(() ->
