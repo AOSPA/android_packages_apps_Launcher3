@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0e64fccd_57dc1f99",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000447
+      },
+      "writtenOn": "2022-12-19T09:14:53Z",
+      "side": 1,
+      "message": "Keep hotseat_bar_bottom_space_default at the AOSP default and change hotseat_qsb_space_default to 36, this should match Google.",
+      "revId": "a6013259d0423dbe4875f17112ee52bcfb74a833",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
