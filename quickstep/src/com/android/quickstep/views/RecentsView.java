@@ -42,6 +42,7 @@ import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.anim.Interpolators.OVERSHOOT_0_75;
 import static com.android.launcher3.anim.Interpolators.clampToProgress;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_LAUNCH_FROM_STAGED_APP;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_ACTIONS_SPLIT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASK_CLEAR_ALL;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASK_DISMISS_SWIPE_UP;
@@ -2769,13 +2770,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      * @param gridProgress 0 = carousel; 1 = 2 row grid.
      */
     private void setGridProgress(float gridProgress) {
-        int taskCount = getTaskViewCount();
-        if (taskCount == 0) {
-            return;
-        }
-
         mGridProgress = gridProgress;
 
+        int taskCount = getTaskViewCount();
         for (int i = 0; i < taskCount; i++) {
             requireTaskViewAt(i).setGridProgress(gridProgress);
         }
@@ -3480,7 +3477,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                         removeViewInLayout(mClearAllButton);
                         if (isHomeTaskDismissed) {
                             updateEmptyMessage();
-                        } else {
+                        } else if (!(ENABLE_TASKBAR_IN_OVERVIEW.get() &&
+                                mSplitSelectStateController.isSplitSelectActive())) {
                             startHome();
                         }
                     } else {
