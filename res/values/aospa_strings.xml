@@ -67,4 +67,8 @@
     <string name="lock_layout_summary_off">Icons and widgets can be added, removed and moved on the homescreen</string>
     <string name="lock_layout_widgets_error">It\'s not possible to add widgets to the home screen</string>
 
+    <!-- Kill App recents action shortcut -->
+    <string name="recent_task_option_kill_app">Force close</string>
+    <string name="recents_app_killed">App closed</string>
+
 </resources>
