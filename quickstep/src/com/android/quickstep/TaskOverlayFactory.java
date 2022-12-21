@@ -118,7 +118,6 @@ public class TaskOverlayFactory {
      * up over time
      */
     public void clearAllActiveState() { }
-
     /**
      * Overlay on each task handling Overview Action Buttons.
      */
