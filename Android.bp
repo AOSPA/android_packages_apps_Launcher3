@@ -390,7 +390,10 @@ android_app {
         "Home",
         "Launcher2",
     ],
-    required: ["privapp_whitelist_com.android.launcher3"],
+    required: [
+        "privapp_whitelist_com.android.launcher3",
+        "privapp_whitelist_aospa_launcher3",
+    ],
 
     jacoco: {
         include_filter: ["com.android.launcher3.**"],
@@ -565,6 +568,7 @@ android_app {
     ],
     required: [
         "privapp_whitelist_com.android.launcher3",
+        "privapp_whitelist_aospa_launcher3",
         "launcher.quickstep.protolog.pb",
     ],
 
@@ -609,7 +613,10 @@ android_app {
         "Launcher3",
         "Launcher3QuickStep",
     ],
-    required: ["privapp_whitelist_com.android.launcher3"],
+    required: [
+        "privapp_whitelist_com.android.launcher3",
+        "privapp_whitelist_aospa_launcher3",
+    ],
 
     additional_manifests: [
         "go/AndroidManifest.xml",
@@ -647,7 +654,10 @@ android_app {
         "Launcher3",
         "Launcher3QuickStep",
     ],
-    required: ["privapp_whitelist_com.android.launcher3"],
+    required: [
+        "privapp_whitelist_com.android.launcher3",
+        "privapp_whitelist_aospa_launcher3",
+    ],
 
     additional_manifests: [
         "go/AndroidManifest.xml",
@@ -659,4 +669,12 @@ android_app {
     jacoco: {
         include_filter: ["com.android.launcher3.*"],
     },
+}
+
+prebuilt_etc {
+    name: "privapp_whitelist_aospa_launcher3",
+    src: "privapp_whitelist_aospa_launcher3.xml",
+    system_ext_specific: true,
+    sub_dir: "permissions",
+    filename_from_src: true,
 }
