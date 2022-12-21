@@ -16,6 +16,24 @@
       "message": "Keep hotseat_bar_bottom_space_default at the AOSP default and change hotseat_qsb_space_default to 36, this should match Google.",
       "revId": "a6013259d0423dbe4875f17112ee52bcfb74a833",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8a06766f_102c14ef",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000579
+      },
+      "writtenOn": "2022-12-21T05:05:06Z",
+      "side": 1,
+      "message": "yeah no this ain\u0027t it chief, now if hotseat is disabled the padding is wack",
+      "parentUuid": "0e64fccd_57dc1f99",
+      "revId": "a6013259d0423dbe4875f17112ee52bcfb74a833",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
