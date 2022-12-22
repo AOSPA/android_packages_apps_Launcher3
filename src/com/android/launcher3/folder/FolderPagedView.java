@@ -41,6 +41,7 @@ import com.android.launcher3.PagedView;
 import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
@@ -112,6 +113,7 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
     public void setFolder(Folder folder) {
         mFolder = folder;
         mPageIndicator = folder.findViewById(R.id.folder_page_indicator);
+        mPageIndicator.setShouldAutoHide(false);
         initParentViews(folder);
     }
 
@@ -202,7 +204,7 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
     public void addViewForRank(View view, WorkspaceItemInfo item, int rank) {
         int pageNo = rank / mOrganizer.getMaxItemsPerPage();
 
-        CellLayout.LayoutParams lp = (CellLayout.LayoutParams) view.getLayoutParams();
+        CellLayoutLayoutParams lp = (CellLayoutLayoutParams) view.getLayoutParams();
         lp.setCellXY(mOrganizer.getPosForRank(rank));
         getPageAt(pageNo).addViewToCellLayout(view, -1, item.getViewId(), lp, true);
     }
@@ -218,9 +220,9 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
         textView.setOnClickListener(ItemClickHandler.INSTANCE);
         textView.setOnLongClickListener(mFolder);
         textView.setOnFocusChangeListener(mFocusIndicatorHelper);
-        CellLayout.LayoutParams lp = (CellLayout.LayoutParams) textView.getLayoutParams();
+        CellLayoutLayoutParams lp = (CellLayoutLayoutParams) textView.getLayoutParams();
         if (lp == null) {
-            textView.setLayoutParams(new CellLayout.LayoutParams(
+            textView.setLayoutParams(new CellLayoutLayoutParams(
                     item.cellX, item.cellY, item.spanX, item.spanY));
         } else {
             lp.cellX = item.cellX;
@@ -314,7 +316,7 @@ public class FolderPagedView extends PagedView<PageIndicatorDots> implements Cli
             }
 
             if (v != null) {
-                CellLayout.LayoutParams lp = (CellLayout.LayoutParams) v.getLayoutParams();
+                CellLayoutLayoutParams lp = (CellLayoutLayoutParams) v.getLayoutParams();
                 ItemInfo info = (ItemInfo) v.getTag();
                 lp.setCellXY(mOrganizer.getPosForRank(rank));
                 currentPage.addViewToCellLayout(v, -1, info.getViewId(), lp, true);

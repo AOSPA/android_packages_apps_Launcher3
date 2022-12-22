@@ -33,13 +33,13 @@ import androidx.test.uiautomator.Until;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.tapl.AllApps;
 import com.android.launcher3.tapl.LaunchedAppState;
 import com.android.launcher3.tapl.LauncherInstrumentation.NavigationModel;
 import com.android.launcher3.tapl.Overview;
 import com.android.launcher3.tapl.OverviewActions;
 import com.android.launcher3.tapl.OverviewTask;
 import com.android.launcher3.ui.TaplTestsLauncher3;
+import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.quickstep.NavigationModeSwitchRule.NavigationModeSwitch;
 import com.android.quickstep.views.RecentsView;
@@ -231,6 +231,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @PortraitLandscape
     @ScreenRecord // b/238461765
     public void testSwitchToOverview() throws Exception {
+        startTestAppsWithCheck();
         assertNotNull("Workspace.switchToOverview() returned null",
                 mLauncher.goHome().switchToOverview());
         assertTrue("Launcher internal state didn't switch to Overview",
@@ -308,6 +309,28 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
         launchedAppState = getAndAssertLaunchedApp();
         launchedAppState.switchToOverview();
+    }
+
+    @Test
+    @ScreenRecord // b/242163205
+    public void testQuickSwitchToPreviousAppForTablet() throws Exception {
+        assumeTrue(mLauncher.isTablet());
+        startTestActivity(2);
+        startImeTestActivity();
+
+        // Set ignoreTaskbarVisibility to true to verify the task bar visibility explicitly.
+        mLauncher.setIgnoreTaskbarVisibility(true);
+
+        // Expect task bar invisible when the launched app was the IME activity.
+        LaunchedAppState launchedAppState = getAndAssertLaunchedApp();
+        launchedAppState.assertTaskbarHidden();
+
+        // Quick-switch to the test app with swiping to right.
+        launchedAppState.quickSwitchToPreviousApp();
+
+        // Expect task bar visible when the launched app was the test activity.
+        launchedAppState = getAndAssertLaunchedApp();
+        launchedAppState.assertTaskbarVisible();
     }
 
     private boolean isTestActivityRunning(int activityNumber) {
@@ -408,19 +431,16 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     }
 
     @Test
+    @ScreenRecord // b/242163205
     public void testDisableRotationCheckForPhone() throws Exception {
         assumeFalse(mLauncher.isTablet());
         try {
             mLauncher.setExpectedRotationCheckEnabled(false);
             mLauncher.setEnableRotation(false);
-            final AllApps allApps = mLauncher.getWorkspace().switchToAllApps();
-            allApps.freeze();
-            try {
-                allApps.getAppIcon("TestActivity7").launch(getAppPackageName());
-            } finally {
-                allApps.unfreeze();
-            }
             mLauncher.getDevice().setOrientationLeft();
+            startTestActivity(7);
+            Wait.atMost("Device should not be in natural orientation",
+                    () -> !mDevice.isNaturalOrientation(), DEFAULT_UI_TIMEOUT, mLauncher);
             mLauncher.goHome();
         } finally {
             mLauncher.setExpectedRotationCheckEnabled(true);

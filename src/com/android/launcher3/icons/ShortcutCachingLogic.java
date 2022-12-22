@@ -16,7 +16,7 @@
 
 package com.android.launcher3.icons;
 
-import static com.android.launcher3.model.WidgetsModel.GO_DISABLE_WIDGETS;
+import static com.android.launcher3.model.WidgetsModel.GO_DISABLE_SHORTCUTS;
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -76,7 +76,8 @@ public class ShortcutCachingLogic implements CachingLogic<ShortcutInfo> {
             Drawable unbadgedDrawable = ShortcutCachingLogic.getIcon(
                     context, info, LauncherAppState.getIDP(context).fillResIconDpi);
             if (unbadgedDrawable == null) return BitmapInfo.LOW_RES_INFO;
-            return new BitmapInfo(li.createScaledBitmapWithoutShadow(unbadgedDrawable),
+            return new BitmapInfo(
+                    li.createScaledBitmap(unbadgedDrawable, BaseIconFactory.MODE_WITH_SHADOW),
                     Themes.getColorAccent(context));
         }
     }
@@ -100,7 +101,7 @@ public class ShortcutCachingLogic implements CachingLogic<ShortcutInfo> {
      * Launcher specific checks
      */
     public static Drawable getIcon(Context context, ShortcutInfo shortcutInfo, int density) {
-        if (GO_DISABLE_WIDGETS) {
+        if (GO_DISABLE_SHORTCUTS) {
             return null;
         }
         try {

@@ -35,6 +35,7 @@ import android.view.View;
 import com.android.launcher3.R;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.uioverrides.PredictedAppIcon;
 
 import java.io.PrintWriter;
@@ -87,19 +88,18 @@ public class TaskbarEduController implements TaskbarControllers.LoggableTaskbarC
     void showEdu() {
         mActivity.setTaskbarWindowFullscreen(true);
         mActivity.getDragLayer().post(() -> {
-            mTaskbarEduView = (TaskbarEduView) mActivity.getLayoutInflater().inflate(
-                    R.layout.taskbar_edu, mActivity.getDragLayer(), false);
+            TaskbarOverlayContext overlayContext =
+                    mControllers.taskbarOverlayController.requestWindow();
+            mTaskbarEduView = (TaskbarEduView) overlayContext.getLayoutInflater().inflate(
+                    R.layout.taskbar_edu, overlayContext.getDragLayer(), false);
             mTaskbarEduView.init(new TaskbarEduCallbacks());
+            mControllers.navbarButtonsViewController.setSlideInViewVisible(true);
+            mTaskbarEduView.setOnCloseBeginListener(
+                    () -> mControllers.navbarButtonsViewController.setSlideInViewVisible(false));
             mTaskbarEduView.addOnCloseListener(() -> mTaskbarEduView = null);
             mTaskbarEduView.show();
             startAnim(createWaveAnim());
         });
-    }
-
-    void hideEdu() {
-        if (mTaskbarEduView != null) {
-            mTaskbarEduView.close(true /* animate */);
-        }
     }
 
     /**
@@ -216,6 +216,10 @@ public class TaskbarEduController implements TaskbarControllers.LoggableTaskbarC
                 mTaskbarEduView.updateEndButton(R.string.taskbar_edu_next,
                         v -> mTaskbarEduView.snapToPage(currentPage + 1));
             }
+        }
+
+        int getIconLayoutBoundsWidth() {
+            return mControllers.taskbarViewController.getIconLayoutWidth();
         }
     }
 }

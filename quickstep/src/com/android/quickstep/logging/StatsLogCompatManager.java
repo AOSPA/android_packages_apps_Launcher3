@@ -190,7 +190,8 @@ public class StatsLogCompatManager extends StatsLogManager {
                 getCardinality(info), // cardinality = 16;
                 info.getWidget().getSpanX(), // span_x = 17 [default = 1];
                 info.getWidget().getSpanY(), // span_y = 18 [default = 1];
-                getAttributes(info) /* attributes */
+                getAttributes(info) /* attributes = 19 [(log_mode) = MODE_BYTES] */,
+                info.getIsKidsMode() /* is_kids_mode = 20 */
         );
     }
 
@@ -216,6 +217,7 @@ public class StatsLogCompatManager extends StatsLogManager {
         private Optional<String> mEditText = Optional.empty();
         private SliceItem mSliceItem;
         private LauncherAtom.Slice mSlice;
+        private Optional<Integer> mCardinality = Optional.empty();
 
         StatsCompatLogger(Context context, ActivityContext activityContext) {
             mContext = context;
@@ -303,6 +305,12 @@ public class StatsLogCompatManager extends StatsLogManager {
         }
 
         @Override
+        public StatsLogger withCardinality(int cardinality) {
+            this.mCardinality = Optional.of(cardinality);
+            return this;
+        }
+
+        @Override
         public void log(EventEnum event) {
             if (!Utilities.ATLEAST_R) {
                 return;
@@ -336,8 +344,9 @@ public class StatsLogCompatManager extends StatsLogManager {
                 appState.getModel().enqueueModelUpdateTask(
                         new BaseModelUpdateTask() {
                             @Override
-                            public void execute(LauncherAppState app, BgDataModel dataModel,
-                                    AllAppsList apps) {
+                            public void execute(@NonNull final LauncherAppState app,
+                                    @NonNull final BgDataModel dataModel,
+                                    @NonNull final AllAppsList apps) {
                                 FolderInfo folderInfo = dataModel.folders.get(mItemInfo.container);
                                 write(event, applyOverwrites(mItemInfo.buildProto(folderInfo)));
                             }
@@ -419,6 +428,7 @@ public class StatsLogCompatManager extends StatsLogManager {
             if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
                 return;
             }
+            int cardinality = mCardinality.orElseGet(() -> getCardinality(atomInfo));
             SysUiStatsLog.write(
                     SysUiStatsLog.LAUNCHER_EVENT,
                     SysUiStatsLog.LAUNCHER_UICHANGED__ACTION__DEFAULT_ACTION /* deprecated */,
@@ -444,7 +454,7 @@ public class StatsLogCompatManager extends StatsLogManager {
                     atomInfo.getFolderIcon().getFromLabelState().getNumber() /* fromState */,
                     atomInfo.getFolderIcon().getToLabelState().getNumber() /* toState */,
                     atomInfo.getFolderIcon().getLabelInfo() /* edittext */,
-                    getCardinality(atomInfo) /* cardinality */,
+                    cardinality /* cardinality */,
                     getFeatures(atomInfo) /* features */,
                     getSearchAttributes(atomInfo) /* searchAttributes */,
                     getAttributes(atomInfo) /* attributes */
@@ -463,6 +473,7 @@ public class StatsLogCompatManager extends StatsLogManager {
         private int mPackageId = 0;
         private long mLatencyInMillis;
         private int mQueryLength = -1;
+        private int mSubEventType = 0;
 
         StatsCompatLatencyLogger(Context context, ActivityContext activityContext) {
             mContext = context;
@@ -500,6 +511,12 @@ public class StatsLogCompatManager extends StatsLogManager {
         }
 
         @Override
+        public StatsLatencyLogger withSubEventType(int type) {
+            this.mSubEventType = type;
+            return this;
+        }
+
+        @Override
         public void log(EventEnum event) {
             if (IS_VERBOSE) {
                 String name = (event instanceof Enum) ? ((Enum) event).name() :
@@ -516,7 +533,8 @@ public class StatsLogCompatManager extends StatsLogManager {
                     mPackageId, // package_id
                     mLatencyInMillis, // latency_in_millis
                     mType.getId(), //type
-                    mQueryLength // query_length
+                    mQueryLength, // query_length
+                    mSubEventType // sub_event_type
             );
         }
     }

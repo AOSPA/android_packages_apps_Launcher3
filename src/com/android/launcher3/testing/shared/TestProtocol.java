@@ -86,6 +86,7 @@ public final class TestProtocol {
     public static final String REQUEST_DISABLE_MANUAL_TASKBAR_STASHING = "disable-taskbar-stashing";
     public static final String REQUEST_UNSTASH_TASKBAR_IF_STASHED = "unstash-taskbar-if-stashed";
     public static final String REQUEST_STASHED_TASKBAR_HEIGHT = "stashed-taskbar-height";
+    public static final String REQUEST_RECREATE_TASKBAR = "recreate-taskbar";
     public static final String REQUEST_APP_LIST_FREEZE_FLAGS = "app-list-freeze-flags";
     public static final String REQUEST_APPS_LIST_SCROLL_Y = "apps-list-scroll-y";
     public static final String REQUEST_WIDGETS_SCROLL_Y = "widgets-scroll-y";
@@ -111,6 +112,9 @@ public final class TestProtocol {
             "get-activities-created-count";
     public static final String REQUEST_GET_ACTIVITIES = "get-activities";
     public static final String REQUEST_HAS_TIS = "has-touch-interaction-service";
+    public static final String REQUEST_TASKBAR_ALL_APPS_TOP_PADDING =
+            "taskbar-all-apps-top-padding";
+    public static final String REQUEST_ALL_APPS_TOP_PADDING = "all-apps-top-padding";
 
     public static final String REQUEST_WORKSPACE_CELL_LAYOUT_SIZE = "workspace-cell-layout-size";
     public static final String REQUEST_WORKSPACE_CELL_CENTER = "workspace-cell-center";
@@ -123,6 +127,8 @@ public final class TestProtocol {
             "get-grid-task-size-rect-for-tablet";
     public static final String REQUEST_GET_OVERVIEW_PAGE_SPACING = "get-overview-page-spacing";
     public static final String REQUEST_ENABLE_ROTATION = "enable_rotation";
+    public static final String REQUEST_ENABLE_SUGGESTION = "enable-suggestion";
+    public static final String REQUEST_MODEL_QUEUE_CLEARED = "model-queue-cleared";
 
     public static boolean sDebugTracing = false;
     public static final String REQUEST_ENABLE_DEBUG_TRACING = "enable-debug-tracing";

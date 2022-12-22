@@ -56,6 +56,7 @@ public class StatsLogManager implements ResourceBasedOverride {
     private InstanceId mInstanceId;
 
     protected @Nullable ActivityContext mActivityContext = null;
+    private KeyboardStateManager mKeyboardStateManager;
 
     /**
      * Returns event enum based on the two state transition information when swipe
@@ -554,6 +555,20 @@ public class StatsLogManager implements ResourceBasedOverride {
                 + "result page etc.")
         LAUNCHER_ALLAPPS_SCROLLED(985),
 
+        @UiEvent(doc = "User scrolled up on one of the all apps surfaces such as A-Z list, search "
+                + "result page etc.")
+        LAUNCHER_ALLAPPS_SCROLLED_UP(1229),
+
+        @UiEvent(doc =
+                "User scrolled down on one of the all apps surfaces such as A-Z list, search "
+                        + "result page etc.")
+        LAUNCHER_ALLAPPS_SCROLLED_DOWN(1230),
+
+        @UiEvent(doc = "User scrolled on one of the all apps surfaces such as A-Z list, search "
+                + "result page etc and we don't know the direction since user came back to "
+                + "original position from which they scrolled.")
+        LAUNCHER_ALLAPPS_SCROLLED_UNKNOWN_DIRECTION(1231),
+
         @UiEvent(doc = "User tapped taskbar home button")
         LAUNCHER_TASKBAR_HOME_BUTTON_TAP(1003),
 
@@ -592,6 +607,21 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User tapped on Share app system shortcut.")
         LAUNCHER_SYSTEM_SHORTCUT_APP_SHARE_TAP(1075),
+
+        @UiEvent(doc = "User has invoked split to right half from an app icon menu")
+        LAUNCHER_APP_ICON_MENU_SPLIT_RIGHT_BOTTOM(1199),
+
+        @UiEvent(doc = "User has invoked split to left half from an app icon menu")
+        LAUNCHER_APP_ICON_MENU_SPLIT_LEFT_TOP(1200),
+
+        @UiEvent(doc = "Number of apps in A-Z list (personal and work profile)")
+        LAUNCHER_ALLAPPS_COUNT(1225),
+
+        @UiEvent(doc = "User has invoked split to right half with a keyboard shortcut.")
+        LAUNCHER_KEYBOARD_SHORTCUT_SPLIT_RIGHT_BOTTOM(1232),
+
+        @UiEvent(doc = "User has invoked split to left half with a keyboard shortcut.")
+        LAUNCHER_KEYBOARD_SHORTCUT_SPLIT_LEFT_TOP(1233)
         ;
 
         // ADD MORE
@@ -713,6 +743,13 @@ public class StatsLogManager implements ResourceBasedOverride {
         }
 
         /**
+         * Sets cardinality of log message.
+         */
+        default StatsLogger withCardinality(int cardinality) {
+            return this;
+        }
+
+        /**
          * Builds the final message and logs it as {@link EventEnum}.
          */
         default void log(EventEnum event) {
@@ -737,8 +774,9 @@ public class StatsLogManager implements ResourceBasedOverride {
             HOT(2),
             TIMEOUT(3),
             FAIL(4),
-            COLD_USERWAITING(5);
-
+            COLD_USERWAITING(5),
+            ATOMIC(6),
+            CONTROLLED(7);
             private final int mId;
 
             LatencyType(int id) {
@@ -748,7 +786,6 @@ public class StatsLogManager implements ResourceBasedOverride {
             public int getId() {
                 return mId;
             }
-
         }
 
         /**
@@ -777,6 +814,13 @@ public class StatsLogManager implements ResourceBasedOverride {
          * Sets query length of the event.
          */
         default StatsLatencyLogger withQueryLength(int queryLength) {
+            return this;
+        }
+
+        /**
+         * Sets sub event type.
+         */
+        default StatsLatencyLogger withSubEventType(int type) {
             return this;
         }
 
@@ -814,6 +858,16 @@ public class StatsLogManager implements ResourceBasedOverride {
             logger.withInstanceId(mInstanceId);
         }
         return logger;
+    }
+
+    /**
+     * Returns a singleton KeyboardStateManager.
+     */
+    public KeyboardStateManager keyboardStateManager() {
+        if (mKeyboardStateManager == null) {
+            mKeyboardStateManager = new KeyboardStateManager();
+        }
+        return mKeyboardStateManager;
     }
 
     protected StatsLogger createLogger() {

@@ -16,6 +16,9 @@
 
 package com.android.launcher3;
 
+import static android.view.InputDevice.SOURCE_TOUCHSCREEN;
+
+import static com.android.launcher3.config.FeatureFlags.ENABLE_TRACKPAD_GESTURE;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ICON_BADGED;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
@@ -68,6 +71,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.animation.Interpolator;
@@ -177,6 +181,8 @@ public final class Utilities {
 
     public static boolean IS_RUNNING_IN_TEST_HARNESS =
                     ActivityManager.isRunningInTestHarness();
+
+    private static final int TRACKPAD_GESTURE_SCALE = 60;
 
     public static void enableRunningInTestHarnessForTests() {
         IS_RUNNING_IN_TEST_HARNESS = true;
@@ -521,6 +527,11 @@ public final class Utilities {
         return (int) (dp * Resources.getSystem().getDisplayMetrics().density);
     }
 
+    /** Converts a dp value to pixels for a certain density. */
+    public static int dpToPx(float dp, int densityDpi) {
+        float densityRatio = (float) densityDpi / DisplayMetrics.DENSITY_DEFAULT;
+        return (int) (dp * densityRatio);
+    }
 
     public static int pxFromSp(float size, DisplayMetrics metrics) {
         return pxFromSp(size, metrics, 1f);
@@ -819,16 +830,6 @@ public final class Utilities {
     }
 
     /**
-     * Compares the ratio of two quantities and returns whether that ratio is greater than the
-     * provided bound. Order of quantities does not matter. Bound should be a decimal representation
-     * of a percentage.
-     */
-    public static boolean isRelativePercentDifferenceGreaterThan(float first, float second,
-            float bound) {
-        return (Math.abs(first - second) / Math.abs((first + second) / 2.0f)) > bound;
-    }
-
-    /**
      * Rotates `inOutBounds` by `delta` 90-degree increments. Rotation is visually CCW. Parent
      * sizes represent the "space" that will rotate carrying inOutBounds along with it to determine
      * the final bounds.
@@ -925,6 +926,45 @@ public final class Utilities {
             }
         }
         return options;
+    }
+
+    public static boolean isTrackpadMotionEvent(MotionEvent event) {
+        // TODO: ideally should use event.getClassification(), but currently only the move
+        // events get assigned the correct classification.
+        return ENABLE_TRACKPAD_GESTURE.get()
+                && (event.getSource() & SOURCE_TOUCHSCREEN) != SOURCE_TOUCHSCREEN;
+    }
+
+    public static int getTrackpadMotionEventScale(Context context) {
+        return ViewConfiguration.get(context).getScaledTouchSlop() * TRACKPAD_GESTURE_SCALE;
+    }
+
+    public static float getXVelocity(VelocityTracker velocityTracker, MotionEvent event,
+            int pointerId) {
+        // Will be enabled after ag/20353570 is submitted
+//        if (isTrackpadMotionEvent(event)) {
+//            return velocityTracker.getAxisVelocity(AXIS_GESTURE_X_OFFSET, pointerId);
+//        } else {
+            return velocityTracker.getXVelocity(pointerId);
+//        }
+    }
+
+    public static float getXVelocity(VelocityTracker velocityTracker, MotionEvent event) {
+        return getXVelocity(velocityTracker, event, -1 /* ACTIVE_POINTER_ID */);
+    }
+
+    public static float getYVelocity(VelocityTracker velocityTracker, MotionEvent event,
+            int pointerId) {
+        // Will be enabled after ag/20353570 is submitted
+//        if (isTrackpadMotionEvent(event)) {
+//            return velocityTracker.getAxisVelocity(AXIS_GESTURE_Y_OFFSET, pointerId);
+//        } else {
+            return velocityTracker.getYVelocity(pointerId);
+//        }
+    }
+
+    public static float getYVelocity(VelocityTracker velocityTracker, MotionEvent event) {
+        return getYVelocity(velocityTracker, event, -1 /* ACTIVE_POINTER_ID */);
     }
 
     public static boolean bothNull(@Nullable Object a, @Nullable Object b) {

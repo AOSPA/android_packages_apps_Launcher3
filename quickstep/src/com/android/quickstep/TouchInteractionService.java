@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,26 +15,31 @@
  */
 package com.android.quickstep;
 
+import static android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS;
 import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
 
 import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER_FOCUS;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_QUICKSTEP_LIVE_TILE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.FLAG_USING_OTHER_ACTIVITY_INPUT_CONSUMER;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_DOWN;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_UP;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_RECENT_TASKS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_BACK_ANIMATION;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_ONE_HANDED;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_PIP;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_SPLIT_SCREEN;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SHELL_STARTING_WINDOW;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_BACK_ANIMATION;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_DESKTOP_MODE;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_ONE_HANDED;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_PIP;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_RECENT_TASKS;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_SPLIT_SCREEN;
+import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_STARTING_WINDOW;
 
 import android.annotation.TargetApi;
 import android.app.PendingIntent;
@@ -43,7 +48,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
-import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.drawable.Icon;
 import android.os.Build;
@@ -51,11 +55,11 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.os.SystemProperties;
 import android.util.Log;
 import android.view.Choreographer;
 import android.view.InputEvent;
 import android.view.MotionEvent;
+import android.view.SurfaceControl;
 import android.view.accessibility.AccessibilityManager;
 
 import androidx.annotation.BinderThread;
@@ -63,11 +67,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
+import com.android.app.viewcapture.ViewCapture;
 import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarManager;
@@ -80,7 +86,6 @@ import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.TraceHelper;
-import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
 import com.android.quickstep.inputconsumers.AssistantInputConsumer;
 import com.android.quickstep.inputconsumers.DeviceLockedInputConsumer;
@@ -97,7 +102,6 @@ import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.ActiveGestureLog.CompoundString;
 import com.android.quickstep.util.ProtoTracer;
 import com.android.quickstep.util.ProxyScreenStatusProvider;
-import com.android.quickstep.util.SplitScreenBounds;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -107,6 +111,7 @@ import com.android.systemui.shared.system.InputMonitorCompat;
 import com.android.systemui.shared.system.smartspace.ISysuiUnlockAnimationController;
 import com.android.systemui.shared.tracing.ProtoTraceable;
 import com.android.wm.shell.back.IBackAnimation;
+import com.android.wm.shell.desktopmode.IDesktopMode;
 import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.pip.IPip;
 import com.android.wm.shell.recents.IRecentTasks;
@@ -132,21 +137,7 @@ public class TouchInteractionService extends Service
 
     private static final String TAG = "TouchInteractionService";
 
-    private static final boolean BUBBLES_HOME_GESTURE_ENABLED =
-            SystemProperties.getBoolean("persist.wm.debug.bubbles_home_gesture", true);
-
-    private static final String KEY_BACK_NOTIFICATION_COUNT = "backNotificationCount";
-    private static final String NOTIFY_ACTION_BACK = "com.android.quickstep.action.BACK_GESTURE";
     private static final String HAS_ENABLED_QUICKSTEP_ONCE = "launcher.has_enabled_quickstep_once";
-    private static final int MAX_BACK_NOTIFICATION_COUNT = 3;
-
-    /**
-     * System Action ID to show all apps.
-     * TODO: Use AccessibilityService's corresponding global action constant in S
-     */
-    private static final int SYSTEM_ACTION_ID_ALL_APPS = 14;
-
-    private int mBackGestureNotificationCounter = -1;
 
     private final TISBinder mTISBinder = new TISBinder();
 
@@ -174,13 +165,15 @@ public class TouchInteractionService extends Service
                     ISysuiUnlockAnimationController.Stub.asInterface(
                             bundle.getBinder(KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER));
             IRecentTasks recentTasks = IRecentTasks.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_RECENT_TASKS));
+                    bundle.getBinder(KEY_EXTRA_SHELL_RECENT_TASKS));
             IBackAnimation backAnimation = IBackAnimation.Stub.asInterface(
                     bundle.getBinder(KEY_EXTRA_SHELL_BACK_ANIMATION));
+            IDesktopMode desktopMode = IDesktopMode.Stub.asInterface(
+                    bundle.getBinder(KEY_EXTRA_SHELL_DESKTOP_MODE));
             MAIN_EXECUTOR.execute(() -> {
                 SystemUiProxy.INSTANCE.get(TouchInteractionService.this).setProxy(proxy, pip,
-                        splitscreen, onehanded, shellTransitions, startingWindow, recentTasks,
-                        launcherUnlockAnimationController, backAnimation);
+                        splitscreen, onehanded, shellTransitions, startingWindow,
+                        recentTasks, launcherUnlockAnimationController, backAnimation, desktopMode);
                 TouchInteractionService.this.initInputMonitor("TISBinder#onInitialize()");
                 preloadOverview(true /* fromInit */);
             });
@@ -220,12 +213,6 @@ public class TouchInteractionService extends Service
 
         @BinderThread
         @Override
-        public void onTip(int actionType, int viewType) {
-            // Please delete this method from the interface
-        }
-
-        @BinderThread
-        @Override
         public void onAssistantAvailable(boolean available) {
             MAIN_EXECUTOR.execute(() -> {
                 mDeviceState.setAssistantAvailable(available);
@@ -242,10 +229,9 @@ public class TouchInteractionService extends Service
             });
         }
 
-        @BinderThread
-        public void onBackAction(boolean completed, int downX, int downY, boolean isButton,
-                boolean gestureSwipeLeft) {
-            // Remove this method from the interface
+        @Override
+        public void onNavigationBarSurface(SurfaceControl surface) {
+            // TODO: implement
         }
 
         @BinderThread
@@ -260,12 +246,6 @@ public class TouchInteractionService extends Service
         @BinderThread
         public void onActiveNavBarRegionChanges(Region region) {
             MAIN_EXECUTOR.execute(() -> mDeviceState.setDeferredGestureRegion(region));
-        }
-
-        @Override
-        public void onSplitScreenSecondaryBoundsChanged(Rect bounds, Rect insets) {
-            WindowBounds wb = new WindowBounds(bounds, insets);
-            MAIN_EXECUTOR.execute(() -> SplitScreenBounds.INSTANCE.setSecondaryWindowBounds(wb));
         }
 
         @BinderThread
@@ -284,6 +264,16 @@ public class TouchInteractionService extends Service
         @Override
         public void onScreenTurningOff() {
             MAIN_EXECUTOR.execute(ProxyScreenStatusProvider.INSTANCE::onScreenTurningOff);
+        }
+
+        @BinderThread
+        @Override
+        public void enterStageSplitFromRunningApp(boolean leftOrTop) {
+            StatefulActivity activity =
+                    mOverviewComponentObserver.getActivityInterface().getCreatedActivity();
+            if (activity != null) {
+                activity.enterStageSplitFromRunningApp(leftOrTop);
+            }
         }
 
         /**
@@ -459,7 +449,8 @@ public class TouchInteractionService extends Service
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
         mOverviewCommandHelper = new OverviewCommandHelper(this,
                 mOverviewComponentObserver, mTaskAnimationManager);
-        mResetGestureInputConsumer = new ResetGestureInputConsumer(mTaskAnimationManager);
+        mResetGestureInputConsumer = new ResetGestureInputConsumer(
+                mTaskAnimationManager, mTaskbarManager::getCurrentActivityContext);
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
         mInputConsumer.registerInputConsumer();
         onSystemUiFlagsChanged(mDeviceState.getSystemUiStateFlags());
@@ -470,8 +461,6 @@ public class TouchInteractionService extends Service
 
         // Temporarily disable model preload
         // new ModelPreload().start(this);
-        mBackGestureNotificationCounter = Math.max(0, Utilities.getDevicePrefs(this)
-                .getInt(KEY_BACK_NOTIFICATION_COUNT, MAX_BACK_NOTIFICATION_COUNT));
         resetHomeBounceSeenOnQuickstepEnabledFirstTime();
 
         mOverviewComponentObserver.setOverviewChangeListener(this::onOverviewTargetChange);
@@ -509,11 +498,11 @@ public class TouchInteractionService extends Service
                     Icon.createWithResource(this, R.drawable.ic_apps),
                     getString(R.string.all_apps_label),
                     getString(R.string.all_apps_label),
-                    PendingIntent.getActivity(this, SYSTEM_ACTION_ID_ALL_APPS, intent,
+                    PendingIntent.getActivity(this, GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS, intent,
                             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
-            am.registerSystemAction(allAppsAction, SYSTEM_ACTION_ID_ALL_APPS);
+            am.registerSystemAction(allAppsAction, GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS);
         } else {
-            am.unregisterSystemAction(SYSTEM_ACTION_ID_ALL_APPS);
+            am.unregisterSystemAction(GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS);
         }
 
         StatefulActivity newOverviewActivity = mOverviewComponentObserver.getActivityInterface()
@@ -531,6 +520,18 @@ public class TouchInteractionService extends Service
             SystemUiProxy.INSTANCE.get(this).setLastSystemUiStateFlags(systemUiStateFlags);
             mOverviewComponentObserver.onSystemUiStateChanged();
             mTaskbarManager.onSystemUiFlagsChanged(systemUiStateFlags);
+
+            boolean wasFreeformActive =
+                    (lastSysUIFlags & SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE) != 0;
+            boolean isFreeformActive =
+                    (systemUiStateFlags & SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE) != 0;
+            if (wasFreeformActive != isFreeformActive) {
+                DesktopVisibilityController controller = mOverviewComponentObserver
+                        .getActivityInterface().getDesktopVisibilityController();
+                if (controller != null) {
+                    controller.setFreeformTasksVisible(isFreeformActive);
+                }
+            }
 
             boolean wasExpanded = (lastSysUIFlags & SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED) != 0;
             boolean isExpanded =
@@ -579,7 +580,7 @@ public class TouchInteractionService extends Service
         ProtoTracer.INSTANCE.get(this).remove(this);
 
         getSystemService(AccessibilityManager.class)
-                .unregisterSystemAction(SYSTEM_ACTION_ID_ALL_APPS);
+                .unregisterSystemAction(GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS);
 
         mTaskbarManager.destroy();
         sConnected = false;
@@ -650,12 +651,17 @@ public class TouchInteractionService extends Service
             switch (event.getActionMasked()) {
                 case ACTION_DOWN:
                 case ACTION_UP:
-                    ActiveGestureLog.INSTANCE.addLog("onMotionEvent("
-                            + (int) event.getRawX() + ", " + (int) event.getRawY() + ")",
-                            event.getActionMasked());
+                    ActiveGestureLog.INSTANCE.addLog(
+                            /* event= */ "onMotionEvent(" + (int) event.getRawX() + ", "
+                                    + (int) event.getRawY() + "): "
+                                    + MotionEvent.actionToString(event.getActionMasked()),
+                            /* gestureEvent= */ event.getActionMasked() == ACTION_DOWN
+                                    ? MOTION_DOWN
+                                    : MOTION_UP);
                     break;
                 default:
-                    ActiveGestureLog.INSTANCE.addLog("onMotionEvent", event.getActionMasked());
+                    ActiveGestureLog.INSTANCE.addLog("onMotionEvent: "
+                            + MotionEvent.actionToString(event.getActionMasked()));
                     break;
             }
         }
@@ -700,17 +706,27 @@ public class TouchInteractionService extends Service
     }
 
     public GestureState createGestureState(GestureState previousGestureState) {
-        GestureState gestureState = new GestureState(mOverviewComponentObserver,
-                ActiveGestureLog.INSTANCE.incrementLogId());
+        final GestureState gestureState;
+        TopTaskTracker.CachedTaskInfo taskInfo;
         if (mTaskAnimationManager.isRecentsAnimationRunning()) {
-            gestureState.updateRunningTask(previousGestureState.getRunningTask());
+            gestureState = new GestureState(mOverviewComponentObserver,
+                    ActiveGestureLog.INSTANCE.getLogId());
+            taskInfo = previousGestureState.getRunningTask();
+            gestureState.updateRunningTask(taskInfo);
             gestureState.updateLastStartedTaskId(previousGestureState.getLastStartedTaskId());
             gestureState.updatePreviouslyAppearedTaskIds(
                     previousGestureState.getPreviouslyAppearedTaskIds());
         } else {
-            gestureState.updateRunningTask(
-                    TopTaskTracker.INSTANCE.get(this).getCachedTopTask(false));
+            gestureState = new GestureState(mOverviewComponentObserver,
+                    ActiveGestureLog.INSTANCE.incrementLogId());
+            taskInfo = TopTaskTracker.INSTANCE.get(this).getCachedTopTask(false);
+            gestureState.updateRunningTask(taskInfo);
         }
+        // Log initial state for the gesture.
+        ActiveGestureLog.INSTANCE.addLog(new CompoundString("Current running task package name=")
+                .append(taskInfo == null ? "no running task" : taskInfo.getPackageName()));
+        ActiveGestureLog.INSTANCE.addLog(new CompoundString("Current SystemUi state flags=")
+                .append(mDeviceState.getSystemUiStateString()));
         return gestureState;
     }
 
@@ -789,27 +805,9 @@ public class TouchInteractionService extends Service
             if (mDeviceState.isBubblesExpanded()) {
                 reasonString = newCompoundString(reasonPrefix)
                         .append(SUBSTRING_PREFIX)
-                        .append("bubbles expanded");
-                if (BUBBLES_HOME_GESTURE_ENABLED) {
-                    reasonString.append(SUBSTRING_PREFIX)
-                            .append("bubbles can handle the home gesture")
-                            .append(", trying to use default input consumer");
-                    // Bubbles can handle home gesture itself.
-                    base = getDefaultInputConsumer(reasonString);
-                } else {
-                    // If Bubbles is expanded, use the overlay input consumer, which will close
-                    // Bubbles instead of going all the way home when a swipe up is detected.
-                    // Notification panel can be expanded on top of expanded bubbles. Bubbles remain
-                    // expanded in the back. Make sure swipe up is not passed to bubbles in this
-                    // case.
-                    if (!mDeviceState.isNotificationPanelExpanded()) {
-                        reasonString = newCompoundString(reasonPrefix)
-                                .append(SUBSTRING_PREFIX)
-                                .append("using SysUiOverlayInputConsumer");
-                        base = new SysUiOverlayInputConsumer(
-                                getBaseContext(), mDeviceState, mInputMonitorCompat);
-                    }
-                }
+                        .append("bubbles expanded, trying to use default input consumer");
+                // Bubbles can handle home gesture itself.
+                base = getDefaultInputConsumer(reasonString);
             }
 
             if (mDeviceState.isSystemUiDialogShowing()) {
@@ -887,6 +885,9 @@ public class TouchInteractionService extends Service
                 .append(consumer.getName())
                 .append(". reason(s):")
                 .append(reasonString));
+        if ((consumer.getType() & InputConsumer.TYPE_OTHER_ACTIVITY) != 0) {
+            ActiveGestureLog.INSTANCE.trackEvent(FLAG_USING_OTHER_ACTIVITY_INPUT_CONSUMER);
+        }
     }
 
     private void handleOrientationSetup(InputConsumer baseInputConsumer) {
@@ -928,8 +929,7 @@ public class TouchInteractionService extends Service
         boolean launcherResumedThroughShellTransition =
                 gestureState.getActivityInterface().isResumed()
                         && !previousGestureState.isRecentsAnimationRunning();
-        if (ENABLE_QUICKSTEP_LIVE_TILE.get()
-                && gestureState.getActivityInterface().isInLiveTileMode()) {
+        if (gestureState.getActivityInterface().isInLiveTileMode()) {
             return createOverviewInputConsumer(
                     previousGestureState,
                     gestureState,
@@ -1012,12 +1012,26 @@ public class TouchInteractionService extends Service
                             .append("activity == null, trying to use default input consumer"));
         }
 
-        if (activity.getRootView().hasWindowFocus()
-                || previousGestureState.isRunningAnimationToLauncher()
-                || (ASSISTANT_GIVES_LAUNCHER_FOCUS.get()
-                    && forceOverviewInputConsumer)
-                || (ENABLE_QUICKSTEP_LIVE_TILE.get()
-                && gestureState.getActivityInterface().isInLiveTileMode())) {
+        boolean hasWindowFocus = activity.getRootView().hasWindowFocus();
+        boolean isPreviousGestureAnimatingToLauncher =
+                previousGestureState.isRunningAnimationToLauncher();
+        boolean forcingOverviewInputConsumer =
+                ASSISTANT_GIVES_LAUNCHER_FOCUS.get() && forceOverviewInputConsumer;
+        boolean isInLiveTileMode = gestureState.getActivityInterface().isInLiveTileMode();
+        reasonString.append(SUBSTRING_PREFIX)
+                .append(hasWindowFocus
+                        ? "activity has window focus"
+                        : (isPreviousGestureAnimatingToLauncher
+                                ? "previous gesture is still animating to launcher"
+                                : (forcingOverviewInputConsumer
+                                        ? "assistant gives launcher focus and forcing focus"
+                                        : (isInLiveTileMode
+                                                ? "device is in live mode"
+                                                : "all overview focus conditions failed"))));
+        if (hasWindowFocus
+                || isPreviousGestureAnimatingToLauncher
+                || forcingOverviewInputConsumer
+                || isInLiveTileMode) {
             reasonString.append(SUBSTRING_PREFIX)
                     .append("overview should have focus, using OverviewInputConsumer");
             return new OverviewInputConsumer(gestureState, activity, mInputMonitorCompat,
@@ -1184,19 +1198,36 @@ public class TouchInteractionService extends Service
                 createdOverviewActivity.getDeviceProfile().dump(this, "", pw);
             }
             mTaskbarManager.dumpLogs("", pw);
+
+            if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
+                ViewCapture.getInstance().dump(pw, fd, this);
+            }
         }
     }
 
     private void printAvailableCommands(PrintWriter pw) {
         pw.println("Available commands:");
         pw.println("  clear-touch-log: Clears the touch interaction log");
+        pw.println("  print-gesture-log: only prints the ActiveGestureLog dump");
     }
 
     private void onCommand(PrintWriter pw, LinkedList<String> args) {
-        switch (args.pollFirst()) {
+        String cmd = args.pollFirst();
+        if (cmd == null) {
+            pw.println("Command missing");
+            printAvailableCommands(pw);
+            return;
+        }
+        switch (cmd) {
             case "clear-touch-log":
                 ActiveGestureLog.INSTANCE.clear();
                 break;
+            case "print-gesture-log":
+                ActiveGestureLog.INSTANCE.dump("", pw);
+                break;
+            default:
+                pw.println("Command does not exist: " + cmd);
+                printAvailableCommands(pw);
         }
     }
 

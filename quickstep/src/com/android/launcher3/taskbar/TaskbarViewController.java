@@ -17,10 +17,13 @@ package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
+import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
 import static com.android.launcher3.taskbar.TaskbarManager.isPhoneMode;
+import static com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_NEGATIVE;
+import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
 import static com.android.quickstep.AnimatedFloat.VALUE;
 
 import android.annotation.NonNull;
@@ -30,6 +33,7 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
+import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.view.OneShotPreDrawListener;
 
@@ -46,9 +50,12 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.icons.ThemedIconDrawable;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.touch.SingleAxisSwipeDetector;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.HorizontalInsettableView;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
+import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.AnimatedFloat;
 
@@ -84,11 +91,17 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
             this::updateTranslationY);
     private AnimatedFloat mTaskbarNavButtonTranslationY;
     private AnimatedFloat mTaskbarNavButtonTranslationYForInAppDisplay;
+    private float mTaskbarIconTranslationYForSwipe;
+
+    private final int mTaskbarBottomMargin;
 
     private final AnimatedFloat mThemeIconsBackground = new AnimatedFloat(
             this::updateIconsBackground);
 
     private final TaskbarModelCallbacks mModelCallbacks;
+
+    // Captures swipe down action to close transient taskbar.
+    protected @Nullable SingleAxisSwipeDetector mSwipeDownDetector;
 
     // Initialized in init.
     private TaskbarControllers mControllers;
@@ -100,12 +113,43 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
     private int mThemeIconsColor;
 
+    private final DeviceProfile.OnDeviceProfileChangeListener mDeviceProfileChangeListener =
+            dp -> commitRunningAppsToUI();
+
     public TaskbarViewController(TaskbarActivityContext activity, TaskbarView taskbarView) {
         mActivity = activity;
         mTaskbarView = taskbarView;
         mTaskbarIconAlpha = new MultiValueAlpha(mTaskbarView, NUM_ALPHA_CHANNELS);
         mTaskbarIconAlpha.setUpdateVisibility(true);
         mModelCallbacks = new TaskbarModelCallbacks(activity, mTaskbarView);
+        mTaskbarBottomMargin = DisplayController.isTransientTaskbar(activity)
+                ? activity.getResources().getDimensionPixelSize(R.dimen.transient_taskbar_margin)
+                : 0;
+
+        if (DisplayController.isTransientTaskbar(mActivity)) {
+            mSwipeDownDetector = new SingleAxisSwipeDetector(activity,
+                    new SingleAxisSwipeDetector.Listener() {
+                        private float mLastDisplacement;
+
+                        @Override
+                        public boolean onDrag(float displacement) {
+                            mLastDisplacement = displacement;
+                            return false;
+                        }
+
+                        @Override
+                        public void onDragEnd(float velocity) {
+                            if (mLastDisplacement > 0) {
+                                mControllers.taskbarStashController
+                                        .updateAndAnimateTransientTaskbar(true);
+                            }
+                        }
+
+                        @Override
+                        public void onDragStart(boolean start, float startDisplacement) {}
+                    }, VERTICAL);
+            mSwipeDownDetector.setDetectableScrollConditions(DIRECTION_NEGATIVE, false);
+        }
     }
 
     public void init(TaskbarControllers controllers) {
@@ -127,10 +171,13 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 controllers.navbarButtonsViewController.getTaskbarNavButtonTranslationY();
         mTaskbarNavButtonTranslationYForInAppDisplay = controllers.navbarButtonsViewController
                 .getTaskbarNavButtonTranslationYForInAppDisplay();
+
+        mActivity.addOnDeviceProfileChangeListener(mDeviceProfileChangeListener);
     }
 
     public void onDestroy() {
         LauncherAppState.getInstance(mActivity).getModel().removeCallbacks(mModelCallbacks);
+        mActivity.removeOnDeviceProfileChangeListener(mDeviceProfileChangeListener);
         mModelCallbacks.unregisterListeners();
     }
 
@@ -138,7 +185,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         return mTaskbarView.areIconsVisible();
     }
 
-    public MultiValueAlpha getTaskbarIconAlpha() {
+    public MultiPropertyFactory<View> getTaskbarIconAlpha() {
         return mTaskbarIconAlpha;
     }
 
@@ -153,7 +200,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      * Should be called when the IME switcher visibility changes.
      */
     public void setIsImeSwitcherVisible(boolean isImeSwitcherVisible) {
-        mTaskbarIconAlpha.getProperty(ALPHA_INDEX_IME_BUTTON_NAV).setValue(
+        mTaskbarIconAlpha.get(ALPHA_INDEX_IME_BUTTON_NAV).setValue(
                 isImeSwitcherVisible ? 0 : 1);
     }
 
@@ -162,7 +209,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     public void setRecentsButtonDisabled(boolean isDisabled) {
         // TODO: check TaskbarStashController#supportsStashing(), to stash instead of setting alpha.
-        mTaskbarIconAlpha.getProperty(ALPHA_INDEX_RECENTS_DISABLED).setValue(isDisabled ? 0 : 1);
+        mTaskbarIconAlpha.get(ALPHA_INDEX_RECENTS_DISABLED).setValue(isDisabled ? 0 : 1);
     }
 
     /**
@@ -183,6 +230,10 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
     public Rect getIconLayoutBounds() {
         return mTaskbarView.getIconLayoutBounds();
+    }
+
+    public int getIconLayoutWidth() {
+        return mTaskbarView.getIconLayoutWidth();
     }
 
     public View[] getIconViews() {
@@ -210,9 +261,18 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarView.setScaleY(scale);
     }
 
+    /**
+     * Sets the translation of the TaskbarView during the swipe up gesture.
+     */
+    public void setTranslationYForSwipe(float transY) {
+        mTaskbarIconTranslationYForSwipe = transY;
+        updateTranslationY();
+    }
+
     private void updateTranslationY() {
         mTaskbarView.setTranslationY(mTaskbarIconTranslationYForHome.value
-                + mTaskbarIconTranslationYForStash.value);
+                + mTaskbarIconTranslationYForStash.value
+                + mTaskbarIconTranslationYForSwipe);
     }
 
     private void updateIconsBackground() {
@@ -230,10 +290,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      *                       0 => not aligned
      *                       1 => fully aligned
      */
-    public void setLauncherIconAlignment(float alignmentRatio, Float endAlignment,
-            DeviceProfile launcherDp) {
+    public void setLauncherIconAlignment(float alignmentRatio, DeviceProfile launcherDp) {
         if (mIconAlignControllerLazy == null) {
-            mIconAlignControllerLazy = createIconAlignmentController(launcherDp, endAlignment);
+            mIconAlignControllerLazy = createIconAlignmentController(launcherDp);
         }
         mIconAlignControllerLazy.setPlayFraction(alignmentRatio);
         if (alignmentRatio <= 0 || alignmentRatio >= 1) {
@@ -245,8 +304,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     /**
      * Creates an animation for aligning the taskbar icons with the provided Launcher device profile
      */
-    private AnimatorPlaybackController createIconAlignmentController(DeviceProfile launcherDp,
-            Float endAlignment) {
+    private AnimatorPlaybackController createIconAlignmentController(DeviceProfile launcherDp) {
         mOnControllerPreCreateCallback.run();
         PendingAnimation setter = new PendingAnimation(100);
         DeviceProfile taskbarDp = mActivity.getDeviceProfile();
@@ -272,7 +330,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         setter.addOnFrameListener(anim -> mActivity.setTaskbarWindowHeight(
                 anim.getAnimatedFraction() > 0 ? expandedHeight : collapsedHeight));
 
-        boolean isToHome = endAlignment != null && endAlignment == 1;
+        boolean isToHome = mControllers.uiController.isIconAlignedWithHotseat();
         for (int i = 0; i < mTaskbarView.getChildCount(); i++) {
             View child = mTaskbarView.getChildAt(i);
             int positionInHotseat;
@@ -308,6 +366,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 float scale = ((float) taskbarDp.iconSizePx) / launcherDp.hotseatQsbVisualHeight;
                 setter.addFloat(child, SCALE_PROPERTY, scale, 1f, LINEAR);
 
+                setter.setFloat(child, VIEW_TRANSLATE_Y, mTaskbarBottomMargin, LINEAR);
+
                 setter.addFloat(child, VIEW_ALPHA, 0f, 1f,
                         isToHome
                                 ? Interpolators.clampToProgress(LINEAR, 0f, 0.35f)
@@ -332,6 +392,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
             float childCenter = (child.getLeft() + child.getRight()) / 2f;
             setter.setFloat(child, ICON_TRANSLATE_X, hotseatIconCenter - childCenter, LINEAR);
+
+            setter.setFloat(child, VIEW_TRANSLATE_Y, mTaskbarBottomMargin, LINEAR);
 
             setter.setFloat(child, SCALE_PROPERTY, scaleUp, LINEAR);
         }
@@ -416,6 +478,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         private float mDownX, mDownY;
         private boolean mCanceledStashHint;
 
+        private boolean mTouchInProgress;
+
         public View.OnClickListener getIconOnClickListener() {
             return mActivity.getItemOnClickListener();
         }
@@ -437,37 +501,75 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
 
         /**
+         * Simply listens to all intercept touch events passed to TaskbarView.
+         */
+        public void onInterceptTouchEvent(MotionEvent ev) {
+            if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+                mTouchInProgress = true;
+            }
+
+            if (mTouchInProgress && mSwipeDownDetector != null) {
+                mSwipeDownDetector.onTouchEvent(ev);
+            }
+
+            if (ev.getAction() == MotionEvent.ACTION_UP
+                    || ev.getAction() == MotionEvent.ACTION_CANCEL) {
+                clearTouchInProgress();
+            }
+        }
+
+        /**
          * Get the first chance to handle TaskbarView#onTouchEvent, and return whether we want to
          * consume the touch so TaskbarView treats it as an ACTION_CANCEL.
          */
         public boolean onTouchEvent(MotionEvent motionEvent) {
+            boolean shouldConsumeTouch = false;
+            boolean clearTouchInProgress = false;
+
             final float x = motionEvent.getRawX();
             final float y = motionEvent.getRawY();
             switch (motionEvent.getAction()) {
                 case MotionEvent.ACTION_DOWN:
+                    mTouchInProgress = true;
                     mDownX = x;
                     mDownY = y;
                     mControllers.taskbarStashController.startStashHint(/* animateForward = */ true);
                     mCanceledStashHint = false;
                     break;
                 case MotionEvent.ACTION_MOVE:
-                    if (!mCanceledStashHint
+                    if (mTouchInProgress
+                            && !mCanceledStashHint
                             && squaredHypot(mDownX - x, mDownY - y) > mSquaredTouchSlop) {
                         mControllers.taskbarStashController.startStashHint(
                                 /* animateForward= */ false);
                         mCanceledStashHint = true;
-                        return true;
+                        shouldConsumeTouch = true;
                     }
                     break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    if (!mCanceledStashHint) {
+                    if (mTouchInProgress && !mCanceledStashHint) {
                         mControllers.taskbarStashController.startStashHint(
                                 /* animateForward= */ false);
                     }
+                    clearTouchInProgress = true;
                     break;
             }
-            return false;
+
+            if (mTouchInProgress && mSwipeDownDetector != null) {
+                mSwipeDownDetector.onTouchEvent(motionEvent);
+            }
+            if (clearTouchInProgress) {
+                clearTouchInProgress();
+            }
+            return shouldConsumeTouch;
+        }
+
+        /**
+         * Ensures that we do not pass any more touch events to the SwipeDetector.
+         */
+        public void clearTouchInProgress() {
+            mTouchInProgress = false;
         }
     }
 

@@ -24,6 +24,7 @@ import android.graphics.Matrix;
 import android.graphics.Matrix.ScaleToFit;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.view.RemoteAnimationTarget;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.UiThread;
@@ -37,11 +38,10 @@ import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.RectFSpringAnim;
+import com.android.quickstep.util.SurfaceTransaction.SurfaceProperties;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.util.TransformParams.BuilderProxy;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
-import com.android.systemui.shared.system.SyncRtSurfaceTransactionApplierCompat.SurfaceParams.Builder;
 
 import java.util.Arrays;
 import java.util.function.Consumer;
@@ -65,6 +65,7 @@ public abstract class SwipeUpAnimationLogic implements
     // 1 => preview snapShot is completely aligned with the recents view and hotseat is completely
     // visible.
     protected final AnimatedFloat mCurrentShift = new AnimatedFloat(this::updateFinalShift);
+    protected float mCurrentDisplacement;
 
     // The distance needed to drag to reach the task size in recents.
     protected int mTransitionDragLength;
@@ -116,6 +117,8 @@ public abstract class SwipeUpAnimationLogic implements
     public void updateDisplacement(float displacement) {
         // We are moving in the negative x/y direction
         displacement = -displacement;
+        mCurrentDisplacement = displacement;
+
         float shift;
         if (displacement > mTransitionDragLength * mDragLengthFactor && mTransitionDragLength > 0) {
             shift = mDragLengthFactor;
@@ -335,11 +338,11 @@ public abstract class SwipeUpAnimationLogic implements
         }
 
         @Override
-        public void onBuildTargetParams(
-                Builder builder, RemoteAnimationTargetCompat app, TransformParams params) {
-            builder.withMatrix(mMatrix)
-                    .withWindowCrop(mCropRect)
-                    .withCornerRadius(params.getCornerRadius());
+        public void onBuildTargetParams(SurfaceProperties builder, RemoteAnimationTarget app,
+                TransformParams params) {
+            builder.setMatrix(mMatrix)
+                    .setWindowCrop(mCropRect)
+                    .setCornerRadius(params.getCornerRadius());
         }
 
         @Override

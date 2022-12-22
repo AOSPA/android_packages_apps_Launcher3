@@ -151,6 +151,8 @@ public abstract class AbstractLauncherUiTest {
                     device.executeShellCommand(
                             "am dumpheap " + device.getLauncherPackageName() + " " + fileName);
                 }
+                Log.d(TAG, "Saved leak dump, the leak is still present: "
+                        + !launcher.noLeakedActivities());
                 sDumpWasGenerated = true;
                 result = "saved memory dump as an artifact";
             } catch (Throwable e) {
@@ -202,7 +204,8 @@ public abstract class AbstractLauncherUiTest {
         };
         mTargetContext.registerReceiver(broadcastReceiver,
                 PackageManagerHelper.getPackageFilter(pkg,
-                        Intent.ACTION_PACKAGE_RESTARTED, Intent.ACTION_PACKAGE_DATA_CLEARED));
+                        Intent.ACTION_PACKAGE_RESTARTED, Intent.ACTION_PACKAGE_DATA_CLEARED),
+                        Context.RECEIVER_EXPORTED/*UNAUDITED*/);
 
         mDevice.executeShellCommand("pm clear " + pkg);
         assertTrue(pkg + " didn't restart", count.await(10, TimeUnit.SECONDS));
@@ -319,7 +322,7 @@ public abstract class AbstractLauncherUiTest {
     /**
      * Adds {@param item} on the homescreen on the 0th screen
      */
-    protected void addItemToScreen(ItemInfo item) {
+    public void addItemToScreen(ItemInfo item) {
         WidgetUtils.addItemToScreen(item, mTargetContext);
         resetLoaderState();
 
@@ -437,7 +440,8 @@ public abstract class AbstractLauncherUiTest {
         private Intent mIntent;
 
         public BlockingBroadcastReceiver(String action) {
-            mTargetContext.registerReceiver(this, new IntentFilter(action));
+            mTargetContext.registerReceiver(this, new IntentFilter(action),
+                    Context.RECEIVER_EXPORTED/*UNAUDITED*/);
         }
 
         @Override
@@ -474,6 +478,16 @@ public abstract class AbstractLauncherUiTest {
         intent.setComponent(new ComponentName(packageName,
                 "com.android.launcher3.tests.Activity" + activityNumber));
         startIntent(intent, By.pkg(packageName).text("TestActivity" + activityNumber),
+                false /* newTask */);
+    }
+
+    public static void startImeTestActivity() {
+        final String packageName = getAppPackageName();
+        final Intent intent = getInstrumentation().getContext().getPackageManager().
+                getLaunchIntentForPackage(packageName);
+        intent.setComponent(new ComponentName(packageName,
+                "com.android.launcher3.testcomponent.ImeTestActivity"));
+        startIntent(intent, By.pkg(packageName).text("ImeTestActivity"),
                 false /* newTask */);
     }
 
@@ -525,7 +539,7 @@ public abstract class AbstractLauncherUiTest {
     }
 
     protected int getAllAppsScroll(Launcher launcher) {
-        return launcher.getAppsView().getActiveRecyclerView().getCurrentScrollY();
+        return launcher.getAppsView().getActiveRecyclerView().computeVerticalScrollOffset();
     }
 
     private void checkLauncherIntegrity(

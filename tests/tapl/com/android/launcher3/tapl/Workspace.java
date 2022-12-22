@@ -18,6 +18,7 @@ package com.android.launcher3.tapl;
 
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_SCROLLED;
 
+import static com.android.launcher3.tapl.LauncherInstrumentation.CALLBACK_RUN_POINT.CALLBACK_HOLD_BEFORE_DROP;
 import static com.android.launcher3.testing.shared.TestProtocol.ALL_APPS_STATE_ORDINAL;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 
@@ -192,6 +193,12 @@ public final class Workspace extends Home {
         }
     }
 
+    /** Returns the number of pages. */
+    public int getPageCount() {
+        final UiObject2 workspace = verifyActiveContainer();
+        return workspace.getChildCount();
+    }
+
     /**
      * Returns the number of pages that are visible on the screen simultaneously.
      */
@@ -293,6 +300,31 @@ public final class Workspace extends Home {
         return launcher.waitForObjectInContainer(
                 launcher.waitForLauncherObject(DROP_BAR_RES_ID),
                 targetId).getVisibleCenter();
+    }
+
+    /**
+     * Drag the appIcon from the workspace and cancel by dragging icon to corner of screen where no
+     * drop point exists.
+     *
+     * @param homeAppIcon to be dragged.
+     */
+    @NonNull
+    public Workspace dragAndCancelAppIcon(HomeAppIcon homeAppIcon) {
+        try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
+             LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
+                     "dragging app icon across workspace")) {
+            dragIconToWorkspace(
+                    mLauncher,
+                    homeAppIcon,
+                    () -> new Point(0, 0),
+                    () -> mLauncher.expectEvent(TestProtocol.SEQUENCE_MAIN, LONG_CLICK_EVENT),
+                    null);
+
+            try (LauncherInstrumentation.Closable c1 = mLauncher.addContextLayer(
+                    "dragged the app across workspace")) {
+                return new Workspace(mLauncher);
+            }
+        }
     }
 
     /**
@@ -469,7 +501,9 @@ public final class Workspace extends Home {
             // Since the destination can be on another page, we need to drag to the edge first
             // until we reach the target page
             while (targetDest.x > displayX || targetDest.x < 0) {
-                int edgeX = targetDest.x > 0 ? displayX : 0;
+                // Don't drag all the way to the edge to prevent touch events from getting out of
+                //screen bounds.
+                int edgeX = targetDest.x > 0 ? displayX - 1 : 1;
                 Point screenEdge = new Point(edgeX, targetDest.y);
                 Point finalDragStart = dragStart;
                 executeAndWaitForPageScroll(launcher,
@@ -485,6 +519,7 @@ public final class Workspace extends Home {
             launcher.movePointer(dragStart, targetDest, DEFAULT_DRAG_STEPS, isDecelerating,
                     downTime, SystemClock.uptimeMillis(), false,
                     LauncherInstrumentation.GestureScope.INSIDE);
+            launcher.runCallbackIfActive(CALLBACK_HOLD_BEFORE_DROP);
             dropDraggedIcon(launcher, targetDest, downTime, expectDropEvents);
         }
     }

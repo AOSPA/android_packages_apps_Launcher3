@@ -30,6 +30,7 @@ import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -40,6 +41,7 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.RemoteAnimationTarget;
 import android.view.View;
 
 import androidx.annotation.Nullable;
@@ -50,18 +52,19 @@ import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statehandlers.DepthController;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.DisplayController;
-import com.android.launcher3.util.DisplayController.NavigationMode;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.views.ScrimView;
+import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.HashMap;
 import java.util.Optional;
@@ -141,6 +144,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     }
 
     @Nullable
+    public DesktopVisibilityController getDesktopVisibilityController() {
+        return null;
+    }
+
+    @Nullable
     public abstract TaskbarUIController getTaskbarController();
 
     public final boolean isResumed() {
@@ -161,7 +169,7 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     public abstract boolean switchToRecentsIfVisible(Runnable onCompleteCallback);
 
     public abstract Rect getOverviewWindowBounds(
-            Rect homeBounds, RemoteAnimationTargetCompat target);
+            Rect homeBounds, RemoteAnimationTarget target);
 
     public abstract boolean allowMinimizeSplitScreen();
 
@@ -183,19 +191,12 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public abstract void onLaunchTaskFailed();
 
-    public void onLaunchTaskSuccess() {
-        ACTIVITY_TYPE activity = getCreatedActivity();
-        if (activity == null) {
-            return;
-        }
-        activity.getStateManager().moveToRestState();
-    }
-
     /**
      * Closes any overlays.
      */
     public void closeOverlay() {
-        Optional.ofNullable(getTaskbarController()).ifPresent(TaskbarUIController::hideAllApps);
+        Optional.ofNullable(getTaskbarController()).ifPresent(
+                TaskbarUIController::hideOverlayWindow);
     }
 
     public void switchRunningTaskViewToScreenshot(HashMap<Integer, ThumbnailData> thumbnailDatas,
@@ -401,14 +402,16 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public interface AnimationFactory {
 
-        void createActivityInterface(long transitionLength);
+        void createActivityInterface(long transitionLength, ActiveGestureLog.CompoundString reason);
 
         /**
          * @param attached Whether to show RecentsView alongside the app window. If false, recents
          *                 will be hidden by some property we can animate, e.g. alpha.
          * @param animate Whether to animate recents to/from its new attached state.
+         * @param reason Explanation for why this method is being called with the given param values
          */
-        default void setRecentsAttachedToAppWindow(boolean attached, boolean animate) { }
+        default void setRecentsAttachedToAppWindow(
+                boolean attached, boolean animate, ActiveGestureLog.CompoundString reason) { }
 
         default boolean isRecentsAttachedToAppWindow() {
             return false;
@@ -450,7 +453,8 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         }
 
         @Override
-        public void createActivityInterface(long transitionLength) {
+        public void createActivityInterface(
+                long transitionLength, ActiveGestureLog.CompoundString reason) {
             PendingAnimation pa = new PendingAnimation(transitionLength * 2);
             createBackgroundToOverviewAnim(mActivity, pa);
             AnimatorPlaybackController controller = pa.createPlaybackController();
@@ -473,42 +477,68 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             // (because we set the animation as the current state animation), so we reapply the
             // attached state here as well to ensure recents is shown/hidden appropriately.
             if (DisplayController.getNavigationMode(mActivity) == NavigationMode.NO_BUTTON) {
-                setRecentsAttachedToAppWindow(mIsAttachedToWindow, false);
+                setRecentsAttachedToAppWindow(
+                        mIsAttachedToWindow,
+                        false,
+                        reason.append("; reapplying the attached state (attached=")
+                                .append(Boolean.toString(mIsAttachedToWindow))
+                                .append(", animate=false)"));
             }
         }
 
         @Override
-        public void setRecentsAttachedToAppWindow(boolean attached, boolean animate) {
+        public void setRecentsAttachedToAppWindow(
+                boolean attached, boolean animate, ActiveGestureLog.CompoundString reason) {
+            // TODO(b/244593270): remove these logs; too verbose
+            ActiveGestureLog.INSTANCE.addLog(
+                    new ActiveGestureLog.CompoundString("setRecentsAttachedToAppWindow: attached=")
+                            .append(Boolean.toString(attached))
+                            .append(", animate=")
+                            .append(Boolean.toString(animate))
+                            .append(", reason=")
+                            .append(reason));
             if (mIsAttachedToWindow == attached && animate) {
+                ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                        "setRecentsAttachedToAppWindow: exiting early"));
                 return;
             }
-            mIsAttachedToWindow = attached;
-            RecentsView recentsView = mActivity.getOverviewPanel();
-            if (attached) {
-                mHasEverAttachedToWindow = true;
-            }
-            Animator fadeAnim = mActivity.getStateManager()
-                    .createStateElementAnimation(INDEX_RECENTS_FADE_ANIM, attached ? 1 : 0);
-
-            float fromTranslation = attached ? 1 : 0;
-            float toTranslation = attached ? 0 : 1;
+            mActivity.getStateManager()
+                    .cancelStateElementAnimation(INDEX_RECENTS_FADE_ANIM);
             mActivity.getStateManager()
                     .cancelStateElementAnimation(INDEX_RECENTS_TRANSLATE_X_ANIM);
-            if (!recentsView.isShown() && animate) {
-                ADJACENT_PAGE_HORIZONTAL_OFFSET.set(recentsView, fromTranslation);
-            } else {
-                fromTranslation = ADJACENT_PAGE_HORIZONTAL_OFFSET.get(recentsView);
-            }
-            if (!animate) {
-                ADJACENT_PAGE_HORIZONTAL_OFFSET.set(recentsView, toTranslation);
-            } else {
-                mActivity.getStateManager().createStateElementAnimation(
-                        INDEX_RECENTS_TRANSLATE_X_ANIM,
-                        fromTranslation, toTranslation).start();
-            }
 
+            AnimatorSet animatorSet = new AnimatorSet();
+            animatorSet.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    super.onAnimationStart(animation);
+                    mIsAttachedToWindow = attached;
+                    if (attached) {
+                        mHasEverAttachedToWindow = true;
+                    }
+                }});
+
+            long animationDuration = animate ? RECENTS_ATTACH_DURATION : 0;
+            Animator fadeAnim = mActivity.getStateManager()
+                    .createStateElementAnimation(INDEX_RECENTS_FADE_ANIM, attached ? 1 : 0);
             fadeAnim.setInterpolator(attached ? INSTANT : ACCEL_2);
-            fadeAnim.setDuration(animate ? RECENTS_ATTACH_DURATION : 0).start();
+            fadeAnim.setDuration(animationDuration);
+            animatorSet.play(fadeAnim);
+
+            float fromTranslation = ADJACENT_PAGE_HORIZONTAL_OFFSET.get(
+                    mActivity.getOverviewPanel());
+            float toTranslation = attached ? 0 : 1;
+            ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                    "setRecentsAttachedToAppWindow: fromTranslation=")
+                    .append(Float.toString(fromTranslation))
+                    .append(", toTranslation=")
+                    .append(Float.toString(toTranslation)));
+
+            Animator translationAnimator = mActivity.getStateManager().createStateElementAnimation(
+                    INDEX_RECENTS_TRANSLATE_X_ANIM, fromTranslation, toTranslation);
+            translationAnimator.setDuration(animationDuration);
+            animatorSet.play(translationAnimator);
+            animatorSet.start();
         }
 
         @Override

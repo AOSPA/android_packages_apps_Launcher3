@@ -259,8 +259,13 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         abortScrollerAnimation(true);
     }
 
+    protected void onScrollerAnimationAborted() {
+        // No-Op
+    }
+
     private void abortScrollerAnimation(boolean resetNextPage) {
         mScroller.abortAnimation();
+        onScrollerAnimationAborted();
         // We need to clean up the next page here to avoid computeScrollHelper from
         // updating current page on the pass.
         if (resetNextPage) {
@@ -555,11 +560,11 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             if (mAllowOverScroll) {
                 if (newPos < mMinScroll && oldPos >= mMinScroll) {
                     mEdgeGlowLeft.onAbsorb((int) mScroller.getCurrVelocity());
-                    mScroller.abortAnimation();
+                    abortScrollerAnimation(false);
                     onEdgeAbsorbingScroll();
                 } else if (newPos > mMaxScroll && oldPos <= mMaxScroll) {
                     mEdgeGlowRight.onAbsorb((int) mScroller.getCurrVelocity());
-                    mScroller.abortAnimation();
+                    abortScrollerAnimation(false);
                     onEdgeAbsorbingScroll();
                 }
             }
@@ -569,7 +574,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
             int finalPos = mOrientationHandler.getPrimaryValue(mScroller.getFinalX(),
                     mScroller.getFinalY());
             if (newPos == finalPos && mEdgeGlowLeft.isFinished() && mEdgeGlowRight.isFinished()) {
-                mScroller.abortAnimation();
+                abortScrollerAnimation(false);
             }
 
             invalidate();
@@ -767,9 +772,9 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         }
 
         if (mScroller.isFinished() && pageScrollChanged) {
-            // TODO(b/238461210): Remove logging once root cause of flake detected.
+            // TODO(b/246283207): Remove logging once root cause of flake detected.
             if (Utilities.IS_RUNNING_IN_TEST_HARNESS && !(this instanceof Workspace)) {
-                Log.d("b/238461210", this.getClass().getSimpleName() + "#onLayout() -> "
+                Log.d("b/246283207", this.getClass().getSimpleName() + "#onLayout() -> "
                         + "if(mScroller.isFinished() && pageScrollChanged) -> getNextPage(): "
                         + getNextPage() + ", getScrollForPage(getNextPage()): "
                         + getScrollForPage(getNextPage()));
@@ -1609,7 +1614,7 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     }
 
     private int getDisplacementFromScreenCenter(int childIndex, int screenCenter) {
-        int childSize = Math.round(getChildVisibleSize(childIndex));
+        int childSize = getChildVisibleSize(childIndex);
         int halfChildSize = (childSize / 2);
         int childCenter = getChildOffset(childIndex) + halfChildSize;
         return childCenter - screenCenter;

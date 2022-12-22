@@ -15,12 +15,18 @@
  */
 package com.android.launcher3.taskbar;
 
+import android.content.Intent;
+import android.graphics.drawable.BitmapDrawable;
+import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.CallSuper;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
+import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.TaskView;
 
 import java.io.PrintWriter;
 import java.util.stream.Stream;
@@ -49,9 +55,13 @@ public class TaskbarUIController {
         return true;
     }
 
+    /**
+     * This should only be called by TaskbarStashController so that a TaskbarUIController can
+     * disable stashing. All other controllers should use
+     * {@link TaskbarStashController#supportsVisualStashing()} as the source of truth.
+     */
     public boolean supportsVisualStashing() {
-        if (mControllers == null) return false;
-        return !mControllers.taskbarActivityContext.isThreeButtonNav();
+        return true;
     }
 
     protected void onStashedInAppChanged() { }
@@ -76,10 +86,10 @@ public class TaskbarUIController {
     }
 
     /**
-     * Manually closes the all apps window.
+     * Manually closes the overlay window.
      */
-    public void hideAllApps() {
-        mControllers.taskbarAllAppsController.hide();
+    public void hideOverlayWindow() {
+        mControllers.taskbarOverlayController.hideWindow();
     }
 
     /**
@@ -93,11 +103,75 @@ public class TaskbarUIController {
         }
     }
 
+    /**
+     * Returns true iff taskbar is stashed.
+     */
+    public boolean isTaskbarStashed() {
+        return mControllers.taskbarStashController.isStashed();
+    }
+
+    /**
+     * Called at the end of the swipe gesture on Transient taskbar.
+     */
+    public void startTranslationSpring() {
+        mControllers.taskbarActivityContext.startTranslationSpring();
+    }
+
+    /*
+     * @param ev MotionEvent in screen coordinates.
+     * @return Whether any Taskbar item could handle the given MotionEvent if given the chance.
+     */
+    public boolean isEventOverAnyTaskbarItem(MotionEvent ev) {
+        return mControllers.taskbarViewController.isEventOverAnyItem(ev)
+                || mControllers.navbarButtonsViewController.isEventOverAnyItem(ev);
+    }
+
+    /**
+     * Returns true if icons should be aligned to hotseat in the current transition.
+     */
+    public boolean isIconAlignedWithHotseat() {
+        return false;
+    }
+
     @CallSuper
     protected void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(String.format(
                 "%sTaskbarUIController: using an instance of %s",
                 prefix,
                 getClass().getSimpleName()));
+    }
+
+    /**
+     * Returns RecentsView. Overwritten in LauncherTaskbarUIController and
+     * FallbackTaskbarUIController with Launcher-specific implementations. Returns null for other
+     * UI controllers (like DesktopTaskbarUIController) that don't have a RecentsView.
+     */
+    public @Nullable RecentsView getRecentsView() {
+        return null;
+    }
+
+    /**
+     * Uses the clicked Taskbar icon to launch a second app for splitscreen.
+     */
+    public void triggerSecondAppForSplit(ItemInfoWithIcon info, Intent intent, View startingView) {
+        RecentsView recents = getRecentsView();
+        TaskView foundTaskView = recents.getTaskViewByComponentName(info.getTargetComponent());
+        if (foundTaskView != null) {
+            recents.confirmSplitSelect(
+                    foundTaskView,
+                    foundTaskView.getTask(),
+                    foundTaskView.getIconView().getDrawable(),
+                    foundTaskView.getThumbnail(),
+                    foundTaskView.getThumbnail().getThumbnail(),
+                    /* intent */ null);
+        } else {
+            recents.confirmSplitSelect(
+                    /* containerTaskView */ null,
+                    /* task */ null,
+                    new BitmapDrawable(info.bitmap.icon),
+                    startingView,
+                    /* thumbnail */ null,
+                    intent);
+        }
     }
 }

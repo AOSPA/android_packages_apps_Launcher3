@@ -39,9 +39,12 @@ import static com.android.launcher3.shortcuts.ShortcutKey.EXTRA_SHORTCUT_ID;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Process;
 import android.os.UserHandle;
+import android.provider.Settings;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.LauncherSettings;
@@ -60,6 +63,7 @@ import com.android.launcher3.logger.LauncherAtom.WallpapersContainer;
 import com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers;
 import com.android.launcher3.model.ModelWriter;
 import com.android.launcher3.util.ContentWriter;
+import com.android.launcher3.util.SettingsCache;
 
 import java.util.Optional;
 
@@ -72,6 +76,9 @@ public class ItemInfo {
     public static final int NO_ID = -1;
     // An id that doesn't match any item, including predicted apps with have an id=NO_ID
     public static final int NO_MATCHING_ID = Integer.MIN_VALUE;
+
+    /** Hidden field Settings.Secure.NAV_BAR_KIDS_MODE */
+    private static final Uri NAV_BAR_KIDS_MODE = Settings.Secure.getUriFor("nav_bar_kids_mode");
 
     /**
      * The id in the settings database for this item
@@ -141,30 +148,34 @@ public class ItemInfo {
     /**
      * Title of the item
      */
+    @Nullable
     public CharSequence title;
 
     /**
      * Content description of the item.
      */
+    @Nullable
     public CharSequence contentDescription;
 
     /**
      * When the instance is created using {@link #copyFrom}, this field is used to keep track of
      * original {@link ComponentName}.
      */
+    @Nullable
     private ComponentName mComponentName;
 
+    @NonNull
     public UserHandle user;
 
     public ItemInfo() {
         user = Process.myUserHandle();
     }
 
-    protected ItemInfo(ItemInfo info) {
+    protected ItemInfo(@NonNull final ItemInfo info) {
         copyFrom(info);
     }
 
-    public void copyFrom(ItemInfo info) {
+    public void copyFrom(@NonNull final ItemInfo info) {
         id = info.id;
         title = info.title;
         cellX = info.cellX;
@@ -182,6 +193,7 @@ public class ItemInfo {
         mComponentName = info.getTargetComponent();
     }
 
+    @Nullable
     public Intent getIntent() {
         return null;
     }
@@ -209,7 +221,7 @@ public class ItemInfo {
                         : null;
     }
 
-    public void writeToValues(ContentWriter writer) {
+    public void writeToValues(@NonNull final ContentWriter writer) {
         writer.put(LauncherSettings.Favorites.ITEM_TYPE, itemType)
                 .put(LauncherSettings.Favorites.CONTAINER, container)
                 .put(LauncherSettings.Favorites.SCREEN, screenId)
@@ -220,7 +232,7 @@ public class ItemInfo {
                 .put(LauncherSettings.Favorites.RANK, rank);
     }
 
-    public void readFromValues(ContentValues values) {
+    public void readFromValues(@NonNull final ContentValues values) {
         itemType = values.getAsInteger(LauncherSettings.Favorites.ITEM_TYPE);
         container = values.getAsInteger(LauncherSettings.Favorites.CONTAINER);
         screenId = values.getAsInteger(LauncherSettings.Favorites.SCREEN);
@@ -234,7 +246,7 @@ public class ItemInfo {
     /**
      * Write the fields of this item to the DB
      */
-    public void onAddToDatabase(ContentWriter writer) {
+    public void onAddToDatabase(@NonNull final ContentWriter writer) {
         if (Workspace.EXTRA_EMPTY_SCREEN_IDS.contains(screenId)) {
             // We should never persist an item on the extra empty screen.
             throw new RuntimeException("Screen id should not be extra empty screen: " + screenId);
@@ -245,10 +257,12 @@ public class ItemInfo {
     }
 
     @Override
+    @NonNull
     public final String toString() {
         return getClass().getSimpleName() + "(" + dumpProperties() + ")";
     }
 
+    @NonNull
     protected String dumpProperties() {
         return "id=" + id
                 + " type=" + LauncherSettings.Favorites.itemTypeToString(itemType)
@@ -288,14 +302,17 @@ public class ItemInfo {
     /**
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
      */
+    @NonNull
     public LauncherAtom.ItemInfo buildProto() {
         return buildProto(null);
     }
 
     /**
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
+     * @param fInfo
      */
-    public LauncherAtom.ItemInfo buildProto(FolderInfo fInfo) {
+    @NonNull
+    public LauncherAtom.ItemInfo buildProto(@Nullable final FolderInfo fInfo) {
         LauncherAtom.ItemInfo.Builder itemBuilder = getDefaultItemInfoBuilder();
         Optional<ComponentName> nullableComponent = Optional.ofNullable(getTargetComponent());
         switch (itemType) {
@@ -339,9 +356,11 @@ public class ItemInfo {
                 break;
             case ITEM_TYPE_TASK:
                 itemBuilder
-                        .setTask(LauncherAtom.Task.newBuilder()
-                                .setComponentName(getTargetComponent().flattenToShortString())
-                                .setIndex(screenId));
+                        .setTask(nullableComponent
+                                .map(component -> LauncherAtom.Task.newBuilder()
+                                        .setComponentName(component.flattenToShortString())
+                                        .setIndex(screenId))
+                                .orElse(LauncherAtom.Task.newBuilder()));
                 break;
             default:
                 break;
@@ -373,9 +392,13 @@ public class ItemInfo {
         return itemBuilder.build();
     }
 
+    @NonNull
     protected LauncherAtom.ItemInfo.Builder getDefaultItemInfoBuilder() {
         LauncherAtom.ItemInfo.Builder itemBuilder = LauncherAtom.ItemInfo.newBuilder();
         itemBuilder.setIsWork(!Process.myUserHandle().equals(user));
+        SettingsCache settingsCache = SettingsCache.INSTANCE.getNoCreate();
+        boolean isKidsMode = settingsCache != null && settingsCache.getValue(NAV_BAR_KIDS_MODE, 0);
+        itemBuilder.setIsKidsMode(isKidsMode);
         itemBuilder.setRank(rank);
         return itemBuilder;
     }
@@ -383,6 +406,7 @@ public class ItemInfo {
     /**
      * Returns {@link ContainerInfo} used when logging this item.
      */
+    @NonNull
     public ContainerInfo getContainerInfo() {
         switch (container) {
             case CONTAINER_HOTSEAT:
@@ -447,6 +471,7 @@ public class ItemInfo {
      * Returns non-AOSP container wrapped by {@link ExtendedContainers} object. Should be overridden
      * by build variants.
      */
+    @NonNull
     protected ExtendedContainers getExtendedContainer() {
         return ExtendedContainers.getDefaultInstance();
     }
@@ -454,6 +479,7 @@ public class ItemInfo {
     /**
      * Returns shallow copy of the object.
      */
+    @NonNull
     public ItemInfo makeShallowCopy() {
         ItemInfo itemInfo = new ItemInfo();
         itemInfo.copyFrom(this);
@@ -463,7 +489,8 @@ public class ItemInfo {
     /**
      * Sets the title of the item and writes to DB model if needed.
      */
-    public void setTitle(CharSequence title, ModelWriter modelWriter) {
+    public void setTitle(@Nullable final CharSequence title,
+            @Nullable final ModelWriter modelWriter) {
         this.title = title;
     }
 }
