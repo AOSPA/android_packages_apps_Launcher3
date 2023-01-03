@@ -89,14 +89,6 @@ public final class FeatureFlags {
             getDebugFlag("ENABLE_FLOATING_SEARCH_BAR", false,
                     "Keep All Apps search bar at the bottom (but above keyboard if open)");
 
-    public static final BooleanFlag ENABLE_QUICK_LAUNCH_V2 = new DeviceFlag(
-            "ENABLE_QUICK_LAUNCH_V2", false, "Use quick launch v2 "
-            + "behavior. Quick search and quick launch v1 would be unavailable if this is enabled");
-
-    public static final BooleanFlag GBOARD_UPDATE_ENTER_KEY = new DeviceFlag(
-            "GBOARD_UPDATE_ENTER_KEY", false, "Update gBoard enter key "
-            + "icon dynamically based on top search content for Quick Launch V2");
-
     public static final BooleanFlag ENABLE_HIDE_HEADER = new DeviceFlag("ENABLE_HIDE_HEADER",
             true, "Hide header on keyboard before typing in all apps");
 
@@ -247,7 +239,7 @@ public final class FeatureFlags {
             "Enables One Search box in Taskbar All Apps.");
 
     public static final BooleanFlag ENABLE_TASKBAR_IN_OVERVIEW = getDebugFlag(
-            "ENABLE_TASKBAR_IN_OVERVIEW", false,
+            "ENABLE_TASKBAR_IN_OVERVIEW", true,
             "Enables accessing the system Taskbar in overview.");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE = getDebugFlag(
@@ -301,10 +293,6 @@ public final class FeatureFlags {
             "USE_SEARCH_REQUEST_TIMEOUT_OVERRIDES", false,
             "Use local overrides for search request timeout");
 
-    public static final BooleanFlag ENABLE_RICH_ANSWER = new DeviceFlag(
-            "ENABLE_RICH_ANSWER", false,
-            "Enable rich answer new UI for web answer search results");
-
     public static final BooleanFlag CONTINUOUS_VIEW_TREE_CAPTURE = getDebugFlag(
             "CONTINUOUS_VIEW_TREE_CAPTURE", false, "Capture View tree every frame");
 
@@ -343,8 +331,12 @@ public final class FeatureFlags {
                     + " to have better visuals");
 
     public static final BooleanFlag ENABLE_TASKBAR_REVISED_THRESHOLDS = getDebugFlag(
-            "ENABLE_TASKBAR_REVISED_THRESHOLDS", false,
+            "ENABLE_TASKBAR_REVISED_THRESHOLDS", true,
             "Uses revised thresholds for transient taskbar.");
+
+    public static final BooleanFlag FORCE_PERSISTENT_TASKBAR = getDebugFlag(
+            "FORCE_PERSISTENT_TASKBAR", false, "Forces taskbar to be persistent, even in gesture"
+                    + " nav mode and when transient taskbar is enabled.");
 
     public static final BooleanFlag ENABLE_TRANSIENT_TASKBAR = getDebugFlag(
             "ENABLE_TRANSIENT_TASKBAR", false, "Enables transient taskbar.");
@@ -372,6 +364,11 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_LAUNCH_FROM_STAGED_APP = getDebugFlag(
             "ENABLE_LAUNCH_FROM_STAGED_APP", false,
             "Enable the ability to tap a staged app during split select to launch it in full screen"
+    );
+
+    public static final BooleanFlag ENABLE_FORCED_MONO_ICON = getDebugFlag(
+            "ENABLE_FORCED_MONO_ICON", false,
+            "Enable the ability to generate monochromatic icons, if it is not provided by the app"
     );
 
     public static void initialize(Context context) {

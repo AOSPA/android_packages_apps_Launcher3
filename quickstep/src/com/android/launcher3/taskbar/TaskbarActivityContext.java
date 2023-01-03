@@ -85,6 +85,7 @@ import com.android.launcher3.taskbar.overlay.TaskbarOverlayController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
+import com.android.launcher3.touch.ItemClickHandler.ItemClickProxy;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.PackageManagerHelper;
@@ -270,9 +271,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     private void updateIconSize(Resources resources) {
-        float taskbarIconSize = DisplayController.isTransientTaskbar(this)
-                ? resources.getDimension(R.dimen.transient_taskbar_icon_size)
-                : resources.getDimension(R.dimen.taskbar_icon_size);
+        float taskbarIconSize = resources.getDimension(DisplayController.isTransientTaskbar(this)
+                ? mDeviceProfile.isTwoPanels
+                        ? R.dimen.transient_taskbar_two_panels_icon_size
+                        : R.dimen.transient_taskbar_icon_size
+                : R.dimen.taskbar_icon_size);
         mDeviceProfile.updateIconSize(1, resources);
         float iconScale = taskbarIconSize / mDeviceProfile.iconSizePx;
         mDeviceProfile.updateIconSize(iconScale, resources);
@@ -342,6 +345,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     public void onConfigurationChanged(@Config int configChanges) {
         mControllers.onConfigurationChanged(configChanges);
+        if (!mIsUserSetupComplete) {
+            setTaskbarWindowHeight(getSetupWindowHeight());
+        }
     }
 
     public boolean isThreeButtonNav() {
@@ -674,16 +680,23 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         }
 
         if (!isUserSetupComplete()) {
-            return resources.getDimensionPixelSize(R.dimen.taskbar_suw_frame);
+            return getSetupWindowHeight();
         }
 
         if (DisplayController.isTransientTaskbar(this)) {
-            return resources.getDimensionPixelSize(R.dimen.transient_taskbar_size)
+            int taskbarSize = resources.getDimensionPixelSize(mDeviceProfile.isTwoPanels
+                    ? R.dimen.transient_taskbar_two_panels_size
+                    : R.dimen.transient_taskbar_size);
+            return taskbarSize
                     + (2 * resources.getDimensionPixelSize(R.dimen.transient_taskbar_margin))
                     + resources.getDimensionPixelSize(R.dimen.transient_taskbar_shadow_blur);
         }
 
         return mDeviceProfile.taskbarSize + Math.max(getLeftCornerRadius(), getRightCornerRadius());
+    }
+
+    public int getSetupWindowHeight() {
+        return getResources().getDimensionPixelSize(R.dimen.taskbar_suw_frame);
     }
 
     /**
@@ -822,6 +835,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 mControllers.uiController.onTaskbarIconLaunched((AppInfo) tag);
             }
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+        } else if (tag instanceof ItemClickProxy) {
+            ((ItemClickProxy) tag).onItemClicked(view);
         } else {
             Log.e(TAG, "Unknown type clicked: " + tag);
         }
