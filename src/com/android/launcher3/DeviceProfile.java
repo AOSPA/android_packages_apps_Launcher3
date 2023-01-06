@@ -589,7 +589,7 @@ public class DeviceProfile {
             hotseatQsbSpace = Utilities.isGSAEnabled(context) && Utilities.isQSBEnabled(context)
                     ? pxFromDp(inv.hotseatQsbSpace[mTypeIndex], mMetrics) : 0;
             hotseatBarBottomSpace = Utilities.isGSAEnabled(context) && Utilities.isQSBEnabled(context)
-                    ? pxFromDp(inv.hotseatBarBottomSpace[mTypeIndex], mMetrics) : 0;
+                    || isTaskbarPresent ? pxFromDp(inv.hotseatBarBottomSpace[mTypeIndex], mMetrics) : 0;
             mHotseatBarEdgePaddingPx =
                     isVerticalBarLayout() ? workspacePageIndicatorHeight : 0;
             mHotseatBarWorkspaceSpacePx =
