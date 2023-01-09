@@ -400,11 +400,6 @@ public class RectFSpringAnim extends ReleaseCheck {
             mRectScaleAnimEnded = false;
             onUpdate();
         }
-
-        mRectXAnimEnded = true;
-        mRectYAnimEnded = true;
-        mRectScaleAnimEnded = true;
-        maybeOnEnd();
     }
 
     private boolean isEnded() {
