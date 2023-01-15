@@ -114,10 +114,10 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory UNINSTALL = new TaskShortcutFactory() {
         public List<SystemShortcut> getShortcuts(BaseDraggingActivity activity,
 			                TaskIdAttributeContainer taskContainer) {
-            return PackageManagerHelper.isSystemApp(activity,
-                 taskContainer.getTask().getTopComponent().getPackageName()) 
+            return !PackageManagerHelper.isSystemApp(activity,
+                 taskContainer.getTask().getTopComponent().getPackageName())
 		    ? Collections.singletonList(new SystemShortcut.UnInstall(activity,
-                    taskContainer.getItemInfo(), taskContainer.getTaskView())) : 
+                    taskContainer.getItemInfo(), taskContainer.getTaskView())) :
 		    null;
         }
     };
