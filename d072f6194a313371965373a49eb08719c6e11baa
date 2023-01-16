@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "1c632c02_48bf93a7",
+        "filename": "quickstep/src/com/android/quickstep/TaskShortcutFactory.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 1000427
+      },
+      "writtenOn": "2023-01-16T18:32:02Z",
+      "side": 1,
+      "message": "get rid of whitespace",
+      "revId": "d072f6194a313371965373a49eb08719c6e11baa",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "354e85d0_9afc15a4",
+        "filename": "quickstep/src/com/android/quickstep/TaskShortcutFactory.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 1000427
+      },
+      "writtenOn": "2023-01-16T18:32:02Z",
+      "side": 1,
+      "message": "here too",
+      "revId": "d072f6194a313371965373a49eb08719c6e11baa",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
