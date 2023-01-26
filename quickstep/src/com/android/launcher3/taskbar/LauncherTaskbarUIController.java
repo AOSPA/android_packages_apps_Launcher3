@@ -17,6 +17,7 @@ package com.android.launcher3.taskbar;
 
 import static android.view.InsetsState.ITYPE_EXTRA_NAVIGATION_BAR;
 
+import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR_TRANSITION_DURATION;
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_RESUMED;
 import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 
@@ -41,7 +42,6 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
-import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.OnboardingPrefs;
@@ -50,7 +50,6 @@ import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.views.RecentsView;
 
 import java.io.PrintWriter;
-import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -157,9 +156,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 isResumed,
                 fromInit,
                 /* startAnimation= */ true,
-                !isResumed
-                        ? QuickstepTransitionManager.TASKBAR_TO_APP_DURATION
-                        : QuickstepTransitionManager.TASKBAR_TO_HOME_DURATION);
+                DisplayController.isTransientTaskbar(mLauncher)
+                        ? TRANSIENT_TASKBAR_TRANSITION_DURATION
+                        : (!isResumed
+                                ? QuickstepTransitionManager.TASKBAR_TO_APP_DURATION
+                                : QuickstepTransitionManager.TASKBAR_TO_HOME_DURATION));
     }
 
     @Nullable
@@ -251,11 +252,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     public void forceHideBackground(boolean forceHide) {
         mTaskbarOverrideBackgroundAlpha.updateValue(forceHide ? 0 : 1);
-    }
-
-    @Override
-    public Stream<ItemInfoWithIcon> getAppIconsForEdu() {
-        return Arrays.stream(mLauncher.getAppsView().getAppsStore().getApps());
     }
 
     /**

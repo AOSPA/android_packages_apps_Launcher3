@@ -126,6 +126,7 @@ public class DeviceProfile {
     public final int workspaceSpringLoadedMinNextPageVisiblePx;
 
     private final int extraSpace;
+    private int maxEmptySpace;
     public int workspaceTopPadding;
     public int workspaceBottomPadding;
 
@@ -255,6 +256,7 @@ public class DeviceProfile {
     public boolean isTaskbarPresentInApps;
     public int taskbarSize;
     public int stashedTaskbarSize;
+    public int transientTaskbarMargin;
 
     // DragController
     public int flingToDeleteThresholdVelocity;
@@ -320,6 +322,8 @@ public class DeviceProfile {
                 taskbarSize = res.getDimensionPixelSize(R.dimen.transient_taskbar_size);
                 stashedTaskbarSize =
                         res.getDimensionPixelSize(R.dimen.transient_taskbar_stashed_size);
+                transientTaskbarMargin =
+                        res.getDimensionPixelSize(R.dimen.transient_taskbar_margin);
             } else {
                 taskbarSize = res.getDimensionPixelSize(R.dimen.taskbar_size);
                 stashedTaskbarSize = res.getDimensionPixelSize(R.dimen.taskbar_stashed_size);
@@ -495,10 +499,12 @@ public class DeviceProfile {
         extraSpace = updateAvailableDimensions(res);
 
         // Now that we have all of the variables calculated, we can tune certain sizes.
-        if (isScalableGrid && inv.devicePaddings != null) {
+        if (isScalableGrid && inv.devicePaddingId != INVALID_RESOURCE_HANDLE) {
             // Paddings were created assuming no scaling, so we first unscale the extra space.
             int unscaledExtraSpace = (int) (extraSpace / cellScaleToFit);
-            DevicePadding padding = inv.devicePaddings.getDevicePadding(unscaledExtraSpace);
+            DevicePaddings devicePaddings = new DevicePaddings(context, inv.devicePaddingId);
+            DevicePadding padding = devicePaddings.getDevicePadding(unscaledExtraSpace);
+            maxEmptySpace = padding.getMaxEmptySpacePx();
 
             int paddingWorkspaceTop = padding.getWorkspaceTopPadding(unscaledExtraSpace);
             int paddingWorkspaceBottom = padding.getWorkspaceBottomPadding(unscaledExtraSpace);
@@ -1305,15 +1311,15 @@ public class DeviceProfile {
      * Returns the number of pixels required below OverviewActions excluding insets.
      */
     public int getOverviewActionsClaimedSpaceBelow() {
-        if (isTaskbarPresent && !isGestureMode
-                // If taskbar is in overview, overview action has dedicated space above nav buttons
-                && !FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()) {
-            // Align vertically to where nav buttons are.
-            return ((taskbarSize - overviewActionsHeight) / 2) + getTaskbarOffsetY();
-        }
-
         if (isTaskbarPresent) {
-            return FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get() ? taskbarSize : stashedTaskbarSize;
+            if (FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()) {
+                return taskbarSize + transientTaskbarMargin;
+            }
+
+            return isGestureMode
+                    ? stashedTaskbarSize
+                    // Align vertically to where nav buttons are.
+                    : ((taskbarSize - overviewActionsHeight) / 2) + getTaskbarOffsetY();
         }
         return mInsets.bottom;
     }
@@ -1562,11 +1568,7 @@ public class DeviceProfile {
         writer.println(prefix + pxToDpStr("extraSpace", extraSpace));
         writer.println(prefix + pxToDpStr("unscaled extraSpace", extraSpace / iconScale));
 
-        if (inv.devicePaddings != null) {
-            int unscaledExtraSpace = (int) (extraSpace / iconScale);
-            writer.println(prefix + pxToDpStr("maxEmptySpace",
-                    inv.devicePaddings.getDevicePadding(unscaledExtraSpace).getMaxEmptySpacePx()));
-        }
+        writer.println(prefix + pxToDpStr("maxEmptySpace", maxEmptySpace));
         writer.println(prefix + pxToDpStr("workspaceTopPadding", workspaceTopPadding));
         writer.println(prefix + pxToDpStr("workspaceBottomPadding", workspaceBottomPadding));
 

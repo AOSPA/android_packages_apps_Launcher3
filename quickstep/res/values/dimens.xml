@@ -272,8 +272,6 @@
     <dimen name="taskbar_stashed_small_screen">108dp</dimen>
     <dimen name="taskbar_unstash_input_area">316dp</dimen>
     <dimen name="taskbar_stashed_handle_height">4dp</dimen>
-    <dimen name="taskbar_edu_wave_anim_trans_y">25dp</dimen>
-    <dimen name="taskbar_edu_wave_anim_trans_y_return_overshoot">4dp</dimen>
     <dimen name="taskbar_edu_horizontal_margin">112dp</dimen>
     <dimen name="taskbar_nav_buttons_width_kids">88dp</dimen>
     <dimen name="taskbar_nav_buttons_height_kids">40dp</dimen>
@@ -289,11 +287,17 @@
     <dimen name="transient_taskbar_key_shadow_distance">10dp</dimen>
     <dimen name="transient_taskbar_stashed_size">32dp</dimen>
     <dimen name="transient_taskbar_icon_spacing">10dp</dimen>
+    <!-- An additional touch slop to prevent x-axis movement during the swipe up to show taskbar -->
+    <dimen name="transient_taskbar_clamped_offset_bound">16dp</dimen>
     <!-- Taskbar swipe up thresholds -->
+    <dimen name="taskbar_nav_threshold">40dp</dimen>
     <dimen name="taskbar_app_window_threshold">150dp</dimen>
     <dimen name="taskbar_home_overview_threshold">225dp</dimen>
     <dimen name="taskbar_catch_up_threshold">300dp</dimen>
-    <dimen name="taskbar_nav_threshold">40dp</dimen>
+
+    <dimen name="taskbar_nav_threshold_v2">30dp</dimen>
+    <dimen name="taskbar_app_window_threshold_v2">100dp</dimen>
+    <dimen name="taskbar_home_overview_threshold_v2">200dp</dimen>
 
     <!--  Taskbar 3 button spacing  -->
     <dimen name="taskbar_button_space_inbetween">24dp</dimen>

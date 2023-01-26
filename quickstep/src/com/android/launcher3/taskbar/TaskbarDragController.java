@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_ALL_APPS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_ALL_APPS;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_PREDICTION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
@@ -206,8 +207,13 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
                     if (FeatureFlags.ENABLE_TASKBAR_POPUP_MENU.get()
                             && !shouldStartDrag(0)) {
-                        // Immediately close the popup menu.
-                        mDragView.setOnAnimationEndCallback(() -> callOnDragStart());
+                        mDragView.setOnAnimationEndCallback(() -> {
+                            // Drag might be cancelled during the DragView animation, so check
+                            // mIsPreDrag again.
+                            if (mIsInPreDrag) {
+                                callOnDragStart();
+                            }
+                        });
                     }
                 }
 
@@ -301,7 +307,15 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
     protected void callOnDragStart() {
         super.callOnDragStart();
         // Pre-drag has ended, start the global system drag.
-        AbstractFloatingView.closeAllOpenViews(mActivity);
+        if (mDisallowGlobalDrag) {
+            AbstractFloatingView.closeAllOpenViewsExcept(mActivity, TYPE_TASKBAR_ALL_APPS);
+        } else {
+            // stash the transient taskbar
+            mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+
+            AbstractFloatingView.closeAllOpenViews(mActivity);
+        }
+
         startSystemDrag((BubbleTextView) mDragObject.originalView);
     }
 
@@ -407,9 +421,14 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
                     if (dragEvent.getResult()) {
                         maybeOnDragEnd();
                     } else {
+                        // un-stash the transient taskbar in case drag and drop was canceled
+                        mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(false);
+
                         // This will take care of calling maybeOnDragEnd() after the animation
                         animateGlobalDragViewToOriginalPosition(btv, dragEvent);
                     }
+                    mActivity.getDragLayer().setOnDragListener(null);
+
                     return true;
             }
             return false;
@@ -536,10 +555,15 @@ public class TaskbarDragController extends DragController<BaseTaskbarContext> im
 
     private View findTaskbarTargetForIconView(@NonNull View iconView) {
         Object tag = iconView.getTag();
+        TaskbarViewController taskbarViewController = mControllers.taskbarViewController;
+
         if (tag instanceof ItemInfo) {
             ItemInfo item = (ItemInfo) tag;
-            TaskbarViewController taskbarViewController = mControllers.taskbarViewController;
             if (item.container == CONTAINER_ALL_APPS || item.container == CONTAINER_PREDICTION) {
+                if (mDisallowGlobalDrag) {
+                    // We're dragging in taskbarAllApps, we don't have folders or shortcuts
+                    return iconView;
+                }
                 // Since all apps closes when the drag starts, target the all apps button instead.
                 return taskbarViewController.getAllAppsButtonView();
             } else if (item.container >= 0) {
