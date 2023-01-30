@@ -176,7 +176,6 @@
 
         <attr name="dbFile" format="string" />
         <attr name="defaultLayoutId" format="reference" />
-        <attr name="defaultSplitDisplayLayoutId" format="reference" />
         <attr name="demoModeLayoutId" format="reference" />
         <attr name="isScalable" format="boolean" />
         <attr name="devicePaddingId" format="reference" />
@@ -212,6 +211,10 @@
         <attr name="a" format="float|dimension" />
         <attr name="b" format="float|dimension" />
         <attr name="c" format="float|dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="PersonalWorkSlidingTabStrip">
+        <attr name="alignOnIcon" format="boolean" />
     </declare-styleable>
 
     <declare-styleable name="ProfileDisplayOption">

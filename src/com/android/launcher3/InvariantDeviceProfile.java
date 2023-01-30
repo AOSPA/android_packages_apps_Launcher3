@@ -400,7 +400,7 @@ public class InvariantDeviceProfile {
         SparseArray<DotRenderer> dotRendererCache = new SparseArray<>();
         for (WindowBounds bounds : displayInfo.supportedBounds) {
             localSupportedProfiles.add(new DeviceProfile.Builder(context, this, displayInfo)
-                    .setUseTwoPanels(deviceType == TYPE_MULTI_DISPLAY)
+                    .setIsMultiDisplay(deviceType == TYPE_MULTI_DISPLAY)
                     .setWindowBounds(bounds)
                     .setDotRendererCache(dotRendererCache)
                     .build());
@@ -421,6 +421,21 @@ public class InvariantDeviceProfile {
                     Math.max(defaultWallpaperSize.x, Math.round(parallaxFactor * displayWidth));
         }
         supportedProfiles = Collections.unmodifiableList(localSupportedProfiles);
+
+        int numMinShownHotseatIconsForTablet = supportedProfiles
+                .stream()
+                .filter(deviceProfile -> deviceProfile.isTablet)
+                .mapToInt(deviceProfile -> deviceProfile.numShownHotseatIcons)
+                .min()
+                .orElse(0);
+
+        supportedProfiles
+                .stream()
+                .filter(deviceProfile -> deviceProfile.isTablet)
+                .forEach(deviceProfile -> {
+                    deviceProfile.numShownHotseatIcons = numMinShownHotseatIconsForTablet;
+                    deviceProfile.recalculateHotseatWidthAndBorderSpace();
+                });
 
         ComponentName cn = new ComponentName(context.getPackageName(), getClass().getName());
         defaultWidgetPadding = AppWidgetHostView.getDefaultPaddingForWidget(context, cn, null);
@@ -799,10 +814,8 @@ public class InvariantDeviceProfile {
                     R.styleable.GridDisplayOption_numSearchContainerColumns, numColumns);
 
             dbFile = a.getString(R.styleable.GridDisplayOption_dbFile);
-            defaultLayoutId = a.getResourceId(deviceType == TYPE_MULTI_DISPLAY && a.hasValue(
-                    R.styleable.GridDisplayOption_defaultSplitDisplayLayoutId)
-                    ? R.styleable.GridDisplayOption_defaultSplitDisplayLayoutId
-                    : R.styleable.GridDisplayOption_defaultLayoutId, 0);
+            defaultLayoutId = a.getResourceId(
+                    R.styleable.GridDisplayOption_defaultLayoutId, 0);
             demoModeLayoutId = a.getResourceId(
                     R.styleable.GridDisplayOption_demoModeLayoutId, defaultLayoutId);
 
