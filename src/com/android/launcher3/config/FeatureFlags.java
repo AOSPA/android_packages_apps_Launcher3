@@ -247,7 +247,7 @@ public final class FeatureFlags {
             "Enable initiating split screen from workspace.");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_FULLSCREEN_WITH_KEYBOARD_SHORTCUTS =
-            getDebugFlag("ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", false,
+            getDebugFlag("ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", true,
                     "Enable splitting from fullscreen app with keyboard shortcuts");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE = getDebugFlag(
@@ -307,14 +307,14 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_WIDGET_PICKER_DEPTH = new DeviceFlag(
             "ENABLE_WIDGET_PICKER_DEPTH", true, "Enable changing depth in widget picker.");
 
+    public static final BooleanFlag ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH = getDebugFlag(
+            "ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH", false,
+            "Allow bottom sheet depth to be smaller than 1 for multi-display devices.");
+
     public static final BooleanFlag SCROLL_TOP_TO_RESET = new DeviceFlag(
-            "SCROLL_TOP_TO_RESET", false, "Bring up IME and focus on "
+            "SCROLL_TOP_TO_RESET", true, "Bring up IME and focus on "
             + "input when scroll to top if 'Always show keyboard' is enabled or in prefix state");
 
-    public static final BooleanFlag SHOW_DELIGHTFUL_PAGINATION = getDebugFlag(
-            "SHOW_DELIGHTFUL_PAGINATION", false,
-            "Enable showing the new 'delightful pagination' which is a brand"
-                    + " new animation for folder pagination and workspace pagination");
     public static final BooleanFlag POPUP_MATERIAL_U = new DeviceFlag(
             "POPUP_MATERIAL_U", false, "Switch popup UX to use material U");
 
@@ -338,8 +338,12 @@ public final class FeatureFlags {
             "FORCE_PERSISTENT_TASKBAR", false, "Forces taskbar to be persistent, even in gesture"
                     + " nav mode and when transient taskbar is enabled.");
 
+    public static final BooleanFlag FOLDABLE_SINGLE_PAGE = getDebugFlag(
+            "FOLDABLE_SINGLE_PAGE", false,
+            "Use a single page for the workspace");
+
     public static final BooleanFlag ENABLE_TRANSIENT_TASKBAR = getDebugFlag(
-            "ENABLE_TRANSIENT_TASKBAR", false, "Enables transient taskbar.");
+            "ENABLE_TRANSIENT_TASKBAR", true, "Enables transient taskbar.");
 
     public static final BooleanFlag ENABLE_TRACKPAD_GESTURE = getDebugFlag(
             "ENABLE_TRACKPAD_GESTURE", false, "Enables trackpad gesture.");
@@ -354,9 +358,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_NEW_GESTURE_NAV_TUTORIAL = getDebugFlag(
             "ENABLE_NEW_GESTURE_NAV_TUTORIAL", false,
             "Enable the redesigned gesture navigation tutorial");
-
-    public static final BooleanFlag ENABLE_TOAST_IMPRESSION_LOGGING = getDebugFlag(
-            "ENABLE_TOAST_IMPRESSION_LOGGING", false, "Enable toast impression logging");
 
     public static final BooleanFlag ENABLE_DEVICE_PROFILE_LOGGING = new DeviceFlag(
             "ENABLE_DEVICE_PROFILE_LOGGING", false, "Allows DeviceProfile logging");

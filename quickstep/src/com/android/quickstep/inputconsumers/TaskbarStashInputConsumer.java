@@ -53,8 +53,9 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
     private final float mUnstashArea;
     private final float mScreenWidth;
 
-    private final int mTaskbarThresholdY;
-    private boolean mHasPassedTaskbarThreshold;
+    private final int mTaskbarNavThresholdY;
+    private final boolean mIsTaskbarAllAppsOpen;
+    private boolean mHasPassedTaskbarNavThreshold;
 
     private final PointF mDownPos = new PointF();
     private final PointF mLastPos = new PointF();
@@ -73,11 +74,13 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
 
         Resources res = context.getResources();
         mUnstashArea = res.getDimensionPixelSize(R.dimen.taskbar_unstash_input_area);
-        int taskbarThreshold = res.getDimensionPixelSize(ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
+        int taskbarNavThreshold = res.getDimensionPixelSize(ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
                 ? R.dimen.taskbar_nav_threshold_v2
                 : R.dimen.taskbar_nav_threshold);
         int screenHeight = taskbarActivityContext.getDeviceProfile().heightPx;
-        mTaskbarThresholdY = screenHeight - taskbarThreshold;
+        mTaskbarNavThresholdY = screenHeight - taskbarNavThreshold;
+        mIsTaskbarAllAppsOpen =
+                mTaskbarActivityContext != null && mTaskbarActivityContext.isTaskbarAllAppsOpen();
 
         mIsTransientTaskbar = DisplayController.isTransientTaskbar(context);
 
@@ -113,7 +116,7 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
                         mDownPos.set(ev.getX(), ev.getY());
                         mLastPos.set(mDownPos);
 
-                        mHasPassedTaskbarThreshold = false;
+                        mHasPassedTaskbarNavThreshold = false;
                         mTaskbarActivityContext.setAutohideSuspendFlag(
                                 FLAG_AUTOHIDE_SUSPEND_TOUCHING, true);
                         if (isInArea(x)) {
@@ -156,19 +159,17 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
 
                         if (mIsTransientTaskbar) {
                             float dY = mLastPos.y - mDownPos.y;
-                            boolean passedTaskbarThreshold = dY < 0
-                                    && mLastPos.y < mTaskbarThresholdY;
+                            boolean passedTaskbarNavThreshold = dY < 0
+                                    && mLastPos.y < mTaskbarNavThresholdY;
 
-                            if (!mHasPassedTaskbarThreshold
-                                    && passedTaskbarThreshold) {
-                                mHasPassedTaskbarThreshold = true;
-
+                            if (!mHasPassedTaskbarNavThreshold && passedTaskbarNavThreshold) {
+                                mHasPassedTaskbarNavThreshold = true;
                                 mTaskbarActivityContext.onSwipeToUnstashTaskbar();
                             }
 
                             if (dY < 0) {
-                                dY = -OverScroll.dampedScroll(-dY, mTaskbarThresholdY);
-                                if (mTransitionCallback != null) {
+                                dY = -OverScroll.dampedScroll(-dY, mTaskbarNavThresholdY);
+                                if (mTransitionCallback != null && !mIsTaskbarAllAppsOpen) {
                                     mTransitionCallback.onActionMove(dY);
                                 }
                             }
@@ -185,7 +186,7 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
                         if (mTransitionCallback != null) {
                             mTransitionCallback.onActionEnd();
                         }
-                        mHasPassedTaskbarThreshold = false;
+                        mHasPassedTaskbarNavThreshold = false;
                         break;
                 }
             }

@@ -351,6 +351,7 @@ public final class Workspace extends Home {
         }
     }
 
+
     /**
      * Uninstall the appIcon by dragging it to the 'uninstall' drop point of the drop_target_bar.
      *
