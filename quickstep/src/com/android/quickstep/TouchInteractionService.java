@@ -20,6 +20,7 @@ import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
 
+import static com.android.launcher3.Utilities.isTrackpadMotionEvent;
 import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER_FOCUS;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
@@ -87,6 +88,7 @@ import com.android.launcher3.tracing.LauncherTraceProto;
 import com.android.launcher3.tracing.TouchInteractionServiceProto;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
@@ -216,10 +218,12 @@ public class TouchInteractionService extends Service
 
         @BinderThread
         @Override
-        public void onAssistantAvailable(boolean available) {
+        public void onAssistantAvailable(boolean available, boolean longPressHomeEnabled) {
             MAIN_EXECUTOR.execute(() -> {
                 mDeviceState.setAssistantAvailable(available);
                 TouchInteractionService.this.onAssistantVisibilityChanged();
+                executeForTaskbarManager(() -> mTaskbarManager
+                        .onLongPressHomeEnabled(longPressHomeEnabled));
             });
         }
 
@@ -404,8 +408,8 @@ public class TouchInteractionService extends Service
         mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
 
         // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
-        mDeviceState.runOnUserUnlocked(this::onUserUnlocked);
-        mDeviceState.runOnUserUnlocked(mTaskbarManager::onUserUnlocked);
+        LockedUserState.get(this).runOnUserUnlocked(this::onUserUnlocked);
+        LockedUserState.get(this).runOnUserUnlocked(mTaskbarManager::onUserUnlocked);
         mDeviceState.addNavigationModeChangedCallback(this::onNavigationModeChanged);
 
         ProtoTracer.INSTANCE.get(this).add(this);
@@ -475,7 +479,7 @@ public class TouchInteractionService extends Service
     }
 
     private void resetHomeBounceSeenOnQuickstepEnabledFirstTime() {
-        if (!mDeviceState.isUserUnlocked() || mDeviceState.isButtonNavMode()) {
+        if (!LockedUserState.get(this).isUserUnlocked() || mDeviceState.isButtonNavMode()) {
             // Skip if not yet unlocked (can't read user shared prefs) or if the current navigation
             // mode doesn't have gestures
             return;
@@ -518,7 +522,7 @@ public class TouchInteractionService extends Service
 
     @UiThread
     private void onSystemUiFlagsChanged(int lastSysUIFlags) {
-        if (mDeviceState.isUserUnlocked()) {
+        if (LockedUserState.get(this).isUserUnlocked()) {
             int systemUiStateFlags = mDeviceState.getSystemUiStateFlags();
             SystemUiProxy.INSTANCE.get(this).setLastSystemUiStateFlags(systemUiStateFlags);
             mOverviewComponentObserver.onSystemUiStateChanged();
@@ -563,7 +567,7 @@ public class TouchInteractionService extends Service
 
     @UiThread
     private void onAssistantVisibilityChanged() {
-        if (mDeviceState.isUserUnlocked()) {
+        if (LockedUserState.get(this).isUserUnlocked()) {
             mOverviewComponentObserver.getActivityInterface().onAssistantVisibilityChanged(
                     mDeviceState.getAssistantVisibility());
         }
@@ -573,7 +577,7 @@ public class TouchInteractionService extends Service
     public void onDestroy() {
         Log.d(TAG, "Touch service destroyed: user=" + getUserId());
         sIsInitialized = false;
-        if (mDeviceState.isUserUnlocked()) {
+        if (LockedUserState.get(this).isUserUnlocked()) {
             mInputConsumer.unregisterInputConsumer();
             mOverviewComponentObserver.onDestroy();
         }
@@ -607,7 +611,7 @@ public class TouchInteractionService extends Service
         TestLogging.recordMotionEvent(
                 TestProtocol.SEQUENCE_TIS, "TouchInteractionService.onInputEvent", event);
 
-        if (!mDeviceState.isUserUnlocked()) {
+        if (!LockedUserState.get(this).isUserUnlocked()) {
             return;
         }
 
@@ -619,7 +623,8 @@ public class TouchInteractionService extends Service
             mRotationTouchHelper.setOrientationTransformIfNeeded(event);
 
             if (!mDeviceState.isOneHandedModeActive()
-                    && mRotationTouchHelper.isInSwipeUpTouchRegion(event)) {
+                    && mRotationTouchHelper.isInSwipeUpTouchRegion(event,
+                    mOverviewComponentObserver.getActivityInterface())) {
                 // Clone the previous gesture state since onConsumerAboutToBeSwitched might trigger
                 // onConsumerInactive and wipe the previous gesture state
                 GestureState prevGestureState = new GestureState(mGestureState);
@@ -629,7 +634,8 @@ public class TouchInteractionService extends Service
                 mGestureState = newGestureState;
                 mConsumer = newConsumer(prevGestureState, mGestureState, event);
                 mUncheckedConsumer = mConsumer;
-            } else if (mDeviceState.isUserUnlocked() && mDeviceState.isFullyGesturalNavMode()
+            } else if (LockedUserState.get(this).isUserUnlocked()
+                    && mDeviceState.isFullyGesturalNavMode()
                     && mDeviceState.canTriggerAssistantAction(event)) {
                 mGestureState = createGestureState(mGestureState);
                 // Do not change mConsumer as if there is an ongoing QuickSwitch gesture, we
@@ -749,7 +755,7 @@ public class TouchInteractionService extends Service
 
         boolean canStartSystemGesture = mDeviceState.canStartSystemGesture();
 
-        if (!mDeviceState.isUserUnlocked()) {
+        if (!LockedUserState.get(this).isUserUnlocked()) {
             CompoundString reasonString = newCompoundString("device locked");
             InputConsumer consumer;
             if (canStartSystemGesture) {
@@ -798,7 +804,7 @@ public class TouchInteractionService extends Service
 
             // If Taskbar is present, we listen for long press to unstash it.
             TaskbarActivityContext tac = mTaskbarManager.getCurrentActivityContext();
-            if (tac != null) {
+            if (tac != null && canStartSystemGesture) {
                 reasonString.append(NEWLINE_PREFIX)
                         .append(reasonPrefix)
                         .append(SUBSTRING_PREFIX)
@@ -850,7 +856,7 @@ public class TouchInteractionService extends Service
                         .append("accessibility menu is available")
                         .append(", using AccessibilityInputConsumer");
                 base = new AccessibilityInputConsumer(
-                        this, mDeviceState, base, mInputMonitorCompat);
+                        this, mDeviceState, mGestureState, base, mInputMonitorCompat);
             }
         } else {
             String reasonPrefix = "device is not in gesture navigation mode";
@@ -1096,7 +1102,7 @@ public class TouchInteractionService extends Service
     }
 
     private void preloadOverview(boolean fromInit, boolean forSUWAllSet) {
-        if (!mDeviceState.isUserUnlocked()) {
+        if (!LockedUserState.get(this).isUserUnlocked()) {
             return;
         }
 
@@ -1128,7 +1134,7 @@ public class TouchInteractionService extends Service
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
-        if (!mDeviceState.isUserUnlocked()) {
+        if (!LockedUserState.get(this).isUserUnlocked()) {
             return;
         }
         final BaseActivityInterface activityInterface =
@@ -1169,7 +1175,7 @@ public class TouchInteractionService extends Service
         } else {
             // Dump everything
             FeatureFlags.dump(pw);
-            if (mDeviceState.isUserUnlocked()) {
+            if (LockedUserState.get(this).isUserUnlocked()) {
                 PluginManagerWrapper.INSTANCE.get(getBaseContext()).dump(pw);
             }
             mDeviceState.dump(pw);

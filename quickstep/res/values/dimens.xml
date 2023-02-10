@@ -255,7 +255,10 @@
     <!-- Taskbar -->
     <dimen name="taskbar_size">@*android:dimen/taskbar_frame_height</dimen>
     <dimen name="taskbar_ime_size">48dp</dimen>
-    <dimen name="taskbar_icon_touch_size">48dp</dimen>
+    <dimen name="taskbar_icon_size">44dp</dimen>
+    <dimen name="taskbar_icon_min_touch_size">48dp</dimen>
+    <!-- Note that this applies to both sides of all icons, so visible space is double this. -->
+    <dimen name="taskbar_icon_spacing">12dp</dimen>
     <dimen name="taskbar_icon_drag_icon_size">54dp</dimen>
     <dimen name="taskbar_folder_margin">16dp</dimen>
     <dimen name="taskbar_contextual_button_padding">16dp</dimen>
@@ -281,13 +284,12 @@
     <dimen name="taskbar_icon_size_kids">32dp</dimen>
 
     <!-- Transient taskbar -->
-    <dimen name="transient_taskbar_size">76dp</dimen>
-    <dimen name="transient_taskbar_two_panels_size">72dp</dimen>
+    <dimen name="transient_taskbar_size">72dp</dimen>
+    <dimen name="transient_taskbar_icon_size">48dp</dimen>
     <dimen name="transient_taskbar_margin">24dp</dimen>
     <dimen name="transient_taskbar_shadow_blur">40dp</dimen>
     <dimen name="transient_taskbar_key_shadow_distance">10dp</dimen>
     <dimen name="transient_taskbar_stashed_size">32dp</dimen>
-    <dimen name="transient_taskbar_icon_spacing">10dp</dimen>
     <!-- An additional touch slop to prevent x-axis movement during the swipe up to show taskbar -->
     <dimen name="transient_taskbar_clamped_offset_bound">16dp</dimen>
     <!-- Taskbar swipe up thresholds -->
@@ -306,6 +308,9 @@
     <dimen name="taskbar_button_margin_split">48dp</dimen>
     <dimen name="taskbar_button_margin_6_5">75dp</dimen>
     <dimen name="taskbar_button_margin_default">48dp</dimen>
+
+    <!-- Recents overview -->
+    <dimen name="recents_filter_icon_size">30dp</dimen>
 
     <!-- Launcher splash screen -->
     <!-- Note: keep this value in sync with the WindowManager/Shell dimens.xml -->

@@ -526,6 +526,52 @@ public class TaskView extends FrameLayout implements Reusable {
         setOrientationState(orientedState);
     }
 
+    /**
+     * Sets up an on-click listener and the visibility for show_windows icon on top of the task.
+     */
+    public void setUpShowAllInstancesListener() {
+        String taskPackageName = mTaskIdAttributeContainer[0].mTask.key.getPackageName();
+
+        // icon of the top/left task
+        View showWindowsView = findViewById(R.id.show_windows);
+        updateFilterCallback(showWindowsView, getFilterUpdateCallback(taskPackageName));
+    }
+
+    /**
+     * Returns a callback that updates the state of the filter and the recents overview
+     *
+     * @param taskPackageName package name of the task to filter by
+     */
+    @Nullable
+    protected View.OnClickListener getFilterUpdateCallback(String taskPackageName) {
+        View.OnClickListener cb = (view) -> {
+            // update and apply a new filter
+            getRecentsView().setAndApplyFilter(taskPackageName);
+        };
+
+        if (!getRecentsView().getFilterState().shouldShowFilterUI(taskPackageName)) {
+            cb = null;
+        }
+        return cb;
+    }
+
+    /**
+     * Sets the correct visibility and callback on the provided filterView based on whether
+     * the callback is null or not
+     */
+    protected void updateFilterCallback(@NonNull View filterView,
+            @Nullable View.OnClickListener callback) {
+        // Filtering changes alpha instead of the visibility since visibility
+        // can be altered separately through RecentsView#resetFromSplitSelectionState()
+        if (callback == null) {
+            filterView.setAlpha(0);
+        } else {
+            filterView.setAlpha(1);
+        }
+
+        filterView.setOnClickListener(callback);
+    }
+
     public TaskIdAttributeContainer[] getTaskIdAttributeContainers() {
         return mTaskIdAttributeContainer;
     }
