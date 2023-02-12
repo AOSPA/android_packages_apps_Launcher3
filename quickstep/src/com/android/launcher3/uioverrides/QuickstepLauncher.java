@@ -141,6 +141,7 @@ import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.SplitToWorkspaceController;
 import com.android.quickstep.util.SplitWithKeyboardShortcutController;
 import com.android.quickstep.util.TISBindHelper;
+import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
@@ -664,6 +665,21 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
+    public void setResumed() {
+        if (DesktopTaskView.DESKTOP_IS_PROTO2_ENABLED) {
+            DesktopVisibilityController controller = mDesktopVisibilityController;
+            if (controller != null && controller.areFreeformTasksVisible()
+                    && !controller.isGestureInProgress()) {
+                // Return early to skip setting activity to appear as resumed
+                // TODO(b/255649902): shouldn't be needed when we have a separate launcher state
+                //  for desktop that we can use to control other parts of launcher
+                return;
+            }
+        }
+        super.setResumed();
+    }
+
+    @Override
     protected void onDeferredResumed() {
         super.onDeferredResumed();
         handlePendingActivityRequest();
@@ -922,7 +938,11 @@ public class QuickstepLauncher extends Launcher {
         // When changing screens, force moving to rest state similar to StatefulActivity.onStop, as
         // StatefulActivity isn't called consistently.
         if ((flags & CHANGE_ACTIVE_SCREEN) != 0) {
-            getStateManager().moveToRestState();
+            // Do not animate moving to rest state, as it can clash with Launcher#onIdpChanged
+            // where reapplyUi calls StateManager's reapplyState during the state change animation,
+            // and cancel the state change unexpectedly. The screen will be off during screen
+            // transition, hiding the unanimated transition.
+            getStateManager().moveToRestState(/* isAnimated = */false);
         }
 
         if ((flags & CHANGE_NAVIGATION_MODE) != 0) {

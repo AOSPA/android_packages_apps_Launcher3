@@ -38,6 +38,7 @@ import static com.android.launcher3.uioverrides.QuickstepLauncher.ENABLE_PIP_KEE
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_FULLSCREEN_TASK;
+import static com.android.launcher3.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
 import static com.android.quickstep.GestureState.GestureEndTarget.HOME;
 import static com.android.quickstep.GestureState.GestureEndTarget.LAST_TASK;
@@ -51,7 +52,6 @@ import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.EXPECTING_TASK_APPEARED;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.ON_SETTLED_ON_END_TARGET;
-import static com.android.quickstep.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 
@@ -107,6 +107,7 @@ import com.android.launcher3.tracing.SwipeHandlerProto;
 import com.android.launcher3.util.ActivityLifecycleCallbacksAdapter;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.TraceHelper;
+import com.android.launcher3.util.VibratorWrapper;
 import com.android.launcher3.util.WindowBounds;
 import com.android.quickstep.BaseActivityInterface.AnimationFactory;
 import com.android.quickstep.GestureState.GestureEndTarget;
@@ -126,7 +127,6 @@ import com.android.quickstep.util.SurfaceTransaction;
 import com.android.quickstep.util.SurfaceTransactionApplier;
 import com.android.quickstep.util.SwipePipToHomeAnimator;
 import com.android.quickstep.util.TaskViewSimulator;
-import com.android.quickstep.util.VibratorWrapper;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
@@ -322,6 +322,10 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     private final boolean mIsTransientTaskbar;
     // May be set to false when mIsTransientTaskbar is true.
     private boolean mCanSlowSwipeGoHome = true;
+    private boolean mHasReachedOverviewThreshold = false;
+
+    @Nullable
+    private RemoteAnimationTargets.ReleaseCheck mSwipePipToHomeReleaseCheck = null;
 
     public AbsSwipeUpHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState,
@@ -761,6 +765,10 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
     private void setIsLikelyToStartNewTask(boolean isLikelyToStartNewTask, boolean animate) {
         if (mIsLikelyToStartNewTask != isLikelyToStartNewTask) {
+            if (isLikelyToStartNewTask && mIsTransientTaskbar) {
+                setDividerShown(false /* shown */, true /* immediate */);
+            }
+
             mIsLikelyToStartNewTask = isLikelyToStartNewTask;
             maybeUpdateRecentsAttachedState(animate);
         }
@@ -868,6 +876,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         mRemoteTargetHandles = mTargetGluer.assignTargetsForSplitScreen(mContext, targets);
         mRecentsAnimationController = controller;
         mRecentsAnimationTargets = targets;
+        mSwipePipToHomeReleaseCheck = new RemoteAnimationTargets.ReleaseCheck();
+        mSwipePipToHomeReleaseCheck.setCanRelease(true);
+        mRecentsAnimationTargets.addReleaseCheck(mSwipePipToHomeReleaseCheck);
 
         // Only initialize the device profile, if it has not been initialized before, as in some
         // configurations targets.homeContentInsets may not be correct.
@@ -1427,9 +1438,16 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 mSwipePipToHomeAnimator = createWindowAnimationToPip(
                         homeAnimFactory, runningTaskTarget, start);
                 mSwipePipToHomeAnimators[0] = mSwipePipToHomeAnimator;
+                if (mSwipePipToHomeReleaseCheck != null) {
+                    mSwipePipToHomeReleaseCheck.setCanRelease(false);
+                }
                 windowAnim = mSwipePipToHomeAnimators;
             } else {
                 mSwipePipToHomeAnimator = null;
+                if (mSwipePipToHomeReleaseCheck != null) {
+                    mSwipePipToHomeReleaseCheck.setCanRelease(true);
+                    mSwipePipToHomeReleaseCheck = null;
+                }
                 windowAnim = createWindowAnimationToHome(start, homeAnimFactory);
 
                 windowAnim[0].addAnimatorListener(new AnimationSuccessListener() {
@@ -1653,7 +1671,9 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         mRecentsAnimationController.enableInputConsumer();
 
         // Start hiding the divider
-        setDividerShown(false /* shown */, true /* immediate */);
+        if (!mIsTransientTaskbar || mTaskbarAlreadyOpen || mIsTaskbarAllAppsOpen) {
+            setDividerShown(false /* shown */, true /* immediate */);
+        }
     }
 
     private void computeRecentsScrollIfInvisible() {
@@ -1950,6 +1970,10 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
             maybeFinishSwipeToHome();
             finishRecentsControllerToHome(
                     () -> mStateCallback.setStateOnUiThread(STATE_CURRENT_TASK_FINISHED));
+        }
+        if (mSwipePipToHomeReleaseCheck != null) {
+            mSwipePipToHomeReleaseCheck.setCanRelease(true);
+            mSwipePipToHomeReleaseCheck = null;
         }
         doLogGesture(HOME, mRecentsView == null ? null : mRecentsView.getCurrentPageTaskView());
     }
@@ -2285,6 +2309,10 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
 
         // "Catch up" with the displacement at mTaskbarCatchUpThreshold.
         if (displacement < mTaskbarCatchUpThreshold) {
+            if (!mHasReachedOverviewThreshold) {
+                setDividerShown(false /* shown */, true /* immediate */);
+                mHasReachedOverviewThreshold = true;
+            }
             return Utilities.mapToRange(displacement, mTaskbarAppWindowThreshold,
                     mTaskbarCatchUpThreshold, 0, mTaskbarCatchUpThreshold, ACCEL_DEACCEL);
         }

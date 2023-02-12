@@ -92,6 +92,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_HIDE_HEADER = new DeviceFlag("ENABLE_HIDE_HEADER",
             true, "Hide header on keyboard before typing in all apps");
 
+    public static final BooleanFlag ENABLE_EXPANDING_PAUSE_WORK_BUTTON = new DeviceFlag(
+            "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", false,
+            "Expand and collapse pause work button while scrolling");
+
     public static final BooleanFlag ENABLE_HIDE_HEADER_STATIC = new DeviceFlag(
             "ENABLE_HIDE_HEADER_STATIC", false, "Hide keyboard suggestion strip");
 
@@ -371,6 +375,14 @@ public final class FeatureFlags {
             "ENABLE_FORCED_MONO_ICON", false,
             "Enable the ability to generate monochromatic icons, if it is not provided by the app"
     );
+
+    public static final BooleanFlag ENABLE_TASKBAR_EDU_TOOLTIP = getDebugFlag(
+            "ENABLE_TASKBAR_EDU_TOOLTIP", false,
+            "Enable the tooltip version of the Taskbar education flow.");
+
+    public static final BooleanFlag ENABLE_MULTI_INSTANCE = getDebugFlag(
+            "ENABLE_MULTI_INSTANCE", false,
+            "Enables creation and filtering of multiple task instances in overview");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {
