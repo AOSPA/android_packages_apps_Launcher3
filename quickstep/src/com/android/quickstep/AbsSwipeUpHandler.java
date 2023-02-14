@@ -323,6 +323,7 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     // May be set to false when mIsTransientTaskbar is true.
     private boolean mCanSlowSwipeGoHome = true;
     private boolean mHasReachedOverviewThreshold = false;
+    private boolean mDividerHiddenBeforeAnimation = false;
 
     @Nullable
     private RemoteAnimationTargets.ReleaseCheck mSwipePipToHomeReleaseCheck = null;
@@ -368,10 +369,13 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
                 .getDimensionPixelSize(ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
                         ? R.dimen.taskbar_app_window_threshold_v2
                         : R.dimen.taskbar_app_window_threshold);
-        mTaskbarHomeOverviewThreshold = res.getDimensionPixelSize(
-                ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
-                        ? R.dimen.taskbar_home_overview_threshold_v2
-                        : R.dimen.taskbar_home_overview_threshold);
+        boolean swipeWillNotShowTaskbar = mTaskbarAlreadyOpen;
+        mTaskbarHomeOverviewThreshold = swipeWillNotShowTaskbar
+                ? 0
+                : res.getDimensionPixelSize(
+                        ENABLE_TASKBAR_REVISED_THRESHOLDS.get()
+                                ? R.dimen.taskbar_home_overview_threshold_v2
+                                : R.dimen.taskbar_home_overview_threshold);
         mTaskbarCatchUpThreshold = res.getDimensionPixelSize(R.dimen.taskbar_catch_up_threshold);
     }
 
@@ -1671,7 +1675,8 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
         mRecentsAnimationController.enableInputConsumer();
 
         // Start hiding the divider
-        if (!mIsTransientTaskbar || mTaskbarAlreadyOpen || mIsTaskbarAllAppsOpen) {
+        if (!mIsTransientTaskbar || mTaskbarAlreadyOpen || mIsTaskbarAllAppsOpen
+                || mDividerHiddenBeforeAnimation) {
             setDividerShown(false /* shown */, true /* immediate */);
         }
     }
@@ -2321,6 +2326,12 @@ public abstract class AbsSwipeUpHandler<T extends StatefulActivity<S>,
     }
 
     private void setDividerShown(boolean shown, boolean immediate) {
+        if (mRecentsAnimationTargets == null) {
+            if (!shown) {
+                mDividerHiddenBeforeAnimation = true;
+            }
+            return;
+        }
         if (mDividerAnimator != null) {
             mDividerAnimator.cancel();
         }

@@ -160,7 +160,6 @@ import java.util.StringJoiner;
 
         mIconAlignment.finishAnimation();
 
-        Log.d("b/260135164", "onDestroy - updateIconAlphaForHome(1)");
         mLauncher.getHotseat().setIconsAlpha(1f);
         mLauncher.getStateManager().removeStateListener(mStateListener);
 
@@ -184,7 +183,7 @@ import java.util.StringJoiner;
         stashController.updateStateForFlag(FLAG_IN_APP, false);
 
         updateStateForFlag(FLAG_RECENTS_ANIMATION_RUNNING, true);
-        animatorSet.play(stashController.applyStateWithoutStart(duration));
+        animatorSet.play(stashController.createApplyStateAnimator(duration));
         animatorSet.play(applyState(duration, false));
 
         if (mTaskBarRecentsAnimationListener != null) {
@@ -398,15 +397,13 @@ import java.util.StringJoiner;
         boolean isInStashedState = mLauncherState.isTaskbarStashed(mLauncher);
         TaskbarStashController stashController = mControllers.taskbarStashController;
         stashController.updateStateForFlag(FLAG_IN_STASHED_LAUNCHER_STATE, isInStashedState);
-        Animator stashAnimator = stashController.applyStateWithoutStart(duration);
+        Animator stashAnimator = stashController.createApplyStateAnimator(duration);
         if (stashAnimator != null) {
             stashAnimator.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
                     if (isInStashedState && committed) {
                         // Reset hotseat alpha to default
-                        Log.d("b/260135164",
-                                "playStateTransitionAnim#onAnimationEnd - setIconsAlpha(1)");
                         mLauncher.getHotseat().setIconsAlpha(1);
                     }
                 }
@@ -455,9 +452,6 @@ import java.util.StringJoiner;
          * Hide Launcher Hotseat icons when Taskbar icons have opacity. Both icon sets
          * should not be visible at the same time.
          */
-        Log.d("b/260135164",
-                "updateIconAlphaForHome - setIconsAlpha(" + (hotseatVisible ? 1 : 0)
-                        + "), isTaskbarPresent: " + mLauncher.getDeviceProfile().isTaskbarPresent);
         mLauncher.getHotseat().setIconsAlpha(hotseatVisible ? 1 : 0);
         mLauncher.getHotseat().setQsbAlpha(
                 mLauncher.getDeviceProfile().isQsbInline && !hotseatVisible ? 0 : 1);

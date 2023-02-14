@@ -57,7 +57,6 @@ import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.InsettableFrameLayout;
-import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.search.DefaultSearchAdapterProvider;
@@ -161,10 +160,8 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
                 R.dimen.dynamic_grid_cell_border_spacing);
         mHeaderProtectionColor = Themes.getAttrColor(context, R.attr.allappsHeaderProtectionColor);
 
-        mWorkManager = new WorkProfileManager(
-                mActivityContext.getSystemService(UserManager.class),
-                this, LauncherPrefs.getPrefs(mActivityContext),
-                mActivityContext.getStatsLogManager());
+        mWorkManager = new WorkProfileManager(mActivityContext.getSystemService(UserManager.class),
+                this, mActivityContext.getStatsLogManager());
         mAH = Arrays.asList(null, null, null);
         mNavBarScrimPaint = new Paint();
         mNavBarScrimPaint.setColor(Themes.getAttrColor(context, R.attr.allAppsNavBarScrimColor));
@@ -808,7 +805,7 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
     }
 
     @Override
-    public void drawOnScrim(Canvas canvas) {
+    public void drawOnScrimWithScale(Canvas canvas, float scale) {
         boolean isTablet = mActivityContext.getDeviceProfile().isTablet;
 
         // Draw full background panel for tablets.
@@ -833,7 +830,9 @@ public abstract class BaseAllAppsContainerView<T extends Context & ActivityConte
         if (mHeaderPaint.getColor() == mScrimColor || mHeaderPaint.getColor() == 0) {
             return;
         }
-        int bottom = getHeaderBottom() + getVisibleContainerView().getPaddingTop();
+        final float offset = (getVisibleContainerView().getHeight() * (1 - scale) / 2);
+        final float bottom =
+                scale * (getHeaderBottom() + getVisibleContainerView().getPaddingTop()) + offset;
         FloatingHeaderView headerView = getFloatingHeaderView();
         if (isTablet) {
             // Start adding header protection if search bar or tabs will attach to the top.

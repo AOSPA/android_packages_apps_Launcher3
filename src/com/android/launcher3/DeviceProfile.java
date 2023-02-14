@@ -260,6 +260,7 @@ public class DeviceProfile {
     // Whether Taskbar will inset the bottom of apps by taskbarSize.
     public boolean isTaskbarPresentInApps;
     public int taskbarSize;
+    public int transientTaskbarSize;
     public int stashedTaskbarSize;
     public int transientTaskbarMargin;
 
@@ -324,12 +325,12 @@ public class DeviceProfile {
         }
 
         if (isTaskbarPresent) {
+            transientTaskbarSize = res.getDimensionPixelSize(R.dimen.transient_taskbar_size);
+            transientTaskbarMargin = res.getDimensionPixelSize(R.dimen.transient_taskbar_margin);
             if (DisplayController.isTransientTaskbar(context)) {
-                taskbarSize = res.getDimensionPixelSize(R.dimen.transient_taskbar_size);
+                taskbarSize = transientTaskbarSize;
                 stashedTaskbarSize =
                         res.getDimensionPixelSize(R.dimen.transient_taskbar_stashed_size);
-                transientTaskbarMargin =
-                        res.getDimensionPixelSize(R.dimen.transient_taskbar_margin);
             } else {
                 taskbarSize = res.getDimensionPixelSize(R.dimen.taskbar_size);
                 stashedTaskbarSize = res.getDimensionPixelSize(R.dimen.taskbar_stashed_size);
@@ -910,12 +911,24 @@ public class DeviceProfile {
                     cellHeightPx = cellContentHeight;
                     cellLayoutBorderSpacePx.y -= extraHeightRequired / numBorders;
                 } else {
-                    // If it still doesn't fit, set borderSpace to 0 and distribute the space for
-                    // cellHeight, and reduce iconSize.
+                    // If it still doesn't fit, set borderSpace to 0 to recover space.
                     cellHeightPx = (cellHeightPx * inv.numRows
                             + cellLayoutBorderSpacePx.y * numBorders) / inv.numRows;
-                    iconSizePx = Math.min(iconSizePx, cellHeightPx - cellTextAndPaddingHeight);
                     cellLayoutBorderSpacePx.y = 0;
+                    // Reduce iconDrawablePaddingPx to make cellContentHeight smaller.
+                    int cellContentWithoutPadding = cellContentHeight - iconDrawablePaddingPx;
+                    if (cellContentWithoutPadding <= cellHeightPx) {
+                        iconDrawablePaddingPx = cellContentHeight - cellHeightPx;
+                    } else {
+                        // If it still doesn't fit, set iconDrawablePaddingPx to 0 to recover space,
+                        // then proportional reduce iconSizePx and iconTextSizePx to fit.
+                        iconDrawablePaddingPx = 0;
+                        float ratio = cellHeightPx / (float) cellContentWithoutPadding;
+                        iconSizePx = (int) (iconSizePx * ratio);
+                        iconTextSizePx = (int) (iconTextSizePx * ratio);
+                    }
+                    cellTextAndPaddingHeight =
+                            iconDrawablePaddingPx + Utilities.calculateTextHeight(iconTextSizePx);
                 }
                 cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
             }
@@ -1371,7 +1384,7 @@ public class DeviceProfile {
     public int getOverviewActionsClaimedSpaceBelow() {
         if (isTaskbarPresent) {
             if (FeatureFlags.ENABLE_TASKBAR_IN_OVERVIEW.get()) {
-                return taskbarSize + transientTaskbarMargin * 2;
+                return transientTaskbarSize + transientTaskbarMargin * 2;
             }
 
             return isGestureMode
