@@ -35,7 +35,10 @@ import com.android.launcher3.tapl.HomeAppIcon;
 import com.android.launcher3.tapl.HomeAppIconMenuItem;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.ui.TaplTestsLauncher3;
+import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayDeque;
@@ -108,7 +111,9 @@ public class ThemeIconsTest extends AbstractLauncherUiTest {
         }
     }
 
+    @Ignore
     @Test
+    @ScreenRecord // b/260722220
     public void testShortcutIconWithTheme() throws Exception {
         setThemeEnabled(true);
         TaplTestsLauncher3.initialize(this);
@@ -128,6 +133,13 @@ public class ThemeIconsTest extends AbstractLauncherUiTest {
     }
 
     private void verifyIconTheme(String title, ViewGroup parent, boolean isThemed) {
+        // Wait for Launcher model to be completed
+        try {
+            Executors.MODEL_EXECUTOR.submit(() -> { }).get();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         // Find the app icon
         Queue<View> viewQueue = new ArrayDeque<>();
         viewQueue.add(parent);

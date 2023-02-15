@@ -582,7 +582,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         }
 
         int cellHSpan = mLauncher.getDeviceProfile().inv.numSearchContainerColumns;
-        CellLayoutLayoutParams lp = new CellLayoutLayoutParams(0, 0, cellHSpan, 1);
+        CellLayoutLayoutParams lp = new CellLayoutLayoutParams(0, 0, cellHSpan, 1, FIRST_SCREEN_ID);
         lp.canReorder = false;
         if (!firstPage.addViewToCellLayout(
                 mFirstPagePinnedItem, 0, R.id.search_container_workspace, lp, true)) {
@@ -2392,10 +2392,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             mDragTargetLayout.visualizeDropLocation(mTargetCell[0], mTargetCell[1],
                     item.spanX, item.spanY, d);
         } else if ((mDragMode == DRAG_MODE_NONE || mDragMode == DRAG_MODE_REORDER)
-                && !mReorderAlarm.alarmPending()
                 && (mLastReorderX != reorderX || mLastReorderY != reorderY)
                 && targetCellDistance < mDragTargetLayout.getReorderRadius(mTargetCell, item.spanX,
                 item.spanY)) {
+            mReorderAlarm.cancelAlarm();
             mLastReorderX = reorderX;
             mLastReorderY = reorderY;
             mDragTargetLayout.performReorder((int) mDragViewVisualCenter[0],
