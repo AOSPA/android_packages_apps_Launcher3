@@ -73,8 +73,8 @@
         launcher:screen="0"
         launcher:x="0"
         launcher:y="0"
-        launcher:spanX="5"
-        launcher:spanY="1" />
+        launcher:spanX="6"
+        launcher:spanY="2" />
 
     <!-- Google Folder -->
     <!-- Google, Gmail, Maps, YouTube, Drive, YouTube Music, Play Movies, Duo, Photos -->
