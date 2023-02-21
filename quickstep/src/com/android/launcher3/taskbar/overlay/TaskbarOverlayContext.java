@@ -15,11 +15,12 @@
  */
 package com.android.launcher3.taskbar.overlay;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+
 import android.content.Context;
 import android.view.View;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -29,8 +30,13 @@ import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarControllers;
 import com.android.launcher3.taskbar.TaskbarDragController;
 import com.android.launcher3.taskbar.TaskbarStashController;
+import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsContainerView;
-import com.android.launcher3.util.OnboardingPrefs;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
+import com.android.quickstep.views.RecentsView;
+import com.android.systemui.shared.recents.model.Task;
+
+import java.util.function.Consumer;
 
 /**
  * Window context for the taskbar overlays such as All Apps and EDU.
@@ -40,7 +46,6 @@ import com.android.launcher3.util.OnboardingPrefs;
  */
 public class TaskbarOverlayContext extends BaseTaskbarContext {
     private final TaskbarActivityContext mTaskbarContext;
-    private final OnboardingPrefs<TaskbarOverlayContext> mOnboardingPrefs;
 
     private final TaskbarOverlayController mOverlayController;
     private final TaskbarDragController mDragController;
@@ -49,6 +54,7 @@ public class TaskbarOverlayContext extends BaseTaskbarContext {
     // We automatically stash taskbar when All Apps is opened in gesture navigation mode.
     private final boolean mWillTaskbarBeVisuallyStashed;
     private final int mStashedTaskbarHeight;
+    private final TaskbarUIController mUiController;
 
     public TaskbarOverlayContext(
             Context windowContext,
@@ -59,12 +65,13 @@ public class TaskbarOverlayContext extends BaseTaskbarContext {
         mOverlayController = controllers.taskbarOverlayController;
         mDragController = new TaskbarDragController(this);
         mDragController.init(controllers);
-        mOnboardingPrefs = new OnboardingPrefs<>(this, LauncherPrefs.getPrefs(this));
         mDragLayer = new TaskbarOverlayDragLayer(this);
 
         TaskbarStashController taskbarStashController = controllers.taskbarStashController;
         mWillTaskbarBeVisuallyStashed = taskbarStashController.supportsVisualStashing();
         mStashedTaskbarHeight = taskbarStashController.getStashedHeight();
+
+        mUiController = controllers.uiController;
     }
 
     boolean willTaskbarBeVisuallyStashed() {
@@ -100,11 +107,6 @@ public class TaskbarOverlayContext extends BaseTaskbarContext {
     }
 
     @Override
-    public OnboardingPrefs<TaskbarOverlayContext> getOnboardingPrefs() {
-        return mOnboardingPrefs;
-    }
-
-    @Override
     public boolean isBindingItems() {
         return mTaskbarContext.isBindingItems();
     }
@@ -117,6 +119,11 @@ public class TaskbarOverlayContext extends BaseTaskbarContext {
     @Override
     public PopupDataProvider getPopupDataProvider() {
         return mTaskbarContext.getPopupDataProvider();
+    }
+
+    @Override
+    public void startSplitSelection(SplitSelectSource splitSelectSource) {
+        mUiController.startSplitSelection(splitSelectSource);
     }
 
     @Override

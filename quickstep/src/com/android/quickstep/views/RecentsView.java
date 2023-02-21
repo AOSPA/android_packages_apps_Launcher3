@@ -16,6 +16,7 @@
 
 package com.android.quickstep.views;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.view.Surface.ROTATION_0;
 import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.makeMeasureSpec;
@@ -144,7 +145,6 @@ import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.cache.HandlerRunnable;
 import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.popup.QuickstepSystemShortcut;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -156,6 +156,7 @@ import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ResourceBasedOverride.Overrides;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitBounds;
+import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
 import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.TranslateEdgeEffect;
@@ -677,7 +678,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private SplitInstructionsView mSplitInstructionsView;
 
     @Nullable
-    private QuickstepSystemShortcut.SplitSelectSource mSplitSelectSource;
+    private SplitSelectSource mSplitSelectSource;
 
     /**
      * Keeps track of the index of the TaskView that split screen was initialized with so we know
@@ -1275,14 +1276,14 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     }
 
     /**
-     * Pulls the list of active Tasks from RecentModel, and finds the most recently active Task
+     * Pulls the list of active Tasks from RecentsModel, and finds the most recently active Task
      * matching a given ComponentName. Then uses that Task (which could be null) with the given
      * callback.
      *
-     * Used in various splitscreen operations when we need to check if there is a currently running
-     * Task of a certain type and use the most recent one.
+     * Used in various task-switching or splitscreen operations when we need to check if there is a
+     * currently running Task of a certain type and use the most recent one.
      */
-    public void findLastActiveTaskAndDoSplitOperation(ComponentName componentName,
+    public void findLastActiveTaskAndRunCallback(ComponentName componentName,
             Consumer<Task> callback) {
         mModel.getTasks(taskGroups -> {
             Task lastActiveTask = null;
@@ -1351,8 +1352,10 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         if (!mActivity.getDeviceProfile().isTablet) {
             mActionsView.updateDisabledFlags(OverviewActionsView.DISABLED_SCROLLING, true);
         }
-        InteractionJankMonitorWrapper.begin(/* view= */ this,
-                InteractionJankMonitorWrapper.CUJ_RECENTS_SCROLLING);
+        if (mOverviewStateEnabled) { // only when in overview
+            InteractionJankMonitorWrapper.begin(/* view= */ this,
+                    InteractionJankMonitorWrapper.CUJ_RECENTS_SCROLLING);
+        }
     }
 
     @Override
@@ -1605,8 +1608,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
         // If we are entering Overview as a result of initiating a split from somewhere else
         // (e.g. split from Home), we need to make sure the staged app is not drawn as a thumbnail.
-        Task stagedTaskToBeRemovedFromGrid =
-                mSplitSelectSource != null ? mSplitSelectSource.alreadyRunningTask : null;
+        int stagedTaskIdToBeRemovedFromGrid = mSplitSelectSource != null
+                ? mSplitSelectSource.alreadyRunningTaskId
+                : INVALID_TASK_ID;
 
         // update the map of instance counts
         mFilterState.updateInstanceCountMap(taskGroups);
@@ -1615,8 +1619,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         // taskGroups backwards populates the thumbnail grid from least recent to most recent.
         for (int i = taskGroups.size() - 1; i >= 0; i--) {
             GroupTask groupTask = taskGroups.get(i);
-            boolean isRemovalNeeded = stagedTaskToBeRemovedFromGrid != null
-                    && groupTask.containsTask(stagedTaskToBeRemovedFromGrid.key.id);
+            boolean isRemovalNeeded = stagedTaskIdToBeRemovedFromGrid != INVALID_TASK_ID
+                    && groupTask.containsTask(stagedTaskIdToBeRemovedFromGrid);
 
             TaskView taskView;
             if (isRemovalNeeded && groupTask.hasMultipleTasks()) {
@@ -1630,7 +1634,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             addView(taskView);
 
             if (isRemovalNeeded && groupTask.hasMultipleTasks()) {
-                if (groupTask.task1.equals(stagedTaskToBeRemovedFromGrid)) {
+                if (groupTask.task1.key.id == stagedTaskIdToBeRemovedFromGrid) {
                     taskView.bind(groupTask.task2, mOrientationState);
                 } else {
                     taskView.bind(groupTask.task1, mOrientationState);
@@ -3017,7 +3021,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
         RectF startingTaskRect = new RectF();
         safeRemoveDragLayerView(mFirstFloatingTaskView);
-        if (mSplitHiddenTaskView != null) {
+        if (mSplitSelectStateController.isAnimateCurrentTaskDismissal()) {
             // Create the split select animation from Overview
             mSplitHiddenTaskView.setThumbnailVisibility(INVISIBLE);
             anim.setViewAlpha(mSplitHiddenTaskView.getIconView(), 0, clampToProgress(LINEAR,
@@ -4391,29 +4395,38 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         initiateSplitSelect(taskView, defaultSplitPosition, LAUNCHER_OVERVIEW_ACTIONS_SPLIT);
     }
 
+    /** TODO(b/266477929): Consolidate this call w/ the one below */
     public void initiateSplitSelect(TaskView taskView, @StagePosition int stagePosition,
             StatsLogManager.EventEnum splitEvent) {
         mSplitHiddenTaskView = taskView;
-        mSplitSelectStateController.setInitialTaskSelect(taskView.getTask(),
-                stagePosition, splitEvent, taskView.getItemInfo());
+        mSplitSelectStateController.setInitialTaskSelect(null /*intent*/,
+                stagePosition, taskView.getItemInfo(), splitEvent, taskView.mTask.key.id);
+        mSplitSelectStateController.setAnimateCurrentTaskDismissal(
+                true /*animateCurrentTaskDismissal*/);
         mSplitHiddenTaskViewIndex = indexOfChild(taskView);
     }
 
     /**
-     * Called when staging a split from Home/AllApps, using the icon long-press menu.
+     * Called when staging a split from Home/AllApps/Overview (Taskbar),
+     * using the icon long-press menu.
+     * Attempts to initiate split with an existing taskView, if one exists
      */
-    public void initiateSplitSelect(QuickstepSystemShortcut.SplitSelectSource splitSelectSource) {
+    public void initiateSplitSelect(SplitSelectSource splitSelectSource) {
         mSplitSelectSource = splitSelectSource;
+        mSplitHiddenTaskView = getTaskViewByTaskId(splitSelectSource.alreadyRunningTaskId);
+        mSplitHiddenTaskViewIndex = indexOfChild(mSplitHiddenTaskView);
+        mSplitSelectStateController
+                .setAnimateCurrentTaskDismissal(splitSelectSource.animateCurrentTaskDismissal);
         mSplitSelectStateController.setInitialTaskSelect(splitSelectSource.intent,
                 splitSelectSource.position.stagePosition, splitSelectSource.itemInfo,
-                splitSelectSource.splitEvent, splitSelectSource.alreadyRunningTask);
+                splitSelectSource.splitEvent, splitSelectSource.alreadyRunningTaskId);
     }
 
     /**
      * Modifies a PendingAnimation with the animations for entering split staging
      */
     public void createSplitSelectInitAnimation(PendingAnimation builder, int duration) {
-        if (mSplitHiddenTaskView != null) {
+        if (mSplitSelectStateController.isAnimateCurrentTaskDismissal()) {
             // Splitting from Overview
             createTaskDismissAnimation(builder, mSplitHiddenTaskView, true, false, duration,
                     true /* dismissingForSplitSelection*/);
@@ -4909,9 +4922,16 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
             return;
         }
 
-        RemoteTargetGluer gluer = new RemoteTargetGluer(getContext(), getSizeStrategy());
-        mRemoteTargetHandles = gluer.assignTargetsForSplitScreen(
-                getContext(), recentsAnimationTargets);
+        RemoteTargetGluer gluer;
+        if (DESKTOP_MODE_SUPPORTED && recentsAnimationTargets.hasDesktopTasks()) {
+            gluer = new RemoteTargetGluer(getContext(), getSizeStrategy(), recentsAnimationTargets,
+                    true /* forDesktop */);
+            mRemoteTargetHandles = gluer.assignTargetsForDesktop(recentsAnimationTargets);
+        } else {
+            gluer = new RemoteTargetGluer(getContext(), getSizeStrategy());
+            mRemoteTargetHandles = gluer.assignTargetsForSplitScreen(
+                    getContext(), recentsAnimationTargets);
+        }
         mSplitBoundsConfig = gluer.getSplitBounds();
         // Add release check to the targets from the RemoteTargetGluer and not the targets
         // passed in because in the event we're in split screen, we use the passed in targets

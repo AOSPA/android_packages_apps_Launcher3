@@ -96,9 +96,6 @@ public final class FeatureFlags {
             "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", false,
             "Expand and collapse pause work button while scrolling");
 
-    public static final BooleanFlag ENABLE_HIDE_HEADER_STATIC = new DeviceFlag(
-            "ENABLE_HIDE_HEADER_STATIC", false, "Hide keyboard suggestion strip");
-
     public static final BooleanFlag COLLECT_SEARCH_HISTORY = new DeviceFlag(
             "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
 
@@ -275,7 +272,7 @@ public final class FeatureFlags {
 
     public static final BooleanFlag ENABLE_SEARCH_RESULT_LAUNCH_TRANSITION = new DeviceFlag(
             "ENABLE_SEARCH_RESULT_LAUNCH_TRANSITION", false,
-            "Enable option to launch search results using the new standardized transitions");
+            "Enable option to launch search results using the new view container transitions");
 
     public static final BooleanFlag TWO_PREDICTED_ROWS_ALL_APPS_SEARCH = new DeviceFlag(
             "TWO_PREDICTED_ROWS_ALL_APPS_SEARCH", false,
@@ -387,6 +384,11 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_MULTI_INSTANCE = getDebugFlag(
             "ENABLE_MULTI_INSTANCE", false,
             "Enables creation and filtering of multiple task instances in overview");
+
+    public static final BooleanFlag ENABLE_TASKBAR_PINNING = getDebugFlag(
+            "ENABLE_TASKBAR_PINNING", false,
+            "Enables taskbar pinning to allow user to switch between transient and persistent "
+                    + "taskbar flavors");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

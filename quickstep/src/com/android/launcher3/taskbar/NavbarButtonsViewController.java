@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar;
 import static android.view.View.AccessibilityDelegate;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_REGION;
+import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
@@ -51,7 +52,6 @@ import android.annotation.IdRes;
 import android.annotation.LayoutRes;
 import android.content.pm.ActivityInfo.Config;
 import android.content.res.ColorStateList;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Point;
@@ -300,7 +300,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                     R.dimen.floating_rotation_button_taskbar_left_margin,
                     R.dimen.floating_rotation_button_taskbar_bottom_margin,
                     R.dimen.floating_rotation_button_diameter,
-                    R.dimen.key_button_ripple_max_width);
+                    R.dimen.key_button_ripple_max_width,
+                    R.bool.floating_rotation_button_position_left);
             mControllers.rotationButtonController.setRotationButton(mFloatingRotationButton,
                     mRotationButtonListener);
 
@@ -484,13 +485,6 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
      */
     public boolean isImeVisible() {
         return (mState & FLAG_IME_VISIBLE) != 0;
-    }
-
-    /**
-     * Returns true if IME switcher is visible
-     */
-    public boolean isImeSwitcherVisible() {
-        return (mState & FLAG_SWITCHER_SHOWING) != 0;
     }
 
     /**
@@ -725,13 +719,6 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             mPropertyHolders.add(new StatePropertyHolder(
                     mBackButtonAlpha.get(ALPHA_INDEX_SUW),
                     flags -> (flags & FLAG_IME_VISIBLE) == 0));
-
-            // TODO(b/210906568) Dark intensity is currently not propagated during setup, so set
-            //  it based on dark theme for now.
-            int mode = res.getConfiguration().uiMode
-                    & Configuration.UI_MODE_NIGHT_MASK;
-            boolean isDarkTheme = mode == Configuration.UI_MODE_NIGHT_YES;
-            mTaskbarNavButtonDarkIntensity.updateValue(isDarkTheme ? 0 : 1);
         } else if (isInKidsMode) {
             int iconSize = res.getDimensionPixelSize(
                     R.dimen.taskbar_icon_size_kids);
@@ -878,8 +865,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         mAreNavButtonsInSeparateWindow = true;
         mContext.getDragLayer().removeView(mNavButtonsView);
         mSeparateWindowParent.addView(mNavButtonsView);
-        WindowManager.LayoutParams windowLayoutParams = mContext.createDefaultWindowLayoutParams();
-        windowLayoutParams.setTitle(NAV_BUTTONS_SEPARATE_WINDOW_TITLE);
+        WindowManager.LayoutParams windowLayoutParams = mContext.createDefaultWindowLayoutParams(
+                TYPE_NAVIGATION_BAR_PANEL, NAV_BUTTONS_SEPARATE_WINDOW_TITLE);
         mContext.addWindowView(mSeparateWindowParent, windowLayoutParams);
 
     }
