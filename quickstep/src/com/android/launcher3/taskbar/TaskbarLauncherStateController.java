@@ -125,7 +125,8 @@ import java.util.StringJoiner;
                     mControllers.taskbarDragController.setDisallowLongClick(disallowLongClick);
                     mControllers.taskbarAllAppsController.setDisallowGlobalDrag(disallowGlobalDrag);
                     mControllers.taskbarAllAppsController.setDisallowLongClick(disallowLongClick);
-                    mControllers.taskbarPopupController.setHideSplitOptions(disallowGlobalDrag);
+                    mControllers.taskbarPopupController.setAllowInitialSplitSelection(
+                            disallowGlobalDrag);
                 }
             };
 
@@ -160,6 +161,7 @@ import java.util.StringJoiner;
 
         mIconAlignment.finishAnimation();
 
+        Log.d("b/260135164", "onDestroy - updateIconAlphaForHome(1)");
         mLauncher.getHotseat().setIconsAlpha(1f);
         mLauncher.getStateManager().removeStateListener(mStateListener);
 
@@ -258,8 +260,9 @@ import java.util.StringJoiner;
     }
 
     private Animator onStateChangeApplied(int changedFlags, long duration, boolean start) {
-        boolean goingToLauncher = isInLauncher();
+        final boolean goingToLauncher = isInLauncher();
         final float toAlignment = isIconAlignedWithHotseat() ? 1 : 0;
+        boolean handleOpenFloatingViews = false;
         if (DEBUG) {
             Log.d(TAG, "onStateChangeApplied - mState: " + getStateString(mState)
                     + ", changedFlags: " + getStateString(changedFlags)
@@ -279,6 +282,10 @@ import java.util.StringJoiner;
                 // We're about to be paused, set immediately to ensure seamless handoff.
                 updateStateForFlag(FLAG_RESUMED, false);
                 applyState(0 /* duration */);
+            }
+            if (mLauncherState == LauncherState.NORMAL) {
+                // We're changing state to home, should close open popups e.g. Taskbar AllApps
+                handleOpenFloatingViews = true;
             }
         }
 
@@ -303,10 +310,11 @@ import java.util.StringJoiner;
                 }
             });
 
-            if (goingToLauncher) {
-                // Handle closing open popups when going home/overview
-                AbstractFloatingView.closeAllOpenViews(mControllers.taskbarActivityContext);
-            }
+            // Handle closing open popups when going home/overview
+            handleOpenFloatingViews = true;
+        }
+        if (handleOpenFloatingViews && goingToLauncher) {
+            AbstractFloatingView.closeAllOpenViews(mControllers.taskbarActivityContext);
         }
 
         float backgroundAlpha =
@@ -404,6 +412,8 @@ import java.util.StringJoiner;
                 public void onAnimationEnd(Animator animation) {
                     if (isInStashedState && committed) {
                         // Reset hotseat alpha to default
+                        Log.d("b/260135164",
+                                "playStateTransitionAnim#onAnimationEnd - setIconsAlpha(1)");
                         mLauncher.getHotseat().setIconsAlpha(1);
                     }
                 }
@@ -452,6 +462,9 @@ import java.util.StringJoiner;
          * Hide Launcher Hotseat icons when Taskbar icons have opacity. Both icon sets
          * should not be visible at the same time.
          */
+        Log.d("b/260135164",
+                "updateIconAlphaForHome - setIconsAlpha(" + (hotseatVisible ? 1 : 0)
+                        + "), isTaskbarPresent: " + mLauncher.getDeviceProfile().isTaskbarPresent);
         mLauncher.getHotseat().setIconsAlpha(hotseatVisible ? 1 : 0);
         mLauncher.getHotseat().setQsbAlpha(
                 mLauncher.getDeviceProfile().isQsbInline && !hotseatVisible ? 0 : 1);
