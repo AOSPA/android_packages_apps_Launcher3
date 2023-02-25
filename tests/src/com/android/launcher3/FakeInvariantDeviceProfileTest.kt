@@ -20,6 +20,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.util.SparseArray
 import androidx.test.core.app.ApplicationProvider
+import com.android.launcher3.DeviceProfile.DEFAULT_DIMENSION_PROVIDER
 import com.android.launcher3.DeviceProfile.DEFAULT_PROVIDER
 import com.android.launcher3.util.DisplayController.Info
 import com.android.launcher3.util.WindowBounds
@@ -30,7 +31,13 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when` as whenever
 
-abstract class DeviceProfileBaseTest {
+/**
+ * This is an abstract class for DeviceProfile tests that don't need the real Context and mock an
+ * InvariantDeviceProfile instead of creating one based on real values.
+ *
+ * For an implementation that creates InvariantDeviceProfile, use [AbstractDeviceProfileTest]
+ */
+abstract class FakeInvariantDeviceProfileTest {
 
     protected var context: Context? = null
     protected var inv: InvariantDeviceProfile? = null
@@ -60,7 +67,8 @@ abstract class DeviceProfileBaseTest {
             transposeLayoutWithOrientation,
             useTwoPanels,
             isGestureMode,
-            DEFAULT_PROVIDER
+            DEFAULT_PROVIDER,
+            DEFAULT_DIMENSION_PROVIDER
         )
 
     protected fun initializeVarsForPhone(
@@ -118,6 +126,7 @@ abstract class DeviceProfileBaseTest {
 
                 horizontalMargin = FloatArray(4) { 22f }
 
+                allAppsStyle = R.style.AllAppsStyleDefault
                 allAppsCellSize =
                     listOf(
                             PointF(80f, 104f),
@@ -196,6 +205,7 @@ abstract class DeviceProfileBaseTest {
 
                 horizontalMargin = floatArrayOf(54f, 120f, 54f, 54f)
 
+                allAppsStyle = R.style.AllAppsStyleDefault
                 allAppsCellSize =
                     listOf(
                             PointF(96f, 142f),
@@ -275,6 +285,7 @@ abstract class DeviceProfileBaseTest {
 
                 horizontalMargin = floatArrayOf(21.5f, 21.5f, 22.5f, 30.5f)
 
+                allAppsStyle = R.style.AllAppsStyleDefault
                 allAppsCellSize =
                     listOf(PointF(0f, 0f), PointF(0f, 0f), PointF(68f, 104f), PointF(80f, 104f))
                         .toTypedArray()

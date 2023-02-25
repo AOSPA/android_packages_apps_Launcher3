@@ -57,6 +57,7 @@ import com.android.launcher3.util.WindowBounds;
 
 import java.io.PrintWriter;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 @SuppressLint("NewApi")
 public class DeviceProfile {
@@ -67,6 +68,7 @@ public class DeviceProfile {
 
     public static final PointF DEFAULT_SCALE = new PointF(1.0f, 1.0f);
     public static final ViewScaleProvider DEFAULT_PROVIDER = itemInfo -> DEFAULT_SCALE;
+    public static final Consumer<DeviceProfile> DEFAULT_DIMENSION_PROVIDER = dp -> {};
 
     // Ratio of empty space, qsb should take up to appear visually centered.
     private final float mQsbCenterFactor;
@@ -271,7 +273,8 @@ public class DeviceProfile {
     DeviceProfile(Context context, InvariantDeviceProfile inv, Info info, WindowBounds windowBounds,
             SparseArray<DotRenderer> dotRendererCache, boolean isMultiWindowMode,
             boolean transposeLayoutWithOrientation, boolean isMultiDisplay, boolean isGestureMode,
-            @NonNull final ViewScaleProvider viewScaleProvider) {
+            @NonNull final ViewScaleProvider viewScaleProvider,
+            @NonNull final Consumer<DeviceProfile> dimensionOverrideProvider) {
 
         this.inv = inv;
         this.isLandscape = windowBounds.isLandscape();
@@ -401,6 +404,7 @@ public class DeviceProfile {
         allAppsBorderSpacePx = new Point(
                 pxFromDp(inv.allAppsBorderSpaces[mTypeIndex].x, mMetrics),
                 pxFromDp(inv.allAppsBorderSpaces[mTypeIndex].y, mMetrics));
+        setupAllAppsStyle(context);
 
         workspacePageIndicatorHeight = res.getDimensionPixelSize(
                 R.dimen.workspace_page_indicator_height);
@@ -571,16 +575,19 @@ public class DeviceProfile {
 
         mViewScaleProvider = viewScaleProvider;
 
+        dimensionOverrideProvider.accept(this);
+
         // This is done last, after iconSizePx is calculated above.
-        mDotRendererWorkSpace = createDotRenderer(iconSizePx, dotRendererCache);
-        mDotRendererAllApps = createDotRenderer(allAppsIconSizePx, dotRendererCache);
+        mDotRendererWorkSpace = createDotRenderer(context, iconSizePx, dotRendererCache);
+        mDotRendererAllApps = createDotRenderer(context, allAppsIconSizePx, dotRendererCache);
     }
 
     private static DotRenderer createDotRenderer(
-            int size, @NonNull SparseArray<DotRenderer> cache) {
+            @NonNull Context context, int size, @NonNull SparseArray<DotRenderer> cache) {
         DotRenderer renderer = cache.get(size);
         if (renderer == null) {
-            renderer = new DotRenderer(size, getShapePath(DEFAULT_DOT_SIZE), DEFAULT_DOT_SIZE);
+            renderer = new DotRenderer(size, getShapePath(context, DEFAULT_DOT_SIZE),
+                    DEFAULT_DOT_SIZE);
             cache.put(size, renderer);
         }
         return renderer;
@@ -805,9 +812,6 @@ public class DeviceProfile {
         int cellLayoutHorizontalPadding =
                 (cellLayoutPaddingPx.left + cellLayoutPaddingPx.right) / 2;
         if (isTablet) {
-            allAppsLeftRightPadding =
-                    res.getDimensionPixelSize(R.dimen.all_apps_bottom_sheet_horizontal_padding);
-
             int usedWidth = (allAppsCellWidthPx * numShownAllAppsColumns)
                     + (allAppsBorderSpacePx.x * (numShownAllAppsColumns - 1))
                     + allAppsLeftRightPadding * 2;
@@ -816,6 +820,20 @@ public class DeviceProfile {
             allAppsLeftRightPadding =
                     desiredWorkspaceHorizontalMarginPx + cellLayoutHorizontalPadding;
         }
+    }
+
+    private void setupAllAppsStyle(Context context) {
+        TypedArray allAppsStyle;
+        if (inv.allAppsStyle != INVALID_RESOURCE_HANDLE) {
+            allAppsStyle = context.obtainStyledAttributes(inv.allAppsStyle,
+                    R.styleable.AllAppsStyle);
+        } else {
+            allAppsStyle = context.obtainStyledAttributes(R.style.AllAppsStyleDefault,
+                    R.styleable.AllAppsStyle);
+        }
+        allAppsLeftRightPadding = allAppsStyle.getDimensionPixelSize(
+                R.styleable.AllAppsStyle_horizontalPadding, 0);
+        allAppsStyle.recycle();
     }
 
     /**
@@ -1406,8 +1424,10 @@ public class DeviceProfile {
 
     /** Gets the space that the overview actions will take, including bottom margin. */
     public int getOverviewActionsClaimedSpace() {
-        return overviewActionsTopMarginPx + overviewActionsHeight
-                + getOverviewActionsClaimedSpaceBelow();
+        int overviewActionsSpace = isTablet && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get()
+                ? 0
+                : (overviewActionsTopMarginPx + overviewActionsHeight);
+        return overviewActionsSpace + getOverviewActionsClaimedSpaceBelow();
     }
 
     /**
@@ -1752,6 +1772,8 @@ public class DeviceProfile {
 
         private SparseArray<DotRenderer> mDotRendererCache;
 
+        private Consumer<DeviceProfile> mOverrideProvider;
+
         public Builder(Context context, InvariantDeviceProfile inv, Info info) {
             mContext = context;
             mInv = inv;
@@ -1788,11 +1810,16 @@ public class DeviceProfile {
             return this;
         }
 
+        public Builder withDimensionsOverride(Consumer<DeviceProfile> overrideProvider) {
+            mOverrideProvider = overrideProvider;
+            return this;
+        }
+
         /**
          * Set the viewScaleProvider for the builder
          *
          * @param viewScaleProvider The viewScaleProvider to be set for the
-         *                                DeviceProfile
+         *                          DeviceProfile
          * @return This builder
          */
         @NonNull
@@ -1817,9 +1844,12 @@ public class DeviceProfile {
             if (mViewScaleProvider == null) {
                 mViewScaleProvider = DEFAULT_PROVIDER;
             }
+            if (mOverrideProvider == null) {
+                mOverrideProvider = DEFAULT_DIMENSION_PROVIDER;
+            }
             return new DeviceProfile(mContext, mInv, mInfo, mWindowBounds, mDotRendererCache,
                     mIsMultiWindowMode, mTransposeLayoutWithOrientation, mIsMultiDisplay,
-                    mIsGestureMode, mViewScaleProvider);
+                    mIsGestureMode, mViewScaleProvider, mOverrideProvider);
         }
     }
 

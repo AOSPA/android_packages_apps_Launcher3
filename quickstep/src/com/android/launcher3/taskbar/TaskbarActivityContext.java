@@ -248,6 +248,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         // Initialize controllers after all are constructed.
         mControllers.init(sharedState);
         updateSysuiStateFlags(sharedState.sysuiStateFlags, true /* fromInit */);
+        disableNavBarElements(sharedState.disableNavBarDisplayId, sharedState.disableNavBarState1,
+                sharedState.disableNavBarState2, false /* animate */);
+        onSystemBarAttributesChanged(sharedState.systemBarAttrsDisplayId,
+                sharedState.systemBarAttrsBehavior);
+        onNavButtonsDarkIntensityChanged(sharedState.navButtonsDarkIntensity);
+
 
         if (!mAddedWindow) {
             mWindowManager.addView(mDragLayer, mWindowLayoutParams);
@@ -287,22 +293,20 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * the icon size
      */
     private void matchDeviceProfile(DeviceProfile originDeviceProfile, Resources resources) {
-        mDeviceProfile = originDeviceProfile.copy(this);
-        // Taskbar should match the number of icons of hotseat
-        mDeviceProfile.numShownHotseatIcons = originDeviceProfile.numShownHotseatIcons;
-        // Same QSB width to have a smooth animation
-        mDeviceProfile.hotseatQsbWidth = originDeviceProfile.hotseatQsbWidth;
-        // Update the size of the icons
-        updateIconSize(resources);
-    }
+        mDeviceProfile = originDeviceProfile.toBuilder(this)
+                .withDimensionsOverride(deviceProfile -> {
+                    // Taskbar should match the number of icons of hotseat
+                    deviceProfile.numShownHotseatIcons = originDeviceProfile.numShownHotseatIcons;
+                    // Same QSB width to have a smooth animation
+                    deviceProfile.hotseatQsbWidth = originDeviceProfile.hotseatQsbWidth;
 
-
-    private void updateIconSize(Resources resources) {
-        mDeviceProfile.iconSizePx = resources.getDimensionPixelSize(
-                DisplayController.isTransientTaskbar(this)
-                    ? R.dimen.transient_taskbar_icon_size
-                    : R.dimen.taskbar_icon_size);
-        mDeviceProfile.updateIconSize(1f, resources);
+                    // Update icon size
+                    deviceProfile.iconSizePx = resources.getDimensionPixelSize(
+                            DisplayController.isTransientTaskbar(TaskbarActivityContext.this)
+                                    ? R.dimen.transient_taskbar_icon_size
+                                    : R.dimen.taskbar_icon_size);
+                    deviceProfile.updateIconSize(1f, resources);
+                }).build();
     }
 
     /**
@@ -550,6 +554,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         }
     }
 
+    public boolean isDestroyed() {
+        return mIsDestroyed;
+    }
+
     public void updateSysuiStateFlags(int systemUiStateFlags, boolean fromInit) {
         mControllers.navbarButtonsViewController.updateStateForSysuiFlags(systemUiStateFlags,
                 fromInit);
@@ -563,6 +571,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         || isNavBarKidsModeActive());
         mControllers.stashedHandleViewController.setIsHomeButtonDisabled(
                 mControllers.navbarButtonsViewController.isHomeDisabled());
+        mControllers.stashedHandleViewController.updateStateForSysuiFlags(systemUiStateFlags);
         mControllers.taskbarKeyguardController.updateStateForSysuiFlags(systemUiStateFlags);
         mControllers.taskbarStashController.updateStateForSysuiFlags(
                 systemUiStateFlags, fromInit || !isUserSetupComplete());
@@ -1058,6 +1067,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                     ~WindowManager.LayoutParams.PRIVATE_FLAG_EXCLUDE_FROM_SCREEN_MAGNIFICATION;
         }
         mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
+    }
+
+    void notifyUpdateLayoutParams() {
+        if (mDragLayer.isAttachedToWindow()) {
+            mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
+        }
     }
 
     public void showPopupMenuForIcon(BubbleTextView btv) {
