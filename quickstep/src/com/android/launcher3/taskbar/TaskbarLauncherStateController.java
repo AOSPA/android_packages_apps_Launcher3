@@ -249,6 +249,9 @@ import java.util.StringJoiner;
     }
 
     public Animator applyState(long duration, boolean start) {
+        if (mControllers.taskbarActivityContext.isDestroyed()) {
+            return null;
+        }
         Animator animator = null;
         if (mPrevState == null || mPrevState != mState) {
             // If this is our initial state, treat all flags as changed.
@@ -278,7 +281,7 @@ import java.util.StringJoiner;
             boolean committed = !hasAnyFlag(FLAG_TRANSITION_STATE_RUNNING);
             playStateTransitionAnim(animatorSet, duration, committed);
 
-            if (committed && mLauncherState == LauncherState.QUICK_SWITCH) {
+            if (committed && mLauncherState == LauncherState.QUICK_SWITCH_FROM_HOME) {
                 // We're about to be paused, set immediately to ensure seamless handoff.
                 updateStateForFlag(FLAG_RESUMED, false);
                 applyState(0 /* duration */);

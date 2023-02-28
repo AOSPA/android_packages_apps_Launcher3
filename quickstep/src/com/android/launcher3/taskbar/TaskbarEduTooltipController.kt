@@ -18,6 +18,8 @@ package com.android.launcher3.taskbar
 import android.graphics.PorterDuff.Mode.SRC_ATOP
 import android.graphics.PorterDuffColorFilter
 import android.view.View
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import android.view.ViewGroup
 import androidx.annotation.IntDef
 import androidx.annotation.LayoutRes
@@ -88,7 +90,7 @@ class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
 
         tooltipStep = TOOLTIP_STEP_FEATURES
         inflateTooltip(R.layout.taskbar_edu_swipe)
-        tooltip?.apply {
+        tooltip?.run {
             findViewById<LottieAnimationView>(R.id.swipe_animation).supportLightTheme()
             show()
         }
@@ -107,9 +109,23 @@ class TaskbarEduTooltipController(val activityContext: TaskbarActivityContext) :
 
         tooltipStep = TOOLTIP_STEP_NONE
         inflateTooltip(R.layout.taskbar_edu_features)
-        tooltip?.apply {
-            findViewById<LottieAnimationView>(R.id.splitscreen_animation).supportLightTheme()
-            findViewById<LottieAnimationView>(R.id.suggestions_animation).supportLightTheme()
+        tooltip?.run {
+            val splitscreenAnim = findViewById<LottieAnimationView>(R.id.splitscreen_animation)
+            val suggestionsAnim = findViewById<LottieAnimationView>(R.id.suggestions_animation)
+            val settingsAnim = findViewById<LottieAnimationView>(R.id.settings_animation)
+            val settingsEdu = findViewById<View>(R.id.settings_edu)
+            splitscreenAnim.supportLightTheme()
+            suggestionsAnim.supportLightTheme()
+            settingsAnim.supportLightTheme()
+            if (DisplayController.isTransientTaskbar(activityContext)) {
+                splitscreenAnim.setAnimation(R.raw.taskbar_edu_splitscreen_transient)
+                suggestionsAnim.setAnimation(R.raw.taskbar_edu_suggestions_transient)
+                settingsEdu.visibility = GONE
+            } else {
+                splitscreenAnim.setAnimation(R.raw.taskbar_edu_splitscreen_persistent)
+                suggestionsAnim.setAnimation(R.raw.taskbar_edu_suggestions_persistent)
+                settingsEdu.visibility = VISIBLE
+            }
 
             findViewById<View>(R.id.done_button)?.setOnClickListener { hide() }
             if (DisplayController.isTransientTaskbar(activityContext)) {

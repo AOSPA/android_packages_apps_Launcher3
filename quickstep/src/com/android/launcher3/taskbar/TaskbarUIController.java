@@ -29,8 +29,10 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SplitConfigurationOptions;
+import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
+import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
 import com.android.systemui.shared.recents.model.Task;
 
 import java.io.PrintWriter;
@@ -195,25 +197,43 @@ public class TaskbarUIController {
                 (Consumer<Task>) foundTask -> {
                     if (foundTask != null) {
                         TaskView foundTaskView = recents.getTaskViewByTaskId(foundTask.key.id);
-                        // There is already a running app of this type, use that as second app.
-                        recents.confirmSplitSelect(
-                                foundTaskView,
-                                foundTaskView.getTask(),
-                                foundTaskView.getIconView().getDrawable(),
-                                foundTaskView.getThumbnail(),
-                                foundTaskView.getThumbnail().getThumbnail(),
-                                null /* intent */);
-                    } else {
-                        // No running app of that type, create a new instance as second app.
-                        recents.confirmSplitSelect(
-                                null /* containerTaskView */,
-                                null /* task */,
-                                new BitmapDrawable(info.bitmap.icon),
-                                startingView,
-                                null /* thumbnail */,
-                                intent);
+                        // TODO (b/266482558): This additional null check is needed because there
+                        // are times when our Tasks list doesn't match our TaskViews list (like when
+                        // a tile is removed during {@link RecentsView#applyLoadPlan()}. A clearer
+                        // state management system is in the works so that we don't need to rely on
+                        // null checks as much. See comments at ag/21152798.
+                        if (foundTaskView != null) {
+                            // There is already a running app of this type, use that as second app.
+                            // Get index of task (0 or 1), in case it's a GroupedTaskView
+                            TaskIdAttributeContainer taskAttributes =
+                                    foundTaskView.getTaskAttributesById(foundTask.key.id);
+                            recents.confirmSplitSelect(
+                                    foundTaskView,
+                                    foundTask,
+                                    taskAttributes.getIconView().getDrawable(),
+                                    taskAttributes.getThumbnailView(),
+                                    taskAttributes.getThumbnailView().getThumbnail(),
+                                    null /* intent */);
+                            return;
+                        }
                     }
+
+                    // No running app of that type, create a new instance as second app.
+                    recents.confirmSplitSelect(
+                            null /* containerTaskView */,
+                            null /* task */,
+                            new BitmapDrawable(info.bitmap.icon),
+                            startingView,
+                            null /* thumbnail */,
+                            intent);
                 }
         );
     }
+
+    /**
+     * Launches the focused task in splitscreen.
+     *
+     * No-op if the view is not yet open.
+     */
+    public void launchSplitTasks(View taskview, GroupTask groupTask) { }
 }
