@@ -19,13 +19,13 @@ import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.Utilities.squaredHypot;
+import static com.android.launcher3.anim.AnimatedFloat.VALUE;
 import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
 import static com.android.launcher3.taskbar.TaskbarManager.isPhoneMode;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_NEGATIVE;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
-import static com.android.quickstep.AnimatedFloat.VALUE;
 
 import android.annotation.NonNull;
 import android.graphics.Rect;
@@ -45,6 +45,7 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AlphaUpdateListener;
+import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
@@ -59,7 +60,6 @@ import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
-import com.android.quickstep.AnimatedFloat;
 
 import java.io.PrintWriter;
 import java.util.function.Predicate;
@@ -401,8 +401,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 // Note that there is no All Apps button in the hotseat, this position is only used
                 // as its convenient for animation purposes.
                 positionInHotseat = Utilities.isRtl(child.getResources())
-                        ? -1
-                        : taskbarDp.numShownHotseatIcons;
+                        ? taskbarDp.numShownHotseatIcons
+                        : -1;
             } else if (child.getTag() instanceof ItemInfo) {
                 positionInHotseat = ((ItemInfo) child.getTag()).screenId;
             } else {
@@ -428,8 +428,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     }
 
     public void onRotationChanged(DeviceProfile deviceProfile) {
-        if (mControllers.taskbarStashController.isInApp()) {
-            // We only translate on rotation when on home
+        if (!mControllers.uiController.isIconAlignedWithHotseat()) {
+            // We only translate on rotation when icon is aligned with hotseat
             return;
         }
         mActivity.setTaskbarWindowHeight(

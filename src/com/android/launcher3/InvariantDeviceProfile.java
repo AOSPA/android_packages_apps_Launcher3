@@ -206,6 +206,8 @@ public class InvariantDeviceProfile {
         if (!newGridName.equals(gridName)) {
             LauncherPrefs.getPrefs(context).edit().putString(KEY_IDP_GRID_NAME, newGridName)
                     .apply();
+            Log.d("b/258560494", "InvariantDeviceProfile - setting newGridName: " + newGridName
+                    + ", gridName: " + gridName);
         }
         new DeviceGridState(this).writeToPrefs(context);
 
@@ -400,7 +402,7 @@ public class InvariantDeviceProfile {
         SparseArray<DotRenderer> dotRendererCache = new SparseArray<>();
         for (WindowBounds bounds : displayInfo.supportedBounds) {
             localSupportedProfiles.add(new DeviceProfile.Builder(context, this, displayInfo)
-                    .setUseTwoPanels(deviceType == TYPE_MULTI_DISPLAY)
+                    .setIsMultiDisplay(deviceType == TYPE_MULTI_DISPLAY)
                     .setWindowBounds(bounds)
                     .setDotRendererCache(dotRendererCache)
                     .build());
@@ -422,6 +424,21 @@ public class InvariantDeviceProfile {
         }
         supportedProfiles = Collections.unmodifiableList(localSupportedProfiles);
 
+        int numMinShownHotseatIconsForTablet = supportedProfiles
+                .stream()
+                .filter(deviceProfile -> deviceProfile.isTablet)
+                .mapToInt(deviceProfile -> deviceProfile.numShownHotseatIcons)
+                .min()
+                .orElse(0);
+
+        supportedProfiles
+                .stream()
+                .filter(deviceProfile -> deviceProfile.isTablet)
+                .forEach(deviceProfile -> {
+                    deviceProfile.numShownHotseatIcons = numMinShownHotseatIconsForTablet;
+                    deviceProfile.recalculateHotseatWidthAndBorderSpace();
+                });
+
         ComponentName cn = new ComponentName(context.getPackageName(), getClass().getName());
         defaultWidgetPadding = AppWidgetHostView.getDefaultPaddingForWidget(context, cn, null);
     }
@@ -438,6 +455,7 @@ public class InvariantDeviceProfile {
     public void setCurrentGrid(Context context, String gridName) {
         Context appContext = context.getApplicationContext();
         LauncherPrefs.getPrefs(appContext).edit().putString(KEY_IDP_GRID_NAME, gridName).apply();
+        Log.d("b/258560494", "setCurrentGrid: " + gridName);
         MAIN_EXECUTOR.execute(() -> onConfigChanged(appContext));
     }
 
@@ -502,6 +520,10 @@ public class InvariantDeviceProfile {
             }
         }
         if (filteredProfiles.isEmpty()) {
+            if (gridName != null) {
+                Log.d("b/258560494", "No matching grid from for gridName: " + gridName
+                        + ", deviceType: " + deviceType);
+            }
             // No grid found, use the default options
             for (DisplayOption option : profiles) {
                 if (option.canBeDefault) {
@@ -799,10 +821,8 @@ public class InvariantDeviceProfile {
                     R.styleable.GridDisplayOption_numSearchContainerColumns, numColumns);
 
             dbFile = a.getString(R.styleable.GridDisplayOption_dbFile);
-            defaultLayoutId = a.getResourceId(deviceType == TYPE_MULTI_DISPLAY && a.hasValue(
-                    R.styleable.GridDisplayOption_defaultSplitDisplayLayoutId)
-                    ? R.styleable.GridDisplayOption_defaultSplitDisplayLayoutId
-                    : R.styleable.GridDisplayOption_defaultLayoutId, 0);
+            defaultLayoutId = a.getResourceId(
+                    R.styleable.GridDisplayOption_defaultLayoutId, 0);
             demoModeLayoutId = a.getResourceId(
                     R.styleable.GridDisplayOption_demoModeLayoutId, defaultLayoutId);
 

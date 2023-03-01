@@ -34,6 +34,8 @@ import android.content.Context;
 import android.graphics.Color;
 import android.view.animation.Interpolator;
 
+import androidx.annotation.FloatRange;
+
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.states.HintState;
@@ -41,6 +43,7 @@ import com.android.launcher3.states.SpringLoadedState;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.uioverrides.states.AllAppsState;
 import com.android.launcher3.uioverrides.states.OverviewState;
+import com.android.launcher3.views.ActivityContext;
 
 import java.util.Arrays;
 
@@ -261,7 +264,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
      *
      * 0 means completely zoomed in, without blurs. 1 is zoomed out, with blurs.
      */
-    public final  <DEVICE_PROFILE_CONTEXT extends Context & DeviceProfile.DeviceProfileListenable>
+    public final  <DEVICE_PROFILE_CONTEXT extends Context & ActivityContext>
             float getDepth(DEVICE_PROFILE_CONTEXT context) {
         return getDepth(context,
                 BaseDraggingActivity.fromContext(context).getDeviceProfile().isMultiWindowMode);
@@ -272,7 +275,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
      *
      * @see #getDepth(Context).
      */
-    public final <DEVICE_PROFILE_CONTEXT extends Context & DeviceProfile.DeviceProfileListenable>
+    public final <DEVICE_PROFILE_CONTEXT extends Context & ActivityContext>
             float getDepth(DEVICE_PROFILE_CONTEXT context, boolean isMultiWindowMode) {
         if (isMultiWindowMode) {
             return 0;
@@ -280,7 +283,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
         return getDepthUnchecked(context);
     }
 
-    protected <DEVICE_PROFILE_CONTEXT extends Context & DeviceProfile.DeviceProfileListenable>
+    protected <DEVICE_PROFILE_CONTEXT extends Context & ActivityContext>
             float getDepthUnchecked(DEVICE_PROFILE_CONTEXT context) {
         return 0f;
     }
@@ -339,6 +342,27 @@ public abstract class LauncherState implements BaseState<LauncherState> {
             LauncherState lastState = lsm.getLastState();
             lsm.goToState(lastState);
         }
+    }
+
+    /**
+     * Find {@link StateManager} and target {@link LauncherState} to handle back progress in
+     * predictive back gesture.
+     */
+    public void onBackProgressed(
+            Launcher launcher, @FloatRange(from = 0.0, to = 1.0) float backProgress) {
+        StateManager<LauncherState> lsm = launcher.getStateManager();
+        LauncherState toState = lsm.getLastState();
+        lsm.onBackProgressed(toState, backProgress);
+    }
+
+    /**
+     * Find {@link StateManager} and target {@link LauncherState} to handle backProgress in
+     * predictive back gesture.
+     */
+    public void onBackCancelled(Launcher launcher) {
+        StateManager<LauncherState> lsm = launcher.getStateManager();
+        LauncherState toState = lsm.getLastState();
+        lsm.onBackCancelled(toState);
     }
 
     public static abstract class PageAlphaProvider {

@@ -53,6 +53,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.states.RotationHelper;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
+import com.android.launcher3.util.DisplayController;
 
 import java.util.Collections;
 import java.util.List;
@@ -92,7 +93,8 @@ public class SettingsActivity extends FragmentActivity
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         Intent intent = getIntent();
-        if (intent.hasExtra(EXTRA_FRAGMENT) || intent.hasExtra(EXTRA_FRAGMENT_ARGS)) {
+        if (intent.hasExtra(EXTRA_FRAGMENT) || intent.hasExtra(EXTRA_FRAGMENT_ARGS)
+                || intent.hasExtra(EXTRA_FRAGMENT_ARG_KEY)) {
             getActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
@@ -267,15 +269,14 @@ public class SettingsActivity extends FragmentActivity
                     return !WidgetsModel.GO_DISABLE_NOTIFICATION_DOTS;
 
                 case ALLOW_ROTATION_PREFERENCE_KEY:
-                    DeviceProfile deviceProfile = InvariantDeviceProfile.INSTANCE.get(
-                            getContext()).getDeviceProfile(getContext());
-                    if (deviceProfile.isTablet) {
+                    DisplayController.Info info =
+                            DisplayController.INSTANCE.get(getContext()).getInfo();
+                    if (info.isTablet(info.realBounds)) {
                         // Launcher supports rotation by default. No need to show this setting.
                         return false;
                     }
                     // Initialize the UI once
-                    preference.setDefaultValue(
-                            RotationHelper.getAllowRotationDefaultValue(deviceProfile));
+                    preference.setDefaultValue(RotationHelper.getAllowRotationDefaultValue(info));
                     return true;
 
                 case FLAGS_PREFERENCE_KEY:

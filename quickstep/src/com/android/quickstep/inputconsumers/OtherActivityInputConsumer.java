@@ -236,7 +236,8 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
                 if (!mPassedPilferInputSlop) {
                     // Cancel interaction in case of multi-touch interaction
                     int ptrIdx = ev.getActionIndex();
-                    if (!mRotationTouchHelper.isInSwipeUpTouchRegion(ev, ptrIdx)) {
+                    if (!mRotationTouchHelper.isInSwipeUpTouchRegion(ev, ptrIdx,
+                            mActivityInterface)) {
                         forceCancelGesture(ev);
                     }
                 }
@@ -391,17 +392,18 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
             } else {
                 mVelocityTracker.computeCurrentVelocity(PX_PER_MS);
                 int activePointerId = mMotionEventsHandler.getActivePointerId();
-                float velocityX = getXVelocity(mVelocityTracker, ev, activePointerId);
-                float velocityY = getYVelocity(mVelocityTracker, ev, activePointerId);
-                float velocity = mNavBarPosition.isRightEdge()
-                        ? velocityX
+                float velocityXPxPerMs = getXVelocity(mVelocityTracker, ev, activePointerId);
+                float velocityYPxPerMs = getYVelocity(mVelocityTracker, ev, activePointerId);
+                float velocityPxPerMs = mNavBarPosition.isRightEdge()
+                        ? velocityXPxPerMs
                         : mNavBarPosition.isLeftEdge()
-                                ? -velocityX
-                                : velocityY;
+                                ? -velocityXPxPerMs
+                                : velocityYPxPerMs;
                 mInteractionHandler.updateDisplacement(
                         mMotionEventsHandler.getDisplacement(ev, mNavBarPosition)
                                 - mStartDisplacement);
-                mInteractionHandler.onGestureEnded(velocity, new PointF(velocityX, velocityY));
+                mInteractionHandler.onGestureEnded(
+                        velocityPxPerMs, new PointF(velocityXPxPerMs, velocityYPxPerMs));
             }
         } else {
             // Since we start touch tracking on DOWN, we may reach this state without actually

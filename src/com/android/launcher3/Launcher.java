@@ -43,7 +43,6 @@ import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.accessibility.LauncherAccessibilityDelegate.getSupportedActions;
 import static com.android.launcher3.anim.Interpolators.EMPHASIZED;
-import static com.android.launcher3.config.FeatureFlags.SHOW_DELIGHTFUL_PAGINATION;
 import static com.android.launcher3.config.FeatureFlags.SHOW_DOT_PAGINATION;
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
@@ -88,6 +87,7 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
@@ -121,6 +121,7 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.CallSuper;
+import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
@@ -1276,12 +1277,19 @@ public class Launcher extends StatefulActivity<LauncherState>
         // Setup the drag controller (drop targets have to be added in reverse order in priority)
         mDropTargetBar.setup(mDragController);
         mAllAppsController.setupViews(mScrimView, mAppsView);
+
+        if (SHOW_DOT_PAGINATION.get()) {
+            mWorkspace.getPageIndicator().setShouldAutoHide(true);
+            mWorkspace.getPageIndicator().setPaintColor(
+                    Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText)
+                            ? Color.BLACK
+                            : Color.WHITE);
+        }
     }
 
     @Override
     public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
-        if ((SHOW_DOT_PAGINATION.get() || SHOW_DELIGHTFUL_PAGINATION.get())
-                && WorkspacePageIndicator.class.getName().equals(name)) {
+        if (SHOW_DOT_PAGINATION.get() && WorkspacePageIndicator.class.getName().equals(name)) {
             return LayoutInflater.from(context).inflate(R.layout.page_indicator_dots,
                     (ViewGroup) parent, false);
         }
@@ -1550,8 +1558,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     protected LauncherWidgetHolder createAppWidgetHolder() {
-        return new LauncherWidgetHolder(this,
-                appWidgetId -> getWorkspace().removeWidget(appWidgetId));
+        return LauncherWidgetHolder.HolderFactory.newFactory(this).newInstance(
+                this, appWidgetId -> getWorkspace().removeWidget(appWidgetId));
     }
 
     public LauncherModel getModel() {
@@ -2065,6 +2073,14 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     protected void onStateBack() {
         mStateManager.getState().onBackPressed(this);
+    }
+
+    protected void onBackProgressed(@FloatRange(from = 0.0, to = 1.0) float backProgress) {
+        mStateManager.getState().onBackProgressed(this, backProgress);
+    }
+
+    protected void onBackCancelled() {
+        mStateManager.getState().onBackCancelled(this);
     }
 
     protected void onScreenOff() {
@@ -3318,5 +3334,13 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
             return false; // Return false to continue iterating through all the items.
         });
+    }
+
+    /**
+     * Returns {@code true} if there are visible tasks with windowing mode set to
+     * {@link android.app.WindowConfiguration#WINDOWING_MODE_FREEFORM}
+     */
+    public boolean areFreeformTasksVisible() {
+        return false; // Base launcher does not track freeform tasks
     }
 }

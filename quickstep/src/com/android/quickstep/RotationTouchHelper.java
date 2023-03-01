@@ -232,23 +232,33 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
     /**
      * @return whether the coordinates of the {@param event} is in the swipe up gesture region.
      */
-    public boolean isInSwipeUpTouchRegion(MotionEvent event) {
-        if (isTrackpadMotionEvent(event)) {
+    public boolean isInSwipeUpTouchRegion(MotionEvent event, BaseActivityInterface activity) {
+        boolean inBarArea = mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(),
+                event.getY());
+        if (inBarArea) {
             return true;
         }
-        return mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(), event.getY());
+        if (isTrackpadMotionEvent(event)) {
+            return !activity.isResumed();
+        }
+        return false;
     }
 
     /**
      * @return whether the coordinates of the {@param event} with the given {@param pointerIndex}
      *         is in the swipe up gesture region.
      */
-    public boolean isInSwipeUpTouchRegion(MotionEvent event, int pointerIndex) {
-        if (isTrackpadMotionEvent(event)) {
+    public boolean isInSwipeUpTouchRegion(MotionEvent event, int pointerIndex,
+            BaseActivityInterface activity) {
+        boolean inBarArea = mOrientationTouchTransformer.touchInValidSwipeRegions(
+                event.getX(pointerIndex), event.getY(pointerIndex));
+        if (inBarArea) {
             return true;
         }
-        return mOrientationTouchTransformer.touchInValidSwipeRegions(event.getX(pointerIndex),
-                event.getY(pointerIndex));
+        if (isTrackpadMotionEvent(event)) {
+            return !activity.isResumed();
+        }
+        return false;
     }
 
     @Override
@@ -328,9 +338,9 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
         if (enable && !mInOverview && !TestProtocol.sDisableSensorRotation) {
             // Clear any previous state from sensor manager
             mSensorRotation = mCurrentAppRotation;
-            mOrientationListener.enable();
+            UI_HELPER_EXECUTOR.execute(mOrientationListener::enable);
         } else {
-            mOrientationListener.disable();
+            UI_HELPER_EXECUTOR.execute(mOrientationListener::disable);
         }
     }
 

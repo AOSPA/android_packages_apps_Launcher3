@@ -62,6 +62,7 @@ import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.accessibility.AccessibleDragListenerAdapter;
 import com.android.launcher3.accessibility.WorkspaceAccessibilityHelper;
@@ -161,7 +162,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     protected ShortcutAndWidgetContainer mDragSourceInternal;
 
-    @Thunk final IntSparseArrayMap<CellLayout> mWorkspaceScreens = new IntSparseArrayMap<>();
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @Thunk public final IntSparseArrayMap<CellLayout> mWorkspaceScreens = new IntSparseArrayMap<>();
+
     @Thunk final IntArray mScreenOrder = new IntArray();
 
     @Thunk boolean mDeferRemoveExtraEmptyScreen = false;
@@ -1754,7 +1757,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     boolean willCreateUserFolder(ItemInfo info, View dropOverView, boolean considerTimeout) {
         if (dropOverView != null) {
             CellLayoutLayoutParams lp = (CellLayoutLayoutParams) dropOverView.getLayoutParams();
-            if (lp.useTmpCoords && (lp.tmpCellX != lp.cellX || lp.tmpCellY != lp.cellY)) {
+            if (lp.useTmpCoords && (lp.getTmpCellX() != lp.getCellX()
+                    || lp.getTmpCellY() != lp.getCellY())) {
                 return false;
             }
         }
@@ -1789,7 +1793,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     boolean willAddToExistingUserFolder(ItemInfo dragInfo, View dropOverView) {
         if (dropOverView != null) {
             CellLayoutLayoutParams lp = (CellLayoutLayoutParams) dropOverView.getLayoutParams();
-            if (lp.useTmpCoords && (lp.tmpCellX != lp.cellX || lp.tmpCellY != lp.cellY)) {
+            if (lp.useTmpCoords && (lp.getTmpCellX() != lp.getCellX()
+                    || lp.getTmpCellY() != lp.getCellY())) {
                 return false;
             }
         }
@@ -2006,8 +2011,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
                     // update the item's position after drop
                     CellLayoutLayoutParams lp = (CellLayoutLayoutParams) cell.getLayoutParams();
-                    lp.cellX = lp.tmpCellX = mTargetCell[0];
-                    lp.cellY = lp.tmpCellY = mTargetCell[1];
+                    lp.setTmpCellX(mTargetCell[0]);
+                    lp.setCellX(mTargetCell[0]);
+                    lp.setTmpCellY(mTargetCell[1]);
+                    lp.setCellY(mTargetCell[1]);
                     lp.cellHSpan = item.spanX;
                     lp.cellVSpan = item.spanY;
                     lp.isLockedToGrid = true;
@@ -2021,7 +2028,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                                 (LauncherAppWidgetHostView) cell, dropTargetLayout);
                     }
                     mLauncher.getModelWriter().modifyItemInDatabase(info, container, screenId,
-                            lp.cellX, lp.cellY, item.spanX, item.spanY);
+                            lp.getCellX(), lp.getCellY(), item.spanX, item.spanY);
                 } else {
                     if (!returnToOriginalCellToPreventShuffling) {
                         onNoCellFound(dropTargetLayout, d.dragInfo, d.logInstanceId);
@@ -2032,8 +2039,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
                     // If we can't find a drop location, we return the item to its original position
                     CellLayoutLayoutParams lp = (CellLayoutLayoutParams) cell.getLayoutParams();
-                    mTargetCell[0] = lp.cellX;
-                    mTargetCell[1] = lp.cellY;
+                    mTargetCell[0] = lp.getCellX();
+                    mTargetCell[1] = lp.getCellY();
                     CellLayout layout = (CellLayout) cell.getParent().getParent();
                     layout.markCellsAsOccupiedForView(cell);
                 }

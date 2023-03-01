@@ -21,6 +21,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 
+import androidx.annotation.Px;
 import androidx.core.view.accessibility.AccessibilityEventCompat;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import androidx.core.view.accessibility.AccessibilityRecordCompat;
@@ -144,6 +145,19 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
         }
 
         /**
+         * We need to extend all apps' RecyclerView's bottom by 5% of view height to ensure extra
+         * roll(s) of app icons is rendered at the bottom, so that they can fill the bottom gap
+         * created during predictive back's scale animation from all apps to home.
+         */
+        @Override
+        protected void calculateExtraLayoutSpace(RecyclerView.State state, int[] extraLayoutSpace) {
+            super.calculateExtraLayoutSpace(state, extraLayoutSpace);
+            @Px int extraSpacePx = (int) (getHeight()
+                    * (1 - AllAppsTransitionController.SWIPE_ALL_APPS_TO_HOME_MIN_SCALE) / 2);
+            extraLayoutSpace[1] = Math.max(extraLayoutSpace[1], extraSpacePx);
+        }
+
+        /**
          * Returns the number of rows before {@param adapterPosition}, including this position
          * which should not be counted towards the collection info.
          */
@@ -203,8 +217,12 @@ public class AllAppsGridAdapter<T extends Context & ActivityContext> extends
 
         @Override
         public int getSpanSize(int position) {
-            int viewType = mApps.getAdapterItems().get(position).viewType;
             int totalSpans = mGridLayoutMgr.getSpanCount();
+            List<AdapterItem> items = mApps.getAdapterItems();
+            if (position >= items.size()) {
+                return totalSpans;
+            }
+            int viewType = items.get(position).viewType;
             if (isIconViewType(viewType)) {
                 return totalSpans / mAppsPerRow;
             } else {

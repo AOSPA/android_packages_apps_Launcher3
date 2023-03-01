@@ -92,6 +92,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_HIDE_HEADER = new DeviceFlag("ENABLE_HIDE_HEADER",
             true, "Hide header on keyboard before typing in all apps");
 
+    public static final BooleanFlag ENABLE_EXPANDING_PAUSE_WORK_BUTTON = new DeviceFlag(
+            "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", false,
+            "Expand and collapse pause work button while scrolling");
+
     public static final BooleanFlag ENABLE_HIDE_HEADER_STATIC = new DeviceFlag(
             "ENABLE_HIDE_HEADER_STATIC", false, "Hide keyboard suggestion strip");
 
@@ -247,7 +251,7 @@ public final class FeatureFlags {
             "Enable initiating split screen from workspace.");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_FULLSCREEN_WITH_KEYBOARD_SHORTCUTS =
-            getDebugFlag("ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", false,
+            getDebugFlag("ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", true,
                     "Enable splitting from fullscreen app with keyboard shortcuts");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE = getDebugFlag(
@@ -268,6 +272,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES = new DeviceFlag(
             "ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES", false,
             "Enable option to replace decorator-based search result backgrounds with drawables");
+
+    public static final BooleanFlag ENABLE_SEARCH_RESULT_LAUNCH_TRANSITION = new DeviceFlag(
+            "ENABLE_SEARCH_RESULT_LAUNCH_TRANSITION", false,
+            "Enable option to launch search results using the new standardized transitions");
 
     public static final BooleanFlag TWO_PREDICTED_ROWS_ALL_APPS_SEARCH = new DeviceFlag(
             "TWO_PREDICTED_ROWS_ALL_APPS_SEARCH", false,
@@ -307,14 +315,14 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_WIDGET_PICKER_DEPTH = new DeviceFlag(
             "ENABLE_WIDGET_PICKER_DEPTH", true, "Enable changing depth in widget picker.");
 
+    public static final BooleanFlag ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH = getDebugFlag(
+            "ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH", false,
+            "Allow bottom sheet depth to be smaller than 1 for multi-display devices.");
+
     public static final BooleanFlag SCROLL_TOP_TO_RESET = new DeviceFlag(
-            "SCROLL_TOP_TO_RESET", false, "Bring up IME and focus on "
+            "SCROLL_TOP_TO_RESET", true, "Bring up IME and focus on "
             + "input when scroll to top if 'Always show keyboard' is enabled or in prefix state");
 
-    public static final BooleanFlag SHOW_DELIGHTFUL_PAGINATION = getDebugFlag(
-            "SHOW_DELIGHTFUL_PAGINATION", false,
-            "Enable showing the new 'delightful pagination' which is a brand"
-                    + " new animation for folder pagination and workspace pagination");
     public static final BooleanFlag POPUP_MATERIAL_U = new DeviceFlag(
             "POPUP_MATERIAL_U", false, "Switch popup UX to use material U");
 
@@ -326,8 +334,8 @@ public final class FeatureFlags {
             "HOME_GARDENING_WORKSPACE_BUTTONS", false,
             "Change workspace edit buttons to reflect home gardening");
 
-    public static final BooleanFlag ENABLE_DOWNLOAD_APP_UX_V2 = getDebugFlag(
-            "ENABLE_DOWNLOAD_APP_UX_V2", false, "Updates the download app UX"
+    public static final BooleanFlag ENABLE_DOWNLOAD_APP_UX_V2 = new DeviceFlag(
+            "ENABLE_DOWNLOAD_APP_UX_V2", true, "Updates the download app UX"
                     + " to have better visuals");
 
     public static final BooleanFlag ENABLE_TASKBAR_REVISED_THRESHOLDS = getDebugFlag(
@@ -338,8 +346,12 @@ public final class FeatureFlags {
             "FORCE_PERSISTENT_TASKBAR", false, "Forces taskbar to be persistent, even in gesture"
                     + " nav mode and when transient taskbar is enabled.");
 
+    public static final BooleanFlag FOLDABLE_SINGLE_PAGE = getDebugFlag(
+            "FOLDABLE_SINGLE_PAGE", false,
+            "Use a single page for the workspace");
+
     public static final BooleanFlag ENABLE_TRANSIENT_TASKBAR = getDebugFlag(
-            "ENABLE_TRANSIENT_TASKBAR", false, "Enables transient taskbar.");
+            "ENABLE_TRANSIENT_TASKBAR", true, "Enables transient taskbar.");
 
     public static final BooleanFlag ENABLE_TRACKPAD_GESTURE = getDebugFlag(
             "ENABLE_TRACKPAD_GESTURE", false, "Enables trackpad gesture.");
@@ -355,14 +367,11 @@ public final class FeatureFlags {
             "ENABLE_NEW_GESTURE_NAV_TUTORIAL", false,
             "Enable the redesigned gesture navigation tutorial");
 
-    public static final BooleanFlag ENABLE_TOAST_IMPRESSION_LOGGING = getDebugFlag(
-            "ENABLE_TOAST_IMPRESSION_LOGGING", false, "Enable toast impression logging");
-
     public static final BooleanFlag ENABLE_DEVICE_PROFILE_LOGGING = new DeviceFlag(
             "ENABLE_DEVICE_PROFILE_LOGGING", false, "Allows DeviceProfile logging");
 
     public static final BooleanFlag ENABLE_LAUNCH_FROM_STAGED_APP = getDebugFlag(
-            "ENABLE_LAUNCH_FROM_STAGED_APP", false,
+            "ENABLE_LAUNCH_FROM_STAGED_APP", true,
             "Enable the ability to tap a staged app during split select to launch it in full screen"
     );
 
@@ -370,6 +379,14 @@ public final class FeatureFlags {
             "ENABLE_FORCED_MONO_ICON", false,
             "Enable the ability to generate monochromatic icons, if it is not provided by the app"
     );
+
+    public static final BooleanFlag ENABLE_TASKBAR_EDU_TOOLTIP = getDebugFlag(
+            "ENABLE_TASKBAR_EDU_TOOLTIP", false,
+            "Enable the tooltip version of the Taskbar education flow.");
+
+    public static final BooleanFlag ENABLE_MULTI_INSTANCE = getDebugFlag(
+            "ENABLE_MULTI_INSTANCE", false,
+            "Enables creation and filtering of multiple task instances in overview");
 
     public static void initialize(Context context) {
         synchronized (sDebugFlags) {

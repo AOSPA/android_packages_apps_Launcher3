@@ -1471,19 +1471,22 @@ public final class LauncherInstrumentation {
         return getRealDisplaySize().x - getWindowInsets().right - 1;
     }
 
-    void clickObject(UiObject2 object) {
-        waitForObjectEnabled(object, "clickObject");
-        if (!isLauncher3() && getNavigationModel() != NavigationModel.THREE_BUTTON) {
-            expectEvent(TestProtocol.SEQUENCE_TIS, LauncherInstrumentation.EVENT_TOUCH_DOWN_TIS);
-            expectEvent(TestProtocol.SEQUENCE_TIS, LauncherInstrumentation.EVENT_TOUCH_UP_TIS);
-        }
-        object.click();
+    /**
+     * Click on the ui object right away without waiting for animation.
+     *
+     * [UiObject2.click] would wait for all animations finished before clicking. Not waiting for
+     * animations because in some scenarios there is a playing animations when the click is
+     * attempted.
+     */
+    void clickObject(UiObject2 uiObject, GestureScope gestureScope) {
+        final long clickTime = SystemClock.uptimeMillis();
+        final Point center = uiObject.getVisibleCenter();
+        sendPointer(clickTime, clickTime, MotionEvent.ACTION_DOWN, center, gestureScope);
+        sendPointer(clickTime, clickTime, MotionEvent.ACTION_UP, center, gestureScope);
     }
 
     void clickLauncherObject(UiObject2 object) {
-        expectEvent(TestProtocol.SEQUENCE_MAIN, LauncherInstrumentation.EVENT_TOUCH_DOWN);
-        expectEvent(TestProtocol.SEQUENCE_MAIN, LauncherInstrumentation.EVENT_TOUCH_UP);
-        clickObject(object);
+        clickObject(object, GestureScope.INSIDE);
     }
 
     void scrollToLastVisibleRow(
@@ -1851,6 +1854,14 @@ public final class LauncherInstrumentation {
      */
     public void useTestWorkspaceLayoutOnReload() {
         getTestInfo(TestProtocol.REQUEST_USE_TEST_WORKSPACE_LAYOUT);
+    }
+
+    /**
+     * Reloads the workspace with a test layout that includes Maps/Play on workspace, and
+     * Dialer/Messaging/Chrome/Camera on hotseat.
+     */
+    public void useTest2WorkspaceLayoutOnReload() {
+        getTestInfo(TestProtocol.REQUEST_USE_TEST2_WORKSPACE_LAYOUT);
     }
 
     /** Reloads the workspace with the default layout defined by the user's grid size selection. */

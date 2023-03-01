@@ -59,10 +59,14 @@ import java.util.function.Consumer;
 // TODO(b/249371338): TaskView needs to be refactored to have better support for N tasks.
 public class DesktopTaskView extends TaskView {
 
+    /** Flag to indicate whether desktop windowing proto 2 is enabled */
+    public static final boolean DESKTOP_IS_PROTO2_ENABLED = SystemProperties.getBoolean(
+            "persist.wm.debug.desktop_mode_2", false);
+
     /** Flags to indicate whether desktop mode is available on the device */
     public static final boolean DESKTOP_MODE_SUPPORTED =
             SystemProperties.getBoolean("persist.wm.debug.desktop_mode", false)
-                    || SystemProperties.getBoolean("persist.wm.debug.desktop_mode_2", false);
+                    || DESKTOP_IS_PROTO2_ENABLED;
 
     private static final String TAG = DesktopTaskView.class.getSimpleName();
 
@@ -76,6 +80,8 @@ public class DesktopTaskView extends TaskView {
     private final SparseArray<TaskThumbnailView> mSnapshotViewMap = new SparseArray<>();
 
     private final ArrayList<CancellableTask<?>> mPendingThumbnailRequests = new ArrayList<>();
+
+    private ShapeDrawable mBackground;
 
     public DesktopTaskView(Context context) {
         this(context, null);
@@ -95,10 +101,11 @@ public class DesktopTaskView extends TaskView {
         float[] outerRadii = new float[8];
         Arrays.fill(outerRadii, getTaskCornerRadius());
         RoundRectShape shape = new RoundRectShape(outerRadii, null, null);
-        ShapeDrawable background = new ShapeDrawable(shape);
-        background.setTint(getResources().getColor(android.R.color.system_neutral2_300));
+        mBackground = new ShapeDrawable(shape);
+        mBackground.setTint(getResources().getColor(android.R.color.system_neutral2_300,
+                getContext().getTheme()));
         // TODO(b/244348395): this should be wallpaper
-        setBackground(background);
+        setBackground(mBackground);
 
         mSnapshotViews.add(mSnapshotView);
     }
@@ -423,6 +430,12 @@ public class DesktopTaskView extends TaskView {
         // TODO(b/249371338): this copies parent implementation and makes it work for N thumbs
         progress = Utilities.boundToRange(progress, 0, 1);
         mFullscreenProgress = progress;
+        if (mFullscreenProgress > 0) {
+            // Don't show background while we are transitioning to/from fullscreen
+            setBackground(null);
+        } else {
+            setBackground(mBackground);
+        }
         for (int i = 0; i < mSnapshotViewMap.size(); i++) {
             TaskThumbnailView thumbnailView = mSnapshotViewMap.valueAt(i);
             thumbnailView.getTaskOverlay().setFullscreenProgress(progress);
