@@ -25,6 +25,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import android.content.Intent;
@@ -33,10 +34,12 @@ import android.platform.test.annotations.IwTest;
 
 import androidx.test.filters.FlakyTest;
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.tapl.AllApps;
 import com.android.launcher3.tapl.AppIcon;
@@ -52,11 +55,13 @@ import com.android.launcher3.tapl.Widgets;
 import com.android.launcher3.tapl.Workspace;
 import com.android.launcher3.util.TestUtil;
 import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
+import com.android.launcher3.util.rule.TISBindRule;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
 import com.android.launcher3.widget.picker.WidgetsRecyclerView;
 
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -71,6 +76,11 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     private static final String MAPS_APP_NAME = "Maps";
     private static final String STORE_APP_NAME = "Play Store";
     private static final String GMAIL_APP_NAME = "Gmail";
+    private static final String READ_DEVICE_CONFIG_PERMISSION =
+            "android.permission.READ_DEVICE_CONFIG";
+
+    @Rule
+    public TISBindRule mTISBindRule = new TISBindRule();
 
     @Before
     public void setUp() throws Exception {
@@ -215,7 +225,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
                 false /* tapRight */);
     }
 
-    @IwTest(focusArea="launcher")
+    @IwTest(focusArea = "launcher")
     @Test
     @ScreenRecord // b/202433017
     public void testWorkspace() throws Exception {
@@ -342,7 +352,7 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
         }
     }
 
-    @IwTest(focusArea="launcher")
+    @IwTest(focusArea = "launcher")
     @Test
     @PortraitLandscape
     @ScreenRecord // b/256898879
@@ -435,11 +445,13 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @Test
     @PortraitLandscape
     public void testPressBack() throws Exception {
+        InstrumentationRegistry.getInstrumentation().getUiAutomation().adoptShellPermissionIdentity(
+                READ_DEVICE_CONFIG_PERMISSION);
+        assumeFalse(FeatureFlags.ENABLE_BACK_SWIPE_LAUNCHER_ANIMATION.get());
         mLauncher.getWorkspace().switchToAllApps();
         mLauncher.pressBack();
         mLauncher.getWorkspace();
         waitForState("Launcher internal state didn't switch to Home", () -> LauncherState.NORMAL);
-
         startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));
         mLauncher.pressBack();
         mLauncher.getWorkspace();
@@ -614,16 +626,16 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     /**
      * @return List of workspace grid coordinates. Those are not pixels. See {@link
-     *     Workspace#getIconGridDimensions()}
+     * Workspace#getIconGridDimensions()}
      */
     private Point[] getCornersAndCenterPositions() {
         final Point dimensions = mLauncher.getWorkspace().getIconGridDimensions();
-        return new Point[] {
-            new Point(0, 1),
-            new Point(0, dimensions.y - 2),
-            new Point(dimensions.x - 1, 1),
-            new Point(dimensions.x - 1, dimensions.y - 2),
-            new Point(dimensions.x / 2, dimensions.y / 2)
+        return new Point[]{
+                new Point(0, 1),
+                new Point(0, dimensions.y - 2),
+                new Point(dimensions.x - 1, 1),
+                new Point(dimensions.x - 1, dimensions.y - 2),
+                new Point(dimensions.x / 2, dimensions.y / 2)
         };
     }
 

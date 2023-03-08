@@ -22,6 +22,8 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"I-pin"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Freeform"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"Walang kamakailang item"</string>
+    <!-- no translation found for recents_empty_desktop_message (1358240150311509733) -->
+    <skip />
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Mga setting ng paggamit ng app"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"I-clear lahat"</string>
     <string name="accessibility_recent_apps" msgid="4058661986695117371">"Mga kamakailang app"</string>
@@ -86,8 +88,7 @@
     <string name="action_share" msgid="2648470652637092375">"Ibahagi"</string>
     <string name="action_screenshot" msgid="8171125848358142917">"Screenshot"</string>
     <string name="action_split" msgid="2098009717623550676">"Split"</string>
-    <!-- no translation found for toast_split_select_app (8464310533320556058) -->
-    <skip />
+    <string name="toast_split_select_app" msgid="8464310533320556058">"Mag-tap ng ibang app para gamitin ang split screen"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"Pumili ng ibang app para gamitin ang split screen"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"Hindi pinapayagan ng app o ng iyong organisasyon ang pagkilos na ito"</string>
     <string name="skip_tutorial_dialog_title" msgid="2725643161260038458">"Laktawan ang tutorial sa pag-navigate?"</string>
@@ -118,4 +119,6 @@
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"Navigation bar"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Ilipat sa itaas/kaliwa"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Ilipat sa ibaba/kanan"</string>
+    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{Magpakita ng # pang app.}one{Magpakita ng # pang app.}other{Magpakita ng # pang app.}}"</string>
+    <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> at <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
 </resources>

@@ -31,9 +31,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StatefulActivity;
+import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.util.RunnableList;
 import com.android.quickstep.RecentsAnimationCallbacks.RecentsAnimationListener;
+import com.android.quickstep.views.DesktopTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -174,8 +178,30 @@ public class OverviewCommandHelper {
                 mOverviewComponentObserver.getActivityInterface();
         RecentsView recents = activityInterface.getVisibleRecentsView();
         if (recents == null) {
+            T activity = activityInterface.getCreatedActivity();
+            DeviceProfile dp = activity == null ? null : activity.getDeviceProfile();
+            TaskbarUIController uiController = activityInterface.getTaskbarController();
+            boolean allowQuickSwitch = FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH.get()
+                    && uiController != null
+                    && dp != null
+                    && (dp.isTablet || dp.isTwoPanels);
+
+            if (DesktopTaskView.DESKTOP_MODE_SUPPORTED) {
+                // TODO(b/268075592): add support for quickswitch to/from desktop
+                allowQuickSwitch = false;
+            }
+
             if (cmd.type == TYPE_HIDE) {
-                // already hidden
+                if (!allowQuickSwitch) {
+                    return true;
+                }
+                mTaskFocusIndexOverride = uiController.launchFocusedTask();
+                if (mTaskFocusIndexOverride == -1) {
+                    return true;
+                }
+            }
+            if (cmd.type == TYPE_KEYBOARD_INPUT && allowQuickSwitch) {
+                uiController.openQuickSwitchView();
                 return true;
             }
             if (cmd.type == TYPE_HOME) {
@@ -258,7 +284,7 @@ public class OverviewCommandHelper {
 
         RecentsView<?, ?> visibleRecentsView = activityInterface.getVisibleRecentsView();
         if (visibleRecentsView != null) {
-            visibleRecentsView.moveFocusedTaskToFront();
+            visibleRecentsView.moveRunningTaskToFront();
         }
         if (mTaskAnimationManager.isRecentsAnimationRunning()) {
             cmd.mActiveCallbacks = mTaskAnimationManager.continueRecentsAnimation(gestureState);
