@@ -375,7 +375,6 @@ public class TaskView extends FrameLayout implements Reusable {
     // Used when in SplitScreenSelectState
     private float mSplitSelectTranslationY;
     private float mSplitSelectTranslationX;
-    private float mSplitSelectScrollOffsetPrimary;
 
     @Nullable
     private ObjectAnimator mIconAndDimAnimator;
@@ -431,9 +430,12 @@ public class TaskView extends FrameLayout implements Reusable {
         mCurrentFullscreenParams = new FullscreenDrawParams(context);
         mDigitalWellBeingToast = new DigitalWellBeingToast(mActivity, this);
 
-        setWillNotDraw(!FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH.get());
+        boolean keyboardFocusHighlightEnabled = FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH.get()
+                || DesktopTaskView.DESKTOP_MODE_SUPPORTED;
 
-        mBorderAnimator = !FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH.get()
+        setWillNotDraw(!keyboardFocusHighlightEnabled);
+
+        mBorderAnimator = !keyboardFocusHighlightEnabled
                 ? null
                 : new BorderAnimator(
                         /* borderBoundsBuilder= */ this::updateBorderBounds,
@@ -1294,10 +1296,6 @@ public class TaskView extends FrameLayout implements Reusable {
         applyTranslationY();
     }
 
-    public void setSplitScrollOffsetPrimary(float splitSelectScrollOffsetPrimary) {
-        mSplitSelectScrollOffsetPrimary = splitSelectScrollOffsetPrimary;
-    }
-
     private void setDismissTranslationX(float x) {
         mDismissTranslationX = x;
         applyTranslationX();
@@ -1361,19 +1359,18 @@ public class TaskView extends FrameLayout implements Reusable {
         applyTranslationX();
     }
 
-    public float getScrollAdjustment(boolean fullscreenEnabled, boolean gridEnabled) {
+    public float getScrollAdjustment(boolean gridEnabled) {
         float scrollAdjustment = 0;
         if (gridEnabled) {
             scrollAdjustment += mGridTranslationX;
         } else {
             scrollAdjustment += getPrimaryNonGridTranslationProperty().get(this);
         }
-        scrollAdjustment += mSplitSelectScrollOffsetPrimary;
         return scrollAdjustment;
     }
 
-    public float getOffsetAdjustment(boolean fullscreenEnabled, boolean gridEnabled) {
-        return getScrollAdjustment(fullscreenEnabled, gridEnabled);
+    public float getOffsetAdjustment(boolean gridEnabled) {
+        return getScrollAdjustment(gridEnabled);
     }
 
     public float getSizeAdjustment(boolean fullscreenEnabled) {
@@ -1439,6 +1436,11 @@ public class TaskView extends FrameLayout implements Reusable {
 
     public FloatProperty<TaskView> getPrimaryTaskOffsetTranslationProperty() {
         return getPagedOrientationHandler().getPrimaryValue(
+                TASK_OFFSET_TRANSLATION_X, TASK_OFFSET_TRANSLATION_Y);
+    }
+
+    public FloatProperty<TaskView> getSecondaryTaskOffsetTranslationProperty() {
+        return getPagedOrientationHandler().getSecondaryValue(
                 TASK_OFFSET_TRANSLATION_X, TASK_OFFSET_TRANSLATION_Y);
     }
 

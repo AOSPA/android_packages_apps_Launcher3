@@ -80,9 +80,10 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
         boolean isInLandscape = orientedState.getTouchRotation() != ROTATION_0;
         boolean isTablet = activity.getDeviceProfile().isTablet;
 
-        // Add overview actions to the menu when in in-place rotate landscape mode.
-        if ((!canLauncherRotate && isInLandscape)
-                || (isTablet && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get())) {
+        boolean isGridOnlyOverview = isTablet && FeatureFlags.ENABLE_GRID_ONLY_OVERVIEW.get();
+        // Add overview actions to the menu when in in-place rotate landscape mode, or in
+        // grid-only overview.
+        if ((!canLauncherRotate && isInLandscape) || isGridOnlyOverview) {
             // Add screenshot action to task menu.
             List<SystemShortcut> screenshotShortcuts = TaskShortcutFactory.SCREENSHOT
                     .getShortcuts(activity, taskContainer);
@@ -90,8 +91,9 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
                 shortcuts.addAll(screenshotShortcuts);
             }
 
-            // Add modal action only if display orientation is the same as the device orientation.
-            if (orientedState.getDisplayRotation() == ROTATION_0) {
+            // Add modal action only if display orientation is the same as the device orientation,
+            // or in grid-only overview.
+            if (orientedState.getDisplayRotation() == ROTATION_0 || isGridOnlyOverview) {
                 List<SystemShortcut> modalShortcuts = TaskShortcutFactory.MODAL
                         .getShortcuts(activity, taskContainer);
                 if (modalShortcuts != null) {

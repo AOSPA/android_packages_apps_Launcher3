@@ -16,9 +16,6 @@
 
 package com.android.launcher3;
 
-import static android.view.InputDevice.SOURCE_TOUCHSCREEN;
-
-import static com.android.launcher3.config.FeatureFlags.ENABLE_TRACKPAD_GESTURE;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_THEMED;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ICON_BADGED;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
@@ -41,6 +38,7 @@ import android.graphics.LightingColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.AdaptiveIconDrawable;
@@ -125,6 +123,9 @@ public final class Utilities {
     @ChecksSdkIntAtLeast(api = VERSION_CODES.TIRAMISU, codename = "T")
     public static final boolean ATLEAST_T = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.UPSIDE_DOWN_CAKE, codename = "U")
+    public static final boolean ATLEAST_U = Build.VERSION.SDK_INT >= VERSION_CODES.UPSIDE_DOWN_CAKE;
+
     /**
      * Set on a motion event dispatched from the nav bar. See {@link MotionEvent#setEdgeFlags(int)}.
      */
@@ -133,10 +134,10 @@ public final class Utilities {
     /**
      * Indicates if the device has a debug build. Should only be used to store additional info or
      * add extra logging and not for changing the app behavior.
+     * @deprecated Use {@link BuildConfig#IS_DEBUG_DEVICE} directly
      */
-    public static final boolean IS_DEBUG_DEVICE =
-            Build.TYPE.toLowerCase(Locale.ROOT).contains("debug") ||
-            Build.TYPE.toLowerCase(Locale.ROOT).equals("eng");
+    @Deprecated
+    public static final boolean IS_DEBUG_DEVICE = BuildConfig.IS_DEBUG_DEVICE;
 
     /**
      * Returns true if theme is dark.
@@ -343,6 +344,21 @@ public final class Utilities {
             r.bottom -= deltaY;
         }
         return scale;
+    }
+
+    /**
+     * Sets the x and y pivots for scaling from one Rect to another.
+     *
+     * @param src the source rectangle to scale from.
+     * @param dst the destination rectangle to scale to.
+     * @param outPivot the pivots set for scaling from src to dst.
+     */
+    public static void getPivotsForScalingRectToRect(Rect src, Rect dst, PointF outPivot) {
+        float pivotXPct = ((float) src.left - dst.left) / ((float) dst.width() - src.width());
+        outPivot.x = dst.left + dst.width() * pivotXPct;
+
+        float pivotYPct = ((float) src.top - dst.top) / ((float) dst.height() - src.height());
+        outPivot.y = dst.top + dst.height() * pivotYPct;
     }
 
     /**
@@ -560,6 +576,12 @@ public final class Utilities {
             int width, int height, Object[] outObj) {
         ActivityContext activity = ActivityContext.lookupContext(context);
         LauncherAppState appState = LauncherAppState.getInstance(context);
+        if (info instanceof PendingAddShortcutInfo) {
+            ShortcutConfigActivityInfo activityInfo =
+                    ((PendingAddShortcutInfo) info).getActivityInfo(context);
+            outObj[0] = activityInfo;
+            return activityInfo.getFullResIcon(appState.getIconCache());
+        }
         if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION) {
             LauncherActivityInfo activityInfo = context.getSystemService(LauncherApps.class)
                     .resolveActivity(info.getIntent(), info.user);
@@ -568,12 +590,6 @@ public final class Utilities {
                     .getIconProvider().getIcon(
                             activityInfo, activity.getDeviceProfile().inv.fillResIconDpi);
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
-            if (info instanceof PendingAddShortcutInfo) {
-                ShortcutConfigActivityInfo activityInfo =
-                        ((PendingAddShortcutInfo) info).activityInfo;
-                outObj[0] = activityInfo;
-                return activityInfo.getFullResIcon(appState.getIconCache());
-            }
             List<ShortcutInfo> si = ShortcutKey.fromItemInfo(info)
                     .buildRequest(context)
                     .query(ShortcutRequest.ALL);
@@ -704,13 +720,6 @@ public final class Utilities {
                 dp.isLandscape ? STAGE_POSITION_BOTTOM_OR_RIGHT : STAGE_POSITION_TOP_OR_LEFT,
                 STAGE_TYPE_MAIN
         ));
-    }
-
-    public static boolean isTrackpadMotionEvent(MotionEvent event) {
-        // TODO: ideally should use event.getClassification(), but currently only the move
-        // events get assigned the correct classification.
-        return ENABLE_TRACKPAD_GESTURE.get()
-                && (event.getSource() & SOURCE_TOUCHSCREEN) != SOURCE_TOUCHSCREEN;
     }
 
     /** Logs the Scale and Translate properties of a matrix. Ignores skew and perspective. */

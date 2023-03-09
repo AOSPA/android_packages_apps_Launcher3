@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.taskbar;
 
-import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.os.Trace.TRACE_TAG_APP;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -89,6 +88,7 @@ import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemClickHandler.ItemClickProxy;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.PackageManagerHelper;
@@ -106,7 +106,6 @@ import com.android.systemui.unfold.updates.RotationChangeProvider;
 import com.android.systemui.unfold.util.ScopedUnfoldTransitionProgressProvider;
 
 import java.io.PrintWriter;
-import java.util.function.Consumer;
 
 /**
  * The {@link ActivityContext} with which we inflate Taskbar-related Views. This allows UI elements
@@ -237,7 +236,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 isDesktopMode
                         ? new DesktopTaskbarRecentAppsController(this)
                         : TaskbarRecentAppsController.DEFAULT,
-                new TaskbarEduTooltipController(this));
+                new TaskbarEduTooltipController(this),
+                new KeyboardQuickSwitchController());
     }
 
     public void init(@NonNull TaskbarSharedState sharedState) {
@@ -561,8 +561,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     public void updateSysuiStateFlags(int systemUiStateFlags, boolean fromInit) {
         mControllers.navbarButtonsViewController.updateStateForSysuiFlags(systemUiStateFlags,
                 fromInit);
-        mControllers.taskbarViewController.setImeIsVisible(
-                mControllers.navbarButtonsViewController.isImeVisible());
         int shadeExpandedFlags = SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED
                 | SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
         onNotificationShadeExpandChanged((systemUiStateFlags & shadeExpandedFlags) != 0, fromInit);
@@ -837,15 +835,17 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                             launchFromTaskbarPreservingSplitIfVisible(recents, info);
                         }
 
-                        mControllers.uiController.onTaskbarIconLaunched(info);
                     } catch (NullPointerException
                             | ActivityNotFoundException
                             | SecurityException e) {
                         Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT)
                                 .show();
                         Log.e(TAG, "Unable to launch. tag=" + info + " intent=" + intent, e);
+                        return;
                     }
+
                 }
+                mControllers.uiController.onTaskbarIconLaunched(info);
                 mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
             }
         } else if (tag instanceof AppInfo) {
@@ -859,8 +859,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 taskbarUIController.triggerSecondAppForSplit(info, info.intent, view);
             } else {
                 launchFromTaskbarPreservingSplitIfVisible(recents, info);
-                mControllers.uiController.onTaskbarIconLaunched(info);
             }
+            mControllers.uiController.onTaskbarIconLaunched(info);
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
         } else if (tag instanceof ItemClickProxy) {
             ((ItemClickProxy) tag).onItemClicked(view);
@@ -878,9 +878,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * (potentially breaking a split pair).
      */
     private void launchFromTaskbarPreservingSplitIfVisible(RecentsView recents, ItemInfo info) {
-        recents.findLastActiveTaskAndRunCallback(
-                info.getTargetComponent(),
-                (Consumer<Task>) foundTask -> {
+        ComponentKey componentToBeLaunched = new ComponentKey(info.getTargetComponent(), info.user);
+        recents.getSplitSelectController().findLastActiveTaskAndRunCallback(
+                componentToBeLaunched,
+                foundTask -> {
                     if (foundTask != null) {
                         TaskView foundTaskView =
                                 recents.getTaskViewByTaskId(foundTask.key.id);

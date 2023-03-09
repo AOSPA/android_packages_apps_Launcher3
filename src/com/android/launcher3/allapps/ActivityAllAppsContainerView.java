@@ -16,10 +16,10 @@
 package com.android.launcher3.allapps;
 
 import static com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder.SEARCH;
-import static com.android.launcher3.allapps.AllAppsTransitionController.SWIPE_ALL_APPS_TO_HOME_MIN_SCALE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_COUNT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_PERSONAL_TAB;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_TAP_ON_WORK_TAB;
+import static com.android.launcher3.util.ScrollableLayoutManager.PREDICTIVE_BACK_MIN_SCALE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -134,6 +134,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     protected AllAppsPagedView mViewPager;
     protected FloatingHeaderView mHeader;
     protected View mBottomSheetBackground;
+    protected RecyclerViewFastScroller mFastScroller;
+
     /**
      * View that defines the search box. Result is rendered inside {@link #mSearchRecyclerView}.
      */
@@ -219,6 +221,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mBottomSheetBackground = findViewById(R.id.bottom_sheet_background);
         mBottomSheetHandleArea = findViewById(R.id.bottom_sheet_handle_area);
         mSearchRecyclerView = findViewById(R.id.search_results_list_view);
+        mFastScroller = findViewById(R.id.fast_scroller);
+        mFastScroller.setPopupView(findViewById(R.id.fast_scroller_popup));
 
         // Add the search box above everything else.
         mSearchContainer = inflateSearchBox();
@@ -302,6 +306,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!mSearchTransitionController.isRunning() && goingToSearch == isSearching()) {
             return;
         }
+        mFastScroller.setVisibility(goingToSearch ? INVISIBLE : VISIBLE);
         if (goingToSearch) {
             // Fade out the button to pause work apps.
             mWorkManager.onActivePageChanged(SEARCH);
@@ -360,6 +365,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 mAH.get(i).mRecyclerView.scrollToTop();
             }
         }
+        if (mTouchHandler != null) {
+            mTouchHandler.endFastScrolling();
+        }
         if (mHeader != null && mHeader.getVisibility() == VISIBLE) {
             mHeader.reset(animate);
         }
@@ -408,7 +416,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
         if (mAH.get(currentActivePage).mRecyclerView != null) {
-            mAH.get(currentActivePage).mRecyclerView.bindFastScrollbar();
+            mAH.get(currentActivePage).mRecyclerView.bindFastScrollbar(mFastScroller);
         }
         // Header keeps track of active recycler view to properly render header protection.
         mHeader.setActiveRV(currentActivePage);
@@ -439,9 +447,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
 
-        RecyclerView.ItemDecoration decoration = getMainAdapterProvider().getDecorator();
-        getSearchRecyclerView().removeItemDecoration(decoration);
-        getSearchRecyclerView().addItemDecoration(decoration);
+        if (!FeatureFlags.ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES.get()) {
+            RecyclerView.ItemDecoration decoration = getMainAdapterProvider().getDecorator();
+            getSearchRecyclerView().removeItemDecoration(decoration);
+            getSearchRecyclerView().addItemDecoration(decoration);
+        }
 
         // replaceAppsRVcontainer() needs to use both mUsingTabs value to remove the old view AND
         // showTabs value to create new view. Hence the mUsingTabs new value assignment MUST happen
@@ -489,7 +499,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (isSearchBarOnBottom()) {
             // Keep the scroller above the search bar.
             RelativeLayout.LayoutParams scrollerLayoutParams =
-                    (LayoutParams) findViewById(R.id.fast_scroller).getLayoutParams();
+                    (LayoutParams) mFastScroller.getLayoutParams();
             scrollerLayoutParams.addRule(RelativeLayout.ABOVE, R.id.search_container_all_apps);
             scrollerLayoutParams.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             scrollerLayoutParams.bottomMargin = getResources().getDimensionPixelSize(
@@ -524,7 +534,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 public void getOutline(View view, Outline outline) {
                     @Px final int bottomOffsetPx =
                             (int) (ActivityAllAppsContainerView.this.getMeasuredHeight()
-                                    * SWIPE_ALL_APPS_TO_HOME_MIN_SCALE);
+                                    * PREDICTIVE_BACK_MIN_SCALE);
                     outline.setRect(
                             0,
                             0,
@@ -1050,12 +1060,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 : mViewPager == null ? AdapterHolder.MAIN : mViewPager.getNextPage();
     }
 
-    /** The scroll bar for the active apps recycler view. */
-    public RecyclerViewFastScroller getScrollBar() {
-        AllAppsRecyclerView rv = getActiveAppsRecyclerView();
-        return rv == null ? null : rv.getScrollbar();
-    }
-
     /**
      * Adds an update listener to animator that adds springs to the animation.
      */
@@ -1247,6 +1251,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         void setup(@NonNull View rv, @Nullable Predicate<ItemInfo> matcher) {
             mAppsList.updateItemFilter(matcher);
             mRecyclerView = (AllAppsRecyclerView) rv;
+            mRecyclerView.bindFastScrollbar(mFastScroller);
             mRecyclerView.setEdgeEffectFactory(createEdgeEffectFactory());
             mRecyclerView.setApps(mAppsList);
             mRecyclerView.setLayoutManager(mLayoutManager);
