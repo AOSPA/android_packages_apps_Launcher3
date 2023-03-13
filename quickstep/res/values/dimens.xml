@@ -196,9 +196,13 @@
     <integer name="gesture_tutorial_webpage_extra_lines_visibility">0</integer> <!-- VISIBLE -->
 
     <!-- Gesture Tutorial mock taskbar -->
-    <dimen name="gesture_tutorial_taskbar_icon_size">44dp</dimen>
+    <dimen name="gesture_tutorial_taskbar_icon_size">52dp</dimen>
+    <dimen name="gesture_tutorial_taskbar_all_apps_mini_size">7dp</dimen>
     <dimen name="gesture_tutorial_taskbar_icon_corner_radius">100dp</dimen>
-    <dimen name="gesture_tutorial_taskbar_padding_start_end">52dp</dimen>
+    <dimen name="gesture_tutorial_taskbar_corner_radius">100dp</dimen>
+    <dimen name="gesture_tutorial_taskbar_padding">12dp</dimen>
+    <dimen name="gesture_tutorial_taskbar_icon_spacing">24dp</dimen>
+    <dimen name="gesture_tutorial_taskbar_margin_bottom">24dp</dimen>
 
     <!-- All Set page -->
     <dimen name="allset_page_margin_horizontal">40dp</dimen>
@@ -293,14 +297,10 @@
     <!-- An additional touch slop to prevent x-axis movement during the swipe up to show taskbar -->
     <dimen name="transient_taskbar_clamped_offset_bound">16dp</dimen>
     <!-- Taskbar swipe up thresholds -->
-    <dimen name="taskbar_nav_threshold">40dp</dimen>
-    <dimen name="taskbar_app_window_threshold">150dp</dimen>
-    <dimen name="taskbar_home_overview_threshold">225dp</dimen>
+    <dimen name="taskbar_nav_threshold">30dp</dimen>
+    <dimen name="taskbar_app_window_threshold">100dp</dimen>
+    <dimen name="taskbar_home_overview_threshold">180dp</dimen>
     <dimen name="taskbar_catch_up_threshold">300dp</dimen>
-
-    <dimen name="taskbar_nav_threshold_v2">30dp</dimen>
-    <dimen name="taskbar_app_window_threshold_v2">100dp</dimen>
-    <dimen name="taskbar_home_overview_threshold_v2">200dp</dimen>
 
     <!--  Taskbar 3 button spacing  -->
     <dimen name="taskbar_button_space_inbetween">24dp</dimen>
@@ -309,6 +309,18 @@
     <dimen name="taskbar_button_margin_6_5">75dp</dimen>
     <dimen name="taskbar_button_margin_default">48dp</dimen>
 
+    <!-- Taskbar education tooltip -->
+    <dimen name="taskbar_edu_tooltip_elevation">14dp</dimen>
+    <dimen name="taskbar_edu_tooltip_horizontal_margin">32dp</dimen>
+    <dimen name="taskbar_edu_tooltip_vertical_margin">24dp</dimen>
+    <dimen name="taskbar_edu_tooltip_enter_y_delta">20dp</dimen>
+    <dimen name="taskbar_edu_tooltip_exit_y_delta">-10dp</dimen>
+    <dimen name="taskbar_edu_swipe_lottie_width">348dp</dimen>
+    <dimen name="taskbar_edu_swipe_lottie_height">217dp</dimen>
+    <dimen name="taskbar_edu_features_lottie_width">170dp</dimen>
+    <dimen name="taskbar_edu_features_lottie_height">106dp</dimen>
+    <dimen name="taskbar_edu_features_horizontal_spacing">24dp</dimen>
+
     <!-- Recents overview -->
     <dimen name="recents_filter_icon_size">30dp</dimen>
 
@@ -316,4 +328,7 @@
     <!-- Note: keep this value in sync with the WindowManager/Shell dimens.xml -->
     <!--     starting_surface_exit_animation_window_shift_length -->
     <dimen name="starting_surface_exit_animation_window_shift_length">20dp</dimen>
+
+    <!-- Keyboard Quick Switch -->
+    <dimen name="keyboard_quick_switch_border_width">4dp</dimen>
 </resources>

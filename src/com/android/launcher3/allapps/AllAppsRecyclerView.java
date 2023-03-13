@@ -261,10 +261,17 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         }
     }
 
+    @Override
     public int getScrollBarTop() {
         return ActivityContext.lookupContext(getContext()).getAppsView().isSearchSupported()
                 ? getResources().getDimensionPixelOffset(R.dimen.all_apps_header_top_padding)
                 : 0;
+    }
+
+    @Override
+    public int getScrollBarMarginBottom() {
+        return getRootWindowInsets() == null ? 0
+                : getRootWindowInsets().getSystemWindowInsetBottom();
     }
 
     public RecyclerViewFastScroller getScrollbar() {
@@ -299,7 +306,7 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
             return;
         } else if (appsView.mViewPager != null) {
             int currentPage = appsView.mViewPager.getCurrentPage();
-            if (currentPage == BaseAllAppsContainerView.AdapterHolder.WORK) {
+            if (currentPage == ActivityAllAppsContainerView.AdapterHolder.WORK) {
                 // In work A-Z list
                 mgr.logger().withContainerInfo(containerInfo).log((mCumulativeVerticalScroll > 0)
                         ? LAUNCHER_WORK_FAB_BUTTON_COLLAPSE

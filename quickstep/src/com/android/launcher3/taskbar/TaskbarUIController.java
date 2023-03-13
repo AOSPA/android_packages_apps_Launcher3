@@ -15,6 +15,8 @@
  */
 package com.android.launcher3.taskbar;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+
 import android.content.Intent;
 import android.graphics.drawable.BitmapDrawable;
 import android.view.MotionEvent;
@@ -26,8 +28,11 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.SplitConfigurationOptions;
+import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
+import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
 import com.android.systemui.shared.recents.model.Task;
 
 import java.io.PrintWriter;
@@ -165,35 +170,70 @@ public class TaskbarUIController {
         return null;
     }
 
+    public void startSplitSelection(SplitConfigurationOptions.SplitSelectSource splitSelectSource) {
+        RecentsView recentsView = getRecentsView();
+        if (recentsView == null) {
+            return;
+        }
+        recentsView.findLastActiveTaskAndRunCallback(
+                splitSelectSource.intent.getComponent(),
+                (Consumer<Task>) foundTask -> {
+                    splitSelectSource.alreadyRunningTaskId = foundTask == null
+                            ? INVALID_TASK_ID
+                            : foundTask.key.id;
+                    splitSelectSource.animateCurrentTaskDismissal = foundTask != null;
+                    recentsView.initiateSplitSelect(splitSelectSource);
+                }
+        );
+    }
+
     /**
      * Uses the clicked Taskbar icon to launch a second app for splitscreen.
      */
     public void triggerSecondAppForSplit(ItemInfoWithIcon info, Intent intent, View startingView) {
         RecentsView recents = getRecentsView();
-        recents.findLastActiveTaskAndDoSplitOperation(
+        recents.findLastActiveTaskAndRunCallback(
                 info.getTargetComponent(),
                 (Consumer<Task>) foundTask -> {
                     if (foundTask != null) {
                         TaskView foundTaskView = recents.getTaskViewByTaskId(foundTask.key.id);
-                        // There is already a running app of this type, use that as second app.
-                        recents.confirmSplitSelect(
-                                foundTaskView,
-                                foundTaskView.getTask(),
-                                foundTaskView.getIconView().getDrawable(),
-                                foundTaskView.getThumbnail(),
-                                foundTaskView.getThumbnail().getThumbnail(),
-                                null /* intent */);
-                    } else {
-                        // No running app of that type, create a new instance as second app.
-                        recents.confirmSplitSelect(
-                                null /* containerTaskView */,
-                                null /* task */,
-                                new BitmapDrawable(info.bitmap.icon),
-                                startingView,
-                                null /* thumbnail */,
-                                intent);
+                        // TODO (b/266482558): This additional null check is needed because there
+                        // are times when our Tasks list doesn't match our TaskViews list (like when
+                        // a tile is removed during {@link RecentsView#applyLoadPlan()}. A clearer
+                        // state management system is in the works so that we don't need to rely on
+                        // null checks as much. See comments at ag/21152798.
+                        if (foundTaskView != null) {
+                            // There is already a running app of this type, use that as second app.
+                            // Get index of task (0 or 1), in case it's a GroupedTaskView
+                            TaskIdAttributeContainer taskAttributes =
+                                    foundTaskView.getTaskAttributesById(foundTask.key.id);
+                            recents.confirmSplitSelect(
+                                    foundTaskView,
+                                    foundTask,
+                                    taskAttributes.getIconView().getDrawable(),
+                                    taskAttributes.getThumbnailView(),
+                                    taskAttributes.getThumbnailView().getThumbnail(),
+                                    null /* intent */);
+                            return;
+                        }
                     }
+
+                    // No running app of that type, create a new instance as second app.
+                    recents.confirmSplitSelect(
+                            null /* containerTaskView */,
+                            null /* task */,
+                            new BitmapDrawable(info.bitmap.icon),
+                            startingView,
+                            null /* thumbnail */,
+                            intent);
                 }
         );
     }
+
+    /**
+     * Launches the focused task in splitscreen.
+     *
+     * No-op if the view is not yet open.
+     */
+    public void launchSplitTasks(View taskview, GroupTask groupTask) { }
 }

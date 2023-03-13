@@ -62,6 +62,7 @@ import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.accessibility.DragAndDropAccessibilityDelegate;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.celllayout.CellLayoutLayoutParams;
+import com.android.launcher3.celllayout.CellPosMapper.CellPos;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.PreviewBackground;
@@ -98,9 +99,9 @@ public class CellLayout extends ViewGroup {
     private Point mBorderSpace;
 
     @ViewDebug.ExportedProperty(category = "launcher")
-    private int mCountX;
+    protected int mCountX;
     @ViewDebug.ExportedProperty(category = "launcher")
-    private int mCountY;
+    protected int mCountY;
 
     private boolean mDropPending = false;
 
@@ -110,8 +111,8 @@ public class CellLayout extends ViewGroup {
     @Thunk final int[] mTempLocation = new int[2];
     final PointF mTmpPointF = new PointF();
 
-    private GridOccupancy mOccupied;
-    private GridOccupancy mTmpOccupied;
+    protected GridOccupancy mOccupied;
+    protected GridOccupancy mTmpOccupied;
 
     private OnTouchListener mInterceptTouchListener;
 
@@ -120,7 +121,7 @@ public class CellLayout extends ViewGroup {
 
     private static final int[] BACKGROUND_STATE_ACTIVE = new int[] { android.R.attr.state_active };
     private static final int[] BACKGROUND_STATE_DEFAULT = EMPTY_STATE_SET;
-    private final Drawable mBackground;
+    protected final Drawable mBackground;
 
     // These values allow a fixed measurement to be set on the CellLayout.
     private int mFixedWidth = -1;
@@ -153,7 +154,7 @@ public class CellLayout extends ViewGroup {
     private int mGridVisualizationRoundingRadius;
     private float mGridAlpha = 0f;
     private int mGridColor = 0;
-    private float mSpringLoadedProgress = 0f;
+    protected float mSpringLoadedProgress = 0f;
     private float mScrollProgress = 0f;
 
     // When a drag operation is in progress, holds the nearest cell to the touch point
@@ -163,7 +164,7 @@ public class CellLayout extends ViewGroup {
     private boolean mDragging = false;
 
     private final TimeInterpolator mEaseOutInterpolator;
-    private final ShortcutAndWidgetContainer mShortcutsAndWidgets;
+    protected final ShortcutAndWidgetContainer mShortcutsAndWidgets;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({WORKSPACE, HOTSEAT, FOLDER})
@@ -267,7 +268,7 @@ public class CellLayout extends ViewGroup {
         mDragCell[0] = mDragCell[1] = -1;
         mDragCellSpan[0] = mDragCellSpan[1] = -1;
         for (int i = 0; i < mDragOutlines.length; i++) {
-            mDragOutlines[i] = new CellLayoutLayoutParams(0, 0, 0, 0, -1);
+            mDragOutlines[i] = new CellLayoutLayoutParams(0, 0, 0, 0);
         }
         mDragOutlinePaint.setColor(Themes.getAttrColor(context, R.attr.workspaceTextColor));
 
@@ -564,7 +565,7 @@ public class CellLayout extends ViewGroup {
         return mSpringLoadedProgress;
     }
 
-    private void updateBgAlpha() {
+    protected void updateBgAlpha() {
         mBackground.setAlpha((int) (mSpringLoadedProgress * 255));
     }
 
@@ -1084,8 +1085,8 @@ public class CellLayout extends ViewGroup {
             final int oldY = lp.y;
             lp.isLockedToGrid = true;
             if (permanent) {
-                lp.setCellX(info.cellX = cellX);
-                lp.setCellY(info.cellY = cellY);
+                lp.setCellX(cellX);
+                lp.setCellY(cellY);
             } else {
                 lp.setTmpCellX(cellX);
                 lp.setTmpCellY(cellY);
@@ -1627,20 +1628,16 @@ public class CellLayout extends ViewGroup {
             // We do a null check here because the item info can be null in the case of the
             // AllApps button in the hotseat.
             if (info != null && child != dragView) {
-                final boolean requiresDbUpdate = (info.cellX != lp.getTmpCellX()
-                        || info.cellY != lp.getTmpCellY() || info.spanX != lp.cellHSpan
-                        || info.spanY != lp.cellVSpan);
+                CellPos presenterPos = mActivity.getCellPosMapper().mapModelToPresenter(info);
+                final boolean requiresDbUpdate = (presenterPos.cellX != lp.getTmpCellX()
+                        || presenterPos.cellY != lp.getTmpCellY() || info.spanX != lp.cellHSpan
+                        || info.spanY != lp.cellVSpan || presenterPos.screenId != screenId);
 
                 lp.setCellX(lp.getTmpCellX());
-                info.cellX = lp.getTmpCellX();
-                info.cellY = lp.getTmpCellY();
                 lp.setCellY(lp.getTmpCellY());
-                info.spanX = lp.cellHSpan;
-                info.spanY = lp.cellVSpan;
-
                 if (requiresDbUpdate) {
                     Launcher.cast(mActivity).getModelWriter().modifyItemInDatabase(info, container,
-                            screenId, info.cellX, info.cellY, info.spanX, info.spanY);
+                            screenId, lp.getCellX(), lp.getCellY(), lp.cellHSpan, lp.cellVSpan);
                 }
             }
         }
@@ -1665,7 +1662,7 @@ public class CellLayout extends ViewGroup {
      * @param spanY vertical cell span
      * @return the configuration that represents the found reorder
      */
-    private ItemConfiguration closestEmptySpaceReorder(int pixelX, int pixelY, int minSpanX,
+    ItemConfiguration closestEmptySpaceReorder(int pixelX, int pixelY, int minSpanX,
             int minSpanY, int spanX, int spanY) {
         ItemConfiguration solution = new ItemConfiguration();
         int[] result = new int[2];
@@ -2405,8 +2402,15 @@ public class CellLayout extends ViewGroup {
         return true;
     }
 
-    private ItemConfiguration findReorderSolution(int pixelX, int pixelY, int minSpanX, int minSpanY,
-            int spanX, int spanY, int[] direction, View dragView, boolean decX,
+    protected ItemConfiguration findReorderSolution(int pixelX, int pixelY, int minSpanX,
+            int minSpanY, int spanX, int spanY, int[] direction, View dragView, boolean decX,
+            ItemConfiguration solution) {
+        return findReorderSolutionRecursive(pixelX, pixelY, minSpanX, minSpanY, spanX, spanY,
+                direction, dragView, decX, solution);
+    }
+
+    protected ItemConfiguration findReorderSolutionRecursive(int pixelX, int pixelY, int minSpanX,
+            int minSpanY, int spanX, int spanY, int[] direction, View dragView, boolean decX,
             ItemConfiguration solution) {
         // Copy the current state into the solution. This solution will be manipulated as necessary.
         copyCurrentStateToSolution(solution, false);
@@ -2429,11 +2433,11 @@ public class CellLayout extends ViewGroup {
             // We try shrinking the widget down to size in an alternating pattern, shrink 1 in
             // x, then 1 in y etc.
             if (spanX > minSpanX && (minSpanY == spanY || decX)) {
-                return findReorderSolution(pixelX, pixelY, minSpanX, minSpanY, spanX - 1, spanY,
-                        direction, dragView, false, solution);
+                return findReorderSolutionRecursive(pixelX, pixelY, minSpanX, minSpanY, spanX - 1,
+                        spanY, direction, dragView, false, solution);
             } else if (spanY > minSpanY) {
-                return findReorderSolution(pixelX, pixelY, minSpanX, minSpanY, spanX, spanY - 1,
-                        direction, dragView, true, solution);
+                return findReorderSolutionRecursive(pixelX, pixelY, minSpanX, minSpanY, spanX,
+                        spanY - 1, direction, dragView, true, solution);
             }
             solution.isSolution = false;
         } else {
@@ -2446,7 +2450,7 @@ public class CellLayout extends ViewGroup {
         return solution;
     }
 
-    private void copyCurrentStateToSolution(ItemConfiguration solution, boolean temp) {
+    protected void copyCurrentStateToSolution(ItemConfiguration solution, boolean temp) {
         int childCount = mShortcutsAndWidgets.getChildCount();
         for (int i = 0; i < childCount; i++) {
             View child = mShortcutsAndWidgets.getChildAt(i);
@@ -2627,7 +2631,7 @@ public class CellLayout extends ViewGroup {
         return mItemPlacementDirty;
     }
 
-    private static class ItemConfiguration extends CellAndSpan {
+    static class ItemConfiguration extends CellAndSpan {
         final ArrayMap<View, CellAndSpan> map = new ArrayMap<>();
         private final ArrayMap<View, CellAndSpan> savedMap = new ArrayMap<>();
         final ArrayList<View> sortedViews = new ArrayList<>();
@@ -2792,7 +2796,8 @@ public class CellLayout extends ViewGroup {
         if (view instanceof LauncherAppWidgetHostView
                 && view.getTag() instanceof LauncherAppWidgetInfo) {
             LauncherAppWidgetInfo info = (LauncherAppWidgetInfo) view.getTag();
-            mOccupied.markCells(info.cellX, info.cellY, info.spanX, info.spanY, true);
+            CellPos pos = mActivity.getCellPosMapper().mapModelToPresenter(info);
+            mOccupied.markCells(pos.cellX, pos.cellY, info.spanX, info.spanY, true);
             return;
         }
         if (view == null || view.getParent() != mShortcutsAndWidgets) return;
@@ -2805,7 +2810,8 @@ public class CellLayout extends ViewGroup {
         if (view instanceof LauncherAppWidgetHostView
                 && view.getTag() instanceof LauncherAppWidgetInfo) {
             LauncherAppWidgetInfo info = (LauncherAppWidgetInfo) view.getTag();
-            mOccupied.markCells(info.cellX, info.cellY, info.spanX, info.spanY, false);
+            CellPos pos = mActivity.getCellPosMapper().mapModelToPresenter(info);
+            mOccupied.markCells(pos.cellX, pos.cellY, info.spanX, info.spanY, false);
             return;
         }
         if (view == null || view.getParent() != mShortcutsAndWidgets) return;
@@ -2858,13 +2864,13 @@ public class CellLayout extends ViewGroup {
         final int screenId;
         final int container;
 
-        public CellInfo(View v, ItemInfo info) {
-            cellX = info.cellX;
-            cellY = info.cellY;
+        public CellInfo(View v, ItemInfo info, CellPos cellPos) {
+            cellX = cellPos.cellX;
+            cellY = cellPos.cellY;
             spanX = info.spanX;
             spanY = info.spanY;
             cell = v;
-            screenId = info.screenId;
+            screenId = cellPos.screenId;
             container = info.container;
         }
 

@@ -18,6 +18,9 @@ package com.android.launcher3.taskbar;
 import static android.view.InsetsState.ITYPE_EXTRA_NAVIGATION_BAR;
 
 import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR_TRANSITION_DURATION;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_EDU_TOOLTIP;
+import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
+import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTIP_STEP_FEATURES;
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_RESUMED;
 import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 
@@ -27,6 +30,7 @@ import android.annotation.ColorInt;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.TaskTransitionSpec;
+import android.view.View;
 import android.view.WindowManagerGlobal;
 
 import androidx.annotation.NonNull;
@@ -47,6 +51,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.OnboardingPrefs;
 import com.android.quickstep.RecentsAnimationCallbacks;
+import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.RecentsView;
 
 import java.io.PrintWriter;
@@ -179,10 +184,12 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             }
         }
 
+        // Launcher is resumed during the swipe-to-overview gesture under shell-transitions, so
+        // avoid updating taskbar state in that situation (when it's non-interactive -- or
+        // "background") to avoid premature animations.
         if (ENABLE_SHELL_TRANSITIONS && isResumed
+                && mLauncher.getStateManager().getState().hasFlag(FLAG_NON_INTERACTIVE)
                 && !mLauncher.getStateManager().getState().isTaskbarAlignedWithHotseat(mLauncher)) {
-            // Launcher is resumed, but in a state where taskbar is still independent, so
-            // ignore the state change.
             return null;
         }
 
@@ -259,23 +266,51 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     /**
-     * Starts the taskbar education flow, if the user hasn't seen it yet.
+     * Starts a Taskbar EDU flow, if the user should see one upon launching an application.
      */
-    public void showEdu() {
-        if (!shouldShowEdu()) {
+    public void showEduOnAppLaunch() {
+        if (!shouldShowEduOnAppLaunch()) {
             return;
         }
-        mLauncher.getOnboardingPrefs().markChecked(OnboardingPrefs.TASKBAR_EDU_SEEN);
 
-        mControllers.taskbarEduController.showEdu();
+        // Transient and persistent bottom sheet.
+        if (!ENABLE_TASKBAR_EDU_TOOLTIP.get()) {
+            mLauncher.getOnboardingPrefs().markChecked(OnboardingPrefs.TASKBAR_EDU_SEEN);
+            mControllers.taskbarEduController.showEdu();
+            return;
+        }
+
+        // Persistent features EDU tooltip.
+        if (!DisplayController.isTransientTaskbar(mLauncher)) {
+            mControllers.taskbarEduTooltipController.maybeShowFeaturesEdu();
+            return;
+        }
+
+        // Transient swipe EDU tooltip.
+        mControllers.taskbarEduTooltipController.maybeShowSwipeEdu();
     }
 
     /**
-     * Whether the taskbar education should be shown.
+     * Returns {@code true} if a Taskbar education should be shown on application launch.
      */
-    public boolean shouldShowEdu() {
-        return !Utilities.IS_RUNNING_IN_TEST_HARNESS
-                && !mLauncher.getOnboardingPrefs().getBoolean(OnboardingPrefs.TASKBAR_EDU_SEEN);
+    public boolean shouldShowEduOnAppLaunch() {
+        if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+            return false;
+        }
+
+        // Transient and persistent bottom sheet.
+        if (!ENABLE_TASKBAR_EDU_TOOLTIP.get()) {
+            return !mLauncher.getOnboardingPrefs().getBoolean(OnboardingPrefs.TASKBAR_EDU_SEEN);
+        }
+
+        // Persistent features EDU tooltip.
+        if (!DisplayController.isTransientTaskbar(mLauncher)) {
+            return !mLauncher.getOnboardingPrefs().hasReachedMaxCount(
+                    OnboardingPrefs.TASKBAR_EDU_TOOLTIP_STEP);
+        }
+
+        // Transient swipe EDU tooltip.
+        return mControllers.taskbarEduTooltipController.getTooltipStep() < TOOLTIP_STEP_FEATURES;
     }
 
     @Override
@@ -350,6 +385,17 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     @Override
+    public RecentsView getRecentsView() {
+        return mLauncher.getOverviewPanel();
+    }
+
+    @Override
+    public void launchSplitTasks(View taskView, GroupTask groupTask) {
+        super.launchSplitTasks(taskView, groupTask);
+        mLauncher.launchSplitTasks(taskView, groupTask);
+    }
+
+    @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         super.dumpLogs(prefix, pw);
 
@@ -368,10 +414,5 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 "SYSUI_SURFACE_PROGRESS_INDEX");
 
         mTaskbarLauncherStateController.dumpLogs(prefix + "\t", pw);
-    }
-
-    @Override
-    public RecentsView getRecentsView() {
-        return mLauncher.getOverviewPanel();
     }
 }

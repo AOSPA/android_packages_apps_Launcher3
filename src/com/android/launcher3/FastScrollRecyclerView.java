@@ -63,6 +63,9 @@ public abstract class FastScrollRecyclerView extends RecyclerView  {
 
     public void bindFastScrollbar() {
         ViewGroup parent = (ViewGroup) getParent().getParent();
+        if (parent.findViewById(R.id.fast_scroller) == null) {
+            parent = (ViewGroup) parent.getParent();
+        }
         mScrollbar = parent.findViewById(R.id.fast_scroller);
         mScrollbar.setRecyclerView(this, parent.findViewById(R.id.fast_scroller_popup));
         onUpdateScrollbar(0);
@@ -77,11 +80,15 @@ public abstract class FastScrollRecyclerView extends RecyclerView  {
         return getPaddingTop();
     }
 
+    public int getScrollBarMarginBottom() {
+        return getPaddingBottom();
+    }
+
     /**
      * Returns the height of the fast scroll bar
      */
     public int getScrollbarTrackHeight() {
-        return mScrollbar.getHeight() - getScrollBarTop() - getPaddingBottom();
+        return mScrollbar.getHeight() - getScrollBarTop() - getScrollBarMarginBottom();
     }
 
     /**

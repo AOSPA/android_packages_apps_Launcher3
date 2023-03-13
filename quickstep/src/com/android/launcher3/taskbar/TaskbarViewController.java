@@ -27,6 +27,8 @@ import static com.android.launcher3.taskbar.TaskbarManager.isPhoneMode;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_NEGATIVE;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
 
+import android.animation.AnimatorSet;
+import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.graphics.Rect;
 import android.util.FloatProperty;
@@ -49,6 +51,8 @@ import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
+import com.android.launcher3.anim.RevealOutlineAnimation;
+import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.icons.ThemedIconDrawable;
@@ -79,9 +83,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public static final int ALPHA_INDEX_RECENTS_DISABLED = 3;
     public static final int ALPHA_INDEX_NOTIFICATION_EXPANDED = 4;
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 5;
-    public static final int ALPHA_INDEX_IME_BUTTON_NAV = 6;
-    public static final int ALPHA_INDEX_SMALL_SCREEN = 7;
-    private static final int NUM_ALPHA_CHANNELS = 8;
+    public static final int ALPHA_INDEX_SMALL_SCREEN = 6;
+    private static final int NUM_ALPHA_CHANNELS = 7;
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarView mTaskbarView;
@@ -96,6 +99,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private float mTaskbarIconTranslationYForSwipe;
 
     private final int mTaskbarBottomMargin;
+    private final int mStashedHandleHeight;
 
     private final AnimatedFloat mThemeIconsBackground = new AnimatedFloat(
             this::updateIconsBackground);
@@ -128,6 +132,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarBottomMargin = DisplayController.isTransientTaskbar(activity)
                 ? activity.getResources().getDimensionPixelSize(R.dimen.transient_taskbar_margin)
                 : 0;
+        mStashedHandleHeight = activity.getResources()
+                .getDimensionPixelSize(R.dimen.taskbar_stashed_handle_height);
 
         if (DisplayController.isTransientTaskbar(mActivity)) {
             mSwipeDownDetector = new SingleAxisSwipeDetector(activity,
@@ -198,14 +204,6 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public void setImeIsVisible(boolean isImeVisible) {
         mTaskbarView.setTouchesEnabled(!isImeVisible
                 || DisplayController.isTransientTaskbar(mActivity));
-    }
-
-    /**
-     * Should be called when the IME switcher visibility changes.
-     */
-    public void setIsImeSwitcherVisible(boolean isImeSwitcherVisible) {
-        mTaskbarIconAlpha.get(ALPHA_INDEX_IME_BUTTON_NAV).setValue(
-                isImeSwitcherVisible ? 0 : 1);
     }
 
     /**
@@ -287,6 +285,40 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                         mTaskbarView.mThemeIconsBackground,
                         mThemeIconsBackground.value
                 ));
+    }
+
+    private ValueAnimator createRevealAnimForView(View view, boolean isStashed) {
+        Rect viewBounds = new Rect(0, 0, view.getWidth(), view.getHeight());
+        int centerY = viewBounds.centerY();
+        int halfHandleHeight = mStashedHandleHeight / 2;
+
+        Rect stashedRect = new Rect(viewBounds.left,
+                centerY - halfHandleHeight,
+                viewBounds.right,
+                centerY + halfHandleHeight);
+
+        float radius = 0;
+        float stashedRadius = viewBounds.width() / 2f;
+
+        return new RoundedRectRevealOutlineProvider(radius, stashedRadius, viewBounds, stashedRect)
+                .createRevealAnimator(view, !isStashed, 0);
+    }
+
+    /**
+     * Creates and returns a {@link RevealOutlineAnimation} Animator that updates the icon shape
+     * and size.
+     * @param isStashed When true, the icon crops vertically to the size of the stashed handle.
+     *                  When false, the reverse happens.
+     */
+    public AnimatorSet createRevealAnimToIsStashed(boolean isStashed) {
+        AnimatorSet as = new AnimatorSet();
+        for (int i = mTaskbarView.getChildCount() - 1; i >= 0; i--) {
+            View child = mTaskbarView.getChildAt(i);
+            if (child instanceof BubbleTextView) {
+                as.play(createRevealAnimForView(child, isStashed));
+            }
+        }
+        return as;
     }
 
     /**

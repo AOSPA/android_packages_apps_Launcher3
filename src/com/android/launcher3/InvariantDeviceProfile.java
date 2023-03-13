@@ -143,6 +143,8 @@ public class InvariantDeviceProfile {
 
     public @StyleRes int folderStyle;
 
+    public @StyleRes int cellStyle;
+
     public float[] horizontalMargin;
 
     public PointF[] allAppsCellSize;
@@ -173,6 +175,7 @@ public class InvariantDeviceProfile {
      */
     public int numAllAppsColumns;
     public int numDatabaseAllAppsColumns;
+    public @StyleRes int allAppsStyle;
 
     /**
      * Do not query directly. see {@link DeviceProfile#isScalableGrid}.
@@ -206,8 +209,6 @@ public class InvariantDeviceProfile {
         if (!newGridName.equals(gridName)) {
             LauncherPrefs.getPrefs(context).edit().putString(KEY_IDP_GRID_NAME, newGridName)
                     .apply();
-            Log.d("b/258560494", "InvariantDeviceProfile - setting newGridName: " + newGridName
-                    + ", gridName: " + gridName);
         }
         new DeviceGridState(this).writeToPrefs(context);
 
@@ -351,6 +352,8 @@ public class InvariantDeviceProfile {
         numFolderColumns = closestProfile.numFolderColumns;
         folderStyle = closestProfile.folderStyle;
 
+        cellStyle = closestProfile.cellStyle;
+
         isScalable = closestProfile.isScalable;
         devicePaddingId = closestProfile.devicePaddingId;
         this.deviceType = deviceType;
@@ -381,6 +384,8 @@ public class InvariantDeviceProfile {
         hotseatColumnSpan = closestProfile.hotseatColumnSpan;
         hotseatBarBottomSpace = displayOption.hotseatBarBottomSpace;
         hotseatQsbSpace = displayOption.hotseatQsbSpace;
+
+        allAppsStyle = closestProfile.allAppsStyle;
 
         numAllAppsColumns = closestProfile.numAllAppsColumns;
         numDatabaseAllAppsColumns = deviceType == TYPE_MULTI_DISPLAY
@@ -455,7 +460,6 @@ public class InvariantDeviceProfile {
     public void setCurrentGrid(Context context, String gridName) {
         Context appContext = context.getApplicationContext();
         LauncherPrefs.getPrefs(appContext).edit().putString(KEY_IDP_GRID_NAME, gridName).apply();
-        Log.d("b/258560494", "setCurrentGrid: " + gridName);
         MAIN_EXECUTOR.execute(() -> onConfigChanged(appContext));
     }
 
@@ -520,10 +524,6 @@ public class InvariantDeviceProfile {
             }
         }
         if (filteredProfiles.isEmpty()) {
-            if (gridName != null) {
-                Log.d("b/258560494", "No matching grid from for gridName: " + gridName
-                        + ", deviceType: " + deviceType);
-            }
             // No grid found, use the default options
             for (DisplayOption option : profiles) {
                 if (option.canBeDefault) {
@@ -790,7 +790,9 @@ public class InvariantDeviceProfile {
         private final int numFolderRows;
         private final int numFolderColumns;
         private final @StyleRes int folderStyle;
+        private final @StyleRes int cellStyle;
 
+        private final @StyleRes int allAppsStyle;
         private final int numAllAppsColumns;
         private final int numDatabaseAllAppsColumns;
         private final int numHotseatIcons;
@@ -826,6 +828,8 @@ public class InvariantDeviceProfile {
             demoModeLayoutId = a.getResourceId(
                     R.styleable.GridDisplayOption_demoModeLayoutId, defaultLayoutId);
 
+            allAppsStyle = a.getResourceId(R.styleable.GridDisplayOption_allAppsStyle,
+                    R.style.AllAppsStyleDefault);
             numAllAppsColumns = a.getInt(
                     R.styleable.GridDisplayOption_numAllAppsColumns, numColumns);
             numDatabaseAllAppsColumns = a.getInt(
@@ -858,6 +862,9 @@ public class InvariantDeviceProfile {
 
             folderStyle = a.getResourceId(R.styleable.GridDisplayOption_folderStyle,
                     INVALID_RESOURCE_HANDLE);
+
+            cellStyle = a.getResourceId(R.styleable.GridDisplayOption_cellStyle,
+                    R.style.CellStyleDefault);
 
             isScalable = a.getBoolean(
                     R.styleable.GridDisplayOption_isScalable, false);
