@@ -197,15 +197,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     public Animator createAnimToLauncher(@NonNull LauncherState toState,
             @NonNull RecentsAnimationCallbacks callbacks, long duration) {
-        AnimatorSet set = new AnimatorSet();
-        Animator taskbarState = mTaskbarLauncherStateController
-                .createAnimToLauncher(toState, callbacks, duration);
-        long halfDuration = Math.round(duration * 0.5f);
-        Animator translation =
-                mControllers.taskbarTranslationController.createAnimToLauncher(halfDuration);
-
-        set.playTogether(taskbarState, translation);
-        return set;
+        return mTaskbarLauncherStateController.createAnimToLauncher(toState, callbacks, duration);
     }
 
     public boolean isDraggingItem() {
@@ -271,7 +263,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      * Returns {@code true} if a Taskbar education should be shown on application launch.
      */
     public boolean shouldShowEduOnAppLaunch() {
-        if (Utilities.IS_RUNNING_IN_TEST_HARNESS) {
+        if (Utilities.isRunningInTestHarness()) {
             return false;
         }
 
@@ -345,6 +337,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mTaskbarLauncherStateController.isInHotseatOnTopStates()
                 && mTaskbarInAppDisplayProgressMultiProp.get(MINUS_ONE_PAGE_PROGRESS_INDEX)
                     .getValue() == 0;
+    }
+
+    @Override
+    protected boolean isInOverview() {
+        return mTaskbarLauncherStateController.isInOverview();
     }
 
     @Override
