@@ -87,14 +87,14 @@ public class ParanoidLauncherModelDelegate extends QuickstepModelDelegate
             @Override
             public void execute(LauncherAppState app, BgDataModel dataModel, AllAppsList apps) {
                 List<ItemInfo> items = new ArrayList<>(mSmartspaceTargets.size());
-                BgDataModel.FixedContainerItems container = new BgDataModel.FixedContainerItems(-110, items);
                 for (SmartspaceTarget target : list) {
                     SmartspaceItem item = new SmartspaceItem();
                     item.setSmartspaceTarget(target);
-                    item.container = container.containerId;
+                    item.container = -110;
                     item.itemType = 8;
-                    container.items.add(item);
+                    items.add(item);
                 }
+                BgDataModel.FixedContainerItems container = new BgDataModel.FixedContainerItems(-110, items);
                 bindExtraContainerItems(container);
             }
         });
