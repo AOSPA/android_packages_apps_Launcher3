@@ -868,7 +868,7 @@ public class DeviceProfile {
         boolean canQsbInline = isTwoPanels ? twoPanelCanInline : tabletInlineQsb;
         canQsbInline = canQsbInline && hotseatQsbHeight > 0;
 
-        return (mIsScalableGrid && inv.inlineQsb[mTypeIndex] && canQsbInline)
+        return (inv.inlineQsb[mTypeIndex] && canQsbInline)
                 || inv.isFixedLandscape;
     }
 
@@ -978,8 +978,6 @@ public class DeviceProfile {
      * necessary.
      */
     public void recalculateHotseatWidthAndBorderSpace() {
-        if (!mIsScalableGrid) return;
-
         updateHotseatWidthAndBorderSpace(inv.numColumns);
         int numWorkspaceColumns = getPanelCount() * inv.numColumns;
         if (isTwoPanels) {
