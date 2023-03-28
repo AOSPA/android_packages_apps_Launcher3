@@ -231,6 +231,10 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
     @Test
     @ScreenRecord // b/202433017
     public void testWorkspace() throws Exception {
+        // Make sure there is an instance of chrome on the hotseat
+        mLauncher.useTaplWorkspaceLayoutOnReload();
+        clearLauncherData();
+
         final Workspace workspace = mLauncher.getWorkspace();
 
         // Test that ensureWorkspaceIsScrollable adds a page by dragging an icon there.
@@ -516,7 +520,6 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
 
     @Test
     @PortraitLandscape
-    @ScreenRecord // (b/256659409)
     public void testUninstallFromAllApps() throws Exception {
         installDummyAppAndWaitForUIUpdate();
         try {
@@ -525,6 +528,8 @@ public class TaplTestsLauncher3 extends AbstractLauncherUiTest {
             allApps.freeze();
             try {
                 workspace = allApps.getAppIcon(DUMMY_APP_NAME).uninstall();
+                // After the toast clears, then the model tries to commit the uninstall transaction
+                mLauncher.waitForModelQueueCleared();
             } finally {
                 allApps.unfreeze();
             }

@@ -317,7 +317,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         return mTransientTaskbarBounds;
     }
 
-    @VisibleForTesting
     @Override
     public StatsLogManager getStatsLogManager() {
         // Used to mock, can't mock a default interface method directly
@@ -590,10 +589,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         AnimatorSet anim = new AnimatorSet();
         anim.play(mControllers.taskbarViewController.getTaskbarIconAlpha().get(
                 TaskbarViewController.ALPHA_INDEX_NOTIFICATION_EXPANDED).animateToValue(alpha));
-        if (!isThreeButtonNav()) {
-            anim.play(mControllers.taskbarDragLayerController.getNotificationShadeBgTaskbar()
-                    .animateToValue(alpha));
-        }
+        anim.play(mControllers.taskbarDragLayerController.getNotificationShadeBgTaskbar()
+                .animateToValue(alpha));
         anim.start();
         if (skipAnim) {
             anim.end();

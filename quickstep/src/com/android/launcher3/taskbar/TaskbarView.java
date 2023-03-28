@@ -16,15 +16,18 @@
 package com.android.launcher3.taskbar;
 
 import static android.content.pm.PackageManager.FEATURE_PC;
+import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
 
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 
 import androidx.annotation.LayoutRes;
@@ -91,6 +94,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
     private float mTransientTaskbarAllAppsButtonTranslationXOffset;
 
+    private final boolean mStartAlignTaskbar;
+
     public TaskbarView(@NonNull Context context) {
         this(context, null);
     }
@@ -118,6 +123,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 resources.getDimension(isTransientTaskbar
                         ? R.dimen.transient_taskbar_all_apps_button_translation_x_offset
                         : R.dimen.taskbar_all_apps_button_translation_x_offset);
+        mStartAlignTaskbar = mActivityContext.isThreeButtonNav()
+                && resources.getBoolean(R.bool.start_align_taskbar);
 
         int actualMargin = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
         int actualIconSize = mActivityContext.getDeviceProfile().iconSizePx;
@@ -153,7 +160,26 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         // TODO: Disable touch events on QSB otherwise it can crash.
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
+    }
 
+    @Override
+    public boolean performAccessibilityActionInternal(int action, Bundle arguments) {
+        if (action == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) {
+            announceForAccessibility(mContext.getString(R.string.taskbar_a11y_shown_title));
+        } else if (action == AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS) {
+            announceForAccessibility(mContext.getString(R.string.taskbar_a11y_hidden_title));
+        }
+        return super.performAccessibilityActionInternal(action, arguments);
+
+    }
+
+    protected void announceAccessibilityChanges() {
+        this.performAccessibilityAction(
+                isVisibleToUser() ? AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS
+                        : AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS, null);
+
+        ActivityContext.lookupContext(getContext()).getDragLayer()
+                .sendAccessibilityEvent(TYPE_WINDOW_CONTENT_CHANGED);
     }
 
     private int getColorWithGivenLuminance(int color, float luminance) {
@@ -161,6 +187,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         ColorUtils.colorToHSL(color, colorHSL);
         colorHSL[2] = luminance;
         return ColorUtils.HSLToColor(colorHSL);
+    }
+
+    /**
+     * Returns the icon touch size.
+     */
+    public int getIconTouchSize() {
+        return mIconTouchSize;
     }
 
     private int calculateThemeIconsBackground() {
@@ -343,10 +376,22 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         boolean needMoreSpaceForNav = layoutRtl ?
                 navSpaceNeeded > (iconEnd - spaceNeeded) :
                 iconEnd > (right - navSpaceNeeded);
-        if (needMoreSpaceForNav) {
-            int offset = layoutRtl ?
-                    navSpaceNeeded - (iconEnd - spaceNeeded) :
-                    (right - navSpaceNeeded) - iconEnd;
+
+        if (mStartAlignTaskbar) {
+            // Taskbar is aligned to the start
+            int startSpacingPx = deviceProfile.inlineNavButtonsEndSpacingPx;
+
+            if (layoutRtl) {
+                iconEnd = right - startSpacingPx;
+            } else {
+                iconEnd = startSpacingPx + spaceNeeded;
+            }
+        } else if (needMoreSpaceForNav) {
+            // Add offset to account for nav bar when taskbar is centered
+            int offset = layoutRtl
+                    ? navSpaceNeeded - (iconEnd - spaceNeeded)
+                    : (right - navSpaceNeeded) - iconEnd;
+
             iconEnd += offset;
         }
 

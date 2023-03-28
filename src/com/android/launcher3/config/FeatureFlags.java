@@ -113,6 +113,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_TWOLINE_ALLAPPS = getDebugFlag(270390937,
             "ENABLE_TWOLINE_ALLAPPS", false, "Enables two line label inside all apps.");
 
+    public static final BooleanFlag ENABLE_TWOLINE_DEVICESEARCH = getDebugFlag(201388851,
+            "ENABLE_TWOLINE_DEVICESEARCH", false,
+            "Enable two line label for icons with labels on device search.");
+
     public static final BooleanFlag ENABLE_DEVICE_SEARCH_PERFORMANCE_LOGGING = getReleaseFlag(
             270391397, "ENABLE_DEVICE_SEARCH_PERFORMANCE_LOGGING", false,
             "Allows on device search in all apps logging");
@@ -335,7 +339,7 @@ public final class FeatureFlags {
             "ENABLE_TRANSIENT_TASKBAR", true, "Enables transient taskbar.");
 
     public static final BooleanFlag ENABLE_TRACKPAD_GESTURE = getDebugFlag(271010401,
-            "ENABLE_TRACKPAD_GESTURE", false, "Enables trackpad gesture.");
+            "ENABLE_TRACKPAD_GESTURE", true, "Enables trackpad gesture.");
 
     public static final BooleanFlag ENABLE_ICON_IN_TEXT_HEADER = getDebugFlag(270395143,
             "ENABLE_ICON_IN_TEXT_HEADER", false, "Show icon in textheader");
@@ -359,8 +363,9 @@ public final class FeatureFlags {
             "Enable the ability to tap a staged app during split select to launch it in full screen"
     );
 
-    public static final BooleanFlag ENABLE_HAPTICS_ALL_APPS = getDebugFlag(270396358,
-            "ENABLE_HAPTICS_ALL_APPS", false, "Enables haptics opening/closing All apps");
+    public static final BooleanFlag ENABLE_PREMIUM_HAPTICS_ALL_APPS = getDebugFlag(270396358,
+            "ENABLE_PREMIUM_HAPTICS_ALL_APPS", false,
+            "Enables haptics opening/closing All apps");
 
     public static final BooleanFlag ENABLE_FORCED_MONO_ICON = getDebugFlag(270396209,
             "ENABLE_FORCED_MONO_ICON", false,
@@ -380,6 +385,11 @@ public final class FeatureFlags {
             "Enables taskbar pinning to allow user to switch between transient and persistent "
                     + "taskbar flavors");
 
+    public static final BooleanFlag ENABLE_WORKSPACE_LOADING_OPTIMIZATION = getDebugFlag(251502424,
+            "ENABLE_WORKSPACE_LOADING_OPTIMIZATION", false, "load the current workspace screen "
+                    + "visible to the user before the rest rather than loading all of them at once."
+    );
+
     public static final BooleanFlag ENABLE_GRID_ONLY_OVERVIEW = getDebugFlag(270397206,
             "ENABLE_GRID_ONLY_OVERVIEW", false,
             "Enable a grid-only overview without a focused task.");
@@ -392,6 +402,10 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_KEYBOARD_QUICK_SWITCH = getDebugFlag(270396844,
             "ENABLE_KEYBOARD_QUICK_SWITCH", true,
             "Enables keyboard quick switching");
+
+    public static final BooleanFlag ENABLE_APP_CLONING_CHANGES_IN_LAUNCHER = getDebugFlag(266177840,
+            "ENABLE_APP_CLONING_CHANGES_IN_LAUNCHER", false,
+            "Removes clone apps from the work profile tab.");
 
     public static class BooleanFlag {
 

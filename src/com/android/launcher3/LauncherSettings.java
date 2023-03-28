@@ -41,10 +41,6 @@ public class LauncherSettings {
          * An animation using the view's background.
          */
         public static final int VIEW_BACKGROUND = 1;
-        /**
-         * The default animation for a given view/item info type, but without the splash icon.
-         */
-        public static final int DEFAULT_NO_ICON = 2;
     }
 
     /**
@@ -393,6 +389,7 @@ public class LauncherSettings {
                 "set_use_test_workspace_layout_flag";
         public static final String ARG_DEFAULT_WORKSPACE_LAYOUT_TEST = "default_test_workspace";
         public static final String ARG_DEFAULT_WORKSPACE_LAYOUT_TEST2 = "default_test2_workspace";
+        public static final String ARG_DEFAULT_WORKSPACE_LAYOUT_TAPL = "default_tapl_workspace";
 
         public static final String METHOD_CLEAR_USE_TEST_WORKSPACE_LAYOUT_FLAG =
                 "clear_use_test_workspace_layout_flag";
