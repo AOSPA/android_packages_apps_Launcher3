@@ -17,21 +17,26 @@ package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
+import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.anim.AnimatedFloat.VALUE;
+import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.anim.Interpolators.FINAL_FRAME;
 import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
 import static com.android.launcher3.taskbar.TaskbarManager.isPhoneMode;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_NEGATIVE;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
+import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
+import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_TASKBAR_ALIGNMENT_ANIM;
+import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_TASKBAR_REVEAL_ANIM;
 
 import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.graphics.Rect;
-import android.util.FloatProperty;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -41,10 +46,10 @@ import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.view.OneShotPreDrawListener;
 
-import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
+import com.android.launcher3.Reorderable;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AlphaUpdateListener;
 import com.android.launcher3.anim.AnimatedFloat;
@@ -54,7 +59,6 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.RevealOutlineAnimation;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.config.FeatureFlags;
-import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.icons.ThemedIconDrawable;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
@@ -63,6 +67,7 @@ import com.android.launcher3.util.HorizontalInsettableView;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.MultiPropertyFactory;
+import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.MultiValueAlpha;
 
 import java.io.PrintWriter;
@@ -199,14 +204,6 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     }
 
     /**
-     * Should be called when the IME visibility changes, so we can make Taskbar not steal touches.
-     */
-    public void setImeIsVisible(boolean isImeVisible) {
-        mTaskbarView.setTouchesEnabled(!isImeVisible
-                || DisplayController.isTransientTaskbar(mActivity));
-    }
-
-    /**
      * Should be called when the recents button is disabled, so we can hide taskbar icons as well.
      */
     public void setRecentsButtonDisabled(boolean isDisabled) {
@@ -312,10 +309,65 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     public AnimatorSet createRevealAnimToIsStashed(boolean isStashed) {
         AnimatorSet as = new AnimatorSet();
-        for (int i = mTaskbarView.getChildCount() - 1; i >= 0; i--) {
+
+        Rect stashedBounds = new Rect();
+        mControllers.stashedHandleViewController.getStashedHandleBounds(stashedBounds);
+
+        int numChildren = mTaskbarView.getChildCount();
+        // We do not actually modify the width of the icons, but we will use this width to position
+        // the children to overlay the nav handle.
+        float virtualChildWidth = stashedBounds.width() / (float) numChildren;
+
+        for (int i = numChildren - 1; i >= 0; i--) {
             View child = mTaskbarView.getChildAt(i);
-            if (child instanceof BubbleTextView) {
-                as.play(createRevealAnimForView(child, isStashed));
+
+            if (child == mTaskbarView.getQsb()) {
+                continue;
+            }
+
+            // Crop the icons to/from the nav handle shape.
+            as.play(createRevealAnimForView(child, isStashed));
+
+            // Translate the icons to/from their locations as the "nav handle."
+            // We look at 'left' and 'right' values to ensure that the children stay within the
+            // bounds of the stashed handle.
+            float iconLeft = child.getLeft();
+            float newLeft = stashedBounds.left + (virtualChildWidth * i);
+            final float croppedTransX;
+            if (iconLeft > newLeft) {
+                float newRight = stashedBounds.right - (virtualChildWidth * (numChildren - 1 - i));
+                croppedTransX = -(child.getLeft() + child.getWidth() - newRight);
+            } else {
+                croppedTransX = newLeft - iconLeft;
+            }
+
+            float croppedTransY = child.getHeight() - stashedBounds.height();
+            if (child instanceof Reorderable) {
+                MultiTranslateDelegate mtd = ((Reorderable) child).getTranslateDelegate();
+
+                as.play(ObjectAnimator.ofFloat(mtd.getTranslationX(INDEX_TASKBAR_REVEAL_ANIM),
+                        MULTI_PROPERTY_VALUE, isStashed
+                                ? new float[] {croppedTransX}
+                                : new float[] {croppedTransX, 0}));
+                as.play(ObjectAnimator.ofFloat(mtd.getTranslationY(INDEX_TASKBAR_REVEAL_ANIM),
+                        MULTI_PROPERTY_VALUE, isStashed
+                                ? new float[] {croppedTransY}
+                                : new float[] {croppedTransY, 0}));
+                as.addListener(forEndCallback(() ->
+                        mtd.setTranslation(INDEX_TASKBAR_REVEAL_ANIM, 0, 0)));
+            } else {
+                as.play(ObjectAnimator.ofFloat(child,
+                        VIEW_TRANSLATE_X, isStashed
+                                ? new float[] {croppedTransX}
+                                : new float[] {croppedTransX, 0}));
+                as.play(ObjectAnimator.ofFloat(child,
+                        VIEW_TRANSLATE_Y, isStashed
+                                ? new float[] {croppedTransY}
+                                : new float[] {croppedTransY, 0}));
+                as.addListener(forEndCallback(() -> {
+                    child.setTranslationX(0);
+                    child.setTranslationY(0);
+                }));
             }
         }
         return as;
@@ -380,8 +432,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         for (int i = 0; i < mTaskbarView.getChildCount(); i++) {
             View child = mTaskbarView.getChildAt(i);
             int positionInHotseat;
-            boolean isAllAppsButton = FeatureFlags.ENABLE_ALL_APPS_IN_TASKBAR.get()
-                    && child == mTaskbarView.getAllAppsButtonView();
+            boolean isAllAppsButton = child == mTaskbarView.getAllAppsButtonView();
             if (!mIsHotseatIconOnTopWhenAligned) {
                 // When going to home, the EMPHASIZED interpolator in TaskbarLauncherStateController
                 // plays iconAlignment to 1 really fast, therefore moving the fading towards the end
@@ -403,7 +454,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 float childCenter = (child.getLeft() + child.getRight()) / 2f;
                 float halfQsbIconWidthDiff =
                         (launcherDp.hotseatQsbWidth - taskbarDp.iconSizePx) / 2f;
-                setter.addFloat(child, ICON_TRANSLATE_X,
+                setter.addFloat(child, VIEW_TRANSLATE_X,
                         isRtl ? -halfQsbIconWidthDiff : halfQsbIconWidthDiff,
                         hotseatIconCenter - childCenter, interpolator);
 
@@ -447,10 +498,18 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                     + hotseatCellSize / 2f;
 
             float childCenter = (child.getLeft() + child.getRight()) / 2f;
-            setter.setFloat(child, ICON_TRANSLATE_X, hotseatIconCenter - childCenter, interpolator);
+            if (child instanceof Reorderable) {
+                MultiTranslateDelegate mtd = ((Reorderable) child).getTranslateDelegate();
 
-            setter.setFloat(child, VIEW_TRANSLATE_Y, mTaskbarBottomMargin, interpolator);
-
+                setter.setFloat(mtd.getTranslationX(INDEX_TASKBAR_ALIGNMENT_ANIM),
+                        MULTI_PROPERTY_VALUE, hotseatIconCenter - childCenter, interpolator);
+                setter.setFloat(mtd.getTranslationY(INDEX_TASKBAR_ALIGNMENT_ANIM),
+                        MULTI_PROPERTY_VALUE, mTaskbarBottomMargin, interpolator);
+            } else {
+                setter.setFloat(child, VIEW_TRANSLATE_X,
+                        hotseatIconCenter - childCenter, interpolator);
+                setter.setFloat(child, VIEW_TRANSLATE_Y, mTaskbarBottomMargin, interpolator);
+            }
             setter.setFloat(child, SCALE_PROPERTY, scaleUp, interpolator);
         }
 
@@ -627,31 +686,12 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         public void clearTouchInProgress() {
             mTouchInProgress = false;
         }
+
+        /**
+         * Notifies launcher to update icon alignment.
+         */
+        public void notifyIconLayoutBoundsChanged() {
+            mControllers.uiController.onIconLayoutBoundsChanged();
+        }
     }
-
-    public static final FloatProperty<View> ICON_TRANSLATE_X =
-            new FloatProperty<View>("taskbarAligmentTranslateX") {
-
-                @Override
-                public void setValue(View view, float v) {
-                    if (view instanceof BubbleTextView) {
-                        ((BubbleTextView) view).setTranslationXForTaskbarAlignmentAnimation(v);
-                    } else if (view instanceof FolderIcon) {
-                        ((FolderIcon) view).setTranslationForTaskbarAlignmentAnimation(v);
-                    } else {
-                        view.setTranslationX(v);
-                    }
-                }
-
-                @Override
-                public Float get(View view) {
-                    if (view instanceof BubbleTextView) {
-                        return ((BubbleTextView) view)
-                                .getTranslationXForTaskbarAlignmentAnimation();
-                    } else if (view instanceof FolderIcon) {
-                        return ((FolderIcon) view).getTranslationXForTaskbarAlignmentAnimation();
-                    }
-                    return view.getTranslationX();
-                }
-            };
 }

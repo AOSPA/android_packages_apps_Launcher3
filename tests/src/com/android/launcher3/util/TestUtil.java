@@ -19,17 +19,17 @@ import static androidx.test.InstrumentationRegistry.getContext;
 import static androidx.test.InstrumentationRegistry.getInstrumentation;
 import static androidx.test.InstrumentationRegistry.getTargetContext;
 
-import android.content.Context;
 import android.content.pm.LauncherApps;
 import android.content.res.Resources;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.UserHandle;
 
-import androidx.annotation.VisibleForTesting;
 import androidx.test.uiautomator.UiDevice;
 
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.config.FeatureFlags.BooleanFlag;
+import com.android.launcher3.config.FeatureFlags.IntFlag;
 
 import org.junit.Assert;
 
@@ -37,6 +37,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 public class TestUtil {
     public static final String DUMMY_PACKAGE = "com.example.android.aardwolf";
@@ -72,16 +74,34 @@ public class TestUtil {
         }
     }
 
-    @VisibleForTesting
-    // Override feature flag, mainly to be used ONLY in tests
-    public static void overrideBooleanFlagValue(
-            Context context, FeatureFlags.BooleanFlag flagToOverride,
-            boolean bool) {
-        context.getSharedPreferences(FeatureFlags.FLAGS_PREF_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(flagToOverride.key, bool)
-                .commit();
-        FeatureFlags.initialize(context);
+    /**
+     * Utility class to override a boolean flag during test. Note that the returned SafeCloseable
+     * must be closed to restore the original state
+     */
+    public static SafeCloseable overrideFlag(BooleanFlag flag, boolean value) {
+        Predicate<BooleanFlag> originalProxy = FeatureFlags.sBooleanReader;
+        Predicate<BooleanFlag> testProxy = f -> f == flag ? value : originalProxy.test(f);
+        FeatureFlags.sBooleanReader = testProxy;
+        return () -> {
+            if (FeatureFlags.sBooleanReader == testProxy) {
+                FeatureFlags.sBooleanReader = originalProxy;
+            }
+        };
+    }
+
+    /**
+     * Utility class to override a int flag during test. Note that the returned SafeCloseable
+     * must be closed to restore the original state
+     */
+    public static SafeCloseable overrideFlag(IntFlag flag, int value) {
+        ToIntFunction<IntFlag> originalProxy = FeatureFlags.sIntReader;
+        ToIntFunction<IntFlag> testProxy = f -> f == flag ? value : originalProxy.applyAsInt(f);
+        FeatureFlags.sIntReader = testProxy;
+        return () -> {
+            if (FeatureFlags.sIntReader == testProxy) {
+                FeatureFlags.sIntReader = originalProxy;
+            }
+        };
     }
 
     public static void uninstallDummyApp() throws IOException {

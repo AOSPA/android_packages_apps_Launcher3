@@ -17,9 +17,7 @@ package com.android.launcher3.widget.picker;
 
 import static android.view.View.MeasureSpec.makeMeasureSpec;
 
-import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
-import static com.android.launcher3.allapps.AllAppsTransitionController.SWIPE_ALL_APPS_TO_HOME_MIN_SCALE;
 import static com.android.launcher3.config.FeatureFlags.LARGE_SCREEN_WIDGET_PICKER;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGETSTRAY_SEARCHED;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
@@ -31,6 +29,7 @@ import android.content.Context;
 import android.content.pm.LauncherApps;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Outline;
 import android.graphics.Rect;
 import android.os.Process;
 import android.os.UserHandle;
@@ -42,33 +41,34 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.WindowInsets;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Interpolator;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.Px;
 import androidx.annotation.VisibleForTesting;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
-import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.model.UserManagerState;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.pm.UserCache;
+import com.android.launcher3.recyclerview.ViewHolderBinder;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.views.ArrowTipView;
 import com.android.launcher3.views.RecyclerViewFastScroller;
@@ -161,7 +161,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                     WidgetsRecyclerView searchRecyclerView =
                             mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView;
                     if (mIsInSearchMode && searchRecyclerView != null) {
-                        searchRecyclerView.bindFastScrollbar();
+                        searchRecyclerView.bindFastScrollbar(mFastScroller);
                     }
                 }
 
@@ -170,14 +170,25 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                 }
             };
 
-    private final int mTabsHeight;
-    private final int mWidgetSheetContentHorizontalPadding;
+    private final ViewOutlineProvider mViewOutlineProvider = new ViewOutlineProvider() {
+        @Override
+        public void getOutline(View view, Outline outline) {
+            outline.setRect(
+                    0,
+                    0,
+                    view.getMeasuredWidth(),
+                    view.getMeasuredHeight() + getBottomOffsetPx()
+            );
+        }
+    };
+
+    @Px private final int mTabsHeight;
 
     @Nullable private WidgetsRecyclerView mCurrentWidgetsRecyclerView;
     @Nullable private PersonalWorkPagedView mViewPager;
     private boolean mIsInSearchMode;
     private boolean mIsNoWidgetsViewNeeded;
-    private int mMaxSpansPerRow = DEFAULT_MAX_HORIZONTAL_SPANS;
+    @Px private int mMaxSpanPerRow;
     private TextView mNoWidgetsView;
 
     private StickyHeaderLayout mSearchScrollView;
@@ -188,17 +199,22 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     private View mSearchBarContainer;
     private WidgetsSearchBar mSearchBar;
     private TextView mHeaderTitle;
-    private ScrollView mRightPane;
+    private FrameLayout mRightPane;
     private WidgetsListTableViewHolderBinder mWidgetsListTableViewHolderBinder;
+    private DeviceProfile mDeviceProfile;
     private final boolean mIsTwoPane;
 
     private int mOrientation;
     private @Nullable WidgetsRecyclerView mCurrentTouchEventRecyclerView;
 
+    private RecyclerViewFastScroller mFastScroller;
+
     public WidgetsFullSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        DeviceProfile dp = Launcher.getLauncher(context).getDeviceProfile();
-        mIsTwoPane = dp.isTablet && dp.isLandscape && LARGE_SCREEN_WIDGET_PICKER.get();
+        mDeviceProfile = Launcher.getLauncher(context).getDeviceProfile();
+        mIsTwoPane = mDeviceProfile.isTablet
+                && mDeviceProfile.isLandscape
+                && LARGE_SCREEN_WIDGET_PICKER.get();
         mHasWorkProfile = context.getSystemService(LauncherApps.class).getProfiles().size() > 1;
         mAdapters.put(AdapterHolder.PRIMARY, new AdapterHolder(AdapterHolder.PRIMARY));
         mAdapters.put(AdapterHolder.WORK, new AdapterHolder(AdapterHolder.WORK));
@@ -208,11 +224,10 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         mTabsHeight = mHasWorkProfile
                 ? resources.getDimensionPixelSize(R.dimen.all_apps_header_pill_height)
                 : 0;
-        mWidgetSheetContentHorizontalPadding = 2 * resources.getDimensionPixelSize(
-                R.dimen.widget_cell_horizontal_padding);
 
         mUserManagerState.init(UserCache.INSTANCE.get(context),
                 context.getSystemService(UserManager.class));
+        setContentBackground(getContext().getDrawable(R.drawable.bg_widgets_full_sheet));
     }
 
     public WidgetsFullSheet(Context context, AttributeSet attrs) {
@@ -224,6 +239,9 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         super.onFinishInflate();
         mContent = findViewById(R.id.container);
 
+        mContent.setOutlineProvider(mViewOutlineProvider);
+        mContent.setClipToOutline(true);
+
         LayoutInflater layoutInflater = LayoutInflater.from(getContext());
         int contentLayoutRes = mHasWorkProfile ? R.layout.widgets_full_sheet_paged_view
                 : R.layout.widgets_full_sheet_recyclerview;
@@ -233,14 +251,19 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         }
         layoutInflater.inflate(contentLayoutRes, mContent, true);
 
-        RecyclerViewFastScroller fastScroller = findViewById(R.id.fast_scroller);
+        mFastScroller = findViewById(R.id.fast_scroller);
         if (mIsTwoPane) {
-            fastScroller.setVisibility(GONE);
+            mFastScroller.setVisibility(GONE);
         }
+        mFastScroller.setPopupView(findViewById(R.id.fast_scroller_popup));
+
         mAdapters.get(AdapterHolder.PRIMARY).setup(findViewById(R.id.primary_widgets_list_view));
         mAdapters.get(AdapterHolder.SEARCH).setup(findViewById(R.id.search_widgets_list_view));
         if (mHasWorkProfile) {
             mViewPager = findViewById(R.id.widgets_view_pager);
+            mViewPager.setOutlineProvider(mViewOutlineProvider);
+            mViewPager.setClipToOutline(true);
+            mViewPager.setClipChildren(false);
             mViewPager.initParentViews(this);
             mViewPager.getPageIndicator().setOnActivePageChangedListener(this);
             mViewPager.getPageIndicator().setActiveMarker(AdapterHolder.PRIMARY);
@@ -272,7 +295,9 @@ public class WidgetsFullSheet extends BaseWidgetSheet
 
             // Inflate the suggestions header.
             mSuggestedWidgetsHeader = (WidgetsListHeader) layoutInflater.inflate(
-                    R.layout.widgets_list_row_header, mSuggestedWidgetsContainer, false);
+                    R.layout.widgets_list_row_header_two_pane,
+                    mSuggestedWidgetsContainer,
+                    false);
             mSuggestedWidgetsHeader.setExpanded(true);
 
             PackageItemInfo packageItemInfo =  new PackageItemInfo(
@@ -293,8 +318,8 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mSuggestedWidgetsHeader.applyFromItemInfoWithIcon(widgetsListHeaderEntry);
             mSuggestedWidgetsHeader.setIcon(
                     getContext().getDrawable(R.drawable.widget_suggestions_icon));
-            mSuggestedWidgetsHeader.setOnExpandChangeListener(isExpanded -> {
-                mSuggestedWidgetsHeader.setExpanded(isExpanded);
+            mSuggestedWidgetsHeader.setOnClickListener(view -> {
+                mSuggestedWidgetsHeader.setExpanded(true);
                 resetExpandedHeaders();
                 mRightPane.removeAllViews();
                 mRightPane.addView(mRecommendedWidgetsTable);
@@ -310,7 +335,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                 : mSearchScrollView.findViewById(R.id.title);
         mRightPane = mIsTwoPane ? mContent.findViewById(R.id.right_pane) : null;
         mWidgetsListTableViewHolderBinder =
-                new WidgetsListTableViewHolderBinder(layoutInflater, this, this);
+                new WidgetsListTableViewHolderBinder(mActivityContext, layoutInflater, this, this);
         onRecommendedWidgetsBound();
         onWidgetsBound();
 
@@ -349,15 +374,12 @@ public class WidgetsFullSheet extends BaseWidgetSheet
 
     @Override
     public void onBackProgressed(@FloatRange(from = 0.0, to = 1.0) float progress) {
-        float deceleratedProgress =
-                Interpolators.PREDICTIVE_BACK_DECELERATED_EASE.getInterpolation(progress);
-        float scaleProgress = SWIPE_ALL_APPS_TO_HOME_MIN_SCALE
-                + (1 - SWIPE_ALL_APPS_TO_HOME_MIN_SCALE) * (1 - deceleratedProgress);
-        SCALE_PROPERTY.set(this, scaleProgress);
+        super.onBackProgressed(progress);
+        mFastScroller.setVisibility(progress > 0 ? View.INVISIBLE : View.VISIBLE);
     }
 
     private void attachScrollbarToRecyclerView(WidgetsRecyclerView recyclerView) {
-        recyclerView.bindFastScrollbar();
+        recyclerView.bindFastScrollbar(mFastScroller);
         if (mCurrentWidgetsRecyclerView != recyclerView) {
             // Only reset the scroll position & expanded apps if the currently shown recycler view
             // has been updated.
@@ -371,6 +393,11 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     private void updateRecyclerViewVisibility(AdapterHolder adapterHolder) {
         // The first item is always an empty space entry. Look for any more items.
         boolean isWidgetAvailable = adapterHolder.mWidgetsListAdapter.hasVisibleEntries();
+
+        if (mIsTwoPane) {
+            mRightPane.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
+        }
+
         adapterHolder.mWidgetsRecyclerView.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
 
         if (adapterHolder.mAdapterType == AdapterHolder.SEARCH) {
@@ -507,22 +534,20 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         View content = mHasWorkProfile
                 ? mViewPager
                 : mAdapters.get(AdapterHolder.PRIMARY).mWidgetsRecyclerView;
-
         if (mIsTwoPane && mRightPane != null) {
             content = mRightPane;
         }
 
-        int maxHorizontalSpans = computeMaxHorizontalSpans(content,
-                mWidgetSheetContentHorizontalPadding);
-        if (mMaxSpansPerRow != maxHorizontalSpans) {
-            mMaxSpansPerRow = maxHorizontalSpans;
-            mAdapters.get(AdapterHolder.PRIMARY).mWidgetsListAdapter.setMaxHorizontalSpansPerRow(
-                    mMaxSpansPerRow);
-            mAdapters.get(AdapterHolder.SEARCH).mWidgetsListAdapter.setMaxHorizontalSpansPerRow(
-                    mMaxSpansPerRow);
+        @Px int maxHorizontalSpan = content.getMeasuredWidth() - (2 * mContentHorizontalMargin);
+        if (mMaxSpanPerRow != maxHorizontalSpan) {
+            mMaxSpanPerRow = maxHorizontalSpan;
+            mAdapters.get(AdapterHolder.PRIMARY).mWidgetsListAdapter.setMaxHorizontalSpansPxPerRow(
+                    maxHorizontalSpan);
+            mAdapters.get(AdapterHolder.SEARCH).mWidgetsListAdapter.setMaxHorizontalSpansPxPerRow(
+                    maxHorizontalSpan);
             if (mHasWorkProfile) {
-                mAdapters.get(AdapterHolder.WORK).mWidgetsListAdapter.setMaxHorizontalSpansPerRow(
-                        mMaxSpansPerRow);
+                mAdapters.get(AdapterHolder.WORK).mWidgetsListAdapter.setMaxHorizontalSpansPxPerRow(
+                        maxHorizontalSpan);
             }
             onRecommendedWidgetsBound();
             return true;
@@ -567,7 +592,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             workUserAdapterHolder.mWidgetsListAdapter.setWidgets(allWidgets);
             onActivePageChanged(mViewPager.getCurrentPage());
         } else {
-            updateRecyclerViewVisibility(primaryUserAdapterHolder);
+            onActivePageChanged(0);
         }
         // Update recommended widgets section so that it occupies appropriate space on screen to
         // leave enough space for presence/absence of mNoWidgetsView.
@@ -671,8 +696,12 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                     - noWidgetsViewHeight) * RECOMMENDATION_TABLE_HEIGHT_RATIO;
 
             List<ArrayList<WidgetItem>> recommendedWidgetsInTable =
-                    WidgetsTableUtils.groupWidgetItemsIntoTableWithoutReordering(
-                            recommendedWidgets, mMaxSpansPerRow);
+                    WidgetsTableUtils.groupWidgetItemsUsingRowPxWithoutReordering(
+                            recommendedWidgets,
+                            mActivityContext,
+                            mActivityContext.getDeviceProfile(),
+                            mMaxSpanPerRow,
+                            mWidgetCellHorizontalPadding);
             mRecommendedWidgetsTable.setRecommendedWidgets(
                     recommendedWidgetsInTable, maxTableHeight);
         } else {
@@ -848,7 +877,9 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         }
 
         // Checks the orientation of the screen
-        if (LARGE_SCREEN_WIDGET_PICKER.get() && mOrientation != newConfig.orientation) {
+        if (LARGE_SCREEN_WIDGET_PICKER.get()
+                && mOrientation != newConfig.orientation
+                && mDeviceProfile.isTablet) {
             mOrientation = newConfig.orientation;
             handleClose(false);
             show(Launcher.getLauncher(getContext()), false);
@@ -859,6 +890,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     public void onBackInvoked() {
         if (mIsInSearchMode) {
             mSearchBar.reset();
+            animateSlideInViewToNoScale();
         } else {
             super.onBackInvoked();
         }
@@ -907,7 +939,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     protected boolean hasSeenEducationDialog() {
         return mActivityContext.getSharedPrefs()
                 .getBoolean(KEY_WIDGETS_EDUCATION_DIALOG_SEEN, false)
-                || Utilities.IS_RUNNING_IN_TEST_HARNESS;
+                || Utilities.isRunningInTestHarness();
     }
 
     private void setUpEducationViewsIfNeeded() {
@@ -943,8 +975,6 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         AdapterHolder(int adapterType) {
             mAdapterType = adapterType;
             Context context = getContext();
-            LauncherAppState apps = LauncherAppState.getInstance(context);
-
             HeaderChangeListener headerChangeListener = new HeaderChangeListener() {
                 @Override
                 public void onHeaderChanged(@NonNull PackageUserKey selectedHeader) {
@@ -962,11 +992,13 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                             mWidgetsListTableViewHolderBinder.newViewHolder(mRightPane);
                     mWidgetsListTableViewHolderBinder.bindViewHolder(widgetsRowViewHolder,
                             contentEntry,
-                            0, Collections.EMPTY_LIST);
+                            ViewHolderBinder.POSITION_FIRST | ViewHolderBinder.POSITION_LAST,
+                            Collections.EMPTY_LIST);
                     widgetsRowViewHolder.mDataCallback = data -> {
                         mWidgetsListTableViewHolderBinder.bindViewHolder(widgetsRowViewHolder,
                                 contentEntry,
-                                0, Collections.singletonList(data));
+                                ViewHolderBinder.POSITION_FIRST | ViewHolderBinder.POSITION_LAST,
+                                Collections.singletonList(data));
                     };
                     mRightPane.removeAllViews();
                     mRightPane.addView(widgetsRowViewHolder.itemView);
@@ -975,7 +1007,6 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mWidgetsListAdapter = new WidgetsListAdapter(
                     context,
                     LayoutInflater.from(context),
-                    apps.getIconCache(),
                     this::getEmptySpaceHeight,
                     /* iconClickListener= */ WidgetsFullSheet.this,
                     /* iconLongClickListener= */ WidgetsFullSheet.this,
@@ -1003,7 +1034,11 @@ public class WidgetsFullSheet extends BaseWidgetSheet
 
         void setup(WidgetsRecyclerView recyclerView) {
             mWidgetsRecyclerView = recyclerView;
+            mWidgetsRecyclerView.setOutlineProvider(mViewOutlineProvider);
+            mWidgetsRecyclerView.setClipToOutline(true);
+            mWidgetsRecyclerView.setClipChildren(false);
             mWidgetsRecyclerView.setAdapter(mWidgetsListAdapter);
+            mWidgetsRecyclerView.bindFastScrollbar(mFastScroller);
             mWidgetsRecyclerView.setItemAnimator(mWidgetsListItemAnimator);
             mWidgetsRecyclerView.setHeaderViewDimensionsProvider(WidgetsFullSheet.this);
             if (!mIsTwoPane) {
@@ -1016,7 +1051,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             if (mAdapterType == PRIMARY || mAdapterType == WORK) {
                 mWidgetsRecyclerView.addOnAttachStateChangeListener(mBindScrollbarInSearchMode);
             }
-            mWidgetsListAdapter.setMaxHorizontalSpansPerRow(mMaxSpansPerRow);
+            mWidgetsListAdapter.setMaxHorizontalSpansPxPerRow(mMaxSpanPerRow);
         }
     }
 

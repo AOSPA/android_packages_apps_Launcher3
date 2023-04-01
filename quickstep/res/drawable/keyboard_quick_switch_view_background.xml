@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (C) 2017 The Android Open Source Project
+<!-- Copyright (C) 2023 The Android Open Source Project
 
      Licensed under the Apache License, Version 2.0 (the "License");
      you may not use this file except in compliance with the License.
@@ -13,20 +13,9 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-
-<LinearLayout
+<shape
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/system_shortcut_icons"
-    android:layout_width="match_parent"
-    android:layout_height="@dimen/system_shortcut_header_height"
-    android:orientation="horizontal"
-    android:gravity="end|center_vertical"
-    android:background="@drawable/single_item_primary"
-    android:elevation="@dimen/deep_shortcuts_elevation"
-    android:clipToPadding="true">
-
-    <Space android:layout_width="0dp"
-           android:layout_height="match_parent"
-           android:layout_weight="1"
-           android:id="@+id/separator"/>
-</LinearLayout>
+    android:shape="rectangle">
+    <solid android:color="?attr/overviewScrimColor" />
+    <corners android:radius="@dimen/keyboard_quick_switch_view_radius" />
+</shape>

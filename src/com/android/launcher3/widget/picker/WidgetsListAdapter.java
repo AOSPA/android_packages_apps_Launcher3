@@ -19,6 +19,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.recyclerview.ViewHolderBinder.POSITION_DEFAULT;
 import static com.android.launcher3.recyclerview.ViewHolderBinder.POSITION_FIRST;
 import static com.android.launcher3.recyclerview.ViewHolderBinder.POSITION_LAST;
+import static com.android.launcher3.widget.BaseWidgetSheet.DEFAULT_MAX_HORIZONTAL_SPANS;
 
 import android.content.Context;
 import android.os.Process;
@@ -32,13 +33,15 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.Px;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.DiffUtil.DiffResult;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.Adapter;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 
 import com.android.launcher3.R;
-import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.recyclerview.ViewHolderBinder;
 import com.android.launcher3.util.LabelComparator;
@@ -48,6 +51,7 @@ import com.android.launcher3.widget.model.WidgetListSpaceEntry;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
+import com.android.launcher3.widget.util.WidgetSizes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -82,7 +86,6 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
     public static final int VIEW_TYPE_WIDGETS_HEADER = R.id.view_type_widgets_header;
 
     private final Context mContext;
-    private final WidgetsDiffReporter mDiffReporter;
     private final SparseArray<ViewHolderBinder> mViewHolderBinders = new SparseArray<>();
     private final WidgetListBaseRowEntryComparator mRowComparator =
             new WidgetListBaseRowEntryComparator();
@@ -99,24 +102,27 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
     @Nullable private Predicate<WidgetsListBaseEntry> mFilter = null;
     @Nullable private RecyclerView mRecyclerView;
     @Nullable private PackageUserKey mPendingClickHeader;
-    private int mMaxSpanSize = 4;
+    @Px private int mMaxHorizontalSpan;
 
     public WidgetsListAdapter(Context context, LayoutInflater layoutInflater,
-            IconCache iconCache, IntSupplier emptySpaceHeightProvider,
-            OnClickListener iconClickListener, OnLongClickListener iconLongClickListener,
+            IntSupplier emptySpaceHeightProvider, OnClickListener iconClickListener,
+            OnLongClickListener iconLongClickListener,
             WidgetsFullSheet.HeaderChangeListener headerChangeListener) {
         mHeaderChangeListener = headerChangeListener;
         mContext = context;
-        mDiffReporter = new WidgetsDiffReporter(iconCache, this);
+        mMaxHorizontalSpan = WidgetSizes.getWidgetSizePx(
+                ActivityContext.lookupContext(context).getDeviceProfile(),
+                        DEFAULT_MAX_HORIZONTAL_SPANS, 1).getWidth();
 
         mViewHolderBinders.put(
                 VIEW_TYPE_WIDGETS_LIST,
                 new WidgetsListTableViewHolderBinder(
-                        layoutInflater, iconClickListener, iconLongClickListener));
+                        mContext, layoutInflater, iconClickListener, iconLongClickListener));
         mViewHolderBinders.put(
                 VIEW_TYPE_WIDGETS_HEADER,
                 new WidgetsListHeaderViewHolderBinder(
-                        layoutInflater, /* onHeaderClickListener= */ this));
+                        layoutInflater, /* onHeaderClickListener= */ this,
+                        headerChangeListener != null));
         mViewHolderBinders.put(
                 VIEW_TYPE_WIDGETS_SPACE,
                 new WidgetsSpaceViewHolderBinder(emptySpaceHeightProvider));
@@ -199,13 +205,18 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
                     } else if (entry instanceof WidgetsListContentEntry) {
                         // Adjust the original content entries to accommodate for the current
                         // maxSpanSize.
-                        return ((WidgetsListContentEntry) entry).withMaxSpanSize(mMaxSpanSize);
+                        return ((WidgetsListContentEntry) entry).withMaxSpanSize(
+                                mMaxHorizontalSpan);
                     }
                     return entry;
                 })
                 .collect(Collectors.toList());
 
-        mDiffReporter.process(mVisibleEntries, newVisibleEntries, mRowComparator);
+        DiffResult diffResult = DiffUtil.calculateDiff(
+                new WidgetsDiffCallback(mVisibleEntries, newVisibleEntries), false);
+        mVisibleEntries.clear();
+        mVisibleEntries.addAll(newVisibleEntries);
+        diffResult.dispatchUpdatesTo(this);
 
         if (mPendingClickHeader != null) {
             // Get the position for the clicked header after adjusting the visible entries. The
@@ -403,11 +414,11 @@ public class WidgetsListAdapter extends Adapter<ViewHolder> implements OnHeaderC
     }
 
     /**
-     * Sets the max horizontal span in cells that is allowed for grouping more than one widget in a
+     * Sets the max horizontal span in pixels that is allowed for grouping more than one widget in a
      * table row.
      */
-    public void setMaxHorizontalSpansPerRow(int maxHorizontalSpans) {
-        mMaxSpanSize = maxHorizontalSpans;
+    public void setMaxHorizontalSpansPxPerRow(@Px int maxHorizontalSpan) {
+        mMaxHorizontalSpan = maxHorizontalSpan;
         updateVisibleEntries();
     }
 

@@ -126,6 +126,9 @@ public final class TestProtocol {
     public static final String REQUEST_WORKSPACE_CELL_CENTER = "workspace-cell-center";
     public static final String REQUEST_WORKSPACE_COLUMNS_ROWS = "workspace-columns-rows";
 
+    public static final String REQUEST_WORKSPACE_CURRENT_PAGE_INDEX =
+            "workspace-current-page-index";
+
     public static final String REQUEST_HOTSEAT_CELL_CENTER = "hotseat-cell-center";
 
     public static final String REQUEST_GET_FOCUSED_TASK_HEIGHT_FOR_TABLET =
@@ -151,6 +154,8 @@ public final class TestProtocol {
     public static final String MISSING_PROMISE_ICON = "b/202985412";
     public static final String TASKBAR_IN_APP_STATE = "b/227657604";
     public static final String NPE_TRANSIENT_TASKBAR = "b/257549303";
+    public static final String FLAKY_BINDING = "b/270216650";
+    public static final String VIEW_AND_ACTIVITY_LEAKS = "b/260260325";
 
     public static final String REQUEST_EMULATE_DISPLAY = "emulate-display";
     public static final String REQUEST_STOP_EMULATE_DISPLAY = "stop-emulate-display";
