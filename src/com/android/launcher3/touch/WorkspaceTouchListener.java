@@ -51,6 +51,7 @@ import com.android.launcher3.logger.LauncherAtom;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.TouchUtil;
+import com.android.launcher3.util.VibratorWrapper;
 
 /**
  * Helper class to handle touch on empty space in workspace and show options popup on long press
@@ -237,6 +238,7 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
     @Override
     public boolean onDoubleTap(MotionEvent event) {
         if (LauncherPrefs.SLEEP_GESTURE.get(mWorkspace.getContext())) {
+            VibratorWrapper.INSTANCE.get(mWorkspace.getContext()).vibrate(VibratorWrapper.EFFECT_CLICK);
             mLauncher.onSleepEvent(event);
             return true;
         }
