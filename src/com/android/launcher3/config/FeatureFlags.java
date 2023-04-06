@@ -104,9 +104,6 @@ public final class FeatureFlags {
             "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", false,
             "Expand and collapse pause work button while scrolling");
 
-    public static final BooleanFlag ENABLE_RECENT_BLOCK = getDebugFlag(270390950,
-            "ENABLE_RECENT_BLOCK", false, "Show recently tapped search target block in zero state");
-
     public static final BooleanFlag COLLECT_SEARCH_HISTORY = getReleaseFlag(270391455,
             "COLLECT_SEARCH_HISTORY", false, "Allow launcher to collect search history for log");
 
@@ -286,7 +283,7 @@ public final class FeatureFlags {
             "Use local overrides for search request timeout");
 
     public static final BooleanFlag CONTINUOUS_VIEW_TREE_CAPTURE = getDebugFlag(270395171,
-            "CONTINUOUS_VIEW_TREE_CAPTURE", false, "Capture View tree every frame");
+            "CONTINUOUS_VIEW_TREE_CAPTURE", true, "Capture View tree every frame");
 
     public static final BooleanFlag SECONDARY_DRAG_N_DROP_TO_PIN = getDebugFlag(
             270395140, "SECONDARY_DRAG_N_DROP_TO_PIN", false,
@@ -306,7 +303,7 @@ public final class FeatureFlags {
                     + " is enabled or in prefix state");
 
     public static final BooleanFlag ENABLE_MATERIAL_U_POPUP = getDebugFlag(270395516,
-            "ENABLE_MATERIAL_U_POPUP", false, "Switch popup UX to use material U");
+            "ENABLE_MATERIAL_U_POPUP", true, "Switch popup UX to use material U");
 
     public static final BooleanFlag ENABLE_SEARCH_UNINSTALLED_APPS = getReleaseFlag(270395269,
             "ENABLE_SEARCH_UNINSTALLED_APPS", false, "Search uninstalled app results.");
@@ -332,7 +329,7 @@ public final class FeatureFlags {
                     + " nav mode and when transient taskbar is enabled.");
 
     public static final BooleanFlag FOLDABLE_SINGLE_PAGE = getDebugFlag(270395274,
-            "FOLDABLE_SINGLE_PAGE", false,
+            "FOLDABLE_SINGLE_PAGE", true,
             "Use a single page for the workspace");
 
     public static final BooleanFlag ENABLE_TRANSIENT_TASKBAR = getDebugFlag(270395798,
@@ -348,14 +345,14 @@ public final class FeatureFlags {
             "ENABLE_APP_ICON_IN_INLINE_SHORTCUTS", false, "Show app icon for inline shortcut");
 
     public static final BooleanFlag SHOW_DOT_PAGINATION = getDebugFlag(270395278,
-            "SHOW_DOT_PAGINATION", false, "Enable showing dot pagination in workspace");
+            "SHOW_DOT_PAGINATION", true, "Enable showing dot pagination in workspace");
 
     public static final BooleanFlag LARGE_SCREEN_WIDGET_PICKER = getDebugFlag(270395809,
-            "LARGE_SCREEN_WIDGET_PICKER", false, "Enable new widget picker that takes "
+            "LARGE_SCREEN_WIDGET_PICKER", true, "Enable new widget picker that takes "
                     + "advantage of large screen format");
 
     public static final BooleanFlag ENABLE_NEW_GESTURE_NAV_TUTORIAL = getDebugFlag(270396257,
-            "ENABLE_NEW_GESTURE_NAV_TUTORIAL", false,
+            "ENABLE_NEW_GESTURE_NAV_TUTORIAL", true,
             "Enable the redesigned gesture navigation tutorial");
 
     public static final BooleanFlag ENABLE_LAUNCH_FROM_STAGED_APP = getDebugFlag(270395567,

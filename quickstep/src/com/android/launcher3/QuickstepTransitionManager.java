@@ -137,6 +137,8 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.quickstep.util.RectFSpringAnim;
+import com.android.quickstep.util.RectFSpringAnim.DefaultSpringConfig;
+import com.android.quickstep.util.RectFSpringAnim.TaskbarHotseatSpringConfig;
 import com.android.quickstep.util.RemoteAnimationProvider;
 import com.android.quickstep.util.StaggeredWorkspaceAnim;
 import com.android.quickstep.util.SurfaceTransaction;
@@ -639,7 +641,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 (mLauncher.getTaskbarUIController() == null || !isTransientTaskbar(mLauncher))
                         ? null
                         : mLauncher.getTaskbarUIController().findMatchingView(v),
-                !appTargetsAreTranslucent, launcherIconBounds, true /* isOpening */);
+                null /* fadeOutView */, !appTargetsAreTranslucent, launcherIconBounds,
+                true /* isOpening */);
         Rect crop = new Rect();
         Matrix matrix = new Matrix();
 
@@ -795,7 +798,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
                 if (initOnly) {
                     // For the init pass, we want full alpha since the window is not yet ready.
-                    floatingView.update(1f, 255, floatingIconBounds, percent, 0f,
+                    floatingView.update(1f, floatingIconBounds, percent, 0f,
                             mWindowRadius.value * scale, true /* isOpening */);
                     return;
                 }
@@ -823,7 +826,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                             matrix.postTranslate(windowTransX0, windowTransY0);
                         }
 
-                        floatingView.update(mIconAlpha.value, 255, floatingIconBounds, percent, 0f,
+                        floatingView.update(mIconAlpha.value, floatingIconBounds, percent, 0f,
                                 mWindowRadius.value * scale, true /* isOpening */);
                         builder.setMatrix(matrix)
                                 .setWindowCrop(crop)
@@ -1349,6 +1352,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         }
 
         // Get floating view and target rect.
+        boolean isInHotseat = false;
         if (launcherView instanceof LauncherAppWidgetHostView) {
             Size windowSize = new Size(mDeviceProfile.availableWidthPx,
                     mDeviceProfile.availableHeightPx);
@@ -1359,17 +1363,22 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                     mDeviceProfile.isMultiWindowMode ? 0 : getWindowCornerRadius(mLauncher),
                     isTransluscent, fallbackBackgroundColor);
         } else if (launcherView != null) {
-            floatingIconView = getFloatingIconView(mLauncher, launcherView,
+            floatingIconView = getFloatingIconView(mLauncher, launcherView, null,
                     mLauncher.getTaskbarUIController() == null
                             ? null
                             : mLauncher.getTaskbarUIController().findMatchingView(launcherView),
                     true /* hideOriginal */, targetRect, false /* isOpening */);
+            isInHotseat = launcherView.getTag() instanceof ItemInfo
+                    && ((ItemInfo) launcherView.getTag()).isInHotseat();
         } else {
             targetRect.set(getDefaultWindowTargetRect());
         }
 
-        RectFSpringAnim anim = new RectFSpringAnim(closingWindowStartRect, targetRect, mLauncher,
-                mDeviceProfile);
+        boolean useTaskbarHotseatParams = mDeviceProfile.isTaskbarPresent && isInHotseat;
+        RectFSpringAnim anim = new RectFSpringAnim(useTaskbarHotseatParams
+                ? new TaskbarHotseatSpringConfig(mLauncher, closingWindowStartRect, targetRect)
+                : new DefaultSpringConfig(mLauncher, mDeviceProfile, closingWindowStartRect,
+                        targetRect));
 
         // Hook up floating views to the closing window animators.
         final int rotationChange = getRotationChange(targets);
@@ -1388,8 +1397,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                     windowTargetBounds, startWindowCornerRadius) {
                 @Override
                 public void onUpdate(RectF currentRectF, float progress) {
-                    finalFloatingIconView.update(1f, 255 /* fgAlpha */, currentRectF, progress,
-                            windowAlphaThreshold, getCornerRadius(progress), false);
+                    finalFloatingIconView.update(1f, currentRectF, progress, windowAlphaThreshold,
+                            getCornerRadius(progress), false);
 
                     super.onUpdate(currentRectF, progress);
                 }

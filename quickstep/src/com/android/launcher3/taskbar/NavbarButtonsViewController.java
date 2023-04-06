@@ -32,7 +32,7 @@ import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_IM
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_RECENTS;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_KEYGUARD;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_SMALL_SCREEN;
-import static com.android.launcher3.taskbar.Utilities.appendFlag;
+import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A11Y_BUTTON_CLICKABLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A11Y_BUTTON_LONG_CLICKABLE;
@@ -159,6 +159,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             this::updateNavButtonTranslationY);
     private final AnimatedFloat mTaskbarNavButtonTranslationYForIme = new AnimatedFloat(
             this::updateNavButtonTranslationY);
+    private float mLastSetNavButtonTranslationY;
     // Used for System UI state updates that should translate the nav button for in-app display.
     private final AnimatedFloat mNavButtonInAppDisplayProgressForSysui = new AnimatedFloat(
             this::updateNavButtonInAppDisplayProgressForSysui);
@@ -606,7 +607,10 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         }
     }
 
-    private void updateNavButtonTranslationY() {
+    /**
+     * Sets the translationY of the nav buttons based on the current device state.
+     */
+    public void updateNavButtonTranslationY() {
         if (isPhoneButtonNavMode(mContext)) {
             return;
         }
@@ -618,9 +622,10 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                         && ((LauncherTaskbarUIController) uiController).shouldUseInAppLayout())
                         ? mTaskbarNavButtonTranslationYForInAppDisplay.value : 0;
 
-        mNavButtonsView.setTranslationY(normalTranslationY
+        mLastSetNavButtonTranslationY = normalTranslationY
                 + imeAdjustmentTranslationY
-                + inAppDisplayAdjustmentTranslationY);
+                + inAppDisplayAdjustmentTranslationY;
+        mNavButtonsView.setTranslationY(mLastSetNavButtonTranslationY);
     }
 
     private void updateNavButtonColor() {
@@ -755,7 +760,6 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             mBackButton.setImageDrawable(rotateDrawable);
             mBackButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
             mBackButton.setPadding(paddingleft, paddingTop, paddingRight, paddingBottom);
-            mBackButton.setScaleX(Utilities.isRtl(mContext.getResources()) ? -1f : 1f);
 
             mHomeButton.setImageDrawable(
                     mHomeButton.getContext().getDrawable(R.drawable.ic_sysbar_home_kids));
@@ -925,6 +929,13 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         pw.println(prefix + "\tmFloatingRotationButtonBounds=" + mFloatingRotationButtonBounds);
         pw.println(prefix + "\tmSysuiStateFlags=" + QuickStepContract.getSystemUiStateString(
                 mSysuiStateFlags));
+        pw.println(prefix + "\tLast set nav button translationY=" + mLastSetNavButtonTranslationY);
+        pw.println(prefix + "\t\tmTaskbarNavButtonTranslationY="
+                + mTaskbarNavButtonTranslationY.value);
+        pw.println(prefix + "\t\tmTaskbarNavButtonTranslationYForInAppDisplay="
+                + mTaskbarNavButtonTranslationYForInAppDisplay.value);
+        pw.println(prefix + "\t\tmTaskbarNavButtonTranslationYForIme="
+                + mTaskbarNavButtonTranslationYForIme.value);
     }
 
     private static String getStateString(int flags) {

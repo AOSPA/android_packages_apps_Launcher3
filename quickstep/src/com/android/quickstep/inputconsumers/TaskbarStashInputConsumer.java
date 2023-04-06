@@ -17,9 +17,9 @@ package com.android.quickstep.inputconsumers;
 
 import static android.view.MotionEvent.INVALID_POINTER_ID;
 
+import static com.android.launcher3.MotionEventsUtils.isTrackpadMotionEvent;
 import static com.android.launcher3.Utilities.squaredHypot;
 import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_TOUCHING;
-import static com.android.quickstep.MotionEventsUtils.isTrackpadMotionEvent;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -54,6 +54,7 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
     private final float mScreenWidth;
 
     private final int mTaskbarNavThreshold;
+    private final int mTaskbarNavThresholdY;
     private final boolean mIsTaskbarAllAppsOpen;
     private boolean mHasPassedTaskbarNavThreshold;
 
@@ -75,6 +76,8 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
         Resources res = context.getResources();
         mUnstashArea = res.getDimensionPixelSize(R.dimen.taskbar_unstash_input_area);
         mTaskbarNavThreshold = res.getDimensionPixelSize(R.dimen.taskbar_nav_threshold);
+        mTaskbarNavThresholdY = taskbarActivityContext.getDeviceProfile().heightPx
+                - mTaskbarNavThreshold;
         mIsTaskbarAllAppsOpen =
                 mTaskbarActivityContext != null && mTaskbarActivityContext.isTaskbarAllAppsOpen();
 
@@ -125,6 +128,10 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
                                 mCanceledUnstashHint = false;
                             }
                         }
+
+                        if (mTransitionCallback != null && !mIsTaskbarAllAppsOpen) {
+                            mTransitionCallback.onActionDown();
+                        }
                         break;
                     case MotionEvent.ACTION_POINTER_UP:
                         int ptrIdx = ev.getActionIndex();
@@ -165,7 +172,7 @@ public class TaskbarStashInputConsumer extends DelegateInputConsumer {
                             }
 
                             if (dY < 0) {
-                                dY = -OverScroll.dampedScroll(-dY, mTaskbarNavThreshold);
+                                dY = -OverScroll.dampedScroll(-dY, mTaskbarNavThresholdY);
                                 if (mTransitionCallback != null && !mIsTaskbarAllAppsOpen) {
                                     mTransitionCallback.onActionMove(dY);
                                 }
