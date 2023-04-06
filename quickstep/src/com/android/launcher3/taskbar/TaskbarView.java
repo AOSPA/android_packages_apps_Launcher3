@@ -33,7 +33,6 @@ import android.widget.FrameLayout;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
@@ -48,6 +47,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
+import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.DoubleShadowBubbleTextView;
 import com.android.launcher3.views.IconButtonView;
@@ -60,16 +60,14 @@ import java.util.function.Predicate;
 public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconParent, Insettable {
     private static final String TAG = TaskbarView.class.getSimpleName();
 
-    private static final float TASKBAR_BACKGROUND_LUMINANCE = 0.30f;
     private static final Rect sTmpRect = new Rect();
-
-    public int mThemeIconsBackground;
 
     private final int[] mTempOutLocation = new int[2];
     private final Rect mIconLayoutBounds;
     private final int mIconTouchSize;
     private final int mItemMarginLeftRight;
     private final int mItemPadding;
+    private final int mFolderLeaveBehindColor;
     private final boolean mIsRtl;
 
     private final TaskbarActivityContext mActivityContext;
@@ -136,10 +134,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mItemMarginLeftRight = actualMargin - (mIconTouchSize - actualIconSize) / 2;
         mItemPadding = (mIconTouchSize - actualIconSize) / 2;
 
+        mFolderLeaveBehindColor = Themes.getAttrColor(mActivityContext,
+                android.R.attr.textColorTertiary);
+
         // Needed to draw folder leave-behind when opening one.
         setWillNotDraw(false);
-
-        mThemeIconsBackground = calculateThemeIconsBackground();
 
         if (!mActivityContext.getPackageManager().hasSystemFeature(FEATURE_PC)) {
             mAllAppsButton = (IconButtonView) LayoutInflater.from(context)
@@ -182,26 +181,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 .sendAccessibilityEvent(TYPE_WINDOW_CONTENT_CHANGED);
     }
 
-    private int getColorWithGivenLuminance(int color, float luminance) {
-        float[] colorHSL = new float[3];
-        ColorUtils.colorToHSL(color, colorHSL);
-        colorHSL[2] = luminance;
-        return ColorUtils.HSLToColor(colorHSL);
-    }
-
     /**
      * Returns the icon touch size.
      */
     public int getIconTouchSize() {
         return mIconTouchSize;
-    }
-
-    private int calculateThemeIconsBackground() {
-        int color = ThemedIconDrawable.getColors(mContext)[0];
-        if (Utilities.isDarkTheme(mContext)) {
-            return getColorWithGivenLuminance(color, TASKBAR_BACKGROUND_LUMINANCE);
-        }
-        return color;
     }
 
     protected void init(TaskbarViewController.TaskbarViewCallbacks callbacks) {
@@ -332,9 +316,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             // Always set QSB to invisible after re-adding.
             mQsb.setVisibility(View.INVISIBLE);
         }
-
-        mThemeIconsBackground = calculateThemeIconsBackground();
-        setThemedIconsBackgroundColor(mThemeIconsBackground);
     }
 
     /**
@@ -547,7 +528,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (mLeaveBehindFolderIcon != null) {
             canvas.save();
             canvas.translate(mLeaveBehindFolderIcon.getLeft(), mLeaveBehindFolderIcon.getTop());
-            mLeaveBehindFolderIcon.getFolderBackground().drawLeaveBehind(canvas);
+            mLeaveBehindFolderIcon.getFolderBackground().drawLeaveBehind(canvas,
+                    mFolderLeaveBehindColor);
             canvas.restore();
         }
     }
