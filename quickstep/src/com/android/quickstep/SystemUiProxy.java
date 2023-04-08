@@ -52,6 +52,7 @@ import androidx.annotation.WorkerThread;
 
 import com.android.internal.logging.InstanceId;
 import com.android.internal.util.ScreenshotRequest;
+import com.android.internal.view.AppearanceRegion;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.systemui.shared.recents.ISystemUiProxy;
@@ -199,29 +200,15 @@ public class SystemUiProxy implements ISystemUiProxy {
         mUnfoldAnimation = unfoldAnimation;
         linkToDeath();
         // re-attach the listeners once missing due to setProxy has not been initialized yet.
-        if (mPipAnimationListener != null && mPip != null) {
-            setPipAnimationListener(mPipAnimationListener);
-        }
-        if (mSplitScreenListener != null && mSplitScreen != null) {
-            registerSplitScreenListener(mSplitScreenListener);
-        }
-        if (mStartingWindowListener != null && mStartingWindow != null) {
-            setStartingWindowListener(mStartingWindowListener);
-        }
-        if (mSysuiUnlockAnimationController != null && mLauncherUnlockAnimationController != null) {
-            setLauncherUnlockAnimationController(mLauncherUnlockAnimationController);
-        }
+        setPipAnimationListener(mPipAnimationListener);
+        registerSplitScreenListener(mSplitScreenListener);
+        setStartingWindowListener(mStartingWindowListener);
+        setLauncherUnlockAnimationController(mLauncherUnlockAnimationController);
         new LinkedHashMap<>(mRemoteTransitions).forEach(this::registerRemoteTransition);
         setupTransactionQueue();
-        if (mRecentTasksListener != null && mRecentTasks != null) {
-            registerRecentTasksListener(mRecentTasksListener);
-        }
-        if (mBackAnimation != null && mBackToLauncherCallback != null) {
-            setBackToLauncherCallback(mBackToLauncherCallback, mBackToLauncherRunner);
-        }
-        if (unfoldAnimation != null && mUnfoldAnimationListener != null) {
-            setUnfoldAnimationListener(mUnfoldAnimationListener);
-        }
+        registerRecentTasksListener(mRecentTasksListener);
+        setBackToLauncherCallback(mBackToLauncherCallback, mBackToLauncherRunner);
+        setUnfoldAnimationListener(mUnfoldAnimationListener);
     }
 
     public void clearProxy() {
@@ -747,7 +734,7 @@ public class SystemUiProxy implements ISystemUiProxy {
      */
     @Nullable
     public RemoteAnimationTarget[] onGoingToRecentsLegacy(RemoteAnimationTarget[] apps) {
-        if (mSplitScreen != null) {
+        if (!TaskAnimationManager.ENABLE_SHELL_TRANSITIONS && mSplitScreen != null) {
             try {
                 return mSplitScreen.onGoingToRecentsLegacy(apps);
             } catch (RemoteException e) {
@@ -988,6 +975,20 @@ public class SystemUiProxy implements ISystemUiProxy {
             mBackAnimation.clearBackToLauncherCallback();
         } catch (RemoteException e) {
             Log.e(TAG, "Failed call clearBackToLauncherCallback", e);
+        }
+    }
+
+    /**
+     * Called when the status bar color needs to be customized when back navigation.
+     */
+    public void customizeStatusBarAppearance(AppearanceRegion appearance) {
+        if (mBackAnimation == null) {
+            return;
+        }
+        try {
+            mBackAnimation.customizeStatusBarAppearance(appearance);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed call useLauncherSysBarFlags", e);
         }
     }
 
