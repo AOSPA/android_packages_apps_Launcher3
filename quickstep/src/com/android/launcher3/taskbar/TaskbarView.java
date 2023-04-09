@@ -92,7 +92,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
     private float mTransientTaskbarAllAppsButtonTranslationXOffset;
 
-    private final boolean mStartAlignTaskbar;
+    private final boolean mShouldTryStartAlign;
 
     public TaskbarView(@NonNull Context context) {
         this(context, null);
@@ -121,11 +121,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 resources.getDimension(isTransientTaskbar
                         ? R.dimen.transient_taskbar_all_apps_button_translation_x_offset
                         : R.dimen.taskbar_all_apps_button_translation_x_offset);
-        mStartAlignTaskbar = mActivityContext.isThreeButtonNav()
+        mShouldTryStartAlign = mActivityContext.isThreeButtonNav()
                 && resources.getBoolean(R.bool.start_align_taskbar);
 
         int actualMargin = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
-        int actualIconSize = mActivityContext.getDeviceProfile().iconSizePx;
+        int actualIconSize = mActivityContext.getDeviceProfile().taskbarIconSize;
 
         mIconTouchSize = Math.max(actualIconSize,
                 resources.getDimensionPixelSize(R.dimen.taskbar_icon_min_touch_size));
@@ -353,12 +353,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
         int navSpaceNeeded = deviceProfile.hotseatBarEndOffset;
         boolean layoutRtl = isLayoutRtl();
-        int iconEnd = right - (right - left - spaceNeeded) / 2;
-        boolean needMoreSpaceForNav = layoutRtl ?
-                navSpaceNeeded > (iconEnd - spaceNeeded) :
-                iconEnd > (right - navSpaceNeeded);
+        int centerAlignIconEnd = right - (right - left - spaceNeeded) / 2;
+        int iconEnd;
 
-        if (mStartAlignTaskbar) {
+        if (mShouldTryStartAlign) {
             // Taskbar is aligned to the start
             int startSpacingPx = deviceProfile.inlineNavButtonsEndSpacingPx;
 
@@ -367,13 +365,20 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             } else {
                 iconEnd = startSpacingPx + spaceNeeded;
             }
-        } else if (needMoreSpaceForNav) {
+        } else {
+            iconEnd = centerAlignIconEnd;
+        }
+
+        boolean needMoreSpaceForNav = layoutRtl
+                ? navSpaceNeeded > (iconEnd - spaceNeeded)
+                : iconEnd > (right - navSpaceNeeded);
+        if (needMoreSpaceForNav) {
             // Add offset to account for nav bar when taskbar is centered
             int offset = layoutRtl
-                    ? navSpaceNeeded - (iconEnd - spaceNeeded)
-                    : (right - navSpaceNeeded) - iconEnd;
+                    ? navSpaceNeeded - (centerAlignIconEnd - spaceNeeded)
+                    : (right - navSpaceNeeded) - centerAlignIconEnd;
 
-            iconEnd += offset;
+            iconEnd = centerAlignIconEnd + offset;
         }
 
         sTmpRect.set(mIconLayoutBounds);
@@ -425,19 +430,9 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     @Override
-    public boolean onInterceptTouchEvent(MotionEvent ev) {
-        mControllerCallbacks.onInterceptTouchEvent(ev);
-        return super.onInterceptTouchEvent(ev);
-    }
-
-    @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (mIconLayoutBounds.left <= event.getX()
-                && event.getX() <= mIconLayoutBounds.right
-                && !DisplayController.isTransientTaskbar(mActivityContext)) {
-            // Don't allow long pressing between icons, or above/below them
-            // unless its transient taskbar.
-            mControllerCallbacks.clearTouchInProgress();
+        if (mIconLayoutBounds.left <= event.getX() && event.getX() <= mIconLayoutBounds.right) {
+            // Don't allow long pressing between icons, or above/below them.
             return true;
         }
         if (mControllerCallbacks.onTouchEvent(event)) {
