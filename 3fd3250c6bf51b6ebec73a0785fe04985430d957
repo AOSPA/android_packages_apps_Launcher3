@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2b8fc965_ed07d79a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000541
+      },
+      "writtenOn": "2023-04-15T11:26:50Z",
+      "side": 1,
+      "message": "some icons become unthemed in the app open and close animation and then return to themed",
+      "revId": "3fd3250c6bf51b6ebec73a0785fe04985430d957",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
