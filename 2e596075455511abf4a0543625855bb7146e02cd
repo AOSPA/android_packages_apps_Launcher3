@@ -16,6 +16,23 @@
       "message": "seems good to me",
       "revId": "2e596075455511abf4a0543625855bb7146e02cd",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "57459415_41c991be",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000012
+      },
+      "writtenOn": "2023-04-16T07:55:44Z",
+      "side": 1,
+      "message": "Timo verified that this works.",
+      "revId": "2e596075455511abf4a0543625855bb7146e02cd",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
