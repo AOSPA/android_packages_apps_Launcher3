@@ -13,10 +13,16 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<shape
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:androidprv="http://schemas.android.com/apk/prv/res/android"
-    android:shape="rectangle">
-    <solid android:color="?androidprv:attr/materialColorSurfaceContainerHigh" />
-    <corners android:radius="@dimen/keyboard_quick_switch_task_view_radius" />
-</shape>
+<!-- Split display specific version of Launcher3/res/xml/default_workspace_4x4.xml -->
+<favorites xmlns:launcher="http://schemas.android.com/apk/res-auto/com.android.launcher3" >
+
+    <!-- Hotseat (We use the screen as the position of the item in the hotseat) -->
+    <favorite
+        launcher:container="-101"
+        launcher:screen="0"
+        launcher:x="0"
+        launcher:y="0"
+        launcher:className="com.google.android.apps.chrome.Main"
+        launcher:packageName="com.android.chrome" />
+
+</favorites>
