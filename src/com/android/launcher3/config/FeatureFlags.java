@@ -39,8 +39,6 @@ import java.util.function.ToIntFunction;
  */
 public final class FeatureFlags {
 
-    public static final String FLAGS_PREF_NAME = "featureFlags";
-
     @VisibleForTesting
     public static Predicate<BooleanFlag> sBooleanReader = f -> f.mCurrentValue;
     @VisibleForTesting
@@ -76,10 +74,6 @@ public final class FeatureFlags {
      * Declare a new ToggleableFlag below. Give it a unique key (e.g. "QSB_ON_FIRST_SCREEN"),
      * and set a default value for the flag. This will be the default value on Debug builds.
      */
-    public static final BooleanFlag ENABLE_GESTURE_ERROR_DETECTION = getDebugFlag(270389990,
-            "ENABLE_GESTURE_ERROR_DETECTION", ENABLED,
-            "Analyze gesture events and log detected errors");
-
     // When enabled the promise icon is visible in all apps while installation an app.
     public static final BooleanFlag PROMISE_APPS_IN_ALL_APPS = getDebugFlag(270390012,
             "PROMISE_APPS_IN_ALL_APPS", DISABLED, "Add promise icon in all-apps");
@@ -135,14 +129,6 @@ public final class FeatureFlags {
             "ASSISTANT_GIVES_LAUNCHER_FOCUS", DISABLED,
             "Allow Launcher to handle nav bar gestures while Assistant is running over it");
 
-    public static final BooleanFlag ENABLE_BULK_WORKSPACE_ICON_LOADING = getDebugFlag(270392203,
-            "ENABLE_BULK_WORKSPACE_ICON_LOADING", ENABLED,
-            "Enable loading workspace icons in bulk.");
-
-    public static final BooleanFlag ENABLE_DATABASE_RESTORE = getDebugFlag(270392706,
-            "ENABLE_DATABASE_RESTORE", DISABLED,
-            "Enable database restore when new restore session is created");
-
     public static final BooleanFlag ENABLE_OVERLAY_CONNECTION_OPTIM = getDebugFlag(270392629,
             "ENABLE_OVERLAY_CONNECTION_OPTIM", DISABLED,
             "Enable optimizing overlay service connection");
@@ -161,10 +147,6 @@ public final class FeatureFlags {
     public static final BooleanFlag SEPARATE_RECENTS_ACTIVITY = getDebugFlag(270392980,
             "SEPARATE_RECENTS_ACTIVITY", DISABLED,
             "Uses a separate recents activity instead of using the integrated recents+Launcher UI");
-
-    public static final BooleanFlag ENABLE_MINIMAL_DEVICE = getDebugFlag(270392984,
-            "ENABLE_MINIMAL_DEVICE", DISABLED,
-            "Allow user to toggle minimal device mode in launcher.");
 
     public static final BooleanFlag ENABLE_TWO_PANEL_HOME = getDebugFlag(270392643,
             "ENABLE_TWO_PANEL_HOME", ENABLED,
@@ -213,7 +195,7 @@ public final class FeatureFlags {
             "Enable initiating split screen from workspace.");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_FULLSCREEN_WITH_KEYBOARD_SHORTCUTS =
-            getDebugFlag(270394122, "ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", ENABLED,
+            getDebugFlag(270394122, "ENABLE_SPLIT_FROM_FULLSCREEN_SHORTCUT", DISABLED,
             "Enable splitting from fullscreen app with keyboard shortcuts");
 
     public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE = getDebugFlag(
@@ -285,19 +267,12 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_SEARCH_UNINSTALLED_APPS = getReleaseFlag(270395269,
             "ENABLE_SEARCH_UNINSTALLED_APPS", DISABLED, "Search uninstalled app results.");
 
-    public static final BooleanFlag SHOW_HOME_GARDENING = getDebugFlag(270395183,
-            "SHOW_HOME_GARDENING", DISABLED, "Show the new home gardening mode");
-
-    public static final BooleanFlag HOME_GARDENING_WORKSPACE_BUTTONS = getDebugFlag(270395133,
-            "HOME_GARDENING_WORKSPACE_BUTTONS", DISABLED,
-            "Change workspace edit buttons to reflect home gardening");
-
     public static final BooleanFlag ENABLE_DOWNLOAD_APP_UX_V2 = getReleaseFlag(270395134,
             "ENABLE_DOWNLOAD_APP_UX_V2", ENABLED, "Updates the download app UX"
                     + " to have better visuals");
 
     public static final BooleanFlag ENABLE_DOWNLOAD_APP_UX_V3 = getDebugFlag(270395186,
-            "ENABLE_DOWNLOAD_APP_UX_V3", DISABLED, "Updates the download app UX"
+            "ENABLE_DOWNLOAD_APP_UX_V3", ENABLED, "Updates the download app UX"
                     + " to have better visuals, improve contrast, and color");
 
     public static final BooleanFlag FORCE_PERSISTENT_TASKBAR = getDebugFlag(270395077,
@@ -347,10 +322,6 @@ public final class FeatureFlags {
             "ENABLE_FORCED_MONO_ICON", DISABLED,
             "Enable the ability to generate monochromatic icons, if it is not provided by the app");
 
-    public static final BooleanFlag ENABLE_TASKBAR_EDU_TOOLTIP = getDebugFlag(270396268,
-            "ENABLE_TASKBAR_EDU_TOOLTIP", ENABLED,
-            "Enable the tooltip version of the Taskbar education flow.");
-
     public static final BooleanFlag ENABLE_MULTI_INSTANCE = getDebugFlag(270396680,
             "ENABLE_MULTI_INSTANCE", DISABLED,
             "Enables creation and filtering of multiple task instances in overview");
@@ -364,6 +335,11 @@ public final class FeatureFlags {
             "ENABLE_WORKSPACE_LOADING_OPTIMIZATION", DISABLED,
             "load the current workspace screen visible to the user before the rest rather than "
                     + "loading all of them at once.");
+
+    public static final BooleanFlag CHANGE_MODEL_DELEGATE_LOADING_ORDER = getDebugFlag(251502424,
+            "CHANGE_MODEL_DELEGATE_LOADING_ORDER", DISABLED,
+            "changes the timing of the loading and binding of delegate items during "
+                    + "data preparation for loading the home screen");
 
     public static final BooleanFlag ENABLE_GRID_ONLY_OVERVIEW = getDebugFlag(270397206,
             "ENABLE_GRID_ONLY_OVERVIEW", DISABLED,

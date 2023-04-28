@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS;
 import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
+import static android.view.MotionEvent.ACTION_MOVE;
 import static android.view.MotionEvent.ACTION_POINTER_DOWN;
 import static android.view.MotionEvent.ACTION_POINTER_UP;
 import static android.view.MotionEvent.ACTION_UP;
@@ -25,10 +26,12 @@ import static android.view.MotionEvent.ACTION_UP;
 import static com.android.launcher3.Launcher.INTENT_ACTION_ALL_APPS_TOGGLE;
 import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.launcher3.config.FeatureFlags.ASSISTANT_GIVES_LAUNCHER_FOCUS;
+import static com.android.launcher3.config.FeatureFlags.ENABLE_TRACKPAD_GESTURE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.GestureState.DEFAULT_STATE;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.FLAG_USING_OTHER_ACTIVITY_INPUT_CONSUMER;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_DOWN;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_MOVE;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_UP;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
@@ -78,7 +81,6 @@ import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -104,6 +106,7 @@ import com.android.quickstep.inputconsumers.OverviewWithoutFocusInputConsumer;
 import com.android.quickstep.inputconsumers.ProgressDelegateInputConsumer;
 import com.android.quickstep.inputconsumers.ResetGestureInputConsumer;
 import com.android.quickstep.inputconsumers.ScreenPinnedInputConsumer;
+import com.android.quickstep.inputconsumers.StatusBarInputConsumer;
 import com.android.quickstep.inputconsumers.SysUiOverlayInputConsumer;
 import com.android.quickstep.inputconsumers.TaskbarStashInputConsumer;
 import com.android.quickstep.util.ActiveGestureLog;
@@ -675,19 +678,28 @@ public class TouchInteractionService extends Service
         if (mUncheckedConsumer != InputConsumer.NO_OP) {
             switch (event.getActionMasked()) {
                 case ACTION_DOWN:
+                    // fall through
                 case ACTION_UP:
                     ActiveGestureLog.INSTANCE.addLog(
                             /* event= */ "onMotionEvent(" + (int) event.getRawX() + ", "
                                     + (int) event.getRawY() + "): "
-                                    + MotionEvent.actionToString(event.getActionMasked()),
+                                    + MotionEvent.actionToString(event.getActionMasked()) + ", "
+                                    + MotionEvent.classificationToString(event.getClassification()),
                             /* gestureEvent= */ event.getActionMasked() == ACTION_DOWN
                                     ? MOTION_DOWN
                                     : MOTION_UP);
                     break;
-                default:
+                case ACTION_MOVE:
                     ActiveGestureLog.INSTANCE.addLog("onMotionEvent: "
-                            + MotionEvent.actionToString(event.getActionMasked()));
+                            + MotionEvent.actionToString(event.getActionMasked()) + ","
+                            + MotionEvent.classificationToString(event.getClassification())
+                            + ", pointerCount: " + event.getPointerCount(), MOTION_MOVE);
                     break;
+                default: {
+                    ActiveGestureLog.INSTANCE.addLog("onMotionEvent: "
+                            + MotionEvent.actionToString(event.getActionMasked()) + ","
+                            + MotionEvent.classificationToString(event.getClassification()));
+                }
             }
         }
 
@@ -851,7 +863,14 @@ public class TouchInteractionService extends Service
                         getBaseContext(), mDeviceState, mInputMonitorCompat);
             }
 
-
+            if (ENABLE_TRACKPAD_GESTURE.get() && mGestureState.isTrackpadGesture()
+                    && mGestureState.getActivityInterface().isResumed()
+                    && !previousGestureState.isRecentsAnimationRunning()) {
+                reasonString = newCompoundString(reasonPrefix)
+                        .append(SUBSTRING_PREFIX)
+                        .append("Trackpad 3-finger gesture, using StatusBarInputConsumer");
+                base = new StatusBarInputConsumer(getBaseContext(), base, mInputMonitorCompat);
+            }
 
             if (mDeviceState.isScreenPinningActive()) {
                 reasonString = newCompoundString(reasonPrefix)
