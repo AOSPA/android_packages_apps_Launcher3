@@ -82,16 +82,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Parcelable;
-import android.os.Process;
 import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -114,7 +113,6 @@ import android.view.ViewTreeObserver.OnPreDrawListener;
 import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
-import android.widget.Toast;
 import android.window.BackEvent;
 import android.window.OnBackAnimationCallback;
 
@@ -159,7 +157,6 @@ import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.ItemInstallQueue;
-import com.android.launcher3.model.ModelUtils;
 import com.android.launcher3.model.ModelWriter;
 import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.WidgetsModel;
@@ -191,7 +188,6 @@ import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.OnboardingPrefs;
-import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.RunnableList;
@@ -261,8 +257,6 @@ public class Launcher extends StatefulActivity<LauncherState>
     private static final int REQUEST_BIND_APPWIDGET = 11;
     public static final int REQUEST_BIND_PENDING_APPWIDGET = 12;
     public static final int REQUEST_RECONFIGURE_APPWIDGET = 13;
-
-    private static final int REQUEST_PERMISSION_CALL_PHONE = 14;
 
     private static final float BOUNCE_ANIMATION_TENSION = 1.3f;
 
@@ -974,33 +968,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         handleActivityResult(requestCode, resultCode, data);
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            int[] grantResults) {
-        PendingRequestArgs pendingArgs = mPendingRequestArgs;
-        if (requestCode == REQUEST_PERMISSION_CALL_PHONE && pendingArgs != null
-                && pendingArgs.getRequestCode() == REQUEST_PERMISSION_CALL_PHONE) {
-            setWaitingForResult(null);
-
-            View v = null;
-            CellPos cellPos = getCellPosMapper().mapModelToPresenter(pendingArgs);
-            CellLayout layout = getCellLayout(pendingArgs.container, cellPos.screenId);
-            if (layout != null) {
-                v = layout.getChildAt(cellPos.cellX, cellPos.cellY);
-            }
-            Intent intent = pendingArgs.getPendingIntent();
-
-            if (grantResults.length > 0
-                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startActivitySafely(v, intent, null);
-            } else {
-                // TODO: Show a snack bar with link to settings
-                Toast.makeText(this, getString(R.string.msg_no_phone_permission,
-                        getString(R.string.derived_app_name)), Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
     /**
      * Check to see if a given screen id exists. If not, create it at the end, return the new id.
      *
@@ -1355,6 +1322,10 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         if (SHOW_DOT_PAGINATION.get()) {
             mWorkspace.getPageIndicator().setShouldAutoHide(true);
+            mWorkspace.getPageIndicator().setPaintColor(
+                    Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText)
+                            ? Color.BLACK
+                            : Color.WHITE);
         }
     }
 
@@ -1412,21 +1383,9 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         WorkspaceItemInfo info = PinRequestHelper.createWorkspaceItemFromPinItemRequest(
                     this, PinRequestHelper.getPinItemRequest(data), 0);
-
         if (info == null) {
-            // Legacy shortcuts are only supported for primary profile.
-            info = Process.myUserHandle().equals(args.user)
-                    ? ModelUtils.fromLegacyShortcutIntent(this, data) : null;
-
-            if (info == null) {
-                Log.e(TAG, "Unable to parse a valid custom shortcut result");
-                return;
-            } else if (!new PackageManagerHelper(this).hasPermissionForActivity(
-                    info.intent, args.getPendingIntent().getComponent().getPackageName())) {
-                // The app is trying to add a shortcut without sufficient permissions
-                Log.e(TAG, "Ignoring malicious intent " + info.intent.toUri(0));
-                return;
-            }
+            Log.e(TAG, "Unable to parse a valid shortcut result");
+            return;
         }
 
         if (container < 0) {
@@ -2143,27 +2102,6 @@ public class Launcher extends StatefulActivity<LauncherState>
                 onUiChangedWhileSleeping();
             }
             mStateManager.goToState(NORMAL);
-        }
-    }
-
-    @TargetApi(Build.VERSION_CODES.M)
-    @Override
-    public boolean onErrorStartingShortcut(Intent intent, ItemInfo info) {
-        // Due to legacy reasons, direct call shortcuts require Launchers to have the
-        // corresponding permission. Show the appropriate permission prompt if that
-        // is the case.
-        if (intent.getComponent() == null
-                && Intent.ACTION_CALL.equals(intent.getAction())
-                && checkSelfPermission(android.Manifest.permission.CALL_PHONE) !=
-                PackageManager.PERMISSION_GRANTED) {
-
-            setWaitingForResult(PendingRequestArgs
-                    .forIntent(REQUEST_PERMISSION_CALL_PHONE, intent, info));
-            requestPermissions(new String[]{android.Manifest.permission.CALL_PHONE},
-                    REQUEST_PERMISSION_CALL_PHONE);
-            return true;
-        } else {
-            return false;
         }
     }
 

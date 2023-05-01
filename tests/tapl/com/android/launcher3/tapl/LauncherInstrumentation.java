@@ -1012,8 +1012,6 @@ public final class LauncherInstrumentation {
                 if (hasLauncherObject(WORKSPACE_RES_ID)) {
                     log(action = "already at home");
                 } else {
-                    log("Hierarchy before swiping up to home:");
-                    dumpViewHierarchy();
                     action = "swiping up to home";
 
                     swipeToState(
@@ -1851,36 +1849,6 @@ public final class LauncherInstrumentation {
 
     public void clearLauncherData() {
         getTestInfo(TestProtocol.REQUEST_CLEAR_DATA);
-    }
-
-    /**
-     * Reloads the workspace with a test layout that includes the Test Activity app icon on the
-     * hotseat.
-     */
-    public void useTestWorkspaceLayoutOnReload() {
-        getTestInfo(TestProtocol.REQUEST_USE_TEST_WORKSPACE_LAYOUT);
-    }
-
-    /**
-     * Reloads the workspace with a test layout that includes Maps/Play on workspace, and
-     * Dialer/Messaging/Chrome/Camera on hotseat.
-     */
-    public void useTest2WorkspaceLayoutOnReload() {
-        getTestInfo(TestProtocol.REQUEST_USE_TEST2_WORKSPACE_LAYOUT);
-    }
-
-
-    /**
-     * Reloads the workspace with a test layout that includes the chrome Activity app icon on the
-     * hotseat.
-     */
-    public void useTaplWorkspaceLayoutOnReload() {
-        getTestInfo(TestProtocol.REQUEST_USE_TAPL_WORKSPACE_LAYOUT);
-    }
-
-    /** Reloads the workspace with the default layout defined by the user's grid size selection. */
-    public void useDefaultWorkspaceLayoutOnReload() {
-        getTestInfo(TestProtocol.REQUEST_USE_DEFAULT_WORKSPACE_LAYOUT);
     }
 
     /** Shows the taskbar if it is hidden, otherwise does nothing. */
