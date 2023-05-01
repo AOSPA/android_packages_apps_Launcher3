@@ -72,9 +72,9 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.PopupContainerWithArrow;
-import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.search.StringMatcherUtility;
 import com.android.launcher3.util.IntArray;
+import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.views.ActivityContext;
@@ -219,6 +219,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             setCompoundDrawablePadding(grid.folderChildDrawablePaddingPx);
             defaultIconSize = grid.folderChildIconSizePx;
         } else if (mDisplay == DISPLAY_SEARCH_RESULT) {
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, grid.allAppsIconTextSizePx);
             defaultIconSize = getResources().getDimensionPixelSize(R.dimen.search_row_icon_size);
         } else if (mDisplay == DISPLAY_SEARCH_RESULT_SMALL) {
             defaultIconSize = getResources().getDimensionPixelSize(
@@ -267,8 +268,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mDotParams.scale = 0f;
         mForceHideDot = false;
         setBackground(null);
-        setSingleLine(true);
-        setMaxLines(1);
+        if (FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get()
+                || FeatureFlags.ENABLE_TWOLINE_DEVICESEARCH.get()) {
+            setMaxLines(1);
+        }
 
         setTag(null);
         if (mIconLoadRequest != null) {
@@ -665,8 +668,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     getPaddingBottom());
         }
         // only apply two line for all_apps
-        if (FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get() && (mLastOriginalText != null)
-                && (mDisplay == DISPLAY_ALL_APPS)) {
+        if (((FeatureFlags.ENABLE_TWOLINE_ALLAPPS.get() && mDisplay == DISPLAY_ALL_APPS)
+                || (FeatureFlags.ENABLE_TWOLINE_DEVICESEARCH.get()
+                && mDisplay == DISPLAY_SEARCH_RESULT)) && (mLastOriginalText != null)) {
             CharSequence modifiedString = modifyTitleToSupportMultiLine(
                     MeasureSpec.getSize(widthMeasureSpec) - getCompoundPaddingLeft()
                             - getCompoundPaddingRight(),
@@ -868,7 +872,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             if (mIcon instanceof PreloadIconDrawable) {
                 preloadIconDrawable = (PreloadIconDrawable) mIcon;
                 preloadIconDrawable.setLevel(progressLevel);
-                preloadIconDrawable.setIsDisabled(!info.isAppStartable());
+                preloadIconDrawable.setIsDisabled(ENABLE_DOWNLOAD_APP_UX_V2.get()
+                        ? info.getProgressLevel() == 0
+                        : !info.isAppStartable());
             } else {
                 preloadIconDrawable = makePreloadIcon();
                 setIcon(preloadIconDrawable);
@@ -893,8 +899,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         final PreloadIconDrawable preloadDrawable = newPendingIcon(getContext(), info);
 
         preloadDrawable.setLevel(progressLevel);
-        preloadDrawable.setIsDisabled(!info.isAppStartable());
-
+        preloadDrawable.setIsDisabled(ENABLE_DOWNLOAD_APP_UX_V2.get()
+                ? info.getProgressLevel() == 0
+                : !info.isAppStartable());
         return preloadDrawable;
     }
 
@@ -973,6 +980,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
         Drawable icon = visible ? mIcon : new ColorDrawable(Color.TRANSPARENT);
         applyCompoundDrawables(icon);
+    }
+
+    /** Sets the icon visual state to disabled or not. */
+    public void setIconDisabled(boolean isDisabled) {
+        if (mIcon != null) {
+            mIcon.setIsDisabled(isDisabled);
+        }
     }
 
     protected boolean iconUpdateAnimationEnabled() {

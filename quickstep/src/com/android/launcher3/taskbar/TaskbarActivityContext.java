@@ -30,8 +30,7 @@ import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLA
 import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_FULLSCREEN;
 import static com.android.launcher3.taskbar.TaskbarManager.FLAG_HIDE_NAVBAR_WINDOW;
 import static com.android.launcher3.testing.shared.ResourceUtils.getBoolByName;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
 
 import android.animation.AnimatorSet;
@@ -56,7 +55,6 @@ import android.view.Gravity;
 import android.view.RoundedCorner;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.WindowManagerGlobal;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
@@ -80,6 +78,7 @@ import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.popup.PopupContainerWithArrow;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.AutohideSuspendFlag;
 import com.android.launcher3.taskbar.TaskbarTranslationController.TransitionCallback;
@@ -234,6 +233,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarInsetsController(this),
                 new VoiceInteractionWindowController(this),
                 new TaskbarTranslationController(this),
+                new TaskbarSpringOnStashController(this),
                 isDesktopMode
                         ? new DesktopTaskbarRecentAppsController(this)
                         : TaskbarRecentAppsController.DEFAULT,
@@ -262,6 +262,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         } else {
             mWindowManager.updateViewLayout(mDragLayer, mWindowLayoutParams);
         }
+    }
+
+    /**
+     * Show Taskbar upon receiving broadcast
+     */
+    public void showTaskbarFromBroadcast() {
+        mControllers.taskbarStashController.showTaskbarFromBroadcast();
     }
 
     @Override
@@ -302,10 +309,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                     deviceProfile.hotseatQsbWidth = originDeviceProfile.hotseatQsbWidth;
 
                     // Update icon size
-                    deviceProfile.iconSizePx = resources.getDimensionPixelSize(
-                            DisplayController.isTransientTaskbar(TaskbarActivityContext.this)
-                                    ? R.dimen.transient_taskbar_icon_size
-                                    : R.dimen.taskbar_icon_size);
+                    deviceProfile.iconSizePx = deviceProfile.taskbarIconSize;
                     deviceProfile.updateIconSize(1f, resources);
                 }).build();
     }
@@ -525,6 +529,16 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         setTaskbarWindowFocusable(isVisible);
     }
 
+    @Override
+    public void onSplitScreenMenuButtonClicked() {
+        PopupContainerWithArrow popup = PopupContainerWithArrow.getOpen(this);
+        if (popup != null) {
+            popup.addOnCloseCallback(() -> {
+                mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
+            });
+        }
+    }
+
     /**
      * Sets a new data-source for this taskbar instance
      */
@@ -561,9 +575,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     public void updateSysuiStateFlags(int systemUiStateFlags, boolean fromInit) {
         mControllers.navbarButtonsViewController.updateStateForSysuiFlags(systemUiStateFlags,
                 fromInit);
-        int shadeExpandedFlags = SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED
-                | SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
-        onNotificationShadeExpandChanged((systemUiStateFlags & shadeExpandedFlags) != 0, fromInit);
+        boolean isShadeVisible = (systemUiStateFlags & SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE) != 0;
+        onNotificationShadeExpandChanged(isShadeVisible, fromInit);
         mControllers.taskbarViewController.setRecentsButtonDisabled(
                 mControllers.navbarButtonsViewController.isRecentsDisabled()
                         || isNavBarKidsModeActive());
@@ -579,6 +592,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.taskbarForceVisibleImmersiveController.updateSysuiFlags(systemUiStateFlags);
         mControllers.voiceInteractionWindowController.setIsVoiceInteractionWindowVisible(
                 (systemUiStateFlags & SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING) != 0, fromInit);
+
+        mControllers.uiController.updateStateForSysuiFlags(systemUiStateFlags, fromInit);
     }
 
     /**
@@ -704,13 +719,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         }
 
         if (DisplayController.isTransientTaskbar(this)) {
-            int taskbarSize = resources.getDimensionPixelSize(R.dimen.transient_taskbar_size);
-            return taskbarSize
-                    + (2 * resources.getDimensionPixelSize(R.dimen.transient_taskbar_margin))
+            return mDeviceProfile.taskbarHeight
+                    + (2 * mDeviceProfile.taskbarBottomMargin)
                     + resources.getDimensionPixelSize(R.dimen.transient_taskbar_shadow_blur);
         }
 
-        return mDeviceProfile.taskbarSize + Math.max(getLeftCornerRadius(), getRightCornerRadius());
+        return mDeviceProfile.taskbarHeight
+                + Math.max(getLeftCornerRadius(), getRightCornerRadius());
     }
 
     public int getSetupWindowHeight() {

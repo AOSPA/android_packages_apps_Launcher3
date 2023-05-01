@@ -70,7 +70,9 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
 
     @Override
     protected int getGestureLottieAnimationId() {
-        return R.raw.home_gesture_tutorial_animation;
+        return mTutorialFragment.isLargeScreen()
+                ? R.raw.home_gesture_tutorial_tablet_animation
+                : R.raw.home_gesture_tutorial_animation;
     }
 
     @Override
@@ -90,6 +92,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
                     case BACK_COMPLETED_FROM_RIGHT:
                     case BACK_CANCELLED_FROM_LEFT:
                     case BACK_CANCELLED_FROM_RIGHT:
+                    case BACK_NOT_STARTED_TOO_FAR_FROM_EDGE:
                         showFeedback(R.string.home_gesture_feedback_swipe_too_far_from_edge);
                         break;
                 }
@@ -97,7 +100,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
             case HOME_NAVIGATION_COMPLETE:
                 if (result == BackGestureResult.BACK_COMPLETED_FROM_LEFT
                         || result == BackGestureResult.BACK_COMPLETED_FROM_RIGHT) {
-                    mTutorialFragment.closeTutorial();
+                    mTutorialFragment.close();
                 }
                 break;
         }
@@ -136,7 +139,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
                 break;
             case HOME_NAVIGATION_COMPLETE:
                 if (result == NavBarGestureResult.HOME_GESTURE_COMPLETED) {
-                    mTutorialFragment.closeTutorial();
+                    mTutorialFragment.close();
                 }
                 break;
         }

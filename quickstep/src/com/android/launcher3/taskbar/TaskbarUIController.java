@@ -125,6 +125,12 @@ public class TaskbarUIController {
     }
 
     /**
+     * SysUI flags updated, see QuickStepContract.SYSUI_STATE_* values.
+     */
+    public void updateStateForSysuiFlags(int sysuiFlags, boolean skipAnim){
+    }
+
+    /**
      * Returns {@code true} iff taskbar is stashed.
      */
     public boolean isTaskbarStashed() {
@@ -238,7 +244,8 @@ public class TaskbarUIController {
                                     taskAttributes.getIconView().getDrawable(),
                                     taskAttributes.getThumbnailView(),
                                     taskAttributes.getThumbnailView().getThumbnail(),
-                                    null /* intent */);
+                                    null /* intent */,
+                                    null /* user */);
                             return;
                         }
                     }
@@ -250,7 +257,8 @@ public class TaskbarUIController {
                             new BitmapDrawable(info.bitmap.icon),
                             startingView,
                             null /* thumbnail */,
-                            intent);
+                            intent,
+                            info.user);
                 }
         );
     }

@@ -85,7 +85,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.database.sqlite.SQLiteDatabase;
-import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
@@ -116,9 +115,10 @@ import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
 import android.widget.Toast;
+import android.window.BackEvent;
+import android.window.OnBackAnimationCallback;
 
 import androidx.annotation.CallSuper;
-import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
@@ -287,6 +287,9 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     // Type PendingSplitSelectInfo<Parcelable>
     protected static final String PENDING_SPLIT_SELECT_INFO = "launcher.pending_split_select_info";
+
+    public static final String INTENT_ACTION_ALL_APPS_TOGGLE =
+            "launcher.intent_action_all_apps_toggle";
 
     public static final String ON_CREATE_EVT = "Launcher.onCreate";
     public static final String ON_START_EVT = "Launcher.onStart";
@@ -560,7 +563,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     /**
-     * Provide {@link OnBackPressedHandler} in below order:
+     * Provide {@link OnBackAnimationCallback} in below order:
      * <ol>
      *  <li> auto cancel action mode handler
      *  <li> drag handler
@@ -575,7 +578,8 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Note that state handler will always be handling the back press event if the previous 3 don't.
      */
     @NonNull
-    protected OnBackPressedHandler getOnBackPressedHandler() {
+    @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    protected OnBackAnimationCallback getOnBackAnimationCallback() {
         // #1 auto cancel action mode handler
         if (isInAutoCancelActionMode()) {
             return this::finishAutoCancelActionMode;
@@ -594,17 +598,16 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
 
         // #4 state handler
-        return new OnBackPressedHandler() {
+        return new OnBackAnimationCallback() {
             @Override
             public void onBackInvoked() {
                 onStateBack();
             }
 
             @Override
-            public void onBackProgressed(
-                    @FloatRange(from = 0.0, to = 1.0) float backProgress) {
+            public void onBackProgressed(@NonNull BackEvent backEvent) {
                 mStateManager.getState().onBackProgressed(
-                        Launcher.this, backProgress);
+                        Launcher.this, backEvent.getProgress());
             }
 
             @Override
@@ -1352,10 +1355,6 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         if (SHOW_DOT_PAGINATION.get()) {
             mWorkspace.getPageIndicator().setShouldAutoHide(true);
-            mWorkspace.getPageIndicator().setPaintColor(
-                    Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText)
-                            ? Color.BLACK
-                            : Color.WHITE);
         }
     }
 
@@ -1691,11 +1690,21 @@ public class Launcher extends StatefulActivity<LauncherState>
             handleGestureContract(intent);
         } else if (Intent.ACTION_ALL_APPS.equals(intent.getAction())) {
             showAllAppsFromIntent(alreadyOnHome);
+        } else if (INTENT_ACTION_ALL_APPS_TOGGLE.equals(intent.getAction())) {
+            toggleAllAppsFromIntent(alreadyOnHome);
         } else if (Intent.ACTION_SHOW_WORK_APPS.equals(intent.getAction())) {
             showAllAppsWorkTabFromIntent(alreadyOnHome);
         }
 
         TraceHelper.INSTANCE.endSection(traceToken);
+    }
+
+    protected void toggleAllAppsFromIntent(boolean alreadyOnHome) {
+        if (getStateManager().isInStableState(ALL_APPS)) {
+            getStateManager().goToState(NORMAL, alreadyOnHome);
+        } else {
+            showAllAppsFromIntent(alreadyOnHome);
+        }
     }
 
     protected void showAllAppsFromIntent(boolean alreadyOnHome) {
@@ -2117,8 +2126,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
+    @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     public void onBackPressed() {
-        getOnBackPressedHandler().onBackInvoked();
+        getOnBackAnimationCallback().onBackInvoked();
     }
 
     protected void onStateBack() {
@@ -3258,6 +3268,10 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected LauncherAccessibilityDelegate createAccessibilityDelegate() {
         return new LauncherAccessibilityDelegate(this);
     }
+
+    /** Enables/disabled the hotseat prediction icon long press edu for testing. */
+    @VisibleForTesting
+    public void enableHotseatEdu(boolean enable) {}
 
     /**
      * @see LauncherState#getOverviewScaleAndOffset(Launcher)

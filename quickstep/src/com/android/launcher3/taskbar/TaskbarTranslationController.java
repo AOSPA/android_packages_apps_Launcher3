@@ -54,6 +54,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
     private boolean mHasSprungOnceThisGesture;
     private @Nullable ValueAnimator mSpringBounce;
     private boolean mGestureEnded;
+    private boolean mGestureInProgress;
     private boolean mAnimationToHomeRunning;
 
     private final boolean mIsTransientTaskbar;
@@ -76,12 +77,11 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
     /**
      * Called to cancel any existing animations.
      */
-    public void cancelAnimationIfExists() {
+    public void cancelSpringIfExists() {
         if (mSpringBounce != null) {
             mSpringBounce.cancel();
             mSpringBounce = null;
         }
-        reset();
     }
 
     private void updateTranslationYForSwipe() {
@@ -124,6 +124,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
 
     private void reset() {
         mGestureEnded = false;
+        mGestureInProgress = false;
         mHasSprungOnceThisGesture = false;
     }
 
@@ -135,16 +136,38 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
     }
 
     /**
+     * Returns {@code true} if we should reset the animation back to zero.
+     *
+     * Returns {@code false} if there is a gesture in progress, or if we are already animating
+     * to 0 within the specified duration.
+     */
+    public boolean shouldResetBackToZero(long duration) {
+        if (mGestureInProgress) {
+            return false;
+        }
+        if (mSpringBounce != null && mSpringBounce.isRunning()) {
+            long springDuration = mSpringBounce.getDuration();
+            long current = mSpringBounce.getCurrentPlayTime();
+            return (springDuration - current >= duration);
+        }
+        if (mTranslationYForSwipe.isAnimatingToValue(0)) {
+            return mTranslationYForSwipe.getRemainingTime() >= duration;
+        }
+        return true;
+    }
+
+    /**
      * Returns an animation to reset the taskbar translation to {@code 0}.
      */
     public ObjectAnimator createAnimToResetTranslation(long duration) {
-        ObjectAnimator animator = ObjectAnimator.ofFloat(mTranslationYForSwipe, VALUE, 0);
+        ObjectAnimator animator = mTranslationYForSwipe.animateToValue(0);
         animator.setInterpolator(Interpolators.LINEAR);
         animator.setDuration(duration);
         animator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
-                cancelAnimationIfExists();
+                cancelSpringIfExists();
+                reset();
                 mAnimationToHomeRunning = true;
             }
 
@@ -162,6 +185,19 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
      */
     public class TransitionCallback {
 
+        /**
+         * Clears any existing animations so that user
+         * can take control over the movement of the taskbaer.
+         */
+        public void onActionDown() {
+            if (mAnimationToHomeRunning) {
+                mTranslationYForSwipe.cancelAnimation();
+            }
+            mAnimationToHomeRunning = false;
+            cancelSpringIfExists();
+            reset();
+            mGestureInProgress = true;
+        }
         /**
          * Called when there is movement to move the taskbar.
          */
@@ -184,6 +220,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
                 mGestureEnded = true;
                 startSpring();
             }
+            mGestureInProgress = false;
         }
     }
 
@@ -195,6 +232,7 @@ public class TaskbarTranslationController implements TaskbarControllers.Loggable
         pw.println(prefix + "\tmHasSprungOnceThisGesture=" + mHasSprungOnceThisGesture);
         pw.println(prefix + "\tmAnimationToHomeRunning=" + mAnimationToHomeRunning);
         pw.println(prefix + "\tmGestureEnded=" + mGestureEnded);
+        pw.println(prefix + "\tmGestureInProgress=" + mGestureInProgress);
         pw.println(prefix + "\tmSpringBounce is running=" + (mSpringBounce != null
                 && mSpringBounce.isRunning()));
     }

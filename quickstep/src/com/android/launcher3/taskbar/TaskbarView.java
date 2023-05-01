@@ -33,7 +33,6 @@ import android.widget.FrameLayout;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
@@ -48,6 +47,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
+import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.DoubleShadowBubbleTextView;
 import com.android.launcher3.views.IconButtonView;
@@ -57,19 +57,18 @@ import java.util.function.Predicate;
 /**
  * Hosts the Taskbar content such as Hotseat and Recent Apps. Drawn on top of other apps.
  */
-public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconParent, Insettable {
+public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconParent, Insettable,
+        DeviceProfile.OnDeviceProfileChangeListener {
     private static final String TAG = TaskbarView.class.getSimpleName();
 
-    private static final float TASKBAR_BACKGROUND_LUMINANCE = 0.30f;
     private static final Rect sTmpRect = new Rect();
-
-    public int mThemeIconsBackground;
 
     private final int[] mTempOutLocation = new int[2];
     private final Rect mIconLayoutBounds;
     private final int mIconTouchSize;
     private final int mItemMarginLeftRight;
     private final int mItemPadding;
+    private final int mFolderLeaveBehindColor;
     private final boolean mIsRtl;
 
     private final TaskbarActivityContext mActivityContext;
@@ -94,7 +93,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
     private float mTransientTaskbarAllAppsButtonTranslationXOffset;
 
-    private final boolean mStartAlignTaskbar;
+    private boolean mShouldTryStartAlign;
 
     public TaskbarView(@NonNull Context context) {
         this(context, null);
@@ -123,11 +122,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 resources.getDimension(isTransientTaskbar
                         ? R.dimen.transient_taskbar_all_apps_button_translation_x_offset
                         : R.dimen.taskbar_all_apps_button_translation_x_offset);
-        mStartAlignTaskbar = mActivityContext.isThreeButtonNav()
-                && resources.getBoolean(R.bool.start_align_taskbar);
+
+        onDeviceProfileChanged(mActivityContext.getDeviceProfile());
 
         int actualMargin = resources.getDimensionPixelSize(R.dimen.taskbar_icon_spacing);
-        int actualIconSize = mActivityContext.getDeviceProfile().iconSizePx;
+        int actualIconSize = mActivityContext.getDeviceProfile().taskbarIconSize;
 
         mIconTouchSize = Math.max(actualIconSize,
                 resources.getDimensionPixelSize(R.dimen.taskbar_icon_min_touch_size));
@@ -136,10 +135,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mItemMarginLeftRight = actualMargin - (mIconTouchSize - actualIconSize) / 2;
         mItemPadding = (mIconTouchSize - actualIconSize) / 2;
 
+        mFolderLeaveBehindColor = Themes.getAttrColor(mActivityContext,
+                android.R.attr.textColorTertiary);
+
         // Needed to draw folder leave-behind when opening one.
         setWillNotDraw(false);
-
-        mThemeIconsBackground = calculateThemeIconsBackground();
 
         if (!mActivityContext.getPackageManager().hasSystemFeature(FEATURE_PC)) {
             mAllAppsButton = (IconButtonView) LayoutInflater.from(context)
@@ -163,6 +163,23 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        mActivityContext.addOnDeviceProfileChangeListener(this);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mActivityContext.removeOnDeviceProfileChangeListener(this);
+    }
+
+    @Override
+    public void onDeviceProfileChanged(DeviceProfile dp) {
+        mShouldTryStartAlign = mActivityContext.isThreeButtonNav() && dp.startAlignTaskbar;
+    }
+
+    @Override
     public boolean performAccessibilityActionInternal(int action, Bundle arguments) {
         if (action == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) {
             announceForAccessibility(mContext.getString(R.string.taskbar_a11y_shown_title));
@@ -182,26 +199,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 .sendAccessibilityEvent(TYPE_WINDOW_CONTENT_CHANGED);
     }
 
-    private int getColorWithGivenLuminance(int color, float luminance) {
-        float[] colorHSL = new float[3];
-        ColorUtils.colorToHSL(color, colorHSL);
-        colorHSL[2] = luminance;
-        return ColorUtils.HSLToColor(colorHSL);
-    }
-
     /**
      * Returns the icon touch size.
      */
     public int getIconTouchSize() {
         return mIconTouchSize;
-    }
-
-    private int calculateThemeIconsBackground() {
-        int color = ThemedIconDrawable.getColors(mContext)[0];
-        if (Utilities.isDarkTheme(mContext)) {
-            return getColorWithGivenLuminance(color, TASKBAR_BACKGROUND_LUMINANCE);
-        }
-        return color;
     }
 
     protected void init(TaskbarViewController.TaskbarViewCallbacks callbacks) {
@@ -332,9 +334,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             // Always set QSB to invisible after re-adding.
             mQsb.setVisibility(View.INVISIBLE);
         }
-
-        mThemeIconsBackground = calculateThemeIconsBackground();
-        setThemedIconsBackgroundColor(mThemeIconsBackground);
     }
 
     /**
@@ -372,12 +371,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
         int navSpaceNeeded = deviceProfile.hotseatBarEndOffset;
         boolean layoutRtl = isLayoutRtl();
-        int iconEnd = right - (right - left - spaceNeeded) / 2;
-        boolean needMoreSpaceForNav = layoutRtl ?
-                navSpaceNeeded > (iconEnd - spaceNeeded) :
-                iconEnd > (right - navSpaceNeeded);
+        int centerAlignIconEnd = right - (right - left - spaceNeeded) / 2;
+        int iconEnd;
 
-        if (mStartAlignTaskbar) {
+        if (mShouldTryStartAlign) {
             // Taskbar is aligned to the start
             int startSpacingPx = deviceProfile.inlineNavButtonsEndSpacingPx;
 
@@ -386,13 +383,20 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             } else {
                 iconEnd = startSpacingPx + spaceNeeded;
             }
-        } else if (needMoreSpaceForNav) {
+        } else {
+            iconEnd = centerAlignIconEnd;
+        }
+
+        boolean needMoreSpaceForNav = layoutRtl
+                ? navSpaceNeeded > (iconEnd - spaceNeeded)
+                : iconEnd > (right - navSpaceNeeded);
+        if (needMoreSpaceForNav) {
             // Add offset to account for nav bar when taskbar is centered
             int offset = layoutRtl
-                    ? navSpaceNeeded - (iconEnd - spaceNeeded)
-                    : (right - navSpaceNeeded) - iconEnd;
+                    ? navSpaceNeeded - (centerAlignIconEnd - spaceNeeded)
+                    : (right - navSpaceNeeded) - centerAlignIconEnd;
 
-            iconEnd += offset;
+            iconEnd = centerAlignIconEnd + offset;
         }
 
         sTmpRect.set(mIconLayoutBounds);
@@ -444,19 +448,9 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     @Override
-    public boolean onInterceptTouchEvent(MotionEvent ev) {
-        mControllerCallbacks.onInterceptTouchEvent(ev);
-        return super.onInterceptTouchEvent(ev);
-    }
-
-    @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (mIconLayoutBounds.left <= event.getX()
-                && event.getX() <= mIconLayoutBounds.right
-                && !DisplayController.isTransientTaskbar(mActivityContext)) {
-            // Don't allow long pressing between icons, or above/below them
-            // unless its transient taskbar.
-            mControllerCallbacks.clearTouchInProgress();
+        if (mIconLayoutBounds.left <= event.getX() && event.getX() <= mIconLayoutBounds.right) {
+            // Don't allow long pressing between icons, or above/below them.
             return true;
         }
         if (mControllerCallbacks.onTouchEvent(event)) {
@@ -547,7 +541,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (mLeaveBehindFolderIcon != null) {
             canvas.save();
             canvas.translate(mLeaveBehindFolderIcon.getLeft(), mLeaveBehindFolderIcon.getTop());
-            mLeaveBehindFolderIcon.getFolderBackground().drawLeaveBehind(canvas);
+            mLeaveBehindFolderIcon.getFolderBackground().drawLeaveBehind(canvas,
+                    mFolderLeaveBehindColor);
             canvas.restore();
         }
     }
