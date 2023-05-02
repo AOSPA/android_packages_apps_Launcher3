@@ -16,6 +16,23 @@
       "message": "actually fixes 2 bugs - anim missing after sysui update and when smartspace is disabled (was always missing then)",
       "revId": "2b582a46aeca389656e8a568a9ecf7994bb606af",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "45f6849a_5e127ffb",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000541
+      },
+      "writtenOn": "2023-05-02T06:37:31Z",
+      "side": 1,
+      "message": "actually just noticed smartspace itself smoothly going up when unlocking can still be missing but the other anim still plays, however still a good improvement",
+      "revId": "2b582a46aeca389656e8a568a9ecf7994bb606af",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
