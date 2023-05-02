@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4d6b6ea2_7e1828cf",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000541
+      },
+      "writtenOn": "2023-05-02T06:32:45Z",
+      "side": 1,
+      "message": "actually fixes 2 bugs - anim missing after sysui update and when smartspace is disabled (was always missing then)",
+      "revId": "2b582a46aeca389656e8a568a9ecf7994bb606af",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
