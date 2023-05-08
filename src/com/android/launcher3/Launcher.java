@@ -63,6 +63,8 @@ import static com.android.launcher3.popup.SystemShortcut.INSTALL;
 import static com.android.launcher3.popup.SystemShortcut.WIDGETS;
 import static com.android.launcher3.states.RotationHelper.REQUEST_LOCK;
 import static com.android.launcher3.states.RotationHelper.REQUEST_NONE;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.ItemInfoMatcher.forFolderMatch;
 
 import android.animation.Animator;
@@ -119,6 +121,7 @@ import android.window.OnBackAnimationCallback;
 import androidx.annotation.CallSuper;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 
@@ -572,7 +575,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Note that state handler will always be handling the back press event if the previous 3 don't.
      */
     @NonNull
-    @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     protected OnBackAnimationCallback getOnBackAnimationCallback() {
         // #1 auto cancel action mode handler
         if (isInAutoCancelActionMode()) {
@@ -1771,6 +1774,11 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
+    public DropTargetHandler getDropTargetHandler() {
+        return new DropTargetHandler(this);
+    }
+
+    @Override
     public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
         if (requestCode != -1) {
             mPendingActivityRequestCode = requestCode;
@@ -1828,9 +1836,6 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     private void setWorkspaceLoading(boolean value) {
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.FLAKY_BINDING, "running: setWorkspaceLoading=" + value);
-        }
         mWorkspaceLoading = value;
     }
 
@@ -2203,10 +2208,6 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         IntSet result = new IntSet();
         if (visibleIds.isEmpty()) {
-            if (TestProtocol.sDebugTracing) {
-                Log.d(TestProtocol.NULL_INT_SET, "getPagesToBindSynchronously (1): "
-                        + result);
-            }
             return result;
         }
         for (int id : orderedScreenIds.toArray()) {
@@ -2226,10 +2227,6 @@ public class Launcher extends StatefulActivity<LauncherState>
             // Add the right panel if left panel is hidden when switching display, due to empty
             // pages being hidden in single panel.
             result.add(pairId);
-        }
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.NULL_INT_SET, "getPagesToBindSynchronously (2): "
-                    + result);
         }
         return result;
     }
@@ -2252,14 +2249,11 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     /**
      * Refreshes the shortcuts shown on the workspace.
-     *
+     * <p>
      * Implementation of the method from LauncherModel.Callbacks.
      */
     public void startBinding() {
         Object traceToken = TraceHelper.INSTANCE.beginSection("startBinding");
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.FLAKY_BINDING, "running: startBinding");
-        }
         // Floating panels (except the full widget sheet) are associated with individual icons. If
         // we are starting a fresh bind, close all such panels as all the icons are about
         // to go away.
@@ -2408,6 +2402,12 @@ public class Launcher extends StatefulActivity<LauncherState>
                             (FolderInfo) item);
                     break;
                 }
+                case LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR: {
+                    FolderInfo info = (FolderInfo) item;
+                    // TODO (jeremysim b/274189428): Create app pair icon
+                    view = null;
+                    break;
+                }
                 case LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET:
                 case LauncherSettings.Favorites.ITEM_TYPE_CUSTOM_APPWIDGET: {
                     view = inflateAppWidget((LauncherAppWidgetInfo) item);
@@ -2438,10 +2438,6 @@ public class Launcher extends StatefulActivity<LauncherState>
                         throw (new RuntimeException(desc));
                     } else {
                         getModelWriter().deleteItemFromDatabase(item, desc);
-                        if (TestProtocol.sDebugTracing) {
-                            Log.d(TestProtocol.MISSING_PROMISE_ICON,
-                                    TAG + "bindItems failed for item=" + item);
-                        }
                         continue;
                     }
                 }
@@ -2727,14 +2723,11 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     /**
      * Callback saying that there aren't any more items to bind.
-     *
+     * <p>
      * Implementation of the method from LauncherModel.Callbacks.
      */
     public void finishBindingItems(IntSet pagesBoundFirst) {
         Object traceToken = TraceHelper.INSTANCE.beginSection("finishBindingItems");
-        if (TestProtocol.sDebugTracing) {
-            Log.d(TestProtocol.FLAKY_BINDING, "running: finishBindingItems");
-        }
         mWorkspace.restoreInstanceStateForRemainingPages();
 
         setWorkspaceLoading(false);
