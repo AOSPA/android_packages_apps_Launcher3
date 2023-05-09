@@ -17,6 +17,7 @@ package com.android.quickstep;
 
 import static androidx.test.InstrumentationRegistry.getInstrumentation;
 
+import static com.android.launcher3.config.FeatureFlags.ENABLE_CURSOR_HOVER_STATES;
 import static com.android.quickstep.TaskbarModeSwitchRule.Mode.PERSISTENT;
 import static com.android.quickstep.TaskbarModeSwitchRule.Mode.TRANSIENT;
 
@@ -27,7 +28,6 @@ import android.content.Intent;
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 
-import com.android.launcher3.tapl.Overview;
 import com.android.launcher3.tapl.Taskbar;
 import com.android.launcher3.ui.TaplTestsLauncher3;
 import com.android.launcher3.util.LauncherLayoutBuilder;
@@ -64,10 +64,6 @@ public class TaplTestsTaskbar extends AbstractQuickStepTest {
                 "com.android.launcher3.testcomponent.BaseTestingActivity");
         mLauncherLayout = TestUtil.setLauncherDefaultLayout(mTargetContext, layoutBuilder);
         TaplTestsLauncher3.initialize(this);
-        Overview overview = mLauncher.getWorkspace().switchToOverview();
-        if (overview.hasTasks()) {
-            overview.dismissAllTasks();
-        }
 
         startAppFast(CALCULATOR_APP_PACKAGE);
         mLauncher.enableBlockTimeout(true);
@@ -267,6 +263,39 @@ public class TaplTestsTaskbar extends AbstractQuickStepTest {
                 .openDeepShortcutMenu()
                 .getMenuItem("Shortcut 1")
                 .dragToSplitscreen(TEST_APP_PACKAGE, CALCULATOR_APP_PACKAGE);
+    }
+
+    @Test
+    @TaskbarModeSwitch(mode = TRANSIENT)
+    public void testShowTaskbarUnstashHintOnHover() {
+        try (AutoCloseable flag = TestUtil.overrideFlag(ENABLE_CURSOR_HOVER_STATES, true)) {
+            getTaskbar().getAppIcon(TEST_APP_NAME).launch(TEST_APP_PACKAGE);
+            mLauncher.getLaunchedAppState().hoverToShowTaskbarUnstashHint();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    @TaskbarModeSwitch(mode = TRANSIENT)
+    public void testUnstashTaskbarOnScreenBottomEdgeHover() {
+        try (AutoCloseable flag = TestUtil.overrideFlag(ENABLE_CURSOR_HOVER_STATES, true)) {
+            getTaskbar().getAppIcon(TEST_APP_NAME).launch(TEST_APP_PACKAGE);
+            mLauncher.getLaunchedAppState().hoverScreenBottomEdgeToUnstashTaskbar();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    @TaskbarModeSwitch(mode = TRANSIENT)
+    public void testHoverBelowHintedTaskbarToUnstash() {
+        try (AutoCloseable flag = TestUtil.overrideFlag(ENABLE_CURSOR_HOVER_STATES, true)) {
+            getTaskbar().getAppIcon(TEST_APP_NAME).launch(TEST_APP_PACKAGE);
+            mLauncher.getLaunchedAppState().hoverBelowHintedTaskbarToUnstash();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Taskbar getTaskbar() {

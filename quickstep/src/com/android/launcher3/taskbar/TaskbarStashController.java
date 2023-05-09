@@ -856,15 +856,18 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * Creates and starts a partial unstash animation, hinting at the new state that will trigger
      * when long press is detected.
+     *
      * @param animateForward Whether we are going towards the new unstashed state or returning to
      *                       the stashed state.
+     * @param forceUnstash Whether we force the unstash hint to animate.
      */
-    public void startUnstashHint(boolean animateForward) {
+    protected void startUnstashHint(boolean animateForward, boolean forceUnstash) {
         if (!isStashed()) {
             // Already unstashed, no need to hint in that direction.
             return;
         }
-        if (!canCurrentlyManuallyUnstash()) {
+        // TODO(b/270395798): Clean up after removing long-press unstashing code path.
+        if (!canCurrentlyManuallyUnstash() && !forceUnstash) {
             // If any other flags are causing us to be stashed, long press won't cause us to
             // unstash, so don't hint that it will.
             return;
@@ -926,20 +929,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             updateStateForFlag(FLAG_STASHED_IN_APP_IME, shouldStashForIme);
             applyState(TASKBAR_STASH_DURATION_FOR_IME, getTaskbarStashStartDelayForIme());
         } else {
-            applyState(mControllers.taskbarOverlayController.getCloseDuration());
-        }
-    }
-
-    /**
-     * Resets the flag if no system gesture is in progress.
-     * <p>
-     * Otherwise, the reset should be deferred until after the gesture is finished.
-     *
-     * @see #setSystemGestureInProgress
-     */
-    public void resetFlagIfNoGestureInProgress(int flag) {
-        if (!mIsSystemGestureInProgress) {
-            updateStateForFlag(flag, false);
             applyState(mControllers.taskbarOverlayController.getCloseDuration());
         }
     }

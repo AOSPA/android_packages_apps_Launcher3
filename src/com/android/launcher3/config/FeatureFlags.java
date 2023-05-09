@@ -253,7 +253,7 @@ public final class FeatureFlags {
             "COLLECT_SEARCH_HISTORY", DISABLED, "Allow launcher to collect search history for log");
 
     public static final BooleanFlag ENABLE_TWOLINE_ALLAPPS = getDebugFlag(270390937,
-            "ENABLE_TWOLINE_ALLAPPS", DISABLED, "Enables two line label inside all apps.");
+            "ENABLE_TWOLINE_ALLAPPS", TEAMFOOD, "Enables two line label inside all apps.");
 
     public static final BooleanFlag IME_STICKY_SNACKBAR_EDU = getDebugFlag(270391693,
             "IME_STICKY_SNACKBAR_EDU", ENABLED, "Show sticky IME edu in AllApps");
@@ -313,6 +313,12 @@ public final class FeatureFlags {
             "RECEIVE_UNFOLD_EVENTS_FROM_SYSUI", ENABLED,
             "Enables receiving unfold animation events from sysui instead of calculating "
                     + "them in launcher process using hinge sensor values.");
+
+    public static final BooleanFlag PREEMPTIVE_UNFOLD_ANIMATION_START = getDebugFlag(270397209,
+            "PREEMPTIVE_UNFOLD_ANIMATION_START", ENABLED,
+            "Enables starting the unfold animation preemptively when unfolding, without"
+                    + "waiting for SystemUI and then merging the SystemUI progress whenever we "
+                    + "start receiving the events");
 
     // TODO(Block 23): Clean up flags
     public static final BooleanFlag ENABLE_GRID_ONLY_OVERVIEW = getDebugFlag(270397206,
