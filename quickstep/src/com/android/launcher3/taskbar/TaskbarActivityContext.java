@@ -224,7 +224,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new TaskbarKeyguardController(this),
                 new StashedHandleViewController(this, stashedHandleView),
                 new TaskbarStashController(this),
-                new TaskbarEduController(this),
                 new TaskbarAutohideSuspendController(this),
                 new TaskbarPopupController(this),
                 new TaskbarForceVisibleImmersiveController(this),
@@ -593,7 +592,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.voiceInteractionWindowController.setIsVoiceInteractionWindowVisible(
                 (systemUiStateFlags & SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING) != 0, fromInit);
 
-        mControllers.uiController.updateStateForSysuiFlags(systemUiStateFlags, fromInit);
+        mControllers.uiController.updateStateForSysuiFlags(systemUiStateFlags);
     }
 
     /**
