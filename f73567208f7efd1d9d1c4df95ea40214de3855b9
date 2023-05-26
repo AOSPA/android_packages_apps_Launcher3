@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "12eef6b4_e95ea056",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000541
+      },
+      "writtenOn": "2023-05-26T15:13:03Z",
+      "side": 1,
+      "message": "what does it look like and what\u0027s the live tile? (not a blocker, but i think a preview should be there)",
+      "revId": "f73567208f7efd1d9d1c4df95ea40214de3855b9",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
