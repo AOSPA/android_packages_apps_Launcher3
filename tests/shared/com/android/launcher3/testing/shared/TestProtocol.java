@@ -16,6 +16,8 @@
 
 package com.android.launcher3.testing.shared;
 
+import android.util.Log;
+
 /**
  * Protocol for custom accessibility events for communication with UI Automation tests.
  */
@@ -155,9 +157,18 @@ public final class TestProtocol {
     public static final String VIEW_AND_ACTIVITY_LEAKS = "b/260260325";
     public static final String WORK_TAB_MISSING = "b/243688989";
     public static final String TWO_TASKBAR_LONG_CLICKS = "b/262282528";
+    public static final String WORKSPACE_LOADS_FOREVER = "b/267200150";
 
     public static final String REQUEST_EMULATE_DISPLAY = "emulate-display";
     public static final String REQUEST_STOP_EMULATE_DISPLAY = "stop-emulate-display";
     public static final String REQUEST_IS_EMULATE_DISPLAY_RUNNING = "is-emulate-display-running";
     public static final String REQUEST_EMULATE_PRINT_DEVICE = "emulate-print-device";
+
+    /** Logs {@link Log#d(String, String)} if {@link #sDebugTracing} is true. */
+    public static void testLogD(String tag, String message) {
+        if (!sDebugTracing) {
+            return;
+        }
+        Log.d(tag, message);
+    }
 }
