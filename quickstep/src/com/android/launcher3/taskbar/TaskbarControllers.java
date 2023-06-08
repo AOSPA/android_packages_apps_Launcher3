@@ -23,12 +23,14 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsController;
+import com.android.launcher3.taskbar.bubbles.BubbleControllers;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayController;
 import com.android.systemui.shared.rotation.RotationButtonController;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Hosts various taskbar controllers to facilitate passing between one another.
@@ -60,6 +62,8 @@ public class TaskbarControllers {
     public final TaskbarOverlayController taskbarOverlayController;
     public final TaskbarEduTooltipController taskbarEduTooltipController;
     public final KeyboardQuickSwitchController keyboardQuickSwitchController;
+    public final TaskbarDividerPopupController taskbarPinningController;
+    public final Optional<BubbleControllers> bubbleControllers;
 
     @Nullable private LoggableTaskbarController[] mControllersToLog = null;
     @Nullable private BackgroundRendererController[] mBackgroundRendererControllers = null;
@@ -105,7 +109,9 @@ public class TaskbarControllers {
             TaskbarSpringOnStashController taskbarSpringOnStashController,
             TaskbarRecentAppsController taskbarRecentAppsController,
             TaskbarEduTooltipController taskbarEduTooltipController,
-            KeyboardQuickSwitchController keyboardQuickSwitchController) {
+            KeyboardQuickSwitchController keyboardQuickSwitchController,
+            TaskbarDividerPopupController taskbarPinningController,
+            Optional<BubbleControllers> bubbleControllers) {
         this.taskbarActivityContext = taskbarActivityContext;
         this.taskbarDragController = taskbarDragController;
         this.navButtonController = navButtonController;
@@ -130,6 +136,8 @@ public class TaskbarControllers {
         this.taskbarRecentAppsController = taskbarRecentAppsController;
         this.taskbarEduTooltipController = taskbarEduTooltipController;
         this.keyboardQuickSwitchController = keyboardQuickSwitchController;
+        this.taskbarPinningController = taskbarPinningController;
+        this.bubbleControllers = bubbleControllers;
     }
 
     /**
@@ -163,6 +171,8 @@ public class TaskbarControllers {
         taskbarTranslationController.init(this);
         taskbarEduTooltipController.init(this);
         keyboardQuickSwitchController.init(this);
+        taskbarPinningController.init(this);
+        bubbleControllers.ifPresent(controllers -> controllers.init(this));
 
         mControllersToLog = new LoggableTaskbarController[] {
                 taskbarDragController, navButtonController, navbarButtonsViewController,
@@ -171,7 +181,7 @@ public class TaskbarControllers {
                 stashedHandleViewController, taskbarStashController,
                 taskbarAutohideSuspendController, taskbarPopupController, taskbarInsetsController,
                 voiceInteractionWindowController, taskbarTranslationController,
-                taskbarEduTooltipController, keyboardQuickSwitchController
+                taskbarEduTooltipController, keyboardQuickSwitchController, taskbarPinningController
         };
         mBackgroundRendererControllers = new BackgroundRendererController[] {
                 taskbarDragLayerController, taskbarScrimViewController,
@@ -222,6 +232,7 @@ public class TaskbarControllers {
         taskbarRecentAppsController.onDestroy();
         keyboardQuickSwitchController.onDestroy();
         taskbarStashController.onDestroy();
+        bubbleControllers.ifPresent(controllers -> controllers.onDestroy());
 
         mControllersToLog = null;
         mBackgroundRendererControllers = null;

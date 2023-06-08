@@ -40,22 +40,34 @@
     <attr name="eduHalfSheetBGColor" format="color" />
     <attr name="overviewScrimColor" format="color" />
     <attr name="popupNotificationDotColor" format="color" />
+    <attr name="notificationDotColor" format="color" />
 
-    <attr name="folderDotColor" format="color" />
     <attr name="folderPaginationColor" format="color" />
     <attr name="folderPreviewColor" format="color" />
     <attr name="folderBackgroundColor" format="color" />
     <attr name="folderIconRadius" format="float" />
     <attr name="folderIconBorderColor" format="color" />
     <attr name="folderTextColor" format="color" />
-    <attr name="folderHintColor" format="color" />
+    <attr name="folderHintTextColor" format="color" />
     <attr name="isFolderDarkText" format="boolean" />
     <attr name="workspaceAccentColor" format="color" />
     <attr name="dropTargetHoverTextColor" format="color" />
     <attr name="preloadIconAccentColor" format="color" />
     <attr name="preloadIconBackgroundColor" format="color" />
+    <attr name="widgetPickerTitleColor" format="color"/>
+    <attr name="widgetPickerPrimarySurfaceColor" format="color"/>
+    <attr name="widgetPickerSecondarySurfaceColor" format="color"/>
     <attr name="widgetPickerHeaderAppTitleColor" format="color"/>
     <attr name="widgetPickerHeaderAppSubtitleColor" format="color"/>
+    <attr name="widgetPickerHeaderBackgroundColor" format="color"/>
+    <attr name="widgetPickerSuggestionsIconBackgroundColor" format="color"/>
+    <attr name="widgetPickerSuggestionsIconColor" format="color"/>
+    <attr name="widgetPickerTabBackgroundSelected" format="color"/>
+    <attr name="widgetPickerTabBackgroundUnselected" format="color"/>
+    <attr name="widgetPickerSearchTextColor" format="color"/>
+    <attr name="widgetPickerSelectedTabTextColor" format="color"/>
+    <attr name="widgetPickerUnselectedTabTextColor" format="color"/>
+    <attr name="widgetPickerCollapseHandleColor" format="color"/>
 
     <!-- BubbleTextView specific attributes. -->
     <declare-styleable name="BubbleTextView">
@@ -78,7 +90,6 @@
     <declare-styleable name="FolderIconPreview">
         <attr name="folderPreviewColor" />
         <attr name="folderIconBorderColor" />
-        <attr name="folderDotColor" />
     </declare-styleable>
 
     <declare-styleable name="SearchResultSuggestion">
@@ -187,6 +198,9 @@
         <attr name="demoModeLayoutId" format="reference" />
         <attr name="isScalable" format="boolean" />
         <attr name="devicePaddingId" format="reference" />
+        <!-- File that contains the specs for the workspace.
+        Needs FeatureFlags.ENABLE_RESPONSIVE_WORKSPACE enabled -->
+        <attr name="workspaceSpecsId" format="reference" />
         <!-- By default all categories are enabled -->
         <attr name="deviceCategory" format="integer">
             <!-- Enable on phone only -->

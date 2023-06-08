@@ -100,9 +100,13 @@ public final class TaskbarAllAppsController {
         }
     }
 
-    /** Opens the {@link TaskbarAllAppsContainerView} in a new window. */
-    public void show() {
-        show(true);
+    /** Toggles visibility of {@link TaskbarAllAppsContainerView} in the overlay window. */
+    public void toggle() {
+        if (isOpen()) {
+            mSlideInView.close(true);
+        } else {
+            show(true);
+        }
     }
 
     /** Returns {@code true} if All Apps is open. */
@@ -148,5 +152,11 @@ public final class TaskbarAllAppsController {
     public int getTaskbarAllAppsTopPadding() {
         // Allow null-pointer since this should only be null if the apps view is not showing.
         return mAppsView.getActiveRecyclerView().getClipBounds().top;
+    }
+
+    @VisibleForTesting
+    public int getTaskbarAllAppsScroll() {
+        // Allow null-pointer since this should only be null if the apps view is not showing.
+        return mAppsView.getActiveRecyclerView().computeVerticalScrollOffset();
     }
 }

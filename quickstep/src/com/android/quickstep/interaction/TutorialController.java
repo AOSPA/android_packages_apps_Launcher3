@@ -118,7 +118,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
     private final AlertDialog mSkipTutorialDialog;
 
     private boolean mGestureCompleted = false;
-    private LottieAnimationView mAnimatedGestureDemonstration;
+    protected LottieAnimationView mAnimatedGestureDemonstration;
     private LottieAnimationView mCheckmarkAnimation;
     private RelativeLayout mFullGestureDemonstration;
 
@@ -233,13 +233,19 @@ abstract class TutorialController implements BackGestureAttemptCallback,
 
     @LayoutRes
     protected int getMockHotseatResId() {
-        return mTutorialFragment.isLargeScreen()
-                ? (mTutorialFragment.isFoldable()
+        if (ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()) {
+            return mTutorialFragment.isLargeScreen()
+                    ? mTutorialFragment.isFoldable()
+                        ? R.layout.redesigned_gesture_tutorial_foldable_mock_hotseat
+                        : R.layout.redesigned_gesture_tutorial_tablet_mock_hotseat
+                    : R.layout.redesigned_gesture_tutorial_mock_hotseat;
+        } else {
+            return mTutorialFragment.isLargeScreen()
+                    ? mTutorialFragment.isFoldable()
                         ? R.layout.gesture_tutorial_foldable_mock_hotseat
-                        : R.layout.gesture_tutorial_tablet_mock_hotseat)
-                : (ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
-                        ? R.layout.redesigned_gesture_tutorial_mock_hotseat
-                        : R.layout.gesture_tutorial_mock_hotseat);
+                        : R.layout.gesture_tutorial_tablet_mock_hotseat
+                    : R.layout.gesture_tutorial_mock_hotseat;
+        }
     }
 
     @LayoutRes
@@ -308,6 +314,14 @@ abstract class TutorialController implements BackGestureAttemptCallback,
         if (gestureAnimation != null && edgeAnimation != null) {
             playFeedbackAnimation(gestureAnimation, edgeAnimation, mShowFeedbackRunnable, true);
         }
+    }
+
+    /**
+     * Only use this when a gesture is completed, but the feedback shouldn't be shown immediately.
+     * In that case, call this method immediately instead.
+     */
+    public void setGestureCompleted() {
+        mGestureCompleted = true;
     }
 
     /**
@@ -547,7 +561,7 @@ abstract class TutorialController implements BackGestureAttemptCallback,
     protected void resetViewsForBackGesture() {
         mFakeTaskView.setVisibility(View.VISIBLE);
         mFakeTaskView.setBackgroundColor(
-                mContext.getColor(R.color.gesture_back_tutorial_background));
+                mContext.getColor(R.color.gesture_tutorial_workspace_background));
         mExitingAppView.setVisibility(View.VISIBLE);
 
         // reset the exiting app's dimensions
@@ -635,13 +649,17 @@ abstract class TutorialController implements BackGestureAttemptCallback,
         }
     }
 
+    void setLauncherViewColor(@ColorRes int backgroundColorRes) {
+        mFakeLauncherView.setBackgroundColor(mContext.getColor(backgroundColorRes));
+    }
+
     private void updateDrawables() {
         if (mContext != null) {
             mTutorialFragment.getRootView().setBackground(AppCompatResources.getDrawable(
                     mContext, getMockWallpaperResId()));
             mTutorialFragment.updateFeedbackAnimation();
-            mFakeLauncherView.setBackgroundColor(
-                    mContext.getColor(R.color.gesture_tutorial_fake_wallpaper_color));
+            setLauncherViewColor(ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
+                    ? getSwipeActionColorResId() : R.color.gesture_tutorial_fake_wallpaper_color);
             updateFakeViewLayout(mFakeHotseatView, getMockHotseatResId());
             mHotseatIconView = mFakeHotseatView.findViewById(R.id.hotseat_icon_1);
             updateFakeViewLayout(mFakeTaskView, getMockAppTaskLayoutResId());
@@ -651,11 +669,6 @@ abstract class TutorialController implements BackGestureAttemptCallback,
                     getMockPreviousAppTaskThumbnailColorResId()));
             mFakeIconView.setBackground(AppCompatResources.getDrawable(
                     mContext, getMockAppIconResId()));
-
-            if (ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()) {
-                mFakeLauncherView.setBackgroundColor(
-                        mContext.getColor(getSwipeActionColorResId()));
-            }
         }
     }
 
@@ -823,9 +836,6 @@ abstract class TutorialController implements BackGestureAttemptCallback,
         HOME_NAVIGATION,
         HOME_NAVIGATION_COMPLETE,
         OVERVIEW_NAVIGATION,
-        OVERVIEW_NAVIGATION_COMPLETE,
-        ASSISTANT,
-        ASSISTANT_COMPLETE,
-        SANDBOX_MODE
+        OVERVIEW_NAVIGATION_COMPLETE
     }
 }

@@ -15,13 +15,13 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.taskbar.TaskbarKeyguardController.MASK_ANY_SYSUI_LOCKED;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_STASHED_LAUNCHER_STATE;
 import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HOME;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
-import static com.android.systemui.animation.Interpolators.EMPHASIZED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_AWAKE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_WAKEFULNESS_MASK;
@@ -420,6 +420,10 @@ public class TaskbarLauncherStateController {
                 // We're changing state to home, should close open popups e.g. Taskbar AllApps
                 handleOpenFloatingViews = true;
             }
+            if (mLauncherState == LauncherState.OVERVIEW) {
+                // Calling to update the insets in TaskbarInsetController#updateInsetsTouchability
+                mControllers.taskbarActivityContext.notifyUpdateLayoutParams();
+            }
         }
 
         if (hasAnyFlag(changedFlags, FLAGS_LAUNCHER_ACTIVE)) {
@@ -470,8 +474,7 @@ public class TaskbarLauncherStateController {
                     public void onAnimationEnd(Animator animation) {
                         TaskbarStashController stashController =
                                 mControllers.taskbarStashController;
-                        stashController.updateAndAnimateTransientTaskbar(
-                                /* stash */ true, /* duration */ 0);
+                        stashController.updateAndAnimateTransientTaskbar(/* stash */ true);
                     }
                 });
             } else {

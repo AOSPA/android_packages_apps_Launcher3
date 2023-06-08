@@ -14,7 +14,8 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<resources>
+<resources
+    xmlns:androidprv="http://schemas.android.com/apk/prv/res/android">
 
     <style name="TextAppearance.GestureTutorial"
         parent="android:TextAppearance.Material.Body1" />
@@ -199,7 +200,7 @@
         <item name="android:background">@drawable/button_taskbar_edu_colored</item>
         <item name="android:stateListAnimator">@null</item>
         <item name="android:textSize">16sp</item>
-        <item name="android:padding">4dp</item>
+        <item name="android:minHeight">36dp</item>
     </style>
 
     <style name="TextAppearance.TaskbarEduTooltip.Title" parent="@android:style/TextAppearance.DeviceDefault.DialogWindowTitle">
@@ -214,11 +215,15 @@
         <item name="android:textSize">14sp</item>
     </style>
 
-    <style name="KeyboardQuickSwitchOverview">
+    <style name="KeyboardQuickSwitchText">
         <item name="fontFamily">google-sans-text</item>
         <item name="android:textSize">14sp</item>
-        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:textColor">?androidprv:attr/materialColorOnSurface</item>
         <item name="lineHeight">20sp</item>
+    </style>
+
+    <style name="KeyboardQuickSwitchText.OnBackground" parent="KeyboardQuickSwitchText">
+        <item name="android:textColor">?androidprv:attr/materialColorOnSurfaceInverse</item>
     </style>
 
     <style name="GestureTutorialActivity"

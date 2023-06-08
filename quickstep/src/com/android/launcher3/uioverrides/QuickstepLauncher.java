@@ -68,12 +68,14 @@ import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.hardware.SensorManager;
 import android.hardware.devicestate.DeviceStateManager;
 import android.hardware.display.DisplayManager;
 import android.media.permission.SafeCloseable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.IBinder;
@@ -91,6 +93,7 @@ import android.window.SplashScreen;
 import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.android.app.viewcapture.SettingsAwareViewCapture;
 import com.android.launcher3.AbstractFloatingView;
@@ -141,6 +144,7 @@ import com.android.launcher3.uioverrides.touchcontrollers.TwoButtonNavbarTouchCo
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.ObjectWrapper;
@@ -341,14 +345,16 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
-    public boolean startActivitySafely(View v, Intent intent, ItemInfo item) {
+    public RunnableList startActivitySafely(View v, Intent intent, ItemInfo item) {
         // Only pause is taskbar controller is not present
         mHotseatPredictionController.setPauseUIUpdate(getTaskbarUIController() == null);
-        boolean started = super.startActivitySafely(v, intent, item);
-        if (getTaskbarUIController() == null && !started) {
+        RunnableList result = super.startActivitySafely(v, intent, item);
+        if (getTaskbarUIController() == null && result == null) {
             mHotseatPredictionController.setPauseUIUpdate(false);
+        } else {
+            result.add(() -> mHotseatPredictionController.setPauseUIUpdate(false));
         }
-        return started;
+        return result;
     }
 
     @Override
@@ -367,11 +373,6 @@ public class QuickstepLauncher extends Launcher {
         if ((changeBits & (ACTIVITY_STATE_DEFERRED_RESUMED | ACTIVITY_STATE_STARTED
                 | ACTIVITY_STATE_USER_ACTIVE | ACTIVITY_STATE_TRANSITION_ACTIVE)) != 0) {
             onStateOrResumeChanging((getActivityFlags() & ACTIVITY_STATE_TRANSITION_ACTIVE) == 0);
-        }
-
-        if (((changeBits & ACTIVITY_STATE_STARTED) != 0
-                || (changeBits & getActivityFlags() & ACTIVITY_STATE_DEFERRED_RESUMED) != 0)) {
-            mHotseatPredictionController.setPauseUIUpdate(false);
         }
     }
 
@@ -764,6 +765,7 @@ public class QuickstepLauncher extends Launcher {
                         mActiveOnBackAnimationCallback.onBackStarted(backEvent);
                     }
 
+                    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
                     @Override
                     public void onBackInvoked() {
                         // Recreate mActiveOnBackAnimationCallback if necessary to avoid NPE
@@ -970,8 +972,8 @@ public class QuickstepLauncher extends Launcher {
         return mTaskbarUIController;
     }
 
-    public SplitSelectStateController getSplitSelectStateController() {
-        return mSplitSelectStateController;
+    public SplitToWorkspaceController getSplitToWorkspaceController() {
+        return mSplitToWorkspaceController;
     }
 
     public <T extends OverviewActionsView> T getActionsView() {
@@ -1060,7 +1062,8 @@ public class QuickstepLauncher extends Launcher {
     }
 
     @Override
-    public void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks) {
+    public void onInitialBindComplete(IntSet boundPages, RunnableList pendingTasks,
+            int workspaceItemCount, boolean isBindSync) {
         pendingTasks.add(() -> {
             // This is added in pending task as we need to wait for views to be positioned
             // correctly before registering them for the animation.
@@ -1070,7 +1073,7 @@ public class QuickstepLauncher extends Launcher {
                 mLauncherUnfoldAnimationController.updateRegisteredViewsIfNeeded();
             }
         });
-        super.onInitialBindComplete(boundPages, pendingTasks);
+        super.onInitialBindComplete(boundPages, pendingTasks, workspaceItemCount, isBindSync);
     }
 
     @Override
@@ -1095,6 +1098,17 @@ public class QuickstepLauncher extends Launcher {
                         : Display.DEFAULT_DISPLAY);
         addLaunchCookie(item, activityOptions.options);
         return activityOptions;
+    }
+
+    @Override
+    public ActivityOptionsWrapper makeDefaultActivityOptions(int splashScreenStyle) {
+        RunnableList callbacks = new RunnableList();
+        ActivityOptions options = ActivityOptions.makeCustomAnimation(
+                this, 0, 0, Color.TRANSPARENT,
+                Executors.MAIN_EXECUTOR.getHandler(), null,
+                elapsedRealTime -> callbacks.executeAllAndDestroy());
+        options.setSplashScreenStyle(splashScreenStyle);
+        return new ActivityOptionsWrapper(options, callbacks);
     }
 
     @Override
@@ -1176,6 +1190,11 @@ public class QuickstepLauncher extends Launcher {
                 mActionsView.updateVerticalMargin(info.navigationMode);
             }
         }
+    }
+
+    @Override
+    public void tryClearAccessibilityFocus(View view) {
+        view.clearAccessibilityFocus();
     }
 
     @Override
@@ -1309,5 +1328,8 @@ public class QuickstepLauncher extends Launcher {
         writer.println("\nQuickstepLauncher:");
         writer.println(prefix + "\tmOrientationState: " + (recentsView == null ? "recentsNull" :
                 recentsView.getPagedViewOrientedState()));
+        if (recentsView != null) {
+            recentsView.getSplitSelectController().dump(prefix, writer);
+        }
     }
 }
