@@ -126,12 +126,6 @@
             android:defaultValue="true"
             android:persistent="true" />
 
-        <Preference
-            android:key="pref_developer_options"
-            android:persistent="false"
-            android:title="Developer Options"
-            android:fragment="com.android.launcher3.settings.DeveloperOptionsFragment"/>
-
     </androidx.preference.PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
