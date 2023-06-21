@@ -536,7 +536,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private int mOverScrollShift = 0;
     private long mScrollLastHapticTimestamp;
 
-    private float mScrollScale = 1f;
+    private float mScrollScale = 0.9f;
 
     /**
      * TODO: Call reloadIdNeeded in onTaskStackChanged.
