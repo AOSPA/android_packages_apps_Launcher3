@@ -536,7 +536,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     private int mOverScrollShift = 0;
     private long mScrollLastHapticTimestamp;
 
-    private float mScrollScale = 1f;
+    private float mScrollScale = 0.9f;
 
     /**
      * TODO: Call reloadIdNeeded in onTaskStackChanged.
@@ -806,8 +806,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         mActivity.getViewCache().setCacheSize(R.layout.digital_wellbeing_toast, 5);
 
         mTintingColor = getForegroundScrimDimColor(context);
-
-        mScrollScale = getResources().getFloat(R.dimen.overview_scroll_scale);
 
         // if multi-instance feature is enabled
         if (FeatureFlags.ENABLE_MULTI_INSTANCE.get()) {
