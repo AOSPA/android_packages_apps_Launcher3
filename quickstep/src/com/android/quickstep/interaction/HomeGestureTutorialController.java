@@ -74,6 +74,13 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
     }
 
     @Override
+    public int getSuccessFeedbackTitle() {
+        return ENABLE_NEW_GESTURE_NAV_TUTORIAL.get()
+                ? R.string.home_gesture_tutorial_success
+                : R.string.gesture_tutorial_nice;
+    }
+
+    @Override
     public int getSuccessFeedbackSubtitle() {
         return mTutorialFragment.isAtFinalStep()
                 ? R.string.home_gesture_feedback_complete_without_follow_up
@@ -140,7 +147,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
 
     @Override
     public void onBackGestureAttempted(BackGestureResult result) {
-        if (isGestureCompleted()) {
+        if (skipGestureAttempt()) {
             return;
         }
         switch (mTutorialType) {
@@ -167,7 +174,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
 
     @Override
     public void onNavBarGestureAttempted(NavBarGestureResult result, PointF finalVelocity) {
-        if (isGestureCompleted()) {
+        if (skipGestureAttempt()) {
             return;
         }
         switch (mTutorialType) {
@@ -185,7 +192,7 @@ final class HomeGestureTutorialController extends SwipeUpGestureTutorialControll
                         showFeedback(R.string.home_gesture_feedback_swipe_too_far_from_edge);
                         break;
                     case OVERVIEW_GESTURE_COMPLETED:
-                        fadeOutFakeTaskView(true, () -> {
+                        fadeOutFakeTaskView(false, () -> {
                             showFeedback(R.string.home_gesture_feedback_overview_detected);
                             showFakeTaskbar(/* animateFromHotseat= */ false);
                         });
