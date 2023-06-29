@@ -3260,7 +3260,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 true /* isStagedTask */);
 
         pendingAnimation.addEndListener(animationSuccess ->
-                mSplitSelectStateController.launchSplitTasks(launchSuccess ->
+                mSplitSelectStateController.launchInitialAppFullscreen(launchSuccess ->
                         resetFromSplitSelectionState()));
 
         pendingAnimation.buildAnim().start();
@@ -4099,6 +4099,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         }
         alpha = Utilities.boundToRange(alpha, 0, 1);
         mContentAlpha = alpha;
+
         int runningTaskId = getTaskIdsForRunningTaskView()[0];
         for (int i = getTaskViewCount() - 1; i >= 0; i--) {
             TaskView child = requireTaskViewAt(i);

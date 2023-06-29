@@ -44,6 +44,10 @@
     <string name="hotsaet_tip_prediction_enabled" msgid="2233554377501347650">"Aplikacionet e sugjeruara janë aktivizuar"</string>
     <string name="hotsaet_tip_prediction_disabled" msgid="1506426298884658491">"Sugjerimet e aplikacioneve janë çaktivizuar"</string>
     <string name="hotseat_prediction_content_description" msgid="4582028296938078419">"Aplikacioni i parashikuar: <xliff:g id="TITLE">%1$s</xliff:g>"</string>
+    <!-- no translation found for gesture_tutorial_rotation_prompt_title (7537946781362766964) -->
+    <skip />
+    <!-- no translation found for gesture_tutorial_rotation_prompt (1664493449851960691) -->
+    <skip />
     <string name="back_gesture_feedback_swipe_too_far_from_edge" msgid="1711645592102201538">"Sigurohu që të rrëshqasësh shpejt nga skaji më i djathtë ose më i majtë."</string>
     <string name="back_gesture_feedback_cancelled" msgid="3274382913290074496">"Sigurohu që të rrëshqasësh shpejt nga skaji i djathtë ose i majtë drejt mesit të ekranit dhe lëshoje."</string>
     <string name="back_gesture_feedback_complete_with_overview_follow_up" msgid="9176400654037014471">"Ke mësuar si të rrëshqasësh shpejt nga e djathta për t\'u kthyer prapa. Në vijim do të mësosh se si t\'i ndërrosh aplikacionet."</string>
@@ -82,7 +86,7 @@
     <string name="allset_title" msgid="5021126669778966707">"Plotësisht gati!"</string>
     <string name="allset_hint" msgid="459504134589971527">"Rrëshqit shpejt lart për të shkuar në ekranin bazë"</string>
     <string name="allset_button_hint" msgid="2395219947744706291">"Trokit te butoni \"kreu\" për të shkuar tek ekrani bazë"</string>
-    <string name="allset_description_generic" msgid="5385500062202019855">"Je gati që të fillosh të përdorësh <xliff:g id="DEVICE">%1$s</xliff:g>"</string>
+    <string name="allset_description_generic" msgid="5385500062202019855">"Je gati që të fillosh ta përdorësh këtë <xliff:g id="DEVICE">%1$s</xliff:g>"</string>
     <string name="default_device_name" msgid="6660656727127422487">"pajisje"</string>
     <string name="allset_navigation_settings" msgid="4713404605961476027"><annotation id="link">"Cilësimet e navigimit të sistemit"</annotation></string>
     <string name="action_share" msgid="2648470652637092375">"Ndaj"</string>

@@ -44,6 +44,10 @@
     <string name="hotsaet_tip_prediction_enabled" msgid="2233554377501347650">"As suxestións de aplicacións están activadas"</string>
     <string name="hotsaet_tip_prediction_disabled" msgid="1506426298884658491">"As suxestións de aplicacións están desactivadas"</string>
     <string name="hotseat_prediction_content_description" msgid="4582028296938078419">"Aplicación predita: <xliff:g id="TITLE">%1$s</xliff:g>"</string>
+    <!-- no translation found for gesture_tutorial_rotation_prompt_title (7537946781362766964) -->
+    <skip />
+    <!-- no translation found for gesture_tutorial_rotation_prompt (1664493449851960691) -->
+    <skip />
     <string name="back_gesture_feedback_swipe_too_far_from_edge" msgid="1711645592102201538">"Asegúrate de pasar o dedo desde o bordo dereito ou esquerdo."</string>
     <string name="back_gesture_feedback_cancelled" msgid="3274382913290074496">"Asegúrate de pasar o dedo desde o bordo dereito ou esquerdo ata o medio da pantalla e avanza."</string>
     <string name="back_gesture_feedback_complete_with_overview_follow_up" msgid="9176400654037014471">"Aprendiches a pasar o dedo desde a dereita para volver. Agora, aprende a cambiar de aplicación."</string>
@@ -53,7 +57,7 @@
     <string name="back_gesture_intro_title" msgid="19551256430224428">"Pasa o dedo para volver"</string>
     <string name="back_gesture_intro_subtitle" msgid="7912576483031802797">"Para volver á última pantalla, pasa o dedo cara ao medio desde o bordo dereito ou esquerdo."</string>
     <string name="back_gesture_spoken_intro_subtitle" msgid="2162043199263088592">"Para volver á última pantalla, pasa 2 dedos desde o bordo esquerdo ou o dereito ata a metade da pantalla."</string>
-    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"Atrás"</string>
+    <string name="back_gesture_tutorial_title" msgid="1944737946101059789">"Volver atrás"</string>
     <string name="home_gesture_feedback_swipe_too_far_from_edge" msgid="1446774096007065298">"Asegúrate de pasar o dedo cara arriba desde o bordo inferior da pantalla."</string>
     <string name="home_gesture_feedback_overview_detected" msgid="1557523944897393013">"Asegúrate de non facer unha pausa antes de avanzar."</string>
     <string name="home_gesture_feedback_wrong_swipe_direction" msgid="6993979358080825438">"Asegúrate de pasar o dedo cara arriba cun movemento vertical."</string>

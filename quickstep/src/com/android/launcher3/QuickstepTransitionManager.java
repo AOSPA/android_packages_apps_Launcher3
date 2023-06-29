@@ -1065,6 +1065,9 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                     new SurfaceControl.Transaction().remove(dimLayer).apply()));
         }
 
+        backgroundRadiusAnim.addListener(
+                AnimatorListeners.forEndCallback(depthController::dispose));
+
         return backgroundRadiusAnim;
     }
 
@@ -1786,7 +1789,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 viewToUse = v;
             }
 
-            // TODO(b/265134143): create a CUJ type for interaction jank monitoring.
+            // The CUJ is logged by the click handler, so we don't log it inside the animation
+            // library.
             ActivityLaunchAnimator.Controller controllerDelegate =
                     ActivityLaunchAnimator.Controller.fromView(viewToUse, null /* cujType */);
 
@@ -2037,11 +2041,6 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
             super(l);
             setCrossWindowBlursEnabled(
                     CrossWindowBlurListeners.getInstance().isCrossWindowBlurEnabled());
-        }
-
-        @Override
-        public void setSurface(SurfaceControl surface) {
-            super.setSurface(surface);
         }
     }
 }
