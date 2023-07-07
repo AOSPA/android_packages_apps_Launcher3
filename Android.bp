@@ -266,7 +266,7 @@ android_library {
         "Launcher3CommonDepsLib",
         "QuickstepResLib",
     ],
-    manifest: "quickstep/AndroidManifest-launcher.xml",
+    manifest: "quickstep/AndroidManifest.xml",
     additional_manifests: [
         "go/AndroidManifest.xml",
         "AndroidManifest-common.xml",
