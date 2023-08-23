@@ -19,6 +19,7 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERV
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherUiState;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.views.ActivityContext;
@@ -45,7 +46,11 @@ public class OverviewModalTaskState extends OverviewState {
 
     @Override
     public int getVisibleElements(LauncherUiState launcherUiState) {
-        return OVERVIEW_ACTIONS;
+        Launcher launcher = Launcher.ACTIVITY_TRACKER.getCreatedContext();
+        boolean clearAll = launcher != null
+                ? LauncherPrefs.getPrefs(launcher).getBoolean("pref_recents_clear_all", true)
+                : true;
+        return OVERVIEW_ACTIONS | (!clearAll ? CLEAR_ALL_BUTTON : 0);
     }
 
     @Override
