@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "47af74a2_eb513b4a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000656
+      },
+      "writtenOn": "2023-10-16T14:07:41Z",
+      "side": 1,
+      "message": "packages/apps/Launcher3/src/com/android/launcher3/widget/LauncherAppWidgetHostView.java:122: error: cannot find symbol\n        if (!Utilities.isWorkspaceEditAllowed(mLauncher.getApplicationContext())) return true;\n                      ^\n  symbol:   method isWorkspaceEditAllowed(Context)\n  location: class Utilities\n1 error",
+      "revId": "fa518a2259ea030820643030fded6e303360527f",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
