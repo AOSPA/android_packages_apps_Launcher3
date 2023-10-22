@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "82ad2dbb_61aca474",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000541
+      },
+      "writtenOn": "2023-10-22T19:45:19Z",
+      "side": 1,
+      "message": "seems google has done some things to mitigate this, or i forgot how to reproduce it properly - i can still make it happen randomly but it doesnt seem as often anymore. not sure about this change yet",
+      "revId": "bb4340b7dd2e1d0dd3e2f64002ad0d39ff7868a9",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
