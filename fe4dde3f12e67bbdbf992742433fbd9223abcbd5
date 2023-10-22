@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "09e2a73a_5e9a94d2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000541
+      },
+      "writtenOn": "2023-10-22T15:24:36Z",
+      "side": 1,
+      "message": "This IIRC caused bugs on tablets",
+      "revId": "fe4dde3f12e67bbdbf992742433fbd9223abcbd5",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
