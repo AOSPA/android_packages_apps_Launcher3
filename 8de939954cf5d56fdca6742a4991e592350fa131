@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9a562211_c56c6b93",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000012
+      },
+      "writtenOn": "2023-10-23T03:31:21Z",
+      "side": 1,
+      "message": "packages/apps/Launcher3/src/com/android/launcher3/LauncherAppState.java:166: error: cannot find symbol\n            Utilities.restart(mContext);\n                     ^\n  symbol:   method restart(Context)\n  location: class Utilities\npackages/apps/Launcher3/src/com/android/launcher3/LauncherAppState.java:176: error: cannot find symbol\n            Utilities.restart(mContext);",
+      "revId": "8de939954cf5d56fdca6742a4991e592350fa131",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
