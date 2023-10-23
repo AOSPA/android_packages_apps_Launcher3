@@ -22,6 +22,7 @@ import static com.android.launcher3.Flags.enableWorkspaceInflation;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.widget.LauncherAppWidgetProviderInfo.fromProviderInfo;
 
+import android.app.ActivityOptions;
 import android.appwidget.AppWidgetHost;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
@@ -44,6 +45,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
+import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ResourceBasedOverride;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.widget.LauncherAppWidgetHost.ListenableHostView;
@@ -230,11 +232,19 @@ public class LauncherWidgetHolder {
                 () -> activity.onActivityResult(requestCode, RESULT_CANCELED, null));
     }
 
+    private Bundle getDefaultConfigurationActivityOptions() {
+        // Must allow background activity start for U.
+        return ActivityOptions.makeBasic()
+                .setPendingIntentBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED).toBundle();
+    }
+
     /**
      * Returns an {@link android.app.ActivityOptions} bundle from the {code activity} for launching
-     * the configuration of the {@code widgetId} app widget, or null of options cannot be produced.
+     * the configuration of the {@code widgetId} app widget, or default configuration options
+     * if they cannot be produced.
      */
-    @Nullable
+    @NonNull
     protected Bundle getConfigurationActivityOptions(@NonNull BaseDraggingActivity activity,
             int widgetId) {
         LauncherAppWidgetHostView view = mViews.get(widgetId);
@@ -247,7 +257,12 @@ public class LauncherWidgetHolder {
             return activity.makeDefaultActivityOptions(
                     -1 /* SPLASH_SCREEN_STYLE_UNDEFINED */).toBundle();
         }
-        Bundle bundle = activity.getActivityLaunchOptions(view, (ItemInfo) tag).toBundle();
+        ActivityOptionsWrapper activityOptionsWrapper =
+                activity.getActivityLaunchOptions(view, (ItemInfo) tag);
+        // Must allow background activity start for U.
+        activityOptionsWrapper.options.setPendingIntentBackgroundActivityStartMode(
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+        Bundle bundle = activityOptionsWrapper.toBundle();
         bundle.putInt(KEY_SPLASH_SCREEN_STYLE, SPLASH_SCREEN_STYLE_EMPTY);
         return bundle;
     }
