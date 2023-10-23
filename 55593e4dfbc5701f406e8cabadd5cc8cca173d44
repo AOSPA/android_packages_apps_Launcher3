@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d52e1062_0799e17f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000012
+      },
+      "writtenOn": "2023-10-23T03:37:39Z",
+      "side": 1,
+      "message": "packages/apps/Launcher3/src/com/android/launcher3/widget/LocalWallpaperColorsExtractor.java:170: error: incompatible types: LocalWallpaperColorsExtractor cannot be converted to OnColorsChangedListener\n            wallpaperManager.addOnColorsChangedListener(this, new ArrayList\u003cRectF\u003e(List.of(tempRectF)));",
+      "revId": "55593e4dfbc5701f406e8cabadd5cc8cca173d44",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
