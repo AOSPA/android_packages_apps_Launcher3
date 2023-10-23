@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7949f8b3_885bc3c1",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000012
+      },
+      "writtenOn": "2023-10-23T07:18:59Z",
+      "side": 1,
+      "message": "Smartspace is working in launcher.  Shows weather currently and successfully takes me to the weather action.",
+      "revId": "a66e56ab0877bfc9f1bf1644e98e74cee56e593b",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
