@@ -54,6 +54,7 @@
     <string name="category_google">Google</string>
     <string name="category_icon">Icons</string>
     <string name="category_recents">Recents</string>
+    <string name="category_gesture">Gestures</string>
 
     <!-- Hotseat searchbar -->
     <string name="label_search">Search</string>
@@ -70,5 +71,9 @@
     <!-- Smartspace -->
     <string name="smartspace_pref_title">At a Glance</string>
     <string name="smartspace_pref_summary">Show smartspace at the top of home screen</string>
+
+    <!-- Faster statusbar expansion -->
+    <string name="faster_sb_expansion_title">Faster status bar expansion</string>
+    <string name="faster_sb_expansion_summary">Swipe down on the right side of home screen to expand quick settings</string>
 
 </resources>
