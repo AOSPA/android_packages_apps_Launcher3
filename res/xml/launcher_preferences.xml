@@ -39,12 +39,25 @@
         android:summaryOn="@string/settings_lock_layout_summary_on"
         android:summaryOff="@string/settings_lock_layout_summary_off" />
 
-    <SwitchPreference
-        android:key="pref_dt_gesture"
-        android:title="@string/pref_dt_gesture_title"
-        android:summary="@string/pref_dt_gesture_summary"
-        android:defaultValue="true"
-        android:persistent="true"/>
+    <androidx.preference.PreferenceCategory
+        android:key="gesture_category"
+        android:title="@string/category_gesture">
+
+        <SwitchPreference
+            android:key="pref_dt_gesture"
+            android:title="@string/pref_dt_gesture_title"
+            android:summary="@string/pref_dt_gesture_summary"
+            android:defaultValue="true"
+            android:persistent="true"/>
+
+        <SwitchPreference
+            android:key="pref_faster_sb_expansion"
+            android:title="@string/faster_sb_expansion_title"
+            android:summary="@string/faster_sb_expansion_summary"
+            android:defaultValue="false"
+            android:persistent="true" />
+
+    </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory
         android:key="google_category"
