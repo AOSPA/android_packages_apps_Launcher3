@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "bd08ffc1_2a5d78a9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000012
+      },
+      "writtenOn": "2023-11-03T07:53:49Z",
+      "side": 1,
+      "message": "do we care? we don\u0027t ship go",
+      "revId": "af2f646b85c1daf047a9ba0cd0b8111f32c04adb",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
