@@ -59,7 +59,7 @@ android {
         withQuickstep {
             dimension "recents"
 
-            minSdkVersion 28
+            minSdkVersion 29
         }
 
         withoutQuickstep {
@@ -146,6 +146,7 @@ dependencies {
     implementation "androidx.dynamicanimation:dynamicanimation:${ANDROID_X_VERSION}"
     implementation "androidx.recyclerview:recyclerview:${ANDROID_X_VERSION}"
     implementation "androidx.preference:preference:${ANDROID_X_VERSION}"
+    implementation 'com.kieronquinn.smartspacer:sdk-client:1.0.1'
     implementation project(':IconLoader')
     implementation project(':UiTestsLibLauncher')
     withQuickstepImplementation project(':SharedLibWrapper')
