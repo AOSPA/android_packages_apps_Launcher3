@@ -50,4 +50,7 @@
     <string name="desktop_show_labels">Show icon labels on desktop</string>
     <string name="drawer_show_labels">Show icon labels in drawer</string>
 
+    <!-- Settings Categories -->
+    <string name="category_icon">Icons</string>
+
 </resources>
