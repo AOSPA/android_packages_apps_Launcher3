@@ -127,6 +127,11 @@ public class BgDataModel {
     public int lastBindId = 0;
 
     /**
+     * Load id for which the callbacks were successfully bound
+     */
+    public int lastLoadId = -1;
+
+    /**
      * Clears all the data
      */
     public synchronized void clear() {
@@ -212,7 +217,6 @@ public class BgDataModel {
                     // Fall through.
                 }
                 case LauncherSettings.Favorites.ITEM_TYPE_APPLICATION:
-                case LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT:
                     workspaceItems.remove(item);
                     break;
                 case LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET:
@@ -247,7 +251,6 @@ public class BgDataModel {
                 break;
             case LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT:
             case LauncherSettings.Favorites.ITEM_TYPE_APPLICATION:
-            case LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT:
                 if (item.container == LauncherSettings.Favorites.CONTAINER_DESKTOP ||
                         item.container == LauncherSettings.Favorites.CONTAINER_HOTSEAT) {
                     workspaceItems.add(item);
