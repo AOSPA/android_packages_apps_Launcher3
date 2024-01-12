@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a5266a19_cbb558e7",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000143
+      },
+      "writtenOn": "2024-01-12T12:27:47Z",
+      "side": 1,
+      "message": "Can we make the \"right side swipe\" dependent on the system setting for it? Sounds more logical to have one \"global\" option for it instead of two different ones in settings and launcher settings as people would either like it enabled on both or disabled for both I guess.",
+      "revId": "2f687f9ca52fd5362ba3a5e218012dbb64d37f72",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
