@@ -26,6 +26,7 @@ import static com.android.launcher3.InvariantDeviceProfile.TYPE_MULTI_DISPLAY;
 import static com.android.launcher3.InvariantDeviceProfile.TYPE_TABLET;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 
+import static co.aospa.launcher.OverlayCallbackImpl.KEY_DT_GESTURE;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_MINUS_ONE;
 
 import android.app.Activity;
@@ -35,6 +36,7 @@ import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.MenuItem;
@@ -127,7 +129,18 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
     }
 
     @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) { }
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        switch (key) {
+            case KEY_DT_GESTURE:
+                Settings.System.putIntForUser(getContentResolver(),
+                        Settings.System.GESTURE_DOUBLE_TAP_SLEEP,
+                        sharedPreferences.getBoolean(key, true) ? 1 : 0,
+                        UserHandle.USER_CURRENT);
+                break;
+            default:
+                break;
+        }
+    }
 
     private boolean startPreference(String fragment, Bundle args, String key) {
         if (getSupportFragmentManager().isStateSaved()) {
