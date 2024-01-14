@@ -16,6 +16,24 @@
       "message": "This IIRC caused bugs on tablets",
       "revId": "fe4dde3f12e67bbdbf992742433fbd9223abcbd5",
       "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a4eb686d_a2e003ca",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000737
+      },
+      "writtenOn": "2024-01-14T21:25:20Z",
+      "side": 1,
+      "message": "https://gerrit.aospa.co/c/AOSPA/android_packages_apps_Launcher3/+/37536",
+      "parentUuid": "09e2a73a_5e9a94d2",
+      "revId": "fe4dde3f12e67bbdbf992742433fbd9223abcbd5",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
     }
   ]
 }
