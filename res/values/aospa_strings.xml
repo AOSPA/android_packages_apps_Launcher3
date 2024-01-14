@@ -71,4 +71,8 @@
     <string name="smartspace_pref_title">At a Glance</string>
     <string name="smartspace_pref_summary">Show smartspace at the top of home screen</string>
 
+    <!-- Hide top shadow -->
+    <string name="hide_top_shadow_title">Hide top shadow</string>
+    <string name="hide_top_shadow_summary">Remove shadow underneath the status bar</string>
+
 </resources>
