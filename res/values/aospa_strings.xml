@@ -27,6 +27,10 @@
     <string name="drawer_labels_title">Drawer labels</string>
     <string name="drawer_labels_summary">Show icon labels in drawer</string>
 
+    <!-- Hide top shadow -->
+    <string name="hide_top_shadow_title">Hide top shadow</string>
+    <string name="hide_top_shadow_summary">Remove shadow underneath the status bar</string>
+
     <!-- Hotseat searchbar -->
     <string name="hotseat_dock_search_title">Google search bar</string>
     <string name="hotseat_dock_search_summary">Search bar in the bottom dock</string>
