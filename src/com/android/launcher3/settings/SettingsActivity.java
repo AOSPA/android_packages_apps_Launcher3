@@ -21,6 +21,7 @@ import static androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTIO
 import static com.android.launcher3.config.FeatureFlags.IS_STUDIO_BUILD;
 
 import static com.android.launcher3.Utilities.KEY_DOCK_SEARCH;
+import static com.android.launcher3.Utilities.KEY_DT_GESTURE;
 import static com.android.launcher3.Utilities.KEY_SMARTSPACE;
 import static com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY;
 
@@ -30,6 +31,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.UserHandle;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.MenuItem;
 import android.view.View;
@@ -155,6 +158,12 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
             case KEY_DOCK_SEARCH:
             case KEY_SMARTSPACE:
                 LauncherAppState.getInstanceNoCreate().setNeedsRestart();
+                break;
+            case KEY_DT_GESTURE:
+                Settings.System.putIntForUser(getContentResolver(),
+                        Settings.System.GESTURE_DOUBLE_TAP_SLEEP,
+                        sharedPreferences.getBoolean(key, true) ? 1 : 0,
+                        UserHandle.USER_CURRENT);
                 break;
             default:
                 break;
