@@ -23,7 +23,7 @@
       LAUNCHER_HOME_SCREEN_ROTATION_ENABLED(615)
       LAUNCHER_HOME_SCREEN_ROTATION_DISABLED(616)
     -->
-    <SwitchPreference
+    <SwitchPreferenceCompat
         android:key="pref_allowRotation"
         android:title="@string/allow_rotation_title"
         android:summary="@string/allow_rotation_desc"
@@ -32,7 +32,7 @@
         launcher:logIdOn="615"
         launcher:logIdOff="616" />
 
-    <SwitchPreference
+    <SwitchPreferenceCompat
         android:key="pref_workspace_lock"
         android:title="@string/lock_layout_title"
         android:summaryOn="@string/lock_layout_summary_on"
@@ -40,14 +40,14 @@
         android:defaultValue="false"
         android:persistent="true" />
 
-    <SwitchPreference
+    <SwitchPreferenceCompat
         android:key="pref_dt_gesture"
         android:title="@string/dt_gesture_title"
         android:summary="@string/dt_gesture_summary"
         android:defaultValue="true"
         android:persistent="true" />
 
-    <SwitchPreference
+    <SwitchPreferenceCompat
         android:key="pref_hide_top_shadow"
         android:title="@string/hide_top_shadow_title"
         android:summary="@string/hide_top_shadow_summary"
@@ -58,13 +58,13 @@
         android:key="google_category"
         android:title="@string/category_google">
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_minus_one"
             android:title="@string/google_feed_title"
             android:summary="@string/google_feed_summary"
             android:defaultValue="true" />
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_dock_search"
             android:title="@string/hotseat_dock_search_title"
             android:summary="@string/hotseat_dock_search_summary"
@@ -88,7 +88,7 @@
         LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_ENABLED(613)
         LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_DISABLED(614)
         -->
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_add_icon_to_home"
             android:title="@string/auto_add_shortcuts_label"
             android:summary="@string/auto_add_shortcuts_description"
@@ -103,14 +103,14 @@
             android:persistent="false"
             android:widgetLayout="@layout/notification_pref_warning" />
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_desktop_labels"
             android:title="@string/desktop_labels_title"
             android:summary="@string/desktop_labels_summary"
             android:defaultValue="true"
             android:persistent="true" />
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_drawer_labels"
             android:title="@string/drawer_labels_title"
             android:summary="@string/drawer_labels_summary"
@@ -141,19 +141,19 @@
         android:key="recents_category"
         android:title="@string/category_recents">
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_recents_screenshot"
             android:title="@string/recents_screenshot_title"
             android:defaultValue="true"
             android:persistent="true" />
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_recents_lens"
             android:title="@string/recents_lens_title"
             android:defaultValue="false"
             android:persistent="true" />
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             android:key="pref_recents_clear_all"
             android:title="@string/recents_clear_all_title"
             android:defaultValue="true"
