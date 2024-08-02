@@ -33,6 +33,7 @@ import static co.aospa.launcher.OverlayCallbackImpl.KEY_ICON_SIZE;
 import static co.aospa.launcher.OverlayCallbackImpl.KEY_MINUS_ONE;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
@@ -68,6 +69,9 @@ import com.android.launcher3.states.RotationHelper;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SettingsCache;
+
+import com.android.quickstep.util.AssistUtils;
+
 import com.android.settingslib.collapsingtoolbar.CollapsingToolbarBaseActivity;
 
 /**
@@ -91,6 +95,12 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
 
     private static final int DELAY_HIGHLIGHT_DURATION_MILLIS = 600;
     public static final String SAVE_HIGHLIGHTED_KEY = "android:preference_highlighted";
+
+    private static final String CTS_KEY = "pref_allow_cts";
+    private static boolean mContextualSearchDefValue;
+    private static boolean mCtsEnabled;
+
+    private static Context mContext;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,6 +133,9 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
             // Display the fragment as the main content.
             fm.beginTransaction().replace(com.android.settingslib.collapsingtoolbar.R.id.content_frame, f).commit();
         }
+            mContext = getApplicationContext();
+            mContextualSearchDefValue = mContext.getResources().getBoolean(
+                    com.android.internal.R.bool.config_searchAllEntrypointsEnabledDefault);
             LauncherPrefs.getPrefs(getApplicationContext())
                     .registerOnSharedPreferenceChangeListener(this);
     }
@@ -144,6 +157,11 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
             case KEY_FONT_SIZE:
             case KEY_ICON_SIZE:
                 InvariantDeviceProfile.INSTANCE.get(this).onConfigChanged(getApplicationContext());
+                break;
+            case CTS_KEY:
+                mCtsEnabled = LauncherPrefs.getPrefs(mContext).getBoolean(CTS_KEY, mContextualSearchDefValue);
+                Settings.Secure.putInt(mContext.getContentResolver(),
+                        Settings.Secure.SEARCH_ALL_ENTRYPOINTS_ENABLED, mCtsEnabled ? 1 : 0);
                 break;
             default:
                 break;
@@ -205,6 +223,7 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
 
         private Preference mShowGoogleAppPref;
         private Preference mShowGoogleBarPref;
+        private Preference mCtsPref;
 
         @Override
         public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -294,6 +313,12 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                 case KEY_MINUS_ONE:
                     mShowGoogleAppPref = preference;
                     preference.setEnabled(Utilities.isGSAEnabled(getContext()));
+                    return true;
+
+                case CTS_KEY:
+                    mCtsPref = preference;
+                    preference.setEnabled(AssistUtils.newInstance(
+                            getContext()).isContextualSearchIntentAvailable());
                     return true;
 
                 case DEVELOPER_OPTIONS_KEY:
