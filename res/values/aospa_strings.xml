@@ -8,6 +8,10 @@
     <!-- Application name -->
     <string name="aospa_app_name" translatable="false">Paranoid Launcher</string>
 
+    <!-- Circle to Search -->
+    <string name="pref_allow_cts_title">Circle to Search</string>
+    <string name="pref_allow_cts_summary">Touch and hold the Home button or the navigation handle to search using the content on your screen.</string>
+
     <!-- Folder titles -->
     <string name="google_folder_title" translatable="false">Google</string>
 
