@@ -70,6 +70,12 @@
             android:summary="@string/hotseat_dock_search_summary"
             android:defaultValue="true" />
 
+        <SwitchPreference
+            android:key="pref_allow_cts"
+            android:title="@string/pref_allow_cts_title"
+            android:summary="@string/pref_allow_cts_summary"
+            android:defaultValue="@*android:bool/config_searchAllEntrypointsEnabledDefault" />
+
         <Preference
             android:key="pref_suggestions"
             android:title="@string/suggestion_screen_title"
