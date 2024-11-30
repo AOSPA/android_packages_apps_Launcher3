@@ -981,6 +981,8 @@ public class DeviceProfile {
      * necessary.
      */
     public void recalculateHotseatWidthAndBorderSpace() {
+        if (isVerticalBarLayout()) return;
+
         updateHotseatWidthAndBorderSpace(inv.numColumns);
         int numWorkspaceColumns = getPanelCount() * inv.numColumns;
         if (isTwoPanels) {
