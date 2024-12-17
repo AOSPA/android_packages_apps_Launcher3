@@ -18,25 +18,6 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:launcher="http://schemas.android.com/apk/res-auto">
 
-    <com.android.launcher3.settings.NotificationDotsPreference
-        android:key="pref_icon_badging"
-        android:title="@string/notification_dots_title"
-        android:persistent="false"
-        android:widgetLayout="@layout/notification_pref_warning" />
-
-    <!--
-      LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_ENABLED(613)
-      LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_DISABLED(614)
-    -->
-    <SwitchPreference
-        android:key="pref_add_icon_to_home"
-        android:title="@string/auto_add_shortcuts_label"
-        android:summary="@string/auto_add_shortcuts_description"
-        android:defaultValue="true"
-        android:persistent="true"
-        launcher:logIdOn="613"
-        launcher:logIdOff="614" />
-
     <!--
       LAUNCHER_HOME_SCREEN_ROTATION_ENABLED(615)
       LAUNCHER_HOME_SCREEN_ROTATION_DISABLED(616)
@@ -49,5 +30,30 @@
         android:persistent="true"
         launcher:logIdOn="615"
         launcher:logIdOff="616" />
+
+    <androidx.preference.PreferenceCategory
+        android:key="icon_category"
+        android:title="@string/category_icon">
+
+        <!--
+        LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_ENABLED(613)
+        LAUNCHER_ADD_NEW_APPS_TO_HOME_SCREEN_DISABLED(614)
+        -->
+        <SwitchPreference
+            android:key="pref_add_icon_to_home"
+            android:title="@string/auto_add_shortcuts_label"
+            android:summary="@string/auto_add_shortcuts_description"
+            android:defaultValue="true"
+            android:persistent="true"
+            launcher:logIdOn="613"
+            launcher:logIdOff="614" />
+
+        <com.android.launcher3.settings.NotificationDotsPreference
+            android:key="pref_icon_badging"
+            android:title="@string/notification_dots_title"
+            android:persistent="false"
+            android:widgetLayout="@layout/notification_pref_warning" />
+
+    </androidx.preference.PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
