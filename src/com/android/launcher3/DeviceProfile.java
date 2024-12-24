@@ -123,7 +123,7 @@ public class DeviceProfile {
 
     public final float aspectRatio;
 
-    private final boolean mIsScalableGrid;
+    public final boolean mIsScalableGrid;
     private final int mTypeIndex;
 
     // Responsive grid
