@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "caa6d4c2_ca10ae6a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000925
+      },
+      "writtenOn": "2024-12-30T07:07:00Z",
+      "side": 1,
+      "message": "This would go better if qsb width is calculated by using hotseatQsbWidth, there are patches fixing the hotseat padding here:-\n\nhttps://github.com/HELLBOY017/android_packages_apps_Launcher3/commits/vic/?after\u003de9f8611cdbcac0ec4d87077e7670822b563a7354+104\n\nHowever revert these patches:-\n\nhttps://gerrit.aospa.co/c/AOSPA/android_packages_apps_Launcher3/+/42526\n\nhttps://gerrit.aospa.co/c/AOSPA/android_packages_apps_Launcher3/+/42643/1",
+      "revId": "1bf0737e0c248cab8f336c9e8b5e4cd0b150ae13",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
