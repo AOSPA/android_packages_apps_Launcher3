@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "25e96dd4_d102ce68",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000579
+      },
+      "writtenOn": "2024-12-31T15:04:54Z",
+      "side": 1,
+      "message": "intentionally kept broken as reducing dpi fixes this issue, using more rows effectively gets rid of using higher grid target",
+      "revId": "1a3a6e3a56c90a015cf62c51af8dc8eca064fc9f",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
