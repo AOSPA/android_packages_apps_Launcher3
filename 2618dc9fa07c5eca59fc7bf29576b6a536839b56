@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f15fdc65_e1575f40",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000925
+      },
+      "writtenOn": "2024-12-31T20:48:18Z",
+      "side": 1,
+      "message": "This patch has broken 3 button navigation, when the user reboots the system or simply restarts the launcher, an updated patch has been pushed here:-\nhttps://github.com/HELLBOY017/android_packages_apps_Launcher3/commit/a86a346d9f8de7e7c72281703b3d4ef5207117db\n\nwhich fixes this issue and also adds a receiver for contextual search package state changes and a settings listener so that the switch can be added in the Settings app instead of the launcher",
+      "revId": "2618dc9fa07c5eca59fc7bf29576b6a536839b56",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
