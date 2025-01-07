@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6aa1d3b6_fd39aa17",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000143
+      },
+      "writtenOn": "2025-01-07T12:16:29Z",
+      "side": 1,
+      "message": "Works, but requires a reboot after first/clean flash",
+      "revId": "2e8cfa2a81b305f0ef6d9d106c6eaf3d66b91a48",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
