@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "1548c0e2_8e8cfbae",
+        "filename": "src/com/android/launcher3/settings/SettingsActivity.java",
+        "patchSetId": 5
+      },
+      "lineNbr": 317,
+      "author": {
+        "id": 1000579
+      },
+      "writtenOn": "2025-01-09T04:42:41Z",
+      "side": 1,
+      "message": "whitespace",
+      "revId": "8d953511287c07644f756e850bdeb5576f7416e4",
+      "serverId": "3162e3d8-d894-470e-abd9-724f7b0effad"
+    }
+  ]
+}
