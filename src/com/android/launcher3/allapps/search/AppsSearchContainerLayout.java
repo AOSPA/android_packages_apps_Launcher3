@@ -157,6 +157,11 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     }
 
     @Override
+    public boolean focusSearchField() {
+        return mSearchBarController.focusSearchField();
+    }
+
+    @Override
     public void preDispatchKeyEvent(KeyEvent event) {
         // Determine if the key event was actual text, if so, focus the search bar and then dispatch
         // the key normally so that it can process this key event
