@@ -53,6 +53,7 @@
     <string name="category_google">Google</string>
     <string name="category_icon">Icons</string>
     <string name="category_recents">Recents</string>
+    <string name="category_allapps">App drawer</string>
 
     <!-- Suggestions -->
     <string name="suggestion_screen_title">Suggestions</string>
@@ -70,5 +71,9 @@
     <!-- Kill App recents action shortcut -->
     <string name="recent_task_option_kill_app">Force close</string>
     <string name="recents_app_killed">App closed</string>
+
+    <!-- Open keyboard -->
+    <string name="drawer_open_keyboard_title">Swipe up to start search</string>
+    <string name="drawer_open_keyboard_summary">Open keyboard whenever app drawer becomes visible</string>
 
 </resources>

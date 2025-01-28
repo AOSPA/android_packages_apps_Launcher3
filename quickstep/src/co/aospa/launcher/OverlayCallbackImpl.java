@@ -46,6 +46,7 @@ public class OverlayCallbackImpl
     public static final String KEY_DESKTOP_LABELS = "pref_desktop_labels";
     public static final String KEY_DOCK_SEARCH = "pref_dock_search";
     public static final String KEY_DRAWER_LABELS = "pref_drawer_labels";
+    public static final String KEY_DRAWER_OPEN_KEYBOARD = "pref_drawer_open_keyboard";
     public static final String KEY_DT_GESTURE = "pref_dt_gesture";
     public static final String KEY_FONT_SIZE = "pref_font_size";
     public static final String KEY_ICON_SIZE = "pref_icon_size";
