@@ -44,6 +44,10 @@
     <!-- Icon size -->
     <string name="icon_size_title">Icon size</string>
 
+    <!-- Open keyboard -->
+    <string name="drawer_open_keyboard_title">Swipe up to start search</string>
+    <string name="drawer_open_keyboard_summary">Open keyboard whenever app drawer becomes visible</string>
+
     <!-- Recents icons -->
     <string name="recents_clear_all_title">Clear all</string>
     <string name="recents_lens_title">Lens</string>
