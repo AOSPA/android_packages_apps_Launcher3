@@ -446,7 +446,7 @@ public class PackageUpdatedTask implements ModelUpdateTask {
         }
 
         if (needsRestart) {
-            Utilities.restart(context);
+            Utilities.restart();
         }
     }
 
