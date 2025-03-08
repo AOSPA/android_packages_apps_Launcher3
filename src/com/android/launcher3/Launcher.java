@@ -417,6 +417,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     private boolean mIsColdStartupAfterReboot;
 
     private boolean mIsNaturalScrollingEnabled;
+    private boolean mIsKeyboardShown;
 
     private final SettingsCache.OnChangeListener mNaturalScrollingChangedListener =
             enabled -> mIsNaturalScrollingEnabled = enabled;
@@ -1241,8 +1242,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
 
         // Hide the keyboard as soon as we start exiting app drawer
-        if (ALL_APPS.equals(mPrevLauncherState) && !ALL_APPS.equals(state)) {
+        if ((mIsKeyboardShown || ALL_APPS.equals(mPrevLauncherState)) && !ALL_APPS.equals(state)) {
             hideKeyboard();
+            mIsKeyboardShown = false;
+        } else if (!mPrevLauncherState.equals(ALL_APPS) && state.equals(ALL_APPS)) {
+            getAppsView().getSearchUiManager().focusSearchField();
+            mIsKeyboardShown = true;
         }
 
         updateDisallowBack();
