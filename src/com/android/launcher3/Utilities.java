@@ -165,6 +165,8 @@ public final class Utilities {
     public static final String LENS_ACTIVITY = "com.google.android.apps.search.lens.LensExportedActivity";
     public static final String LENS_URI = "google://lens";
     public static final String LENS_SHARE_ACTIVITY = "com.google.android.apps.search.lens.LensShareEntryPointActivity";
+    public static final String KEY_HOTSEAT_SUGGESTIONS = "pref_hotseat_suggestions";
+    public static final String KEY_ALLAPPS_SUGGESTIONS = "pref_allapps_suggestions";
 
     /**
      * Returns true if theme is dark.
@@ -1036,5 +1038,15 @@ public final class Utilities {
             }
             android.os.Process.killProcess(android.os.Process.myPid());
         });
+    }
+
+    public static boolean showHotseatSuggestions(Context context) {
+        SharedPreferences prefs = LauncherPrefs.getPrefs(context.getApplicationContext());
+        return prefs.getBoolean(KEY_HOTSEAT_SUGGESTIONS, true);
+    }
+
+    public static boolean showAllappsSuggestions(Context context) {
+        SharedPreferences prefs = LauncherPrefs.getPrefs(context.getApplicationContext());
+        return prefs.getBoolean(KEY_ALLAPPS_SUGGESTIONS, true);
     }
 }

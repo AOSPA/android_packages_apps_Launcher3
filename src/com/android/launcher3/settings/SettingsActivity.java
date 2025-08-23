@@ -348,6 +348,10 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                     InvariantDeviceProfile.INSTANCE.get(getContext())
                             .onConfigChanged(getActivity().getApplicationContext());
                     break;
+                case Utilities.KEY_ALLAPPS_SUGGESTIONS:
+                case Utilities.KEY_HOTSEAT_SUGGESTIONS:
+                    LauncherAppState.getInstance(getContext()).getModel().forceReload();
+                    break;
                 default:
                     break;
             }

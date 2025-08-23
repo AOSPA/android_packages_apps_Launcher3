@@ -538,12 +538,14 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     @Override
     public void bindExtraContainerItems(FixedContainerItems item) {
         if (item.containerId == Favorites.CONTAINER_PREDICTION) {
-            mAllAppsPredictions = item;
+            boolean showSuggestions = Utilities.showAllappsSuggestions(getApplicationContext());
+            mAllAppsPredictions = showSuggestions ? item : null;
             PredictionRowView<?> predictionRowView =
                     getAppsView().getFloatingHeaderView().findFixedRowByType(
                             PredictionRowView.class);
-            predictionRowView.setPredictedApps(item.items);
-        } else if (item.containerId == Favorites.CONTAINER_HOTSEAT_PREDICTION) {
+            predictionRowView.setPredictedApps(showSuggestions ? item.items : new ArrayList<>());
+        } else if (item.containerId == Favorites.CONTAINER_HOTSEAT_PREDICTION
+                && Utilities.showHotseatSuggestions(getApplicationContext())) {
             mHotseatPredictionController.setPredictedItems(item);
         } else if (item.containerId == Favorites.CONTAINER_WIDGETS_PREDICTION) {
             getWidgetPickerDataProvider().setWidgetRecommendations(item.items);
