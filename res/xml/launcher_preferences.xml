@@ -49,13 +49,19 @@
             android:summary="@string/pref_show_google_now_summary"
             android:title="@string/title_show_google_app" />
 
-        <Preference
-            android:key="pref_suggestions"
-            android:title="@string/suggestion_screen_title"
-            android:summary="@string/suggestion_screen_summary"
-            android:persistent="false" >
-            <intent android:action="android.settings.ACTION_CONTENT_SUGGESTIONS_SETTINGS" />
-        </Preference>
+        <SwitchPreferenceCompat
+            android:key="pref_hotseat_suggestions"
+            android:title="@string/pref_suggestions_title"
+            android:summary="@string/pref_hotseat_suggestions_summary"
+            android:defaultValue="true"
+            android:persistent="true"/>
+
+        <SwitchPreferenceCompat
+            android:key="pref_allapps_suggestions"
+            android:title="@string/pref_suggestions_title"
+            android:summary="@string/pref_allapps_suggestions_summary"
+            android:defaultValue="true"
+            android:persistent="true"/>
     </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory
@@ -137,6 +143,7 @@
             android:summary="@string/pref_show_google_now_summary"
             android:title="@string/title_show_google_app" />
 
+<<<<<<< HEAD
         <Preference
             android:key="pref_suggestions"
             android:title="@string/suggestion_screen_title"
@@ -145,5 +152,20 @@
             <intent android:action="android.settings.ACTION_CONTENT_SUGGESTIONS_SETTINGS" />
         </Preference>
 >>>>>>> d3e09c6497 (Launcher3: Allow changing app suggestion settings)
+=======
+        <SwitchPreferenceCompat
+            android:key="pref_hotseat_suggestions"
+            android:title="@string/pref_suggestions_title"
+            android:summary="@string/pref_hotseat_suggestions_summary"
+            android:defaultValue="true"
+            android:persistent="true"/>
+
+        <SwitchPreferenceCompat
+            android:key="pref_allapps_suggestions"
+            android:title="@string/pref_suggestions_title"
+            android:summary="@string/pref_allapps_suggestions_summary"
+            android:defaultValue="true"
+            android:persistent="true"/>
+>>>>>>> 7c011483a8 (Launcher3: Rework app suggestions preferences)
     </androidx.preference.PreferenceCategory>
 </androidx.preference.PreferenceScreen>

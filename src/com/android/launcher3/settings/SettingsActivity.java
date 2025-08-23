@@ -58,6 +58,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.BuildConfig;
 import com.android.launcher3.InvariantDeviceProfile;
+import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherFiles;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
@@ -139,7 +140,17 @@ public class SettingsActivity extends CollapsingToolbarBaseActivity
                     Settings.Secure.DOUBLE_TAP_TO_SLEEP,
                     sharedPreferences.getBoolean(key, false) ? 1 : 0,
                     UserHandle.USER_CURRENT);
+        } else if (Utilities.KEY_ALLAPPS_SUGGESTIONS.equals(key)
+                || Utilities.KEY_HOTSEAT_SUGGESTIONS.equals(key)) {
+            LauncherAppState.getInstance(this).getModel().forceReload("app_suggestions_changed");
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        LauncherPrefs.getPrefs(getApplicationContext())
+                .unregisterOnSharedPreferenceChangeListener(this);
     }
 
     private boolean startPreference(String fragment, Bundle args, String key) {

@@ -47,8 +47,9 @@
     <string name="msg_minus_one_on_right">When you swipe left from main home screen</string>
 
     <!-- Suggestions -->
-    <string name="suggestion_screen_title">Suggestions</string>
-    <string name="suggestion_screen_summary">For All Apps &amp; Home screen suggestions</string>
+    <string name="pref_suggestions_title">Show app suggestions</string>
+    <string name="pref_hotseat_suggestions_summary">Bottom row of apps on the home screen</string>
+    <string name="pref_allapps_suggestions_summary">Suggestions in all apps list</string>
 
     <!-- Widget categories -->
     <string name="widget_category_weather">Weather</string>

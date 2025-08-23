@@ -33,6 +33,7 @@ import android.app.ActivityOptions;
 import android.app.Person;
 import android.app.WallpaperManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -135,7 +136,8 @@ public final class Utilities {
     public @interface AdjustmentDirection{}
 
     public static final String GSA_PACKAGE = "com.google.android.googlequicksearchbox";
-
+    public static final String KEY_HOTSEAT_SUGGESTIONS = "pref_hotseat_suggestions";
+    public static final String KEY_ALLAPPS_SUGGESTIONS = "pref_allapps_suggestions";
     /**
      * Returns true if theme is dark.
      */
@@ -963,5 +965,15 @@ public final class Utilities {
 
     public static boolean isWorkspaceEditAllowed(Context context) {
         return !LauncherPrefs.WORKSPACE_LOCK.get(context);
+    }
+
+    public static boolean showHotseatSuggestions(Context context) {
+        SharedPreferences prefs = LauncherPrefs.getPrefs(context.getApplicationContext());
+        return prefs.getBoolean(KEY_HOTSEAT_SUGGESTIONS, true);
+    }
+
+    public static boolean showAllappsSuggestions(Context context) {
+        SharedPreferences prefs = LauncherPrefs.getPrefs(context.getApplicationContext());
+        return prefs.getBoolean(KEY_ALLAPPS_SUGGESTIONS, true);
     }
 }
