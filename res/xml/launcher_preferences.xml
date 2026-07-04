@@ -51,6 +51,13 @@
         android:title="@string/category_google">
 
         <SwitchPreferenceCompat
+            android:key="pref_show_hotseat_qsb"
+            android:title="@string/pref_show_hotseat_qsb_title"
+            android:summary="@string/pref_show_hotseat_qsb_summary"
+            android:defaultValue="false"
+            android:persistent="true" />
+
+        <SwitchPreferenceCompat
             android:defaultValue="true"
             android:key="pref_enable_minus_one"
             android:summary="@string/pref_show_google_now_summary"

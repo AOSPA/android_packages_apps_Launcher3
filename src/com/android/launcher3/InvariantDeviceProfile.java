@@ -26,6 +26,7 @@ import static com.android.launcher3.LauncherPrefs.ICON_SIZE;
 import static com.android.launcher3.LauncherPrefs.NON_FIXED_LANDSCAPE_GRID_NAME;
 import static com.android.launcher3.LauncherPrefs.SHOW_DESKTOP_LABELS;
 import static com.android.launcher3.LauncherPrefs.SHOW_DRAWER_LABELS;
+import static com.android.launcher3.LauncherPrefs.SHOW_HOTSEAT_QSB;
 import static com.android.launcher3.LauncherPrefs.WORKSPACE_ITEMS_LABEL_HIDDEN;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.deviceprofile.parser.DeviceTypedMap.COUNT_SIZES;
@@ -308,7 +309,8 @@ public class InvariantDeviceProfile {
             } else if (ALLAPPS_THEMED_ICONS.getSharedPrefKey().equals(key)) {
                 onConfigChanged();
             } else if (SHOW_DESKTOP_LABELS.getSharedPrefKey().equals(key) ||
-                    SHOW_DRAWER_LABELS.getSharedPrefKey().equals(key)) {
+                    SHOW_DRAWER_LABELS.getSharedPrefKey().equals(key) ||
+                    SHOW_HOTSEAT_QSB.getSharedPrefKey().equals(key)) {
                 onConfigChanged();
             } else if (FONT_SIZE.getSharedPrefKey().equals(key) ||
                     ICON_SIZE.getSharedPrefKey().equals(key)) {
@@ -317,11 +319,11 @@ public class InvariantDeviceProfile {
         };
         prefs.addListener(prefListener, FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
                 WORKSPACE_ITEMS_LABEL_HIDDEN, ALLAPPS_THEMED_ICONS, SHOW_DESKTOP_LABELS,
-                SHOW_DRAWER_LABELS, FONT_SIZE, ICON_SIZE);
+                SHOW_DRAWER_LABELS, SHOW_HOTSEAT_QSB, FONT_SIZE, ICON_SIZE);
         lifeCycle.addCloseable(() -> prefs.removeListener(prefListener,
                 FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
                 WORKSPACE_ITEMS_LABEL_HIDDEN, ALLAPPS_THEMED_ICONS, SHOW_DESKTOP_LABELS,
-                SHOW_DRAWER_LABELS, FONT_SIZE, ICON_SIZE));
+                SHOW_DRAWER_LABELS, SHOW_HOTSEAT_QSB, FONT_SIZE, ICON_SIZE));
 
         SimpleBroadcastReceiver localeReceiver = new SimpleBroadcastReceiver(context,
                 mMainExecutor, i -> onConfigChanged());
